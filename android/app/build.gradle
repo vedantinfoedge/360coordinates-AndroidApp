@@ -85,6 +85,11 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    
+    // Enable cleartext traffic for development (Metro bundler)
+    buildTypes.each {
+        it.buildConfigField "boolean", "usesCleartextTraffic", "true"
+    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

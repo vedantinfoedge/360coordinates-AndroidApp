@@ -18,4 +18,9 @@ buildscript {
     }
 }
 
+// Workaround for Java 25 compatibility with Gradle 9.0
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
+
 apply plugin: "com.facebook.react.rootproject"
