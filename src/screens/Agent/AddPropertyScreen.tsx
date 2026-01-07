@@ -56,6 +56,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [propertyType, setPropertyType] = useState<PropertyType>('sell');
   const [propertyCategory, setPropertyCategory] = useState<PropertyCategory>('');
   const [location, setLocation] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [bathrooms, setBathrooms] = useState<number | null>(null);
   const [balconies, setBalconies] = useState<number | null>(null);
@@ -369,17 +372,50 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Property Location on Map (Optional)</Text>
-              <TouchableOpacity style={styles.mapButton}>
+              <Text style={styles.label}>Property Location on Map</Text>
+              <TouchableOpacity
+                style={styles.mapButton}
+                onPress={() => setLocationPickerVisible(true)}>
                 <View style={styles.mapButtonInner}>
-                  <Text style={styles.mapButtonIcon}>📍</Text>
-                  <Text style={styles.mapButtonText}>Add Location on Map</Text>
+                  <Text style={styles.mapButtonIcon}>
+                    {latitude && longitude ? '📍' : '🗺️'}
+                  </Text>
+                  <Text style={styles.mapButtonText}>
+                    {latitude && longitude
+                      ? 'Location Selected'
+                      : 'Select Location on Map'}
+                  </Text>
                 </View>
               </TouchableOpacity>
-              <Text style={styles.mapButtonSubtext}>
-                Select exact location on map for better visibility
-              </Text>
+              {latitude && longitude && (
+                <Text style={styles.mapButtonSubtext}>
+                  Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                </Text>
+              )}
+              {!latitude && !longitude && (
+                <Text style={styles.mapButtonSubtext}>
+                  Select exact location on map for better visibility
+                </Text>
+              )}
             </View>
+
+            <LocationPicker
+              visible={locationPickerVisible}
+              initialLocation={
+                latitude && longitude
+                  ? {latitude, longitude}
+                  : undefined
+              }
+              onLocationSelect={selectedLocation => {
+                setLatitude(selectedLocation.latitude);
+                setLongitude(selectedLocation.longitude);
+                if (selectedLocation.address) {
+                  setLocation(selectedLocation.address);
+                }
+                setLocationPickerVisible(false);
+              }}
+              onClose={() => setLocationPickerVisible(false)}
+            />
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>

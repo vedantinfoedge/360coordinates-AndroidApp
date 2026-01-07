@@ -11,6 +11,8 @@ import {
   Image,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
@@ -105,7 +107,9 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
 
     setIsLoading(true);
     try {
+      // Pass the selected role to login - backend may use it for validation
       await login(email, password, selectedRole);
+      // Navigation will be handled by AuthContext based on user_type returned from backend
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Login failed');
     } finally {
@@ -147,10 +151,13 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
   });
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
       {/* Background with gradient pattern */}
       <ImageBackground
-        source={require('../../assets/logo.jpeg')}
+        source={require('../../assets/browserlogo.png')}
         style={styles.backgroundImage}
         imageStyle={styles.backgroundImageStyle}
         resizeMode="cover">
@@ -198,7 +205,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             {/* Logo */}
             <View style={styles.logoContainer}>
               <Image
-                source={require('../../assets/logo.jpeg')}
+                source={require('../../assets/browserlogo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
@@ -212,7 +219,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
               </Text>
             </View>
 
-            {/* Role Selection */}
+            {/* Role Selection - Square boxes with minimal radius */}
             <View style={styles.roleContainer}>
               {roles.map(role => (
                 <TouchableOpacity
@@ -221,7 +228,8 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
                     styles.roleButton,
                     selectedRole === role.value && styles.roleButtonSelected,
                   ]}
-                  onPress={() => setSelectedRole(role.value)}>
+                  onPress={() => setSelectedRole(role.value)}
+                  activeOpacity={0.7}>
                   <View style={styles.roleButtonInner}>
                     <Text style={styles.roleIcon}>{role.icon}</Text>
                     <Text
@@ -229,7 +237,8 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
                         styles.roleButtonText,
                         selectedRole === role.value &&
                           styles.roleButtonTextSelected,
-                      ]}>
+                      ]}
+                      numberOfLines={2}>
                       {role.label}
                     </Text>
                   </View>
@@ -327,7 +336,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
           </View>
         </ScrollView>
       </ImageBackground>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -393,16 +402,16 @@ const styles = StyleSheet.create({
     height: 50,
   },
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: colors.borderLight,
   },
   header: {
     marginBottom: spacing.xl,
@@ -416,9 +425,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  subtitle: {
+              subtitle: {
     ...typography.body,
-    color: colors.surface,
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -430,15 +439,23 @@ const styles = StyleSheet.create({
   },
   roleButton: {
     flex: 1,
-    borderRadius: borderRadius.round,
-    borderWidth: 1,
+    borderRadius: 8, // Minimal radius for square boxes
+    borderWidth: 2,
     borderColor: colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   roleButtonSelected: {
     borderWidth: 2,
-    borderColor: colors.text,
-    backgroundColor: colors.text,
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.3,
+    elevation: 4,
   },
   roleButtonInner: {
     flexDirection: 'row',
@@ -455,8 +472,8 @@ const styles = StyleSheet.create({
   roleButtonText: {
     ...typography.caption,
     color: colors.text,
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
     flexShrink: 1,
   },
@@ -464,7 +481,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.surface,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
   },
   infoBanner: {
@@ -501,21 +518,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   input: {
-    backgroundColor: 'rgba(247, 247, 247, 0.9)',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     ...typography.body,
     color: colors.text,
     fontSize: 16,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(247, 247, 247, 0.9)',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
   },
   passwordInput: {

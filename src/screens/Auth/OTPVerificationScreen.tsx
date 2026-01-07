@@ -12,6 +12,8 @@ import {AuthStackParamList} from '../../navigation/AuthNavigator';
 import {colors, typography, spacing, borderRadius} from '../../theme';
 import Button from '../../components/common/Button';
 import OTPInput from '../../components/auth/OTPInput';
+import {authService} from '../../services/auth.service';
+import {useAuth} from '../../context/AuthContext';
 
 type OTPVerificationScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -19,6 +21,8 @@ type OTPVerificationScreenNavigationProp = NativeStackNavigationProp<
 >;
 
 type RouteParams = {
+  userId?: number;
+  user_id?: number;
   phone?: string;
   email?: string;
   type?: 'register' | 'forgotPassword';
@@ -28,10 +32,12 @@ const OTPVerificationScreen: React.FC = () => {
   const navigation = useNavigation<OTPVerificationScreenNavigationProp>();
   const route = useRoute();
   const params = route.params as RouteParams;
+  const {verifyOTP, resendOTP} = useAuth();
 
   const [otp, setOtp] = useState('');
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (timer > 0) {
@@ -50,33 +56,79 @@ const OTPVerificationScreen: React.FC = () => {
 
   const handleOTPComplete = (value: string) => {
     setOtp(value);
-    // Auto-verify when 6 digits entered
-    handleVerify();
+    // Auto-verify when 6 digits entered (with small delay for better UX)
+    setTimeout(() => {
+      handleVerify();
+    }, 300);
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (otp.length !== 6) {
       Alert.alert('Error', 'Please enter the complete OTP');
       return;
     }
 
-    // TODO: Verify OTP with backend
-    Alert.alert('Success', 'OTP verified successfully');
-    
-    if (params.type === 'forgotPassword') {
-      navigation.navigate('ResetPassword', {otp} as never);
-    } else {
-      // Navigate to home after registration
-      navigation.navigate('Login' as never);
+    const userId = params.userId || params.user_id;
+    if (!userId) {
+      Alert.alert('Error', 'User ID not found. Please try registering again.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Use verifyOTP from AuthContext which handles login automatically
+      // Pass phone if available for backend compatibility
+      await verifyOTP(userId, otp, params.phone);
+      
+      // If we reach here, verification was successful and user is logged in
+      // For forgot password flow, navigate to reset password
+      if (params.type === 'forgotPassword') {
+        navigation.navigate('ResetPassword', {otp} as never);
+      } else {
+        // For registration, show success and navigation will be handled by AppNavigator
+        // The user state change will trigger navigation in AppNavigator
+        Alert.alert(
+          'Success',
+          'OTP verified successfully! You are now logged in.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigation will be handled automatically by AppNavigator
+                // when user state changes
+              },
+            },
+          ],
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Invalid OTP. Please try again.');
+      setOtp(''); // Clear OTP on error
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleResendOTP = () => {
-    // TODO: Resend OTP
-    setTimer(60);
-    setCanResend(false);
-    setOtp('');
-    Alert.alert('Success', 'OTP sent successfully');
+  const handleResendOTP = async () => {
+    const userId = params.userId || params.user_id;
+    if (!userId) {
+      Alert.alert('Error', 'User ID not found. Please try registering again.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Pass phone if available for backend compatibility
+      await resendOTP(userId, params.phone);
+      setTimer(60);
+      setCanResend(false);
+      setOtp('');
+      Alert.alert('Success', 'New OTP sent successfully!');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to resend OTP');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const formatPhone = (phone?: string) => {
@@ -121,9 +173,10 @@ const OTPVerificationScreen: React.FC = () => {
         </View>
 
         <Button
-          title="Verify"
+          title={isLoading ? 'Verifying...' : 'Verify'}
           onPress={handleVerify}
-          disabled={otp.length !== 6}
+          disabled={otp.length !== 6 || isLoading}
+          loading={isLoading}
           fullWidth
         />
       </View>

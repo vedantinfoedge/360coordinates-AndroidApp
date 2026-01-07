@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,10 @@ import {
   StyleSheet,
   ScrollView,
   FlatList,
+  Image,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -18,6 +22,9 @@ import AgentHeader from '../../components/AgentHeader';
 import SearchBar from '../../components/SearchBar';
 import PropertyCard from '../../components/PropertyCard';
 import ProjectCard from '../../components/ProjectCard';
+import {propertyService} from '../../services/property.service';
+import {inquiryService} from '../../services/inquiry.service';
+import {fixImageUrl} from '../../utils/imageHelper';
 
 type DashboardScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BuyerTabParamList, 'Home'>,
@@ -30,90 +37,13 @@ type Props = {
   navigation: DashboardScreenNavigationProp;
 };
 
-// Dummy data for Featured Properties (Indian Properties)
-const featuredProperties = [
-  {
-    id: '1',
-    name: 'Luxury 3BHK Apartment',
-    location: 'Bandra West, Mumbai',
-    price: '₹2.5 Cr',
-    type: 'buy' as const,
-  },
-  {
-    id: '2',
-    name: 'Modern Villa',
-    location: 'Whitefield, Bangalore',
-    price: '₹4.2 Cr',
-    type: 'buy' as const,
-  },
-  {
-    id: '3',
-    name: 'Spacious 2BHK',
-    location: 'Gurgaon Sector 43',
-    price: '₹35,000/month',
-    type: 'rent' as const,
-  },
-  {
-    id: '4',
-    name: 'Premium Penthouse',
-    location: 'Pune, Kothrud',
-    price: '₹55,000/month',
-    type: 'rent' as const,
-  },
-  {
-    id: '5',
-    name: 'Independent House',
-    location: 'Hyderabad, Gachibowli',
-    price: '₹1.8 Cr',
-    type: 'buy' as const,
-  },
-  {
-    id: '6',
-    name: 'Studio Apartment',
-    location: 'Noida Sector 62',
-    price: '₹18,000/month',
-    type: 'rent' as const,
-  },
-];
-
-// Dummy data for Upcoming Projects (Indian Projects)
-const upcomingProjects = [
-  {
-    id: '1',
-    name: 'Green Valley Residency',
-    city: 'Mumbai',
-  },
-  {
-    id: '2',
-    name: 'Skyline Towers',
-    city: 'Delhi',
-  },
-  {
-    id: '3',
-    name: 'Ocean View Complex',
-    city: 'Goa',
-  },
-  {
-    id: '4',
-    name: 'Garden City Apartments',
-    city: 'Bangalore',
-  },
-  {
-    id: '5',
-    name: 'Tech Park Residences',
-    city: 'Hyderabad',
-  },
-];
-
 const DashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
   const [searchType, setSearchType] = useState<'buy' | 'rent'>('buy');
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Filter properties based on selected type
-  const filteredProperties = featuredProperties.filter(
-    p => p.type === searchType,
-  );
+  const [featuredProperties, setFeaturedProperties] = useState<any[]>([]);
+  const [upcomingProjects, setUpcomingProjects] = useState<any[]>([]);
+  const [propertiesLoading, setPropertiesLoading] = useState(false);
 
   const getRoleLabel = (role: string) => {
     switch (role) {
@@ -130,10 +60,76 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
 
   const getGreeting = () => {
     if (user) {
-      return `Hello, ${user.name}`;
+      return `Hello, ${user.full_name || 'User'}`;
     }
     return 'Welcome to PropertyApp';
   };
+
+  // Load properties for buyer view
+  useEffect(() => {
+    if (user?.role === 'buyer') {
+      loadBuyerProperties();
+      loadBuyerProjects();
+    }
+  }, [user?.role, searchType]);
+
+  const loadBuyerProperties = async () => {
+    try {
+      setPropertiesLoading(true);
+      const response = await propertyService.getProperties({
+        status: 'approved',
+        limit: 10,
+        property_type: searchType === 'buy' ? 'sale' : 'rent',
+      });
+      
+      if (response && response.success) {
+        const propertiesData = response.data?.properties || response.data || [];
+        const formatted = propertiesData.map((prop: any) => ({
+          id: prop.id?.toString() || prop.property_id?.toString() || '',
+          name: prop.title || prop.property_title || 'Untitled Property',
+          location: prop.location || prop.city || 'Location not specified',
+          price: typeof prop.price === 'number'
+            ? `₹${prop.price.toLocaleString('en-IN')}${prop.status === 'rent' ? '/month' : ''}`
+            : prop.price || 'Price not available',
+          type: (prop.status === 'sale' || prop.property_status === 'sale') ? 'buy' : 'rent',
+        }));
+        setFeaturedProperties(formatted);
+      }
+    } catch (error) {
+      console.error('Error loading buyer properties:', error);
+      setFeaturedProperties([]);
+    } finally {
+      setPropertiesLoading(false);
+    }
+  };
+
+  const loadBuyerProjects = async () => {
+    try {
+      const response = await propertyService.getProperties({
+        status: 'approved',
+        limit: 5,
+        sort_by: 'newest',
+      });
+      
+      if (response && response.success) {
+        const propertiesData = response.data?.properties || response.data || [];
+        const formatted = propertiesData.map((prop: any) => ({
+          id: prop.id?.toString() || prop.property_id?.toString() || '',
+          name: prop.title || prop.property_title || 'Untitled Property',
+          city: prop.city || prop.location || 'Location not specified',
+        }));
+        setUpcomingProjects(formatted);
+      }
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      setUpcomingProjects([]);
+    }
+  };
+
+  // Filter properties based on selected type
+  const filteredProperties = featuredProperties.filter(
+    p => p.type === searchType,
+  );
 
   // If user is buyer, show new Buyer Home Page
   if (user?.role === 'buyer') {
@@ -153,7 +149,7 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
           {/* Welcome Section */}
           <View style={styles.welcomeSection}>
             <Text style={styles.welcomeText}>
-              {user ? `Hello, ${user.name.split(' ')[0]}` : 'Welcome'}
+              {user ? `Hello, ${(user.full_name || '').split(' ')[0]}` : 'Welcome'}
             </Text>
             <Text style={styles.welcomeSubtext}>
               Find your dream property in India
@@ -349,7 +345,7 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
           <View style={styles.sellerWelcomeBanner}>
           <View style={styles.sellerWelcomeContent}>
             <Text style={styles.sellerWelcomeText}>
-              Welcome back, {user.name.split(' ')[0]}! 👋
+              Welcome back, {(user.full_name || '').split(' ')[0]}! 👋
             </Text>
             <Text style={styles.sellerWelcomeSubtext}>
               Here's what's happening with your properties today
@@ -563,40 +559,111 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
 
   // Agent Dashboard (similar to seller)
   if (user?.role === 'agent') {
-    // Dummy data for agent dashboard
-    const agentProperties = [
-      {
-        id: '1',
-        name: 'Luxury Apartment Complex',
-        location: 'Mumbai, Maharashtra',
-        price: '₹3.5 Cr',
-        image: '🏢',
-      },
-      {
-        id: '2',
-        name: 'Premium Villa Project',
-        location: 'Bangalore, Karnataka',
-        price: '₹5.2 Cr',
-        image: '🏡',
-      },
-    ];
+    const [agentProperties, setAgentProperties] = useState<any[]>([]);
+    const [agentStats, setAgentStats] = useState({
+      totalListings: 0,
+      totalViews: 0,
+      totalInquiries: 0,
+      activeListings: 0,
+      pendingListings: 0,
+    });
+    const [recentInquiries, setRecentInquiries] = useState<any[]>([]);
+    const [agentLoading, setAgentLoading] = useState(true);
 
-    const recentInquiries = [
-      {
-        id: '1',
-        name: 'Amit Kumar',
-        time: '5h ago',
-        property: 'Luxury Apartment Complex',
-        avatar: '👤',
-      },
-      {
-        id: '2',
-        name: 'Priya Sharma',
-        time: '1d ago',
-        property: 'Premium Villa Project',
-        avatar: '👤',
-      },
-    ];
+    useEffect(() => {
+      if (user?.role === 'agent') {
+        loadAgentDashboardData();
+      }
+    }, [user?.role]);
+
+    const loadAgentDashboardData = async () => {
+      try {
+        setAgentLoading(true);
+        const [propertiesResponse, inquiriesResponse] = await Promise.all([
+          propertyService.getMyProperties(),
+          inquiryService.getInbox(),
+        ]);
+
+        // Process properties
+        if (propertiesResponse && propertiesResponse.success) {
+          const propertiesData = propertiesResponse.data?.properties || propertiesResponse.data || [];
+          
+          const formatted = propertiesData.slice(0, 5).map((prop: any) => ({
+            id: prop.id?.toString() || prop.property_id?.toString() || '',
+            name: prop.title || prop.property_title || 'Untitled Property',
+            location: prop.location || prop.city || 'Location not specified',
+            price: typeof prop.price === 'number'
+              ? `₹${prop.price.toLocaleString('en-IN')}${prop.status === 'rent' ? '/month' : ''}`
+              : prop.price || 'Price not available',
+            image: fixImageUrl(prop.cover_image || prop.image || ''),
+          }));
+
+          setAgentProperties(formatted);
+
+          // Calculate stats
+          const total = propertiesData.length;
+          const active = propertiesData.filter((p: any) => 
+            p.status === 'active' || p.property_status === 'active'
+          ).length;
+          const pending = propertiesData.filter((p: any) => 
+            p.status === 'pending' || p.property_status === 'pending'
+          ).length;
+          const totalViews = propertiesData.reduce((sum: number, p: any) => 
+            sum + (p.views || p.view_count || 0), 0
+          );
+
+          setAgentStats({
+            totalListings: total,
+            totalViews: totalViews,
+            activeListings: active,
+            pendingListings: pending,
+            totalInquiries: 0, // Will be set from inquiries
+          });
+        }
+
+        // Process inquiries
+        if (inquiriesResponse && inquiriesResponse.success) {
+          const inquiries = inquiriesResponse.data?.inquiries || inquiriesResponse.data || [];
+          
+          const formattedInquiries = inquiries.slice(0, 5).map((inq: any) => {
+            let time = 'Just now';
+            if (inq.created_at || inq.timestamp) {
+              const date = new Date(inq.created_at || inq.timestamp);
+              const now = new Date();
+              const diffMs = now.getTime() - date.getTime();
+              const diffHours = Math.floor(diffMs / 3600000);
+              const diffDays = Math.floor(diffMs / 86400000);
+              
+              if (diffHours < 1) time = 'Just now';
+              else if (diffHours < 24) time = `${diffHours}h ago`;
+              else if (diffDays === 1) time = 'Yesterday';
+              else if (diffDays < 7) time = `${diffDays}d ago`;
+              else time = date.toLocaleDateString();
+            }
+
+            return {
+              id: inq.id?.toString() || inq.inquiry_id?.toString() || '',
+              name: inq.sender_name || inq.buyer_name || 'Buyer',
+              time,
+              property: inq.property_title || inq.property_name || 'Property',
+              avatar: '👤',
+            };
+          });
+
+          setRecentInquiries(formattedInquiries);
+          setAgentStats(prev => ({
+            ...prev,
+            totalInquiries: Array.isArray(inquiries) ? inquiries.length : 0,
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading agent dashboard:', error);
+        setAgentProperties([]);
+        setRecentInquiries([]);
+      } finally {
+        setAgentLoading(false);
+      }
+    };
 
     return (
       <View style={styles.sellerContainer}>
@@ -613,7 +680,7 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
           <View style={styles.sellerWelcomeBanner}>
             <View style={styles.sellerWelcomeContent}>
               <Text style={styles.sellerWelcomeText}>
-                Welcome back, {user.name.split(' ')[0]}! 👋
+                Welcome back, {(user.full_name || '').split(' ')[0]}! 👋
               </Text>
               <Text style={styles.sellerWelcomeSubtext}>
                 Here's what's happening with your listings today
@@ -638,7 +705,7 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
                     Total Listings
                   </Text>
                   <Text style={[styles.sellerSummaryNumber, styles.sellerSummaryNumberPrimary]}>
-                    8
+                    {agentStats.totalListings}
                   </Text>
                 </View>
               </View>
@@ -653,9 +720,9 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.sellerSummaryIcon}>👁️</Text>
                 <View style={styles.sellerSummaryInfo}>
                   <Text style={styles.sellerSummaryLabel}>People Showed Interest</Text>
-                  <Text style={styles.sellerSummaryNumber}>342</Text>
+                  <Text style={styles.sellerSummaryNumber}>{agentStats.totalViews}</Text>
                   <Text style={styles.sellerSummaryDescription}>
-                    342 people have viewed your listings
+                    {agentStats.totalViews} people have viewed your listings
                   </Text>
                 </View>
               </View>
@@ -670,11 +737,13 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.sellerSummaryIcon}>💬</Text>
                 <View style={styles.sellerSummaryInfo}>
                   <Text style={styles.sellerSummaryLabel}>Total Inquiries</Text>
-                  <Text style={styles.sellerSummaryNumber}>5</Text>
+                  <Text style={styles.sellerSummaryNumber}>{agentStats.totalInquiries}</Text>
                 </View>
               </View>
               <View style={styles.sellerBadgeWarning}>
-                <Text style={styles.sellerBadgeText}>3 NEW</Text>
+                <Text style={styles.sellerBadgeText}>
+                  {agentStats.totalInquiries > 0 ? `${agentStats.totalInquiries} NEW` : '0 NEW'}
+                </Text>
               </View>
             </View>
 
@@ -686,11 +755,11 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
                   <Text style={styles.sellerSummaryLabel}>Listing Status</Text>
                   <View style={styles.sellerStatusBadges}>
                     <View style={styles.sellerStatusBadge}>
-                      <Text style={styles.sellerStatusBadgeText}>6 Sale</Text>
+                      <Text style={styles.sellerStatusBadgeText}>{agentStats.activeListings} Active</Text>
                     </View>
                     <View style={[styles.sellerStatusBadge, styles.sellerStatusBadgeInactive]}>
                       <Text style={[styles.sellerStatusBadgeText, styles.sellerStatusBadgeTextInactive]}>
-                        2 Rent
+                        {agentStats.pendingListings} Pending
                       </Text>
                     </View>
                   </View>
@@ -754,54 +823,71 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.sellerSeeAllText}>View All →</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.sellerHorizontalScrollContainer}>
-              <FlatList
-                data={agentProperties}
-                renderItem={({item}) => (
-                  <TouchableOpacity
-                    style={styles.sellerPropertyCard}
-                    onPress={() =>
-                      (navigation as any).navigate('PropertyDetails', {
-                        propertyId: item.id,
-                      })
-                    }>
-                    <View style={styles.sellerPropertyImage}>
-                      <Text style={styles.sellerPropertyImageIcon}>{item.image}</Text>
-                    </View>
-                    <View style={styles.sellerPropertyInfo}>
-                      <Text style={styles.sellerPropertyName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={styles.sellerPropertyLocation} numberOfLines={1}>
-                        {item.location}
-                      </Text>
-                      <Text style={styles.sellerPropertyPrice}>{item.price}</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-                keyExtractor={item => item.id}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.sellerHorizontalList}
-              />
-            </View>
+            {agentLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading properties...</Text>
+              </View>
+            ) : agentProperties.length > 0 ? (
+              <View style={styles.sellerHorizontalScrollContainer}>
+                <FlatList
+                  data={agentProperties}
+                  renderItem={({item}) => (
+                    <TouchableOpacity
+                      style={styles.sellerPropertyCard}
+                      onPress={() =>
+                        (navigation as any).navigate('PropertyDetails', {
+                          propertyId: item.id,
+                        })
+                      }>
+                      {item.image && item.image !== '🏢' && item.image !== '🏡' ? (
+                        <Image source={{uri: item.image}} style={styles.sellerPropertyImage} />
+                      ) : (
+                        <View style={styles.sellerPropertyImage}>
+                          <Text style={styles.sellerPropertyImageIcon}>🏠</Text>
+                        </View>
+                      )}
+                      <View style={styles.sellerPropertyInfo}>
+                        <Text style={styles.sellerPropertyName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={styles.sellerPropertyLocation} numberOfLines={1}>
+                          {item.location}
+                        </Text>
+                        <Text style={styles.sellerPropertyPrice}>{item.price}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  keyExtractor={item => item.id}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.sellerHorizontalList}
+                />
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No properties listed yet</Text>
+              </View>
+            )}
           </View>
 
           {/* Recent Inquiries Section */}
           <View style={styles.sellerSection}>
             <View style={styles.sellerSectionHeader}>
-              <View style={styles.sellerSectionTitleWithBadge}>
+                <View style={styles.sellerSectionTitleWithBadge}>
                 <Text style={styles.sellerSectionTitle}>Recent Inquiries</Text>
-                <View style={styles.sellerInquiryBadge}>
-                  <Text style={styles.sellerInquiryBadgeText}>3</Text>
-                </View>
+                {agentStats.totalInquiries > 0 && (
+                  <View style={styles.sellerInquiryBadge}>
+                    <Text style={styles.sellerInquiryBadgeText}>{agentStats.totalInquiries}</Text>
+                  </View>
+                )}
               </View>
               <TouchableOpacity
                 onPress={() => (navigation as any).navigate('Inquiries')}>
                 <Text style={styles.sellerSeeAllText}>View All →</Text>
               </TouchableOpacity>
             </View>
-            {recentInquiries.map(inquiry => (
+            {recentInquiries.length > 0 ? (
+              recentInquiries.map(inquiry => (
               <TouchableOpacity
                 key={inquiry.id}
                 style={styles.sellerInquiryItem}
@@ -815,7 +901,12 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
                 </View>
                 <Text style={styles.sellerInquiryTime}>{inquiry.time}</Text>
               </TouchableOpacity>
-            ))}
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No inquiries yet</Text>
+              </View>
+            )}
           </View>
 
           {/* Bottom padding */}
@@ -1430,6 +1521,22 @@ const styles = StyleSheet.create({
   },
   sellerInquiryTime: {
     ...typography.caption,
+    color: colors.textSecondary,
+  },
+  loadingContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  emptyContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  emptyText: {
+    ...typography.body,
     color: colors.textSecondary,
   },
 });

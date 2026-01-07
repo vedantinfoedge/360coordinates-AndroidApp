@@ -13,7 +13,7 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
-  OTPVerification: {phone?: string; email?: string; type?: 'register' | 'forgotPassword'};
+  OTPVerification: {userId?: number; user_id?: number; phone?: string; email?: string; type?: 'register' | 'forgotPassword'};
   ResetPassword: {otp: string};
 };
 

@@ -5,15 +5,25 @@
  * @format
  */
 
-import React from 'react';
+import React, {useEffect} from 'react';
 import {StatusBar, useColorScheme} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {AuthProvider} from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import {initializeMapbox} from './src/config/mapbox.config';
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
+
+  useEffect(() => {
+    // Initialize Mapbox on app start (will fail gracefully if not linked)
+    try {
+      initializeMapbox();
+    } catch (error) {
+      console.warn('Mapbox initialization failed (app will continue without maps):', error);
+    }
+  }, []);
 
   return (
     <GestureHandlerRootView style={{flex: 1}}>

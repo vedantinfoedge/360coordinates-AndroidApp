@@ -20,8 +20,11 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import PropertyCard from '../../components/PropertyCard';
 import BuyerHeader from '../../components/BuyerHeader';
 import {useAuth} from '../../context/AuthContext';
-import {demoProperties} from '../../data/demoProperties';
 import {propertyTypes, pgHostelType, ListingType, PropertyType} from '../../data/propertyTypes';
+import {propertyService} from '../../services/property.service';
+import {propertySearchService} from '../../services/propertySearch.service';
+import {commonService} from '../../services/common.service';
+import {fixImageUrl} from '../../utils/imageHelper';
 
 type SearchResultsScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BuyerTabParamList, 'PropertyList'>,
@@ -37,38 +40,16 @@ type Props = {
   };
 };
 
-// Using demo properties from data file
-const allProperties = demoProperties.map(prop => ({
-  id: prop.id,
-  name: prop.title,
-  location: prop.location,
-  price: prop.price,
-  type: prop.type as 'buy' | 'rent' | 'pg-hostel',
-  bedrooms: prop.bedrooms || 0,
-  bathrooms: prop.bathrooms || 0,
-  area: prop.area || '',
-  propertyType: prop.propertyType,
-  city: prop.city,
-  state: prop.state,
-  bhk: prop.bhk,
-}));
-
 const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
   const {logout} = useAuth();
   const initialQuery = route?.params?.searchQuery || '';
 
-  const [properties, setProperties] = useState<Property[]>(allProperties);
-  const [filteredProperties, setFilteredProperties] = useState<Property[]>(allProperties);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [searchText, setSearchText] = useState(initialQuery);
-
-  useEffect(() => {
-    if (initialQuery) {
-      setSearchText(initialQuery);
-      applyFilters();
-    }
-  }, [initialQuery]);
+  const [loading, setLoading] = useState(true);
 
   // Filters
   const [listingType, setListingType] = useState<ListingType | 'all'>('all');
@@ -78,6 +59,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [maxPrice, setMaxPrice] = useState('');
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [bathrooms, setBathrooms] = useState<number | null>(null);
+  const [cities, setCities] = useState<string[]>(['all']);
 
   // Get all property types for filter
   const allPropertyTypes = useMemo(() => {
@@ -85,23 +67,111 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     return types;
   }, []);
 
-  const cities = ['all', 'Mumbai', 'Bangalore', 'Pune', 'Gurgaon', 'Hyderabad', 'Noida', 'Delhi'];
-
+  // Load cities from API
   useEffect(() => {
-    applyFilters();
+    loadCities();
+  }, []);
+
+  const loadCities = async () => {
+    try {
+      const response = await commonService.getCities();
+      if (response && response.success) {
+        const citiesData = response.data?.cities || response.data || [];
+        const cityNames = Array.isArray(citiesData) 
+          ? citiesData.map((city: any) => city.name || city.city_name || city).filter(Boolean)
+          : [];
+        setCities(['all', ...cityNames]);
+      }
+    } catch (error) {
+      console.error('Error loading cities:', error);
+      // Fallback to common Indian cities
+      setCities(['all', 'Mumbai', 'Bangalore', 'Pune', 'Gurgaon', 'Hyderabad', 'Noida', 'Delhi']);
+    }
+  };
+
+  // Load properties from API when filters change
+  useEffect(() => {
+    loadProperties();
+  }, [initialQuery, listingType, selectedCity]);
+
+  // Apply client-side filters for price, bedrooms, bathrooms, property type
+  useEffect(() => {
+    if (properties.length > 0) {
+      applyFilters();
+    }
   }, [
     searchText,
-    listingType,
     selectedPropertyType,
-    selectedCity,
     minPrice,
     maxPrice,
     bedrooms,
     bathrooms,
+    properties,
   ]);
 
+  const loadProperties = async () => {
+    try {
+      setLoading(true);
+      
+      // Build search filters
+      const searchFilters: any = {};
+      if (listingType !== 'all') {
+        searchFilters.status = listingType === 'buy' ? 'sale' : listingType === 'rent' ? 'rent' : 'rent';
+      }
+      if (selectedCity !== 'all') {
+        searchFilters.city = selectedCity;
+      }
+      
+      // Use search API if there's a query, otherwise use list API
+      let results: any[] = [];
+      
+      if (searchText.trim() || initialQuery) {
+        // Use search API with keyword
+        results = await propertySearchService.search(searchText || initialQuery, searchFilters);
+      } else {
+        // Use list API with filters
+        const response = await propertyService.getProperties({
+          ...searchFilters,
+          limit: 100, // Get more results for filtering
+        });
+        
+        if (response && response.success) {
+          const propertiesData = response.data?.properties || response.data || [];
+          results = propertiesData;
+        }
+      }
+      
+      // Format properties
+      const formattedProperties = results.map((prop: any) => ({
+        id: prop.id?.toString() || prop.property_id?.toString() || '',
+        name: prop.title || prop.property_title || prop.name || 'Untitled Property',
+        location: prop.location || prop.city || prop.address || 'Location not specified',
+        price: typeof prop.price === 'number' 
+          ? `₹${prop.price.toLocaleString('en-IN')}${prop.status === 'rent' ? '/month' : ''}`
+          : prop.price || 'Price not available',
+        type: (prop.status === 'sale' || prop.property_status === 'sale') ? 'buy' : 'rent',
+        bedrooms: parseInt(prop.bedrooms || '0'),
+        bathrooms: parseInt(prop.bathrooms || '0'),
+        area: prop.area || prop.carpet_area || '',
+        propertyType: prop.property_type || 'apartment',
+        city: prop.city || '',
+        state: prop.state || '',
+        bhk: prop.bedrooms || 0,
+      }));
+      
+      setProperties(formattedProperties);
+      setFilteredProperties(formattedProperties);
+    } catch (error) {
+      console.error('Error loading properties:', error);
+      setProperties([]);
+      setFilteredProperties([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const applyFilters = () => {
-    let filtered = [...allProperties];
+    let filtered = [...properties];
 
     // Search text filter
     if (searchText.trim()) {

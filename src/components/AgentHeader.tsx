@@ -31,7 +31,7 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
         {/* Logo */}
         <View style={styles.logoContainer}>
           <Image
-            source={require('../assets/logo.jpeg')}
+            source={require('../assets/logo.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
@@ -97,16 +97,17 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#022b5f', // Navbar bg color
+    zIndex: 1000,
     ...Platform.select({
       android: {
-        elevation: 2,
+        elevation: 4,
       },
       ios: {
         shadowColor: '#000',
-        shadowOffset: {width: 0, height: 1},
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
       },
     }),
   },
@@ -116,7 +117,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.primary,
+    backgroundColor: '#022b5f', // Navbar bg color
+    borderBottomWidth: 0,
   },
   logoContainer: {
     flex: 1,

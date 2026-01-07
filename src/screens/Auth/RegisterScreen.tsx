@@ -11,11 +11,15 @@ import {
   Image,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth, UserRole} from '../../context/AuthContext';
+import {otpService} from '../../services/otp.service';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -32,12 +36,17 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const {register} = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [emailVerifying, setEmailVerifying] = useState(false);
+  const [phoneVerifying, setPhoneVerifying] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
   // Animation values
   const building1Anim = useRef(new Animated.Value(0)).current;
@@ -98,8 +107,58 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     animateBuildings();
   }, []);
 
+  const handleEmailVerify = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email first');
+      return;
+    }
+    
+    setEmailVerifying(true);
+    try {
+      const response = await otpService.sendEmail(email);
+      if (response.success) {
+        setEmailVerified(true);
+        Alert.alert('Success', 'Verification email sent! Please check your inbox and enter the OTP when prompted.');
+      } else {
+        Alert.alert('Error', response.message || 'Failed to send verification email');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send verification email');
+    } finally {
+      setEmailVerifying(false);
+    }
+  };
+
+  const handlePhoneVerify = async () => {
+    if (!phone) {
+      Alert.alert('Error', 'Please enter your phone number first');
+      return;
+    }
+    
+    const phoneNumber = phone.replace(/[^0-9]/g, '');
+    if (phoneNumber.length !== 10) {
+      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      return;
+    }
+    
+    setPhoneVerifying(true);
+    try {
+      const response = await otpService.sendSMS(`+91${phoneNumber}`);
+      if (response.success) {
+        setPhoneVerified(true);
+        Alert.alert('Success', 'Verification SMS sent! Please check your phone and enter the OTP when prompted.');
+      } else {
+        Alert.alert('Error', response.message || 'Failed to send verification SMS');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send verification SMS');
+    } finally {
+      setPhoneVerifying(false);
+    }
+  };
+
   const handleRegister = async () => {
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !phone || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
@@ -114,9 +173,26 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
 
+    // Validate phone number (10 digits)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(phone.replace(/[^0-9]/g, ''))) {
+      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await register(name, email, password, selectedRole);
+      const response = await register(name, email, phone.replace(/[^0-9]/g, ''), password, selectedRole);
+      // If registration successful, navigate to OTP verification
+      if (response && response.success && response.data?.user_id) {
+        navigation.navigate('OTPVerification', {
+          userId: response.data.user_id,
+          user_id: response.data.user_id, // Support both formats
+          phone: phone.replace(/[^0-9]/g, ''),
+          email: email,
+          type: 'register',
+        });
+      }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Registration failed');
     } finally {
@@ -159,10 +235,13 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   });
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
       {/* Background with gradient pattern */}
       <ImageBackground
-        source={require('../../assets/logo.jpeg')}
+        source={require('../../assets/browserlogo.png')}
         style={styles.backgroundImage}
         imageStyle={styles.backgroundImageStyle}
         resizeMode="cover">
@@ -206,7 +285,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
             {/* Logo */}
             <View style={styles.logoContainer}>
               <Image
-                source={require('../../assets/logo.jpeg')}
+                source={require('../../assets/browserlogo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
@@ -218,7 +297,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.subtitle}>Sign up to get started</Text>
             </View>
 
-            {/* Role Selection */}
+            {/* Role Selection - Square boxes with minimal radius */}
             <View style={styles.roleContainer}>
               {roles.map(role => (
                 <TouchableOpacity
@@ -227,7 +306,8 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                     styles.roleButton,
                     selectedRole === role.value && styles.roleButtonSelected,
                   ]}
-                  onPress={() => setSelectedRole(role.value)}>
+                  onPress={() => setSelectedRole(role.value)}
+                  activeOpacity={0.7}>
                   <View style={styles.roleButtonInner}>
                     <Text style={styles.roleIcon}>{role.icon}</Text>
                     <Text
@@ -235,7 +315,8 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                         styles.roleButtonText,
                         selectedRole === role.value &&
                           styles.roleButtonTextSelected,
-                      ]}>
+                      ]}
+                      numberOfLines={2}>
                       {role.label}
                     </Text>
                   </View>
@@ -266,18 +347,82 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                 />
               </View>
 
-              {/* Email Input */}
+              {/* Email Input with Verify Button */}
               <View style={styles.inputContainer}>
+                <View style={styles.labelRow}>
                 <Text style={styles.label}>Email Address</Text>
+                  {emailVerified && (
+                    <Text style={styles.verifiedBadge}>✓ Verified</Text>
+                  )}
+                </View>
+                <View style={styles.inputWithButton}>
                 <TextInput
                   style={styles.input}
                   placeholder="Enter your email"
                   placeholderTextColor={colors.textSecondary}
                   value={email}
-                  onChangeText={setEmail}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      setEmailVerified(false);
+                    }}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
+                  <TouchableOpacity
+                    style={[
+                      styles.verifyButton,
+                      emailVerified && styles.verifyButtonVerified,
+                    ]}
+                    onPress={handleEmailVerify}
+                    disabled={!email || emailVerifying || emailVerified}>
+                    {emailVerifying ? (
+                      <ActivityIndicator size="small" color={colors.surface} />
+                    ) : emailVerified ? (
+                      <Text style={styles.verifyButtonText}>✓</Text>
+                    ) : (
+                      <Text style={styles.verifyButtonText}>Verify</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Phone Input with Verify Button */}
+              <View style={styles.inputContainer}>
+                <View style={styles.labelRow}>
+                <Text style={styles.label}>Phone Number</Text>
+                  {phoneVerified && (
+                    <Text style={styles.verifiedBadge}>✓ Verified</Text>
+                  )}
+                </View>
+                <View style={styles.inputWithButton}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your 10-digit phone number"
+                  placeholderTextColor={colors.textSecondary}
+                  value={phone}
+                    onChangeText={(text) => {
+                      setPhone(text);
+                      setPhoneVerified(false);
+                    }}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                />
+                  <TouchableOpacity
+                    style={[
+                      styles.verifyButton,
+                      phoneVerified && styles.verifyButtonVerified,
+                    ]}
+                    onPress={handlePhoneVerify}
+                    disabled={!phone || phoneVerifying || phoneVerified}>
+                    {phoneVerifying ? (
+                      <ActivityIndicator size="small" color={colors.surface} />
+                    ) : phoneVerified ? (
+                      <Text style={styles.verifyButtonText}>✓</Text>
+                    ) : (
+                      <Text style={styles.verifyButtonText}>Verify</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Password Input */}
@@ -354,7 +499,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
           </View>
         </ScrollView>
       </ImageBackground>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -420,16 +565,16 @@ const styles = StyleSheet.create({
     height: 50,
   },
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: colors.borderLight,
   },
   header: {
     marginBottom: spacing.xl,
@@ -445,7 +590,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...typography.body,
-    color: colors.surface,
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -457,15 +602,23 @@ const styles = StyleSheet.create({
   },
   roleButton: {
     flex: 1,
-    borderRadius: borderRadius.round,
-    borderWidth: 1,
+    borderRadius: 8, // Minimal radius for square boxes
+    borderWidth: 2,
     borderColor: colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   roleButtonSelected: {
     borderWidth: 2,
-    borderColor: colors.text,
-    backgroundColor: colors.text,
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.3,
+    elevation: 4,
   },
   roleButtonInner: {
     flexDirection: 'row',
@@ -482,16 +635,16 @@ const styles = StyleSheet.create({
   roleButtonText: {
     ...typography.caption,
     color: colors.text,
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
     flexShrink: 1,
   },
   roleButtonTextSelected: {
     ...typography.caption,
     color: colors.surface,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     textAlign: 'center',
   },
   infoBanner: {
@@ -520,29 +673,65 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: spacing.lg,
   },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
   label: {
     ...typography.caption,
     color: colors.text,
-    marginBottom: spacing.sm,
     fontWeight: '600',
     fontSize: 14,
   },
+  verifiedBadge: {
+    ...typography.caption,
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  inputWithButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   input: {
-    backgroundColor: 'rgba(247, 247, 247, 0.9)',
+    flex: 1,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     ...typography.body,
     color: colors.text,
     fontSize: 16,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
+  },
+  verifyButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+  },
+  verifyButtonVerified: {
+    backgroundColor: colors.success,
+  },
+  verifyButtonText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(247, 247, 247, 0.9)',
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
   },
   passwordInput: {
@@ -566,10 +755,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.lg,
     marginBottom: spacing.lg,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   registerButtonDisabled: {
     backgroundColor: colors.disabled,
-    opacity: 0.5,
+    opacity: 0.6,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   registerButtonText: {
     ...typography.body,
@@ -584,12 +780,12 @@ const styles = StyleSheet.create({
   },
   loginText: {
     ...typography.body,
-    color: colors.surface,
+    color: colors.textSecondary,
     fontSize: 14,
   },
   loginLink: {
     ...typography.body,
-    color: colors.surface,
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
     textDecorationLine: 'underline',

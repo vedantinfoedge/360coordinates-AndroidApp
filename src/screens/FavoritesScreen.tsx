@@ -1,81 +1,217 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Image,
+  Alert,
 } from 'react-native';
+import {CompositeNavigationProp} from '@react-navigation/native';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../navigation/AppNavigator';
+import {BuyerTabParamList} from '../components/navigation/BuyerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {favoriteService} from '../services/favorite.service';
+import {fixImageUrl} from '../utils/imageHelper';
+import BuyerHeader from '../components/BuyerHeader';
+import {useAuth} from '../context/AuthContext';
+
+type FavoritesScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<BuyerTabParamList, 'Favorites'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 type Props = {
-  navigation: NativeStackNavigationProp<any>;
+  navigation: FavoritesScreenNavigationProp;
 };
 
 interface Property {
-  id: string;
+  id: number | string;
   title: string;
-  location: string;
-  price: string;
+  location?: string;
+  city?: string;
+  price: number | string;
+  cover_image?: string;
+  images?: string[];
 }
 
-const favoriteProperties: Property[] = [
-  {
-    id: '1',
-    title: 'Luxury 3BHK Apartment',
-    location: 'Bandra West, Mumbai',
-    price: '₹2.5 Cr',
-  },
-  {
-    id: '2',
-    title: 'Modern Villa',
-    location: 'Whitefield, Bangalore',
-    price: '₹4.2 Cr',
-  },
-  {
-    id: '3',
-    title: 'Spacious 2BHK',
-    location: 'Gurgaon Sector 43',
-    price: '₹35,000/month',
-  },
-];
-
 const FavoritesScreen: React.FC<Props> = ({navigation}) => {
-  const renderProperty = ({item}: {item: Property}) => (
-    <TouchableOpacity
-      style={styles.propertyCard}
-      onPress={() => navigation.navigate('PropertyDetails', {propertyId: item.id})}>
-      <View style={styles.propertyImagePlaceholder}>
-        <Text style={styles.placeholderText}>Property Image</Text>
-      </View>
-      <View style={styles.propertyInfo}>
-        <Text style={styles.propertyTitle}>{item.title}</Text>
-        <Text style={styles.propertyLocation}>{item.location}</Text>
-        <Text style={styles.propertyPrice}>{item.price}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const {logout} = useAuth();
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  if (favoriteProperties.length === 0) {
+  useEffect(() => {
+    loadFavorites();
+  }, []);
+
+  const loadFavorites = async (pageNum: number = 1, append: boolean = false) => {
+    try {
+      if (pageNum === 1) {
+        setLoading(true);
+      }
+      
+      const response = await favoriteService.getFavorites(pageNum, 20);
+      
+      if (response && response.success && response.data?.properties) {
+        const formattedProperties = response.data.properties.map((prop: any) => ({
+          id: prop.id,
+          title: prop.title || prop.property_title || 'Untitled Property',
+          location: prop.location || prop.city || 'Location not specified',
+          city: prop.city,
+          price: prop.price || 0,
+          cover_image: fixImageUrl(prop.cover_image || prop.images?.[0] || ''),
+          images: prop.images || [],
+        }));
+
+        if (append) {
+          setProperties(prev => [...prev, ...formattedProperties]);
+        } else {
+          setProperties(formattedProperties);
+        }
+
+        // Check if there are more pages
+        const pagination = response.data.pagination;
+        if (pagination) {
+          setHasMore(pagination.current_page < pagination.total_pages);
+        } else {
+          setHasMore(formattedProperties.length === 20);
+        }
+      } else {
+        if (!append) {
+          setProperties([]);
+        }
+        setHasMore(false);
+      }
+    } catch (error: any) {
+      console.error('Error loading favorites:', error);
+      if (!append) {
+        Alert.alert('Error', error.message || 'Failed to load favorites');
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setPage(1);
+    setHasMore(true);
+    loadFavorites(1, false);
+  };
+
+  const handleLoadMore = () => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadFavorites(nextPage, true);
+    }
+  };
+
+  const renderProperty = ({item}: {item: Property}) => {
+    const priceText = typeof item.price === 'number' 
+      ? `₹${item.price.toLocaleString('en-IN')}` 
+      : item.price;
+
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No favorites yet</Text>
-        <Text style={styles.emptySubtext}>
-          Start exploring properties and add them to your favorites
-        </Text>
+      <TouchableOpacity
+        style={styles.propertyCard}
+        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}>
+        <View style={styles.imageContainer}>
+          {item.cover_image ? (
+            <Image
+              source={{uri: item.cover_image}}
+              style={styles.propertyImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.propertyImagePlaceholder}>
+              <Text style={styles.placeholderText}>No Image</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.propertyInfo}>
+          <Text style={styles.propertyTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={styles.propertyLocation} numberOfLines={1}>
+            {item.location || item.city || 'Location not specified'}
+          </Text>
+          <Text style={styles.propertyPrice}>{priceText}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading && properties.length === 0) {
+    return (
+      <View style={styles.container}>
+        <BuyerHeader
+          onProfilePress={() => navigation.navigate('Profile')}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={logout}
+        />
+        <View style={[styles.centerContainer, {flex: 1}]}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingText}>Loading favorites...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (properties.length === 0) {
+    return (
+      <View style={styles.container}>
+        <BuyerHeader
+          onProfilePress={() => navigation.navigate('Profile')}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={logout}
+        />
+        <View style={[styles.centerContainer, {flex: 1}]}>
+          <Text style={styles.emptyText}>No favorites yet</Text>
+          <Text style={styles.emptySubtext}>
+            Start exploring properties and add them to your favorites
+          </Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      <BuyerHeader
+        onProfilePress={() => navigation.navigate('Profile')}
+        onSupportPress={() => navigation.navigate('Support')}
+        onLogoutPress={logout}
+      />
       <FlatList
-        data={favoriteProperties}
+        data={properties}
         renderItem={renderProperty}
-        keyExtractor={item => item.id}
+        keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.accent]}
+          />
+        }
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loading && properties.length > 0 ? (
+            <ActivityIndicator size="small" color={colors.accent} style={styles.footerLoader} />
+          ) : null
+        }
       />
     </View>
   );
@@ -86,6 +222,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  centerContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
   listContent: {
     padding: spacing.md,
   },
@@ -94,6 +235,19 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 200,
+  },
+  propertyImage: {
+    width: '100%',
+    height: '100%',
   },
   propertyImagePlaceholder: {
     height: 200,
@@ -123,12 +277,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: '600',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
   emptyText: {
     ...typography.h2,
     color: colors.text,
@@ -138,6 +286,14 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  footerLoader: {
+    paddingVertical: spacing.md,
   },
 });
 

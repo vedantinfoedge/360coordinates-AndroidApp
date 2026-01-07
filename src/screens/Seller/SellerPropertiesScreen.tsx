@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Button from '../../components/common/Button';
+import {propertyService} from '../../services/property.service';
+import {fixImageUrl} from '../../utils/imageHelper';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -37,7 +40,18 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       setLoading(true);
       const response = await propertyService.getMyProperties();
       if (response.success) {
-        setProperties(response.data);
+        // Handle exact backend response structure
+        const propertiesData = response.data?.properties || response.data || [];
+        if (Array.isArray(propertiesData)) {
+          // Fix image URLs
+          const fixedProperties = propertiesData.map((prop: any) => ({
+            ...prop,
+            cover_image: fixImageUrl(prop.cover_image),
+          }));
+          setProperties(fixedProperties);
+        } else {
+          setProperties([]);
+        }
       }
     } catch (error) {
       console.error('Error loading properties:', error);
@@ -96,26 +110,13 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
     navigation.navigate('PropertyDetails', {propertyId});
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return colors.success;
-      case 'pending':
-        return colors.warning;
-      case 'sold':
-        return colors.textSecondary;
-      default:
-        return colors.textSecondary;
-    }
-  };
-
   const renderProperty = ({item}: {item: any}) => (
     <View style={styles.propertyCard}>
       <TouchableOpacity
         style={styles.propertyContent}
         onPress={() => handleViewDetails(item.id)}>
         {item.cover_image ? (
-          <Image source={{uri: item.cover_image}} style={styles.propertyImage} />
+          <Image source={{uri: fixImageUrl(item.cover_image)}} style={styles.propertyImage} />
         ) : (
           <View style={styles.propertyImagePlaceholder}>
             <Text style={styles.placeholderText}>Property Image</Text>
@@ -356,6 +357,4 @@ const styles = StyleSheet.create({
 });
 
 export default SellerPropertiesScreen;
-
-export default MyPropertiesScreen;
 

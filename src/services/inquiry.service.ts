@@ -1,25 +1,42 @@
 import api from './api.service';
+import {API_ENDPOINTS} from '../config/api.config';
 
 export const inquiryService = {
-  sendInquiry: async (inquiryData: {
-    property_id: string;
-    name: string;
-    email: string;
-    mobile: string;
-    message?: string;
-  }) => {
-    const response = await api.post('/inquiries/send', inquiryData);
-    return response.data;
+  // Send inquiry
+  sendInquiry: async (propertyId: string | number, message: string) => {
+    const response = await api.post(API_ENDPOINTS.INQUIRY_SEND, {
+      property_id: propertyId,
+      message,
+    });
+    return response;
   },
 
-  getInquiries: async (type: 'received' | 'sent' = 'received') => {
-    const response = await api.get('/inquiries', { params: { type } });
-    return response.data;
+  // Get inbox (seller/agent)
+  getInbox: async () => {
+    const response = await api.get(API_ENDPOINTS.INQUIRY_INBOX);
+    return response;
   },
 
-  updateInquiryStatus: async (inquiryId: string, status: string) => {
-    const response = await api.put(`/inquiries/${inquiryId}/status`, { status });
-    return response.data;
+  // Get sent inquiries (buyer)
+  getSentInquiries: async () => {
+    const response = await api.get(API_ENDPOINTS.INQUIRY_SENT);
+    return response;
+  },
+
+  // Mark as read
+  markAsRead: async (inquiryId: string | number) => {
+    const response = await api.put(API_ENDPOINTS.INQUIRY_MARK_READ, {
+      inquiry_id: inquiryId,
+    });
+    return response;
+  },
+
+  // Reply to inquiry
+  replyToInquiry: async (inquiryId: string | number, message: string) => {
+    const response = await api.post(API_ENDPOINTS.INQUIRY_REPLY, {
+      inquiry_id: inquiryId,
+      message,
+    });
+    return response;
   },
 };
-

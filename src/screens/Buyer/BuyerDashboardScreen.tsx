@@ -18,7 +18,9 @@ import BuyerHeader from '../../components/BuyerHeader';
 import SearchBar from '../../components/SearchBar';
 import PropertyCard from '../../components/PropertyCard';
 import ProjectCard from '../../components/ProjectCard';
+import PropertyMapView from '../../components/map/PropertyMapView';
 import {propertyService} from '../../services/property.service';
+import {fixImageUrl} from '../../utils/imageHelper';
 import {ListingType} from '../../data/propertyTypes';
 
 type DashboardScreenNavigationProp = CompositeNavigationProp<
@@ -32,47 +34,20 @@ type Props = {
   navigation: DashboardScreenNavigationProp;
 };
 
-// Using demo properties from data file
-
-// Dummy data for Upcoming Projects (Indian Projects)
-const upcomingProjects = [
-  {
-    id: '1',
-    name: 'Green Valley Residency',
-    city: 'Mumbai',
-  },
-  {
-    id: '2',
-    name: 'Skyline Towers',
-    city: 'Delhi',
-  },
-  {
-    id: '3',
-    name: 'Ocean View Complex',
-    city: 'Goa',
-  },
-  {
-    id: '4',
-    name: 'Garden City Apartments',
-    city: 'Bangalore',
-  },
-  {
-    id: '5',
-    name: 'Tech Park Residences',
-    city: 'Hyderabad',
-  },
-];
-
 const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
   const [searchType, setSearchType] = useState<ListingType>('buy');
   const [searchQuery, setSearchQuery] = useState('');
   const [properties, setProperties] = useState<any[]>([]);
+  const [upcomingProjects, setUpcomingProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  // Load properties from API
+  // Load properties and projects from API
   useEffect(() => {
     loadProperties();
+    loadUpcomingProjects();
   }, [searchType]);
 
   const loadProperties = async () => {
@@ -82,21 +57,80 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         status: searchType === 'buy' ? 'sale' : 'rent',
         limit: 10,
       });
-      if (response.success) {
-        // Convert to PropertyCard format
-        const formattedProperties = response.data.map((prop: any) => ({
-          id: prop.id.toString(),
-          name: prop.title,
-          location: prop.location,
-          price: prop.status === 'sale' ? `₹${prop.price.toLocaleString()}` : `₹${prop.price.toLocaleString()}/month`,
-          type: prop.status === 'sale' ? 'buy' : 'rent',
-        }));
-        setProperties(formattedProperties);
+      
+      console.log('Properties API Response:', JSON.stringify(response, null, 2));
+      
+      if (response && response.success) {
+        // Handle different response structures
+        // Property service returns: {success: true, data: {properties: [...], total, page, total_pages}}
+        const propertiesData = response.data?.properties || response.data || response.properties || [];
+        
+        if (Array.isArray(propertiesData) && propertiesData.length > 0) {
+          // Convert to PropertyCard format with fixed image URLs
+          const formattedProperties = propertiesData.map((prop: any) => ({
+            id: prop.id?.toString() || prop.property_id?.toString() || '',
+            name: prop.title || prop.property_title || prop.name || 'Untitled Property',
+            location: prop.location || prop.city || prop.address || 'Location not specified',
+            price: prop.status === 'sale' || prop.property_status === 'sale'
+              ? `₹${parseFloat(prop.price || '0').toLocaleString('en-IN')}`
+              : `₹${parseFloat(prop.price || '0').toLocaleString('en-IN')}/month`,
+            type: (prop.status === 'sale' || prop.property_status === 'sale') ? 'buy' : 'rent',
+            image: fixImageUrl(prop.cover_image || prop.image || prop.thumbnail),
+            // Store full property data for map view
+            fullProperty: prop,
+          }));
+          setProperties(formattedProperties);
+        } else {
+          console.log('No properties found in response');
+          setProperties([]);
+        }
+      } else {
+        console.log('API response not successful:', response);
+        setProperties([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading properties:', error);
+      
+      // Handle different error types - API interceptor should format errors consistently
+      const errorMessage = error?.message || 'Failed to load properties. Please try again.';
+      console.error('Error details:', errorMessage);
+      
+      setProperties([]);
+      
+      // Optionally show error to user (uncomment if needed)
+      // Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUpcomingProjects = async () => {
+    try {
+      setProjectsLoading(true);
+      // Fetch recent properties as "upcoming projects" - can be filtered by property_type if needed
+      const response = await propertyService.getProperties({
+        status: 'approved',
+        limit: 5,
+        sort_by: 'newest',
+      });
+      
+      if (response && response.success) {
+        const propertiesData = response.data?.properties || response.data || [];
+        
+        // Format as projects
+        const formattedProjects = propertiesData.map((prop: any) => ({
+          id: prop.id?.toString() || prop.property_id?.toString() || '',
+          name: prop.title || prop.property_title || 'Untitled Property',
+          city: prop.city || prop.location || 'Location not specified',
+        }));
+        
+        setUpcomingProjects(formattedProjects);
+      }
+    } catch (error: any) {
+      console.error('Error loading upcoming projects:', error);
+      setUpcomingProjects([]);
+    } finally {
+      setProjectsLoading(false);
     }
   };
 
@@ -123,7 +157,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <Text style={styles.welcomeText}>
-            {user ? `Hello, ${user.name.split(' ')[0]}` : 'Welcome'}
+            {user ? `Hello, ${(user.full_name || '').split(' ')[0]}` : 'Welcome'}
           </Text>
           <Text style={styles.welcomeSubtext}>
             Find your dream property in India
@@ -210,12 +244,66 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Featured Properties</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('PropertyList')}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {/* View Toggle */}
+              <View style={styles.viewToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    viewMode === 'list' && styles.toggleButtonActive,
+                  ]}
+                  onPress={() => setViewMode('list')}>
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      viewMode === 'list' && styles.toggleTextActive,
+                    ]}>
+                    📋
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    viewMode === 'map' && styles.toggleButtonActive,
+                  ]}
+                  onPress={() => setViewMode('map')}>
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      viewMode === 'map' && styles.toggleTextActive,
+                    ]}>
+                    🗺️
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('PropertyList')}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          {loading ? (
+          {viewMode === 'map' ? (
+            <View style={styles.mapContainer}>
+              <PropertyMapView
+                properties={properties
+                  .filter(prop => prop.fullProperty?.latitude && prop.fullProperty?.longitude)
+                  .map(prop => ({
+                    id: prop.id,
+                    title: prop.name,
+                    location: prop.location,
+                    price: parseFloat(prop.fullProperty?.price || prop.price.replace(/[₹,]/g, '') || '0'),
+                    status: prop.type === 'buy' ? 'sale' : 'rent',
+                    latitude: parseFloat(prop.fullProperty?.latitude || '0'),
+                    longitude: parseFloat(prop.fullProperty?.longitude || '0'),
+                    cover_image: prop.image,
+                  }))}
+                onPropertyPress={property => {
+                  navigation.navigate('PropertyDetails', {propertyId: property.id});
+                }}
+                showListToggle={false}
+              />
+            </View>
+          ) : loading ? (
             <View style={styles.loadingContainer}>
               <Text style={styles.loadingText}>Loading properties...</Text>
             </View>
@@ -247,25 +335,35 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Upcoming Projects</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('PropertyList')}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={upcomingProjects}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.projectsList}
-            renderItem={({item}) => (
-              <ProjectCard
-                project={item}
-                onPress={() => {
-                  // Handle project press
-                }}
-              />
-            )}
-          />
+          {projectsLoading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading projects...</Text>
+            </View>
+          ) : upcomingProjects.length > 0 ? (
+            <FlatList
+              data={upcomingProjects}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.projectsList}
+              renderItem={({item}) => (
+                <ProjectCard
+                  project={item}
+                  onPress={() => {
+                    navigation.navigate('PropertyDetails', {propertyId: item.id});
+                  }}
+                />
+              )}
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No projects available</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -364,6 +462,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+    padding: 2,
+    gap: 2,
+  },
+  mapContainer: {
+    height: 400,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
   },
   sectionTitle: {
     ...typography.h2,

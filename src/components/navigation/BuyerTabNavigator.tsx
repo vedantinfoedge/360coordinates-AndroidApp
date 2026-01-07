@@ -91,6 +91,7 @@ const BuyerTabNavigator = () => {
         component={FavoritesScreen}
         options={{
           title: 'Favorites',
+          headerShown: false, // Hide default header for custom header
           tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>❤️</Text>,
         }}
       />

@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, Alert} from 'react-native';
+import {View, Text, StyleSheet, TouchableOpacity, Alert, Image} from 'react-native';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {fixImageUrl} from '../utils/imageHelper';
 
 interface PropertyCardProps {
   image?: string;
@@ -16,6 +17,7 @@ interface PropertyCardProps {
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
+  image,
   name,
   location,
   price,
@@ -56,9 +58,17 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       activeOpacity={0.8}>
       {/* Property Image */}
       <View style={styles.imageContainer}>
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.imagePlaceholderText}>Property Image</Text>
-        </View>
+        {image ? (
+          <Image
+            source={{uri: fixImageUrl(image)}}
+            style={styles.image}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.imagePlaceholderText}>Property Image</Text>
+          </View>
+        )}
 
         {/* Action Buttons Overlay */}
         <View style={styles.actionsOverlay}>
@@ -146,6 +156,11 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
     height: 180,
+    overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
   },
   imagePlaceholder: {
     width: '100%',

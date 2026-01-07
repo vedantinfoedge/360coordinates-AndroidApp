@@ -1,31 +1,104 @@
 import React from 'react';
-import {View, Text, StyleSheet, SafeAreaView} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Linking,
+} from 'react-native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../../navigation/AppNavigator';
+import {colors, spacing, typography, borderRadius} from '../../theme';
+import {useAuth} from '../../context/AuthContext';
 
-const AdminAgentsScreen = () => {
+type AdminAgentsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'AdminAgents'
+>;
+
+type Props = {
+  navigation: AdminAgentsScreenNavigationProp;
+};
+
+const AdminAgentsScreen: React.FC<Props> = ({navigation}) => {
+  const {logout} = useAuth();
+  const ADMIN_WEB_URL = 'https://demo1.indiapropertys.com/admin/agents';
+
+  const handleOpenAdminDashboard = async () => {
+    try {
+      await Linking.openURL(ADMIN_WEB_URL);
+    } catch (error) {
+      console.error('Error opening admin dashboard:', error);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Admin Agents</Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Admin Agents</Text>
+        <TouchableOpacity onPress={logout}>
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+      <View style={styles.content}>
+        <Text style={styles.message}>Admin agents management is available on the website.</Text>
+        <TouchableOpacity style={styles.button} onPress={handleOpenAdminDashboard}>
+          <Text style={styles.buttonText}>Open Website Admin</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
+  },
+  header: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: {
+    ...typography.h1,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  logoutText: {
+    ...typography.body,
+    color: colors.error,
+    fontWeight: '600',
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.xl,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  message: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  button: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  buttonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
   },
 });
 
 export default AdminAgentsScreen;
-

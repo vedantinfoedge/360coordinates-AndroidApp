@@ -28,24 +28,37 @@ const AppNavigator = () => {
       useEffect(() => {
         if (!isLoading && navigationRef.current) {
           if (isAuthenticated && user) {
+            console.log('Navigating user with type:', user.user_type);
             // Navigate to role-based dashboard
-            // Allow buyer and seller to access each other's dashboards
-            if (user.user_type === 'buyer' || user.user_type === 'seller') {
-              // Default to Buyer dashboard, but they can switch
+            if (user.user_type === 'buyer') {
+              console.log('Navigating to Buyer dashboard');
               navigationRef.current?.reset({
                 index: 0,
                 routes: [{name: 'Buyer'}],
               });
+            } else if (user.user_type === 'seller') {
+              console.log('Navigating to Seller dashboard');
+              navigationRef.current?.reset({
+                index: 0,
+                routes: [{name: 'Seller'}],
+              });
             } else if (user.user_type === 'agent') {
-              // Agents can only access agent dashboard
+              console.log('Navigating to Agent dashboard');
               navigationRef.current?.reset({
                 index: 0,
                 routes: [{name: 'Agent'}],
               });
             } else if (user.user_type === 'admin') {
+              console.log('Navigating to Admin dashboard');
               navigationRef.current?.reset({
                 index: 0,
                 routes: [{name: 'Admin'}],
+              });
+            } else {
+              console.log('Unknown user type, defaulting to Buyer:', user.user_type);
+              navigationRef.current?.reset({
+                index: 0,
+                routes: [{name: 'Buyer'}],
               });
             }
           } else if (!isAuthenticated) {
@@ -62,8 +75,10 @@ const AppNavigator = () => {
       let initialRoute: keyof RootStackParamList = 'Splash';
       if (!isLoading) {
         if (isAuthenticated && user) {
-          if (user.user_type === 'buyer' || user.user_type === 'seller') {
-            initialRoute = 'Buyer'; // Default to Buyer dashboard
+          if (user.user_type === 'buyer') {
+            initialRoute = 'Buyer';
+          } else if (user.user_type === 'seller') {
+            initialRoute = 'Seller';
           } else if (user.user_type === 'agent') {
             initialRoute = 'Agent';
           } else if (user.user_type === 'admin') {

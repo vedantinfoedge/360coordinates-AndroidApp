@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -7,82 +7,149 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
+  Alert,
+  Image,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {propertySearchService} from '../services/propertySearch.service';
+import {fixImageUrl} from '../utils/imageHelper';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
 interface Property {
-  id: string;
+  id: string | number;
   title: string;
   location: string;
-  price: string;
-  bedrooms: number;
-  bathrooms: number;
+  city?: string;
+  price: number | string;
+  cover_image?: string;
+  bedrooms?: number;
+  bathrooms?: number;
 }
-
-const dummyProperties: Property[] = [
-  {
-    id: '1',
-    title: 'Modern Apartment',
-    location: 'New York, NY',
-    price: '$250,000',
-    bedrooms: 2,
-    bathrooms: 1,
-  },
-  {
-    id: '2',
-    title: 'Luxury Villa',
-    location: 'Los Angeles, CA',
-    price: '$850,000',
-    bedrooms: 4,
-    bathrooms: 3,
-  },
-  {
-    id: '3',
-    title: 'Cozy House',
-    location: 'Chicago, IL',
-    price: '$320,000',
-    bedrooms: 3,
-    bathrooms: 2,
-  },
-];
 
 const SearchScreen: React.FC<Props> = ({navigation}) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredProperties, setFilteredProperties] = useState(dummyProperties);
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    if (query.trim() === '') {
-      setFilteredProperties(dummyProperties);
-    } else {
-      const filtered = dummyProperties.filter(
-        p =>
-          p.title.toLowerCase().includes(query.toLowerCase()) ||
-          p.location.toLowerCase().includes(query.toLowerCase()),
-      );
-      setFilteredProperties(filtered);
+  useEffect(() => {
+    // Load initial properties when component mounts
+    loadInitialProperties();
+  }, []);
+
+  const loadInitialProperties = async () => {
+    try {
+      setLoading(true);
+      // Load recent approved properties
+      const {propertyService} = await import('../services/property.service');
+      const response = await propertyService.getProperties({
+        status: 'approved',
+        limit: 20,
+      });
+      
+      if (response && response.success) {
+        const propertiesData = response.data?.properties || response.data || [];
+        const formatted = propertiesData.map((prop: any) => ({
+          id: prop.id?.toString() || prop.property_id?.toString() || '',
+          title: prop.title || prop.property_title || 'Untitled Property',
+          location: prop.location || prop.city || 'Location not specified',
+          city: prop.city,
+          price: typeof prop.price === 'number' 
+            ? `₹${prop.price.toLocaleString('en-IN')}` 
+            : prop.price || 'Price not available',
+          cover_image: fixImageUrl(prop.cover_image || prop.image || ''),
+          bedrooms: prop.bedrooms,
+          bathrooms: prop.bathrooms,
+        }));
+        setFilteredProperties(formatted);
+      }
+    } catch (error: any) {
+      console.error('Error loading initial properties:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const renderProperty = ({item}: {item: Property}) => (
-    <TouchableOpacity
-      style={styles.propertyCard}
-      onPress={() => navigation.navigate('PropertyDetails', {propertyId: item.id})}>
-      <View style={styles.propertyImagePlaceholder}>
-        <Text style={styles.placeholderText}>Property Image</Text>
-      </View>
-      <View style={styles.propertyInfo}>
-        <Text style={styles.propertyTitle}>{item.title}</Text>
-        <Text style={styles.propertyLocation}>{item.location}</Text>
-        <Text style={styles.propertyPrice}>{item.price}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    
+    // Clear previous timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    if (query.trim() === '') {
+      loadInitialProperties();
+      return;
+    }
+    
+    // Debounce search - wait 500ms after user stops typing
+    const timeout = setTimeout(async () => {
+      try {
+        setLoading(true);
+        const results = await propertySearchService.search(query);
+        
+        const formatted = results.map((prop: any) => ({
+          id: prop.id?.toString() || prop.property_id?.toString() || '',
+          title: prop.title || prop.property_title || 'Untitled Property',
+          location: prop.location || prop.city || 'Location not specified',
+          city: prop.city,
+          price: typeof prop.price === 'number' 
+            ? `₹${prop.price.toLocaleString('en-IN')}` 
+            : prop.price || 'Price not available',
+          cover_image: fixImageUrl(prop.cover_image || prop.image || ''),
+          bedrooms: prop.bedrooms,
+          bathrooms: prop.bathrooms,
+        }));
+        
+        setFilteredProperties(formatted);
+      } catch (error: any) {
+        console.error('Error searching properties:', error);
+        Alert.alert('Error', 'Failed to search properties. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }, 500);
+    
+    setSearchTimeout(timeout);
+  };
+
+  const renderProperty = ({item}: {item: Property}) => {
+    const priceText = typeof item.price === 'number' 
+      ? `₹${item.price.toLocaleString('en-IN')}` 
+      : item.price;
+      
+    return (
+      <TouchableOpacity
+        style={styles.propertyCard}
+        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}>
+        {item.cover_image ? (
+          <Image source={{uri: item.cover_image}} style={styles.propertyImage} />
+        ) : (
+          <View style={styles.propertyImagePlaceholder}>
+            <Text style={styles.placeholderText}>No Image</Text>
+          </View>
+        )}
+        <View style={styles.propertyInfo}>
+          <Text style={styles.propertyTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.propertyLocation} numberOfLines={1}>{item.location}</Text>
+          <Text style={styles.propertyPrice}>{priceText}</Text>
+          {(item.bedrooms || item.bathrooms) && (
+            <Text style={styles.propertyDetails}>
+              {item.bedrooms ? `${item.bedrooms} BHK` : ''} 
+              {item.bedrooms && item.bathrooms ? ' • ' : ''}
+              {item.bathrooms ? `${item.bathrooms} Bath` : ''}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -95,13 +162,25 @@ const SearchScreen: React.FC<Props> = ({navigation}) => {
           onChangeText={handleSearch}
         />
       </View>
-      <FlatList
-        data={filteredProperties}
-        renderItem={renderProperty}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading && filteredProperties.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingText}>Searching...</Text>
+        </View>
+      ) : filteredProperties.length > 0 ? (
+        <FlatList
+          data={filteredProperties}
+          renderItem={renderProperty}
+          keyExtractor={item => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No properties found</Text>
+          <Text style={styles.emptySubtext}>Try a different search term</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -158,6 +237,41 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.accent,
     fontWeight: '600',
+  },
+  propertyDetails: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  propertyImage: {
+    width: '100%',
+    height: 200,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  emptyText: {
+    ...typography.h3,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  emptySubtext: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
 });
 

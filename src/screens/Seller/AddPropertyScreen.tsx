@@ -20,6 +20,7 @@ import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
+import {moderationService} from '../../services/moderation.service';
 
 type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -250,9 +251,73 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         amenities: selectedAmenities,
       };
 
+      // Create property first
       const response = await propertyService.createProperty(propertyData);
       
       if (response.success) {
+        const propertyId = response.data?.property_id || response.data?.id || response.data?.property?.id;
+        
+        // Upload images with moderation if property was created and images are available
+        // As per guide: Upload image with moderation FIRST, image URLs are already full URLs from backend
+        if (propertyId && photos.length > 0) {
+          try {
+            const uploadedImageUrls: string[] = [];
+            const uploadResults = await Promise.all(
+              photos.map(photoUri => moderationService.uploadWithModeration(photoUri, propertyId))
+            );
+            
+            // Check moderation_status: 'SAFE' as per guide
+            // Main fix: Use 'success' instead of 'approved' and verify moderation_status === 'SAFE'
+            const approved = uploadResults.filter(r => 
+              (r.status === 'success' || r.status === 'approved') && 
+              (r.moderation_status === 'SAFE' || r.moderation_status === 'APPROVED')
+            ).length;
+            const pending = uploadResults.filter(r => 
+              r.status === 'pending' || 
+              (r.status === 'success' && r.moderation_status === 'PENDING')
+            ).length;
+            const rejected = uploadResults.filter(r => 
+              r.status === 'rejected' || 
+              r.status === 'failed' ||
+              r.moderation_status === 'UNSAFE'
+            ).length;
+            
+            // Collect approved/pending image URLs (already full URLs from backend)
+            // Only collect if status is 'success' and moderation_status is 'SAFE' or 'APPROVED'
+            uploadResults.forEach(result => {
+              const isApproved = (result.status === 'success' || result.status === 'approved') && 
+                                 (result.moderation_status === 'SAFE' || result.moderation_status === 'APPROVED');
+              const isPending = result.status === 'pending' || 
+                               (result.status === 'success' && result.moderation_status === 'PENDING');
+              
+              if ((isApproved || isPending) && result.image_url) {
+                uploadedImageUrls.push(result.image_url);
+              }
+            });
+            
+            if (uploadedImageUrls.length > 0) {
+              console.log('[AddProperty] Images saved:', uploadedImageUrls);
+            }
+            
+            if (rejected > 0) {
+              Alert.alert(
+                'Image Moderation',
+                `${rejected} image(s) were rejected. ${approved} approved, ${pending} pending review.`
+              );
+            } else if (pending > 0) {
+              Alert.alert(
+                'Image Moderation',
+                `${pending} image(s) are pending admin review. ${approved} approved.`
+              );
+            } else {
+              console.log('[AddProperty] All images uploaded and approved successfully');
+            }
+          } catch (imageError: any) {
+            console.error('[AddProperty] Error uploading images:', imageError);
+            Alert.alert('Warning', 'Property created but some images failed to upload. You can add images later.');
+          }
+        }
+        
         Alert.alert('Success', 'Property listed successfully!', [
           {text: 'OK', onPress: () => navigation.goBack()},
         ]);

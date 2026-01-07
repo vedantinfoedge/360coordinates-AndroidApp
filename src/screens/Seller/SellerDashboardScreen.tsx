@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -16,6 +18,9 @@ import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
+import {propertyService} from '../../services/property.service';
+import {inquiryService} from '../../services/inquiry.service';
+import {fixImageUrl} from '../../utils/imageHelper';
 
 type SellerDashboardScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<SellerTabParamList, 'Dashboard'>,
@@ -36,47 +41,92 @@ interface Property {
   inquiries: number;
 }
 
-// Mock data
-const recentProperties: Property[] = [
-  {
-    id: '1',
-    title: '3BHK Luxury Apartment',
-    location: 'Bandra West, Mumbai',
-    price: '₹2.5 Cr',
-    status: 'active',
-    views: 245,
-    inquiries: 12,
-  },
-  {
-    id: '2',
-    title: 'Modern Villa',
-    location: 'Whitefield, Bangalore',
-    price: '₹4.2 Cr',
-    status: 'pending',
-    views: 189,
-    inquiries: 8,
-  },
-  {
-    id: '3',
-    title: 'Spacious 2BHK',
-    location: 'Gurgaon Sector 43',
-    price: '₹35,000/month',
-    status: 'active',
-    views: 156,
-    inquiries: 5,
-  },
-];
-
 const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
+  const [recentProperties, setRecentProperties] = useState<Property[]>([]);
+  const [stats, setStats] = useState({
+    totalProperties: 0,
+    activeProperties: 0,
+    pendingProperties: 0,
+    soldProperties: 0,
+    totalViews: 0,
+    totalInquiries: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
-  const stats = {
-    totalProperties: 8,
-    activeProperties: 5,
-    pendingProperties: 2,
-    soldProperties: 1,
-    totalViews: 1245,
-    totalInquiries: 45,
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load properties and inquiries in parallel
+      const [propertiesResponse, inquiriesResponse] = await Promise.all([
+        propertyService.getMyProperties(),
+        inquiryService.getInbox(),
+      ]);
+
+      // Process properties
+      if (propertiesResponse && propertiesResponse.success) {
+        const propertiesData = propertiesResponse.data?.properties || propertiesResponse.data || [];
+        
+        const formattedProperties = propertiesData.slice(0, 5).map((prop: any) => ({
+          id: prop.id?.toString() || prop.property_id?.toString() || '',
+          title: prop.title || prop.property_title || 'Untitled Property',
+          location: prop.location || prop.city || prop.address || 'Location not specified',
+          price: typeof prop.price === 'number'
+            ? `₹${prop.price.toLocaleString('en-IN')}${prop.status === 'rent' ? '/month' : ''}`
+            : prop.price || 'Price not available',
+          status: (prop.status === 'active' || prop.property_status === 'active') ? 'active' :
+                  (prop.status === 'pending' || prop.property_status === 'pending') ? 'pending' :
+                  (prop.status === 'sold' || prop.property_status === 'sold') ? 'sold' : 'active',
+          views: prop.views || prop.view_count || 0,
+          inquiries: prop.inquiries || prop.inquiry_count || 0,
+        }));
+
+        setRecentProperties(formattedProperties);
+
+        // Calculate stats
+        const total = propertiesData.length;
+        const active = propertiesData.filter((p: any) => 
+          p.status === 'active' || p.property_status === 'active'
+        ).length;
+        const pending = propertiesData.filter((p: any) => 
+          p.status === 'pending' || p.property_status === 'pending'
+        ).length;
+        const sold = propertiesData.filter((p: any) => 
+          p.status === 'sold' || p.property_status === 'sold'
+        ).length;
+        const totalViews = propertiesData.reduce((sum: number, p: any) => 
+          sum + (p.views || p.view_count || 0), 0
+        );
+
+        setStats(prev => ({
+          ...prev,
+          totalProperties: total,
+          activeProperties: active,
+          pendingProperties: pending,
+          soldProperties: sold,
+          totalViews: totalViews,
+        }));
+      }
+
+      // Process inquiries
+      if (inquiriesResponse && inquiriesResponse.success) {
+        const inquiries = inquiriesResponse.data?.inquiries || inquiriesResponse.data || [];
+        setStats(prev => ({
+          ...prev,
+          totalInquiries: Array.isArray(inquiries) ? inquiries.length : 0,
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      Alert.alert('Error', 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderProperty = ({item}: {item: Property}) => (

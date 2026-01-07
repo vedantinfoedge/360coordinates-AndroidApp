@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,27 @@ import {
   FlatList,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from 'react-native';
+import {CompositeNavigationProp} from '@react-navigation/native';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../../navigation/AppNavigator';
+import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
 import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import BuyerHeader from '../../components/BuyerHeader';
+import {useAuth} from '../../context/AuthContext';
+import {chatService} from '../../services/chat.service';
 
-type ChatListScreenNavigationProp = NativeStackNavigationProp<
-  ChatStackParamList,
-  'ChatList'
+type ChatListScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<ChatStackParamList, 'ChatList'>,
+  CompositeNavigationProp<
+    BottomTabNavigationProp<BuyerTabParamList>,
+    NativeStackNavigationProp<RootStackParamList>
+  >
 >;
 
 type Props = {
@@ -28,66 +41,93 @@ interface ChatUser {
   unreadCount?: number;
   avatar?: string;
   isOnline?: boolean;
+  propertyId?: string | number;
+  propertyTitle?: string;
 }
 
-// Dummy chat users data
-const chatUsers: ChatUser[] = [
-  {
-    id: '1',
-    name: 'Rajesh Kumar',
-    lastMessage: 'Hi, I am interested in the property',
-    timestamp: '10:30 AM',
-    unreadCount: 2,
-    isOnline: true,
-  },
-  {
-    id: '2',
-    name: 'Priya Sharma',
-    lastMessage: 'When can we schedule a visit?',
-    timestamp: 'Yesterday',
-    unreadCount: 0,
-    isOnline: false,
-  },
-  {
-    id: '3',
-    name: 'Amit Patel',
-    lastMessage: 'The property looks great!',
-    timestamp: '2 days ago',
-    unreadCount: 1,
-    isOnline: true,
-  },
-  {
-    id: '4',
-    name: 'Sneha Reddy',
-    lastMessage: 'Thank you for the information',
-    timestamp: '3 days ago',
-    unreadCount: 0,
-    isOnline: false,
-  },
-  {
-    id: '5',
-    name: 'Vikram Singh',
-    lastMessage: 'Can you send more photos?',
-    timestamp: '1 week ago',
-    unreadCount: 0,
-    isOnline: true,
-  },
-  {
-    id: '6',
-    name: 'Anjali Mehta',
-    lastMessage: 'I will get back to you soon',
-    timestamp: '1 week ago',
-    unreadCount: 0,
-    isOnline: false,
-  },
-];
-
 const ChatListScreen: React.FC<Props> = ({navigation}) => {
+  const {logout, user} = useAuth();
+  const [chatUsers, setChatUsers] = useState<ChatUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  const loadConversations = async () => {
+    try {
+      setLoading(true);
+      const response = await chatService.getConversations();
+      
+      if (response && response.success) {
+        const conversations = response.data?.conversations || response.data || [];
+        
+        // Format conversations for display
+        const formatted = conversations.map((conv: any) => {
+          // Format timestamp
+          let timestamp = 'Just now';
+          if (conv.updated_at || conv.last_message_time) {
+            const date = new Date(conv.updated_at || conv.last_message_time);
+            const now = new Date();
+            const diffMs = now.getTime() - date.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 1) timestamp = 'Just now';
+            else if (diffMins < 60) timestamp = `${diffMins}m ago`;
+            else if (diffHours < 24) timestamp = `${diffHours}h ago`;
+            else if (diffDays === 1) timestamp = 'Yesterday';
+            else if (diffDays < 7) timestamp = `${diffDays}d ago`;
+            else timestamp = date.toLocaleDateString();
+          }
+          
+          // Get receiver name (opposite of current user)
+          const receiverName = conv.receiver_name || conv.seller_name || conv.buyer_name || 'User';
+          
+          return {
+            id: conv.conversation_id?.toString() || conv.id?.toString() || '',
+            name: receiverName,
+            lastMessage: conv.last_message || conv.lastMessage || 'No messages yet',
+            timestamp,
+            unreadCount: conv.unread_count || conv.unreadCount || 0,
+            isOnline: false, // Backend doesn't provide this, can be enhanced with Firebase presence
+            propertyId: conv.property_id || conv.propertyId,
+            propertyTitle: conv.property_title || conv.propertyTitle,
+          };
+        });
+        
+        setChatUsers(formatted);
+      } else {
+        setChatUsers([]);
+      }
+    } catch (error: any) {
+      console.error('Error loading conversations:', error);
+      Alert.alert('Error', error.message || 'Failed to load conversations');
+      setChatUsers([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadConversations();
+  };
+  
   const renderChatItem = ({item}: {item: ChatUser}) => {
     return (
       <TouchableOpacity
         style={styles.chatItem}
-        onPress={() => navigation.navigate('ChatConversation', {userId: item.id, userName: item.name})}
+        onPress={() => navigation.navigate('ChatConversation', {
+          conversationId: item.id,
+          userId: item.id,
+          userName: item.name,
+          propertyId: item.propertyId,
+          propertyTitle: item.propertyTitle,
+        })}
         activeOpacity={0.7}>
         {/* Avatar */}
         <View style={styles.avatarContainer}>
@@ -122,19 +162,51 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Chats</Text>
+  if (loading && chatUsers.length === 0) {
+    return (
+      <View style={styles.container}>
+        <BuyerHeader
+          onProfilePress={() => navigation.navigate('Profile')}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={logout}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingText}>Loading conversations...</Text>
+        </View>
       </View>
-      <FlatList
-        data={chatUsers}
-        renderItem={renderChatItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <BuyerHeader
+        onProfilePress={() => navigation.navigate('Profile')}
+        onSupportPress={() => navigation.navigate('Support')}
+        onLogoutPress={logout}
       />
-    </SafeAreaView>
+      {chatUsers.length > 0 ? (
+        <FlatList
+          data={chatUsers}
+          renderItem={renderChatItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.accent]}
+            />
+          }
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No conversations yet</Text>
+          <Text style={styles.emptySubtext}>Start chatting with property owners</Text>
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -142,16 +214,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    backgroundColor: '#022b5f', // Logo background color
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  headerTitle: {
-    ...typography.h2,
-    color: colors.surface, // White text for dark background
-    fontWeight: '600',
   },
   listContent: {
     paddingVertical: spacing.xs,
@@ -237,6 +299,33 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.surface,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  emptyText: {
+    ...typography.h3,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  emptySubtext: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
 

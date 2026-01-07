@@ -31,7 +31,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
 
   const userData = user || {
-    name: 'John Doe',
+    full_name: 'John Doe',
     email: 'john.doe@example.com',
     phone: '+91 98765 43210',
     address: 'Mumbai, Maharashtra',
@@ -39,14 +39,14 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    name: userData.name,
+    name: userData.full_name || '',
     phone: userData.phone || '',
     email: userData.email,
     address: userData.address || '',
   });
 
   const [originalData, setOriginalData] = useState({
-    name: userData.name,
+    name: userData.full_name || '',
     phone: userData.phone || '',
     email: userData.email,
     address: userData.address || '',
@@ -105,7 +105,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {userData.name
+                {(userData.full_name || '')
                   .split(' ')
                   .map(n => n[0])
                   .join('')
@@ -118,7 +118,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.name}>{userData.name}</Text>
+          <Text style={styles.name}>{userData.full_name || 'User'}</Text>
           <Text style={styles.email}>{userData.email}</Text>
           <View style={styles.roleBadge}>
             <Text style={styles.roleText}>{getRoleLabel(user?.role)}</Text>

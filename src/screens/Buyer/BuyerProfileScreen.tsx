@@ -7,7 +7,11 @@ import {
   TouchableOpacity,
   TextInput,
   SafeAreaView,
+  Image,
+  Alert,
+  Platform,
 } from 'react-native';
+import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -37,6 +41,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const [isEditing, setIsEditing] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: userData.name,
     phone: userData.phone || '',
@@ -70,6 +75,70 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     await logout();
   };
 
+  const showImagePicker = () => {
+    Alert.alert(
+      'Select Profile Image',
+      'Choose an option',
+      [
+        {text: 'Camera', onPress: () => handleImagePicker('camera')},
+        {text: 'Gallery', onPress: () => handleImagePicker('gallery')},
+        {text: 'Cancel', style: 'cancel'},
+      ],
+      {cancelable: true},
+    );
+  };
+
+  const handleImagePicker = (source: 'camera' | 'gallery') => {
+    const options = {
+      mediaType: 'photo' as MediaType,
+      quality: 0.8,
+      maxWidth: 800,
+      maxHeight: 800,
+    };
+
+    const callback = async (response: ImagePickerResponse) => {
+      if (response.didCancel) {
+        return;
+      }
+      if (response.errorMessage) {
+        Alert.alert('Error', response.errorMessage);
+        return;
+      }
+      if (response.assets && response.assets[0]) {
+        const imageUri = response.assets[0].uri;
+        if (imageUri) {
+          setProfileImage(imageUri);
+          // Upload image to backend
+          try {
+            const {userService} = require('../../services/user.service');
+            // Use new endpoint that syncs with website
+            const uploadResponse = await userService.uploadProfileImage(imageUri);
+            if (uploadResponse.success) {
+              Alert.alert('Success', 'Profile picture updated successfully');
+              // Update local state with new image URL
+              if (uploadResponse.data?.url) {
+                setProfileImage(uploadResponse.data.url);
+              }
+              // Reload user profile to get updated image URL
+              const {useAuth} = require('../../context/AuthContext');
+            } else {
+              Alert.alert('Error', uploadResponse.message || 'Failed to upload image');
+            }
+          } catch (error: any) {
+            console.error('Error uploading profile image:', error);
+            Alert.alert('Error', error.message || 'Failed to upload image');
+          }
+        }
+      }
+    };
+
+    if (source === 'camera') {
+      launchCamera(options, callback);
+    } else {
+      launchImageLibrary(options, callback);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Custom Header */}
@@ -87,19 +156,38 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {userData.name
-                  .split(' ')
-                  .map(n => n[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2)}
-              </Text>
-            </View>
+            <TouchableOpacity
+              style={styles.avatarWrapper}
+              onPress={showImagePicker}
+              activeOpacity={0.8}>
+              {profileImage ? (
+                <Image source={{uri: profileImage}} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {(userData.full_name || '')
+                      .split(' ')
+                      .map(n => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.cameraIconContainer}>
+                <Text style={styles.cameraIcon}>📷</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{userData.name}</Text>
+          <Text style={styles.userName}>{userData.full_name || 'User'}</Text>
           <Text style={styles.userEmail}>{userData.email}</Text>
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={showImagePicker}>
+            <Text style={styles.uploadButtonText}>
+              {profileImage ? 'Change Photo' : 'Upload Photo'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Edit/Cancel Buttons */}
@@ -242,6 +330,11 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: spacing.sm,
   },
   avatar: {
     width: 100,
@@ -251,11 +344,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.border,
+  },
   avatarText: {
     ...typography.h2,
     color: colors.surface,
     fontSize: 36,
     fontWeight: '700',
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.surface,
+  },
+  cameraIcon: {
+    fontSize: 16,
+  },
+  uploadButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  uploadButtonText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 14,
   },
   userName: {
     ...typography.h2,
