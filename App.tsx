@@ -12,6 +12,7 @@ import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {AuthProvider} from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import {initializeMapbox} from './src/config/mapbox.config';
+import {initializeFirebase} from './src/config/firebase.config';
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
@@ -22,6 +23,13 @@ function App(): React.JSX.Element {
       initializeMapbox();
     } catch (error) {
       console.warn('Mapbox initialization failed (app will continue without maps):', error);
+    }
+
+    // Initialize Firebase on app start (will fail gracefully if not configured)
+    try {
+      initializeFirebase();
+    } catch (error) {
+      console.warn('Firebase initialization failed (app will continue without Firebase):', error);
     }
   }, []);
 

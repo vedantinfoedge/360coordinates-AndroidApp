@@ -63,21 +63,63 @@ api.interceptors.response.use(
     });
 
     if (error.response?.status === 401) {
-      // Token expired - logout
-      log.auth('Token expired, logging out');
-      await AsyncStorage.removeItem('@auth_token');
-      await AsyncStorage.removeItem('@propertyapp_user');
-      // Navigate to login will be handled by AuthContext
+      // Token expired - try to refresh token first
+      log.auth('Token expired, attempting refresh');
+      
+      try {
+        const refreshToken = await AsyncStorage.getItem('@refresh_token');
+        if (refreshToken) {
+          // Try to refresh token
+          const {authService} = require('./auth.service');
+          const refreshResponse = await authService.refreshToken(refreshToken);
+          
+          if (refreshResponse.success) {
+            // Retry original request with new token
+            const originalRequest = error.config;
+            const newToken = await AsyncStorage.getItem('@auth_token');
+            if (newToken && originalRequest) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              return api(originalRequest);
+            }
+          }
+        }
+      } catch (refreshError) {
+        // Refresh failed - logout user
+        log.auth('Token refresh failed, logging out');
+        await AsyncStorage.removeItem('@auth_token');
+        await AsyncStorage.removeItem('@propertyapp_user');
+        await AsyncStorage.removeItem('@refresh_token');
+        // Navigate to login will be handled by AuthContext
+      }
+      
+      // If no refresh token or refresh failed, logout
+      if (!(await AsyncStorage.getItem('@refresh_token'))) {
+        await AsyncStorage.removeItem('@auth_token');
+        await AsyncStorage.removeItem('@propertyapp_user');
+      }
     }
 
     // Handle PHP error responses
     const errorData = error.response?.data;
+    const statusCode = error.response?.status;
     let errorMessage = 'Something went wrong';
     
+    // Provide user-friendly error messages based on status code
+    if (statusCode === 403) {
+      errorMessage = 'Access denied. Please check your credentials or contact support.';
+    } else if (statusCode === 404) {
+      errorMessage = 'Service not found. Please try again later.';
+    } else if (statusCode === 500) {
+      errorMessage = 'Server error. Please try again in a few moments.';
+    } else if (statusCode === 503) {
+      errorMessage = 'Service temporarily unavailable. Please try again later.';
+    }
+    
+    // Try to get error message from response data
     if (typeof errorData === 'string') {
       // Check if it's HTML (server error page)
       if (errorData.includes('<!DOCTYPE') || errorData.includes('<html')) {
-        errorMessage = `Server error (${error.response?.status || 'Unknown'}). Please try again later.`;
+        errorMessage = `Server error (${statusCode || 'Unknown'}). Please try again later.`;
       } else {
         try {
           const parsed = JSON.parse(errorData);
@@ -89,7 +131,8 @@ api.interceptors.response.use(
       }
     } else if (errorData?.message) {
       errorMessage = errorData.message;
-    } else if (error.message) {
+    } else if (error.message && !error.message.includes('status code')) {
+      // Only use error.message if it's not a generic status code message
       errorMessage = error.message;
     }
 

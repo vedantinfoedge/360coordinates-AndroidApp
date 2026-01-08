@@ -1,6 +1,8 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// Google services Gradle plugin (for Firebase)
+apply plugin: "com.google.gms.google-services"
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -79,7 +81,7 @@ android {
 
     namespace "com.propertyapp"
     defaultConfig {
-        applicationId "com.propertyapp"
+        applicationId "Indiapropertys.com"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -121,4 +123,17 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+    
+    // Firebase BOM (Bill of Materials) for version management
+    // Using BoM ensures all Firebase libraries use compatible versions
+    implementation platform('com.google.firebase:firebase-bom:34.7.0')
+    
+    // Firebase products (versions are managed by BoM, don't specify versions)
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-messaging'
+    
+    // Add other Firebase products as needed:
+    // implementation 'com.google.firebase:firebase-auth'
+    // implementation 'com.google.firebase:firebase-storage'
 }

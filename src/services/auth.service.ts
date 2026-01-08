@@ -104,6 +104,66 @@ export const authService = {
     }
   },
 
+  // Refresh Token (workaround - backend doesn't have this endpoint yet)
+  // When backend implements /auth/refresh-token.php, this will work
+  refreshToken: async (refreshToken?: string) => {
+    try {
+      // Backend endpoint not implemented yet
+      // When implemented, it should accept: { "refreshToken": "..." }
+      // And return: { "success": true, "data": { "token": "new_jwt_token", "refreshToken": "new_refresh_token" } }
+      
+      const response = await api.post(API_ENDPOINTS.REFRESH_TOKEN, {
+        refreshToken: refreshToken || '',
+      });
+      
+      if (response.success && response.data?.token) {
+        await AsyncStorage.setItem('@auth_token', response.data.token);
+        if (response.data.refreshToken) {
+          await AsyncStorage.setItem('@refresh_token', response.data.refreshToken);
+        }
+      }
+      
+      return response;
+    } catch (error: any) {
+      // Endpoint doesn't exist yet - return error
+      console.warn('Refresh token endpoint not available:', error);
+      throw new Error('Token refresh not available. Please login again.');
+    }
+  },
+
+  // Verify Email (using OTP verify-email endpoint)
+  verifyEmail: async (email: string, otp: string) => {
+    const response = await api.post(API_ENDPOINTS.OTP_VERIFY_EMAIL, {
+      email,
+      otp,
+    });
+    return response;
+  },
+
+  // Delete Account (user self-delete - backend endpoint not implemented yet)
+  deleteAccount: async (password?: string) => {
+    try {
+      const response = await api.delete(API_ENDPOINTS.DELETE_ACCOUNT, {
+        data: password ? {password} : {},
+      });
+      
+      if (response.success) {
+        // Clear local storage on successful deletion
+        await AsyncStorage.removeItem('@auth_token');
+        await AsyncStorage.removeItem('@propertyapp_user');
+        await AsyncStorage.removeItem('@refresh_token');
+      }
+      
+      return response;
+    } catch (error: any) {
+      // Endpoint doesn't exist yet
+      if (error.status === 404) {
+        throw new Error('Delete account endpoint not available. Please contact support.');
+      }
+      throw error;
+    }
+  },
+
   // Logout
   logout: async () => {
     try {
@@ -114,6 +174,7 @@ export const authService = {
     } finally {
       await AsyncStorage.removeItem('@auth_token');
       await AsyncStorage.removeItem('@propertyapp_user');
+      await AsyncStorage.removeItem('@refresh_token');
     }
   },
 };
