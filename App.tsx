@@ -13,6 +13,7 @@ import {AuthProvider} from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import {initializeMapbox} from './src/config/mapbox.config';
 import {initializeFirebase} from './src/config/firebase.config';
+import {initializeMSG91} from './src/config/msg91.config';
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
@@ -30,6 +31,13 @@ function App(): React.JSX.Element {
       initializeFirebase();
     } catch (error) {
       console.warn('Firebase initialization failed (app will continue without Firebase):', error);
+    }
+
+    // Initialize MSG91 OTP Widget on app start (will fail gracefully if not configured)
+    try {
+      initializeMSG91();
+    } catch (error) {
+      console.warn('MSG91 initialization failed (app will continue without MSG91):', error);
     }
   }, []);
 

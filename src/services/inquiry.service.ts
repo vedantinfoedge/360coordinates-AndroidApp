@@ -13,6 +13,16 @@ export const inquiryService = {
 
   // Get inbox (seller/agent)
   getInbox: async () => {
+    // Try seller endpoint first, fallback to old endpoint
+    try {
+      const response = await api.get(API_ENDPOINTS.SELLER_INQUIRIES_LIST);
+      if (response.success) {
+        return response;
+      }
+    } catch (error) {
+      console.warn('Seller inquiries endpoint failed, trying legacy endpoint');
+    }
+    // Fallback to legacy endpoint
     const response = await api.get(API_ENDPOINTS.INQUIRY_INBOX);
     return response;
   },

@@ -8,6 +8,7 @@ export {inquiryService} from './inquiry.service';
 export {userService} from './user.service';
 export {uploadService} from './upload.service';
 export {buyerService} from './buyer.service';
+export {sellerService} from './seller.service';
 export {chatService} from './chat.service';
 export {notificationService} from './notification.service';
 export {default as commonService} from './common.service';

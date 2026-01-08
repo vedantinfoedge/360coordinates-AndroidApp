@@ -1,0 +1,90 @@
+import api from './api.service';
+import {API_ENDPOINTS} from '../config/api.config';
+
+export interface DashboardStats {
+  total_properties: number;
+  active_properties: number;
+  total_inquiries: number;
+  new_inquiries: number;
+  total_views: number;
+  views_percentage_change: number;
+  properties_by_status: {
+    sale: number;
+    rent: number;
+  };
+  recent_inquiries: Array<{
+    id: number;
+    property_id: number;
+    property_title: string;
+    buyer_id: number;
+    buyer_name: string;
+    buyer_email: string;
+    buyer_phone: string;
+    buyer_profile_image?: string;
+    message: string;
+    status: string;
+    created_at: string;
+  }>;
+  subscription?: {
+    plan_type: string;
+    end_date: string;
+  } | null;
+}
+
+export interface DashboardStatsResponse {
+  success: boolean;
+  message: string;
+  data: DashboardStats;
+}
+
+export const sellerService = {
+  // Get dashboard statistics
+  getDashboardStats: async (): Promise<DashboardStatsResponse> => {
+    const response = await api.get(API_ENDPOINTS.SELLER_DASHBOARD_STATS);
+    return response;
+  },
+
+  // Get seller properties list
+  getProperties: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: 'sale' | 'rent';
+  }) => {
+    const response = await api.get(API_ENDPOINTS.SELLER_PROPERTIES_LIST, {
+      params,
+    });
+    return response;
+  },
+
+  // Get seller inquiries list
+  getInquiries: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    property_id?: number;
+  }) => {
+    const response = await api.get(API_ENDPOINTS.SELLER_INQUIRIES_LIST, {
+      params,
+    });
+    return response;
+  },
+
+  // Get seller profile
+  getProfile: async () => {
+    const response = await api.get(API_ENDPOINTS.SELLER_PROFILE_GET);
+    return response;
+  },
+
+  // Update inquiry status
+  updateInquiryStatus: async (
+    inquiryId: number | string,
+    status: string,
+  ) => {
+    const response = await api.put(API_ENDPOINTS.SELLER_INQUIRY_UPDATE_STATUS, {
+      inquiry_id: inquiryId,
+      status,
+    });
+    return response;
+  },
+};
+

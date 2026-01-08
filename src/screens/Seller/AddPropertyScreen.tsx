@@ -21,6 +21,9 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {moderationService} from '../../services/moderation.service';
+import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
+import StateAutoSuggest from '../../components/search/StateAutoSuggest';
+import LocationPicker from '../../components/map/LocationPicker';
 
 type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -32,25 +35,38 @@ type Props = {
 };
 
 type PropertyType = 'sell' | 'rent';
-type PropertyCategory = 'apartment' | 'villa' | 'house' | 'rowhouse' | '';
+type PropertyCategory = 
+  | 'apartment' 
+  | 'villa' 
+  | 'independent-house' 
+  | 'rowhouse' 
+  | 'penthouse' 
+  | 'studio-apartment' 
+  | 'commercial-office' 
+  | 'commercial-shop' 
+  | 'warehouse-godown' 
+  | 'plot-land' 
+  | 'pg-hostel' 
+  | '';
 
 const amenitiesList = [
   {id: 'parking', label: 'Parking', icon: '🚗'},
   {id: 'lift', label: 'Lift', icon: '🛗'},
   {id: 'security', label: '24x7 Security', icon: '👮'},
-  {id: 'power', label: 'Power Backup', icon: '⚡'},
+  {id: 'power_backup', label: 'Power Backup', icon: '⚡'},
   {id: 'gym', label: 'Gym', icon: '🏋️'},
-  {id: 'pool', label: 'Swimming Pool', icon: '🏊'},
+  {id: 'swimming_pool', label: 'Swimming Pool', icon: '🏊'},
   {id: 'garden', label: 'Garden', icon: '🌳'},
   {id: 'clubhouse', label: 'Club House', icon: '🏛️'},
-  {id: 'playarea', label: "Children's Play Area", icon: '🛝'},
+  {id: 'playground', label: "Children's Play Area", icon: '🎢'},
   {id: 'cctv', label: 'CCTV', icon: '📹'},
   {id: 'intercom', label: 'Intercom', icon: '📞'},
-  {id: 'firesafety', label: 'Fire Safety', icon: '🔥'},
-  {id: 'water', label: '24x7 Water', icon: '💧'},
-  {id: 'gas', label: 'Gas Pipeline', icon: '🔥'},
+  {id: 'fire_safety', label: 'Fire Safety', icon: '🔥'},
+  {id: 'water_supply', label: '24x7 Water', icon: '💧'},
+  {id: 'gas_pipeline', label: 'Gas Pipeline', icon: '🔥'},
   {id: 'wifi', label: 'WiFi', icon: '📶'},
   {id: 'ac', label: 'Air Conditioning', icon: '❄️'},
+  {id: 'electricity', label: 'Electricity', icon: '⚡'},
 ];
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
@@ -59,20 +75,27 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [propertyType, setPropertyType] = useState<PropertyType>('sell');
   const [propertyCategory, setPropertyCategory] = useState<PropertyCategory>('');
   const [location, setLocation] = useState('');
+  const [state, setState] = useState('');
+  const [additionalAddress, setAdditionalAddress] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [bathrooms, setBathrooms] = useState<number | null>(null);
   const [balconies, setBalconies] = useState<number | null>(null);
   const [builtUpArea, setBuiltUpArea] = useState('');
   const [carpetArea, setCarpetArea] = useState('');
+  const [floor, setFloor] = useState('');
   const [totalFloors, setTotalFloors] = useState('');
   const [facing, setFacing] = useState('');
   const [propertyAge, setPropertyAge] = useState('');
   const [furnishing, setFurnishing] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<Array<{uri: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
   const [expectedPrice, setExpectedPrice] = useState('');
   const [priceNegotiable, setPriceNegotiable] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
   const [maintenance, setMaintenance] = useState('');
 
   const totalSteps = 5;
@@ -83,6 +106,83 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     {id: 4, name: 'Photos', icon: '📷'},
     {id: 5, name: 'Pricing', icon: '💰'},
   ];
+
+  // Field visibility configuration based on property type
+  const getFieldVisibility = () => {
+    const isResidential = ['apartment', 'villa', 'independent-house', 'rowhouse', 'penthouse', 'studio-apartment'].includes(propertyCategory);
+    const isCommercial = ['commercial-office', 'commercial-shop', 'warehouse-godown'].includes(propertyCategory);
+    const isLand = propertyCategory === 'plot-land';
+    const isPG = propertyCategory === 'pg-hostel';
+    const isFarmHouse = propertyCategory === 'rowhouse';
+    const isStudio = propertyCategory === 'studio-apartment';
+    const isCommercialShop = propertyCategory === 'commercial-shop';
+
+    return {
+      showBedrooms: !isLand && !isCommercial,
+      showBathrooms: !isLand && (isResidential || isPG || isCommercial),
+      showBalconies: !isLand && !isCommercial && !isFarmHouse && !isPG,
+      showFloor: !isLand,
+      showTotalFloors: !isLand,
+      showFacing: true, // Always show
+      showFurnishing: !isLand && !isCommercialShop,
+      showAge: !isLand,
+      showCarpetArea: !isLand,
+      areaLabel: isLand ? 'Plot Area' : 'Built-up Area',
+      bedroomsRequired: isResidential && !isStudio,
+      bathroomsRequired: isResidential || isPG,
+      furnishingRequired: isResidential && !isCommercialShop,
+    };
+  };
+
+  const fieldVisibility = getFieldVisibility();
+
+  // Get available amenities based on property type
+  const getAvailableAmenities = () => {
+    if (!propertyCategory) return amenitiesList;
+    
+    const isResidential = ['apartment', 'villa', 'independent-house', 'rowhouse', 'penthouse', 'studio-apartment'].includes(propertyCategory);
+    const isFarmHouse = propertyCategory === 'rowhouse';
+    const isCommercialOffice = propertyCategory === 'commercial-office';
+    const isCommercialShop = propertyCategory === 'commercial-shop';
+    const isLand = propertyCategory === 'plot-land';
+    const isPG = propertyCategory === 'pg-hostel';
+
+    return amenitiesList.filter(amenity => {
+      // Plot/Land only gets specific amenities
+      if (isLand) {
+        return ['security', 'water_supply', 'cctv', 'electricity'].includes(amenity.id);
+      }
+      
+      // PG/Hostel amenities
+      if (isPG) {
+        return !['lift', 'gym', 'swimming_pool', 'garden', 'clubhouse', 'playground', 'gas_pipeline'].includes(amenity.id);
+      }
+      
+      // Commercial Office amenities
+      if (isCommercialOffice) {
+        return !['gym', 'swimming_pool', 'garden', 'clubhouse', 'playground', 'gas_pipeline'].includes(amenity.id);
+      }
+      
+      // Commercial Shop amenities
+      if (isCommercialShop) {
+        return !['lift', 'gym', 'swimming_pool', 'garden', 'clubhouse', 'playground', 'intercom', 'gas_pipeline'].includes(amenity.id);
+      }
+      
+      // Farm House (no lift, no balconies)
+      if (isFarmHouse) {
+        return amenity.id !== 'lift';
+      }
+      
+      // Residential properties get all amenities except electricity
+      if (isResidential) {
+        return amenity.id !== 'electricity';
+      }
+      
+      return true;
+    });
+  };
+
+  const availableAmenities = getAvailableAmenities();
 
   const toggleAmenity = (amenityId: string) => {
     setSelectedAmenities(prev =>
@@ -133,7 +233,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       includeBase64: false,
     };
 
-    launchImageLibrary(options, (response: ImagePickerResponse) => {
+    launchImageLibrary(options, async (response: ImagePickerResponse) => {
       if (response.didCancel) {
         return;
       }
@@ -144,16 +244,74 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
 
       if (response.assets && response.assets.length > 0) {
-        const newPhotos = response.assets
+        const newPhotoUris = response.assets
           .map(asset => asset.uri)
           .filter((uri): uri is string => uri !== undefined);
         
-        if (photos.length + newPhotos.length > 10) {
+        const maxPhotos = 10;
+        const remainingSlots = maxPhotos - photos.length;
+        const photosToAdd = newPhotoUris.slice(0, remainingSlots);
+        
+        if (photos.length + photosToAdd.length > maxPhotos) {
           Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
-          setPhotos([...photos, ...newPhotos.slice(0, 10 - photos.length)]);
-        } else {
-          setPhotos([...photos, ...newPhotos]);
+          return;
         }
+
+        // Add new photos with initial status
+        const newPhotos = photosToAdd.map(uri => ({
+          uri,
+          moderationStatus: 'checking' as const,
+        }));
+        
+        const updatedPhotos = [...photos, ...newPhotos];
+        setPhotos(updatedPhotos);
+
+        // Validate each new image through moderation
+        photosToAdd.forEach(async (uri, index) => {
+          const actualIndex = photos.length + index;
+          try {
+            const result = await moderationService.uploadWithModeration(uri);
+            
+            // Update the specific photo's moderation status
+            setPhotos(prev => {
+              const updated = [...prev];
+              updated[actualIndex] = {
+                ...updated[actualIndex],
+                moderationStatus:
+                  result.moderation_status === 'APPROVED' || result.moderation_status === 'SAFE'
+                    ? 'APPROVED'
+                    : result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE'
+                    ? 'REJECTED'
+                    : 'PENDING',
+                moderationReason: result.moderation_reason,
+                imageUrl: result.image_url,
+              };
+              return updated;
+            });
+
+            // Show alert for rejected images
+            if (result.status === 'rejected' || result.moderation_status === 'REJECTED') {
+              Alert.alert(
+                'Image Rejected',
+                result.moderation_reason || result.message || 'Image does not meet quality standards. Please select a different image.',
+              );
+            } else if (result.status === 'pending' || result.moderation_status === 'PENDING') {
+              // Silent for pending - user can still proceed
+            }
+          } catch (error: any) {
+            console.error('Image moderation error:', error);
+            setPhotos(prev => {
+              const updated = [...prev];
+              updated[actualIndex] = {
+                ...updated[actualIndex],
+                moderationStatus: 'REJECTED',
+                moderationReason: error.message || 'Failed to validate image',
+              };
+              return updated;
+            });
+            Alert.alert('Validation Error', error.message || 'Failed to validate image');
+          }
+        });
       }
     });
   };
@@ -175,22 +333,51 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         Alert.alert('Error', 'Please enter location');
         return;
       }
-      if (bedrooms === null) {
+      if (!state.trim()) {
+        Alert.alert('Error', 'Please enter state');
+        return;
+      }
+      if (!facing) {
+        Alert.alert('Error', 'Please select facing direction');
+        return;
+      }
+      const fieldVisibility = getFieldVisibility();
+      if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyCategory !== 'studio-apartment') {
         Alert.alert('Error', 'Please select number of bedrooms');
         return;
       }
-      if (bathrooms === null) {
+      if (fieldVisibility.bathroomsRequired && bathrooms === null) {
         Alert.alert('Error', 'Please select number of bathrooms');
         return;
       }
       if (!builtUpArea.trim()) {
-        Alert.alert('Error', 'Please enter built-up area');
+        Alert.alert('Error', `Please enter ${fieldVisibility.areaLabel.toLowerCase()}`);
+        return;
+      }
+      if (fieldVisibility.furnishingRequired && !furnishing) {
+        Alert.alert('Error', 'Please select furnishing status');
         return;
       }
     }
     if (currentStep === 3) {
       if (!description.trim()) {
         Alert.alert('Error', 'Please enter property description');
+        return;
+      }
+      if (description.trim().length < 100) {
+        Alert.alert('Error', 'Description must be at least 100 characters');
+        return;
+      }
+      // Check for mobile numbers (Indian format: 10 digits, may have +91)
+      const mobileRegex = /(\+91[\s-]?)?[6-9]\d{9}/g;
+      if (mobileRegex.test(description)) {
+        Alert.alert('Error', 'Description cannot contain mobile numbers');
+        return;
+      }
+      // Check for email addresses
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      if (emailRegex.test(description)) {
+        Alert.alert('Error', 'Description cannot contain email addresses');
         return;
       }
     }
@@ -224,8 +411,15 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       const propertyTypeMap: {[key: string]: string} = {
         'apartment': 'Apartment',
         'villa': 'Villa / Banglow',
-        'house': 'Row House/ Farm House',
+        'independent-house': 'Independent House',
         'rowhouse': 'Row House/ Farm House',
+        'penthouse': 'Penthouse',
+        'studio-apartment': 'Studio Apartment',
+        'commercial-office': 'Commercial Office',
+        'commercial-shop': 'Commercial Shop',
+        'warehouse-godown': 'Warehouse / Godown',
+        'plot-land': 'Plot / Land / Industrial Property',
+        'pg-hostel': 'PG / Hostel',
       };
 
       const propertyData = {
@@ -233,21 +427,25 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         status: propertyType === 'sell' ? 'sale' : 'rent',
         property_type: propertyTypeMap[propertyCategory] || propertyCategory,
         location: location,
-        bedrooms: bedrooms?.toString() || null,
+        state: state || null,
+        additional_address: additionalAddress || null,
+        latitude: latitude || null,
+        longitude: longitude || null,
+        bedrooms: bedrooms?.toString() || (propertyCategory === 'studio-apartment' ? '0' : null),
         bathrooms: bathrooms?.toString() || null,
         balconies: balconies?.toString() || null,
         area: parseFloat(builtUpArea) || 0,
         carpet_area: carpetArea ? parseFloat(carpetArea) : null,
+        floor: floor || null,
         total_floors: totalFloors ? parseInt(totalFloors) : null,
-        floor: null, // Can be added later
         facing: facing || null,
         age: propertyAge || null,
         furnishing: furnishing || null,
         description: description || null,
         price: parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0,
         price_negotiable: priceNegotiable ? 1 : 0,
+        deposit_amount: propertyType === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : null,
         maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
-        deposit_amount: null, // Can be added later
         amenities: selectedAmenities,
       };
 
@@ -257,59 +455,61 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       if (response.success) {
         const propertyId = response.data?.property_id || response.data?.id || response.data?.property?.id;
         
-        // Upload images with moderation if property was created and images are available
-        // As per guide: Upload image with moderation FIRST, image URLs are already full URLs from backend
+        // Images are already validated through moderation when selected
+        // Only upload approved images or re-upload if needed
         if (propertyId && photos.length > 0) {
           try {
-            const uploadedImageUrls: string[] = [];
-            const uploadResults = await Promise.all(
-              photos.map(photoUri => moderationService.uploadWithModeration(photoUri, propertyId))
+            const approvedPhotos = photos.filter(
+              p => p.moderationStatus === 'APPROVED' && p.imageUrl
+            );
+            const pendingPhotos = photos.filter(
+              p => p.moderationStatus === 'PENDING' && p.imageUrl
+            );
+            const rejectedPhotos = photos.filter(p => p.moderationStatus === 'REJECTED');
+            
+            // Re-upload images that don't have imageUrl yet (shouldn't happen, but safety check)
+            const photosNeedingUpload = photos.filter(
+              p => (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') && !p.imageUrl
             );
             
-            // Check moderation_status: 'SAFE' as per guide
-            // Main fix: Use 'success' instead of 'approved' and verify moderation_status === 'SAFE'
-            const approved = uploadResults.filter(r => 
-              (r.status === 'success' || r.status === 'approved') && 
-              (r.moderation_status === 'SAFE' || r.moderation_status === 'APPROVED')
-            ).length;
-            const pending = uploadResults.filter(r => 
-              r.status === 'pending' || 
-              (r.status === 'success' && r.moderation_status === 'PENDING')
-            ).length;
-            const rejected = uploadResults.filter(r => 
-              r.status === 'rejected' || 
-              r.status === 'failed' ||
-              r.moderation_status === 'UNSAFE'
-            ).length;
-            
-            // Collect approved/pending image URLs (already full URLs from backend)
-            // Only collect if status is 'success' and moderation_status is 'SAFE' or 'APPROVED'
-            uploadResults.forEach(result => {
-              const isApproved = (result.status === 'success' || result.status === 'approved') && 
-                                 (result.moderation_status === 'SAFE' || result.moderation_status === 'APPROVED');
-              const isPending = result.status === 'pending' || 
-                               (result.status === 'success' && result.moderation_status === 'PENDING');
+            if (photosNeedingUpload.length > 0) {
+              const uploadResults = await Promise.all(
+                photosNeedingUpload.map(photo => 
+                  moderationService.uploadWithModeration(photo.uri, propertyId)
+                )
+              );
               
-              if ((isApproved || isPending) && result.image_url) {
-                uploadedImageUrls.push(result.image_url);
-              }
-            });
-            
-            if (uploadedImageUrls.length > 0) {
-              console.log('[AddProperty] Images saved:', uploadedImageUrls);
+              // Update photos with image URLs
+              uploadResults.forEach((result, index) => {
+                const photoIndex = photos.findIndex(p => p.uri === photosNeedingUpload[index].uri);
+                if (photoIndex >= 0 && result.image_url) {
+                  setPhotos(prev => {
+                    const updated = [...prev];
+                    updated[photoIndex] = {
+                      ...updated[photoIndex],
+                      imageUrl: result.image_url,
+                    };
+                    return updated;
+                  });
+                }
+              });
             }
             
-            if (rejected > 0) {
+            const totalApproved = approvedPhotos.length;
+            const totalPending = pendingPhotos.length;
+            const totalRejected = rejectedPhotos.length;
+            
+            if (totalRejected > 0) {
               Alert.alert(
                 'Image Moderation',
-                `${rejected} image(s) were rejected. ${approved} approved, ${pending} pending review.`
+                `${totalRejected} image(s) were rejected and removed. ${totalApproved} approved, ${totalPending} pending review.`
               );
-            } else if (pending > 0) {
+            } else if (totalPending > 0) {
               Alert.alert(
                 'Image Moderation',
-                `${pending} image(s) are pending admin review. ${approved} approved.`
+                `${totalPending} image(s) are pending admin review. ${totalApproved} approved.`
               );
-            } else {
+            } else if (totalApproved > 0) {
               console.log('[AddProperty] All images uploaded and approved successfully');
             }
           } catch (imageError: any) {
@@ -415,71 +615,192 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.label}>
                 Property Type <Text style={styles.required}>*</Text>
               </Text>
-              <View style={styles.propertyTypeGrid}>
-                <TouchableOpacity
-                  style={[
-                    styles.propertyTypeButton,
-                    propertyCategory === 'apartment' && styles.propertyTypeButtonActive,
-                  ]}
-                  onPress={() => setPropertyCategory('apartment')}>
-                  <Text style={styles.propertyTypeIcon}>🏢</Text>
-                  <Text
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.propertyTypeScroll}>
+                <View style={styles.propertyTypeGrid}>
+                  {/* Residential Properties */}
+                  <TouchableOpacity
                     style={[
-                      styles.propertyTypeText,
-                      propertyCategory === 'apartment' && styles.propertyTypeTextActive,
-                    ]}>
-                    Apartment
-                  </Text>
-                </TouchableOpacity>
+                      styles.propertyTypeButton,
+                      propertyCategory === 'apartment' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('apartment')}>
+                    <Text style={styles.propertyTypeIcon}>🏢</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'apartment' && styles.propertyTypeTextActive,
+                      ]}>
+                      Apartment
+                    </Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.propertyTypeButton,
-                    propertyCategory === 'villa' && styles.propertyTypeButtonActive,
-                  ]}
-                  onPress={() => setPropertyCategory('villa')}>
-                  <Text style={styles.propertyTypeIcon}>🏡</Text>
-                  <Text
+                  <TouchableOpacity
                     style={[
-                      styles.propertyTypeText,
-                      propertyCategory === 'villa' && styles.propertyTypeTextActive,
-                    ]}>
-                    Villa / Banglow
-                  </Text>
-                </TouchableOpacity>
+                      styles.propertyTypeButton,
+                      propertyCategory === 'villa' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('villa')}>
+                    <Text style={styles.propertyTypeIcon}>🏡</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'villa' && styles.propertyTypeTextActive,
+                      ]}>
+                      Villa / Banglow
+                    </Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.propertyTypeButton,
-                    propertyCategory === 'house' && styles.propertyTypeButtonActive,
-                  ]}
-                  onPress={() => setPropertyCategory('house')}>
-                  <Text style={styles.propertyTypeIcon}>🏠</Text>
-                  <Text
+                  <TouchableOpacity
                     style={[
-                      styles.propertyTypeText,
-                      propertyCategory === 'house' && styles.propertyTypeTextActive,
-                    ]}>
-                    Independent House
-                  </Text>
-                </TouchableOpacity>
+                      styles.propertyTypeButton,
+                      propertyCategory === 'independent-house' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('independent-house')}>
+                    <Text style={styles.propertyTypeIcon}>🏘️</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'independent-house' && styles.propertyTypeTextActive,
+                      ]}>
+                      Independent House
+                    </Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.propertyTypeButton,
-                    propertyCategory === 'rowhouse' && styles.propertyTypeButtonActive,
-                  ]}
-                  onPress={() => setPropertyCategory('rowhouse')}>
-                  <Text style={styles.propertyTypeIcon}>🏘️</Text>
-                  <Text
+                  <TouchableOpacity
                     style={[
-                      styles.propertyTypeText,
-                      propertyCategory === 'rowhouse' && styles.propertyTypeTextActive,
-                    ]}>
-                    Row House/ Farm House
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                      styles.propertyTypeButton,
+                      propertyCategory === 'rowhouse' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('rowhouse')}>
+                    <Text style={styles.propertyTypeIcon}>🏘️</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'rowhouse' && styles.propertyTypeTextActive,
+                      ]}>
+                      Row House/ Farm House
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.propertyTypeButton,
+                      propertyCategory === 'penthouse' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('penthouse')}>
+                    <Text style={styles.propertyTypeIcon}>🌆</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'penthouse' && styles.propertyTypeTextActive,
+                      ]}>
+                      Penthouse
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.propertyTypeButton,
+                      propertyCategory === 'studio-apartment' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => {
+                      setPropertyCategory('studio-apartment');
+                      setBedrooms(0); // Auto-set to 0 for studio
+                    }}>
+                    <Text style={styles.propertyTypeIcon}>🛏️</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'studio-apartment' && styles.propertyTypeTextActive,
+                      ]}>
+                      Studio Apartment
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Commercial Properties */}
+                  <TouchableOpacity
+                    style={[
+                      styles.propertyTypeButton,
+                      propertyCategory === 'commercial-office' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('commercial-office')}>
+                    <Text style={styles.propertyTypeIcon}>🏢</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'commercial-office' && styles.propertyTypeTextActive,
+                      ]}>
+                      Commercial Office
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.propertyTypeButton,
+                      propertyCategory === 'commercial-shop' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('commercial-shop')}>
+                    <Text style={styles.propertyTypeIcon}>🏪</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'commercial-shop' && styles.propertyTypeTextActive,
+                      ]}>
+                      Commercial Shop
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.propertyTypeButton,
+                      propertyCategory === 'warehouse-godown' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('warehouse-godown')}>
+                    <Text style={styles.propertyTypeIcon}>🏪</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'warehouse-godown' && styles.propertyTypeTextActive,
+                      ]}>
+                      Warehouse / Godown
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Land */}
+                  <TouchableOpacity
+                    style={[
+                      styles.propertyTypeButton,
+                      propertyCategory === 'plot-land' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('plot-land')}>
+                    <Text style={styles.propertyTypeIcon}>📐</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'plot-land' && styles.propertyTypeTextActive,
+                      ]}>
+                      Plot / Land
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* PG/Hostel */}
+                  <TouchableOpacity
+                    style={[
+                      styles.propertyTypeButton,
+                      propertyCategory === 'pg-hostel' && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => setPropertyCategory('pg-hostel')}>
+                    <Text style={styles.propertyTypeIcon}>🛏️</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyCategory === 'pg-hostel' && styles.propertyTypeTextActive,
+                      ]}>
+                      PG / Hostel
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
           </View>
         );
@@ -496,18 +817,76 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.label}>
                 Location <Text style={styles.required}>*</Text>
               </Text>
+              <View style={styles.locationInputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter locality, area or landmark"
+                  placeholderTextColor={colors.textSecondary}
+                  value={location}
+                  onChangeText={setLocation}
+                />
+                <LocationAutoSuggest
+                  query={location}
+                  onSelect={(locationData) => {
+                    setLocation(locationData.placeName || locationData.name);
+                    if (locationData.coordinates) {
+                      setLatitude(locationData.coordinates[1]);
+                      setLongitude(locationData.coordinates[0]);
+                    }
+                    // Extract state from context if available
+                    if (locationData.context) {
+                      const stateContext = locationData.context.find((ctx: any) => ctx.id?.startsWith('region'));
+                      if (stateContext) {
+                        setState(stateContext.text || stateContext.name);
+                      }
+                    }
+                  }}
+                  visible={location.length >= 2}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>
+                State <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.stateInputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter state"
+                  placeholderTextColor={colors.textSecondary}
+                  value={state}
+                  onChangeText={setState}
+                />
+                <StateAutoSuggest
+                  query={state}
+                  onSelect={(stateData) => {
+                    setState(stateData.name || stateData.placeName);
+                  }}
+                  visible={state.length >= 2}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Additional Address</Text>
               <TextInput
-                style={styles.input}
-                placeholder="Enter locality, area or landmark"
+                style={[styles.input, styles.textArea]}
+                placeholder="Enter additional address details (building name, landmark, etc.)"
                 placeholderTextColor={colors.textSecondary}
-                value={location}
-                onChangeText={setLocation}
+                value={additionalAddress}
+                onChangeText={setAdditionalAddress}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
               />
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Property Location on Map (Optional)</Text>
-              <TouchableOpacity style={styles.mapButton}>
+              <TouchableOpacity 
+                style={styles.mapButton}
+                onPress={() => setLocationPickerVisible(true)}>
                 <LinearGradient
                   colors={['#8B5CF6', '#6D28D9']}
                   start={{x: 0, y: 0}}
@@ -520,51 +899,80 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.mapButtonSubtext}>
                 Select exact location on map for better visibility
               </Text>
+              {latitude && longitude && (
+                <Text style={styles.coordinateText}>
+                  Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                </Text>
+              )}
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Bedrooms <Text style={styles.required}>*</Text>
-              </Text>
-              <View style={styles.numberButtonsContainer}>
-                {[1, 2, 3, 4, 5].map(num => (
-                  <TouchableOpacity
-                    key={num}
-                    style={[
-                      styles.numberButton,
-                      bedrooms === num && styles.numberButtonActive,
-                    ]}
-                    onPress={() => setBedrooms(num)}>
-                    <Text
+            <LocationPicker
+              visible={locationPickerVisible}
+              initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
+              onLocationSelect={(locationData) => {
+                setLatitude(locationData.latitude);
+                setLongitude(locationData.longitude);
+                if (locationData.address) {
+                  setLocation(locationData.address);
+                }
+                setLocationPickerVisible(false);
+              }}
+              onClose={() => setLocationPickerVisible(false)}
+            />
+
+            {fieldVisibility.showBedrooms && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  {propertyCategory === 'studio-apartment' ? 'Studio' : 'Bedrooms'} 
+                  {fieldVisibility.bedroomsRequired && <Text style={styles.required}>*</Text>}
+                </Text>
+                {propertyCategory === 'studio-apartment' ? (
+                  <View style={styles.studioButton}>
+                    <Text style={styles.studioButtonText}>Studio (0 Bedrooms)</Text>
+                  </View>
+                ) : (
+                  <View style={styles.numberButtonsContainer}>
+                    {[1, 2, 3, 4, 5].map(num => (
+                      <TouchableOpacity
+                        key={num}
+                        style={[
+                          styles.numberButton,
+                          bedrooms === num && styles.numberButtonActive,
+                        ]}
+                        onPress={() => setBedrooms(num)}>
+                        <Text
+                          style={[
+                            styles.numberButtonText,
+                            bedrooms === num && styles.numberButtonTextActive,
+                          ]}>
+                          {num}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
                       style={[
-                        styles.numberButtonText,
-                        bedrooms === num && styles.numberButtonTextActive,
-                      ]}>
-                      {num}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.numberButton,
-                    bedrooms === 6 && styles.numberButtonActive,
-                  ]}
-                  onPress={() => setBedrooms(6)}>
-                  <Text
-                    style={[
-                      styles.numberButtonText,
-                      bedrooms === 6 && styles.numberButtonTextActive,
-                    ]}>
-                    5+
-                  </Text>
-                </TouchableOpacity>
+                        styles.numberButton,
+                        bedrooms === 6 && styles.numberButtonActive,
+                      ]}
+                      onPress={() => setBedrooms(6)}>
+                      <Text
+                        style={[
+                          styles.numberButtonText,
+                          bedrooms === 6 && styles.numberButtonTextActive,
+                        ]}>
+                        5+
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-            </View>
+            )}
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Bathrooms <Text style={styles.required}>*</Text>
-              </Text>
+            {fieldVisibility.showBathrooms && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  Bathrooms {fieldVisibility.bathroomsRequired && <Text style={styles.required}>*</Text>}
+                </Text>
               <View style={styles.numberButtonsContainer}>
                 {[1, 2, 3, 4].map(num => (
                   <TouchableOpacity
@@ -599,9 +1007,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 </TouchableOpacity>
               </View>
             </View>
+            )}
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Balconies</Text>
+            {fieldVisibility.showBalconies && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Balconies</Text>
               <View style={styles.numberButtonsContainer}>
                 {[0, 1, 2, 3].map(num => (
                   <TouchableOpacity
@@ -639,12 +1049,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Built-up Area <Text style={styles.required}>*</Text>
+                {fieldVisibility.areaLabel} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.areaInputContainer}>
                 <TextInput
                   style={[styles.input, styles.areaInput]}
-                  placeholder="Enter area"
+                  placeholder={fieldVisibility.areaLabel === 'Plot Area' ? 'Enter plot area' : 'Enter area'}
                   placeholderTextColor={colors.textSecondary}
                   value={builtUpArea}
                   onChangeText={setBuiltUpArea}
@@ -654,77 +1064,98 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Carpet Area</Text>
-              <View style={styles.areaInputContainer}>
+            {fieldVisibility.showCarpetArea && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Carpet Area</Text>
+                <View style={styles.areaInputContainer}>
+                  <TextInput
+                    style={[styles.input, styles.areaInput]}
+                    placeholder="Enter area"
+                    placeholderTextColor={colors.textSecondary}
+                    value={carpetArea}
+                    onChangeText={setCarpetArea}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.areaUnit}>sq.ft</Text>
+                </View>
+              </View>
+            )}
+
+            {fieldVisibility.showFloor && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Floor Number</Text>
                 <TextInput
-                  style={[styles.input, styles.areaInput]}
-                  placeholder="Enter area"
+                  style={styles.input}
+                  placeholder="e.g., 5 or Ground"
                   placeholderTextColor={colors.textSecondary}
-                  value={carpetArea}
-                  onChangeText={setCarpetArea}
+                  value={floor}
+                  onChangeText={setFloor}
+                />
+              </View>
+            )}
+
+            {fieldVisibility.showTotalFloors && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Total Floors</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Total floors in building"
+                  placeholderTextColor={colors.textSecondary}
+                  value={totalFloors}
+                  onChangeText={setTotalFloors}
                   keyboardType="numeric"
                 />
-                <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Total Floors</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Total floors in building"
-                placeholderTextColor={colors.textSecondary}
-                value={totalFloors}
-                onChangeText={setTotalFloors}
-                keyboardType="numeric"
-              />
-            </View>
+            )}
 
             <Dropdown
               label="Facing"
               placeholder="Select facing direction"
+              required={true}
               options={[
-                {label: 'North', value: 'north'},
-                {label: 'South', value: 'south'},
-                {label: 'East', value: 'east'},
-                {label: 'West', value: 'west'},
-                {label: 'North-East', value: 'north-east'},
-                {label: 'North-West', value: 'north-west'},
-                {label: 'South-East', value: 'south-east'},
-                {label: 'South-West', value: 'south-west'},
+                {label: 'North', value: 'North'},
+                {label: 'South', value: 'South'},
+                {label: 'East', value: 'East'},
+                {label: 'West', value: 'West'},
+                {label: 'North-East', value: 'North-East'},
+                {label: 'North-West', value: 'North-West'},
+                {label: 'South-East', value: 'South-East'},
+                {label: 'South-West', value: 'South-West'},
               ]}
               value={facing}
               onSelect={setFacing}
             />
 
-            <Dropdown
-              label="Property Age"
-              placeholder="Select property age"
-              options={[
-                {label: 'Under Construction', value: 'under-construction'},
-                {label: '0-1 Years', value: '0-1'},
-                {label: '1-5 Years', value: '1-5'},
-                {label: '5-10 Years', value: '5-10'},
-                {label: '10-15 Years', value: '10-15'},
-                {label: '15-20 Years', value: '15-20'},
-                {label: '20+ Years', value: '20+'},
-              ]}
-              value={propertyAge}
-              onSelect={setPropertyAge}
-            />
+            {fieldVisibility.showAge && (
+              <Dropdown
+                label="Property Age"
+                placeholder="Select property age"
+                options={[
+                  {label: 'New Construction', value: 'New Construction'},
+                  {label: 'Less than 1 Year', value: 'Less than 1 Year'},
+                  {label: '1-5 Years', value: '1-5 Years'},
+                  {label: '5-10 Years', value: '5-10 Years'},
+                  {label: '10+ Years', value: '10+ Years'},
+                ]}
+                value={propertyAge}
+                onSelect={setPropertyAge}
+              />
+            )}
 
-            <Dropdown
-              label="Furnishing"
-              placeholder="Select furnishing status"
-              options={[
-                {label: 'Unfurnished', value: 'unfurnished'},
-                {label: 'Semi-Furnished', value: 'semi-furnished'},
-                {label: 'Fully Furnished', value: 'fully-furnished'},
-              ]}
-              value={furnishing}
-              onSelect={setFurnishing}
-            />
+            {fieldVisibility.showFurnishing && (
+              <Dropdown
+                label="Furnishing"
+                placeholder="Select furnishing status"
+                required={fieldVisibility.furnishingRequired}
+                options={[
+                  {label: 'Unfurnished', value: 'Unfurnished'},
+                  {label: 'Semi-Furnished', value: 'Semi-Furnished'},
+                  {label: 'Fully-Furnished', value: 'Fully-Furnished'},
+                ]}
+                value={furnishing}
+                onSelect={setFurnishing}
+              />
+            )}
           </View>
         );
 
@@ -739,7 +1170,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Select Amenities</Text>
               <View style={styles.amenitiesGrid}>
-                {amenitiesList.map(amenity => (
+                {availableAmenities.map(amenity => (
                   <TouchableOpacity
                     key={amenity.id}
                     style={[
@@ -768,7 +1199,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Describe your property in detail. Mention unique features, nearby landmarks, connectivity, etc."
+                placeholder="Describe your property in detail (minimum 100 characters required). Mention unique features, nearby landmarks, connectivity, etc. Note: Mobile numbers and email addresses are not allowed."
                 placeholderTextColor={colors.textSecondary}
                 value={description}
                 onChangeText={setDescription}
@@ -777,7 +1208,14 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 textAlignVertical="top"
                 maxLength={1000}
               />
-              <Text style={styles.charCount}>{description.length}/1000</Text>
+              <Text style={styles.charCount}>
+                Characters: {description.length}/1000 (min: 100)
+              </Text>
+              {description.length > 0 && description.length < 100 && (
+                <Text style={styles.errorText}>
+                  Description must be at least 100 characters
+                </Text>
+              )}
             </View>
           </View>
         );
@@ -806,18 +1244,46 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             {photos.length > 0 && (
               <View style={styles.photosPreview}>
-                {photos.map((photo, index) => (
-                  <View key={index} style={styles.photoPreviewItem}>
-                    <Image source={{uri: photo}} style={styles.photoPreviewImage} />
-                    <TouchableOpacity
-                      style={styles.photoRemoveButton}
-                      onPress={() => {
-                        setPhotos(prev => prev.filter((_, i) => i !== index));
-                      }}>
-                      <Text style={styles.photoRemoveText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                {photos.map((photo, index) => {
+                  const statusColor = 
+                    photo.moderationStatus === 'APPROVED' ? '#4CAF50' :
+                    photo.moderationStatus === 'REJECTED' ? colors.error :
+                    photo.moderationStatus === 'PENDING' ? '#FF9800' :
+                    photo.moderationStatus === 'checking' ? colors.textSecondary :
+                    'transparent';
+                  
+                  const statusText = 
+                    photo.moderationStatus === 'APPROVED' ? '✓' :
+                    photo.moderationStatus === 'REJECTED' ? '✗' :
+                    photo.moderationStatus === 'PENDING' ? '⏳' :
+                    photo.moderationStatus === 'checking' ? '...' :
+                    '';
+                  
+                  return (
+                    <View key={index} style={styles.photoPreviewItem}>
+                      <Image source={{uri: photo.uri}} style={styles.photoPreviewImage} />
+                      {photo.moderationStatus && (
+                        <View style={[styles.moderationBadge, {backgroundColor: statusColor}]}>
+                          <Text style={styles.moderationBadgeText}>{statusText}</Text>
+                        </View>
+                      )}
+                      {photo.moderationReason && photo.moderationStatus === 'REJECTED' && (
+                        <View style={styles.reasonBadge}>
+                          <Text style={styles.reasonText} numberOfLines={1}>
+                            {photo.moderationReason}
+                          </Text>
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={styles.photoRemoveButton}
+                        onPress={() => {
+                          setPhotos(prev => prev.filter((_, i) => i !== index));
+                        }}>
+                        <Text style={styles.photoRemoveText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
               </View>
             )}
           </View>
@@ -831,13 +1297,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Expected Price <Text style={styles.required}>*</Text>
+                {propertyType === 'sell' ? 'Expected Price' : 'Monthly Rent'} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.priceInputContainer}>
                 <Text style={styles.currencySymbol}>₹</Text>
                 <TextInput
                   style={[styles.input, styles.priceInput]}
-                  placeholder="Enter expected price"
+                  placeholder={propertyType === 'sell' ? 'Enter expected price' : 'Enter monthly rent'}
                   placeholderTextColor={colors.textSecondary}
                   value={expectedPrice}
                   onChangeText={setExpectedPrice}
@@ -857,6 +1323,26 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.checkboxLabel}>Price is negotiable</Text>
               </TouchableOpacity>
             </View>
+
+            {propertyType === 'rent' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Security Deposit</Text>
+                <View style={styles.priceInputContainer}>
+                  <Text style={styles.currencySymbol}>₹</Text>
+                  <TextInput
+                    style={[styles.input, styles.priceInput]}
+                    placeholder="Enter deposit amount"
+                    placeholderTextColor={colors.textSecondary}
+                    value={depositAmount}
+                    onChangeText={setDepositAmount}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <Text style={styles.hintText}>
+                  Typically 2-6 months of rent
+                </Text>
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Maintenance (per month)</Text>
@@ -1468,6 +1954,35 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  moderationBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  moderationBadgeText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  reasonBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 4,
+  },
+  reasonText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 8,
+  },
   photoRemoveButton: {
     position: 'absolute',
     top: 4,
@@ -1668,6 +2183,50 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
+  },
+  propertyTypeScroll: {
+    marginTop: spacing.sm,
+  },
+  locationInputContainer: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  stateInputContainer: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  coordinateText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    fontFamily: 'monospace',
+    fontSize: 11,
+  },
+  studioButton: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  studioButtonText: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  hintText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: spacing.xs,
+  },
+  errorText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 12,
+    marginTop: spacing.xs,
   },
 });
 

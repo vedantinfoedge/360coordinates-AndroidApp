@@ -15,12 +15,14 @@ interface SellerHeaderProps {
   onProfilePress?: () => void;
   onSupportPress?: () => void;
   onLogoutPress?: () => void;
+  subscriptionDays?: number;
 }
 
 const SellerHeader: React.FC<SellerHeaderProps> = ({
   onProfilePress,
   onSupportPress,
   onLogoutPress,
+  subscriptionDays,
 }) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const insets = useSafeAreaInsets();
@@ -29,13 +31,30 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
     <View style={[styles.safeArea, {paddingTop: insets.top}]}>
       <View style={styles.header}>
         {/* Logo */}
-        <View style={styles.logoContainer}>
+        <TouchableOpacity
+          style={styles.logoContainer}
+          onPress={() => {
+            // Navigate to dashboard if needed
+          }}>
           <Image
             source={require('../assets/logo.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
-        </View>
+        </TouchableOpacity>
+
+        {/* Free Trial Badge */}
+        {subscriptionDays !== undefined && subscriptionDays > 0 && (
+          <View
+            style={[
+              styles.trialBadge,
+              subscriptionDays <= 7 && styles.trialBadgeUrgent,
+            ]}>
+            <Text style={styles.trialBadgeText}>
+              {subscriptionDays} {subscriptionDays === 1 ? 'day' : 'days'} left
+            </Text>
+          </View>
+        )}
 
         {/* Hamburger Menu */}
         <TouchableOpacity
@@ -173,6 +192,22 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: colors.error,
+  },
+  trialBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.md,
+    marginRight: spacing.sm,
+  },
+  trialBadgeUrgent: {
+    backgroundColor: colors.error,
+  },
+  trialBadgeText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
   },
 });
 

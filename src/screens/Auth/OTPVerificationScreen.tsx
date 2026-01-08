@@ -13,6 +13,7 @@ import {colors, typography, spacing, borderRadius} from '../../theme';
 import Button from '../../components/common/Button';
 import OTPInput from '../../components/auth/OTPInput';
 import {authService} from '../../services/auth.service';
+import {otpService} from '../../services/otp.service';
 import {useAuth} from '../../context/AuthContext';
 
 type OTPVerificationScreenNavigationProp = NativeStackNavigationProp<
@@ -76,8 +77,77 @@ const OTPVerificationScreen: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Use verifyOTP from AuthContext which handles login automatically
-      // Pass phone if available for backend compatibility
+      // If email is provided, try MSG91 email OTP verification first
+      if (params.email) {
+        try {
+          const emailVerifyResponse = await otpService.verifyEmail(params.email, otp);
+          if (emailVerifyResponse.success) {
+            // Email OTP verified via MSG91, now verify with backend
+            await verifyOTP(userId, otp, params.phone);
+            
+            // Success - navigation handled by AppNavigator
+            if (params.type === 'forgotPassword') {
+              navigation.navigate('ResetPassword', {otp} as never);
+            } else {
+              Alert.alert(
+                'Success',
+                'Email OTP verified successfully! You are now logged in.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Navigation handled automatically by AppNavigator
+                    },
+                  },
+                ],
+              );
+            }
+            return;
+          }
+        } catch (emailError: any) {
+          // MSG91 verification failed, fall back to backend verification
+          console.warn('[OTP] MSG91 email verification failed, using backend:', emailError);
+        }
+      }
+      
+      // If phone is provided, try MSG91 SMS OTP verification
+      if (params.phone) {
+        try {
+          const phoneNumber = params.phone.startsWith('+') ? params.phone : `+91${params.phone}`;
+          // Determine context: 'forgotPassword' or 'register' (default)
+          const context = params.type === 'forgotPassword' ? 'forgotPassword' : 'register';
+          const smsVerifyResponse = await otpService.verifySMS(phoneNumber, otp, context);
+          if (smsVerifyResponse.success) {
+            // SMS OTP verified via MSG91, now verify with backend
+            await verifyOTP(userId, otp, params.phone);
+            
+            // Success - navigation handled by AppNavigator
+            if (params.type === 'forgotPassword') {
+              navigation.navigate('ResetPassword', {otp} as never);
+            } else {
+              Alert.alert(
+                'Success',
+                'SMS OTP verified successfully! You are now logged in.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Navigation handled automatically by AppNavigator
+                    },
+                  },
+                ],
+              );
+            }
+            return;
+          }
+        } catch (smsError: any) {
+          // MSG91 verification failed, fall back to backend verification
+          console.warn('[OTP] MSG91 SMS verification failed, using backend:', smsError);
+        }
+      }
+      
+      // Default: Use verifyOTP from AuthContext (fallback to backend)
+      // This handles login automatically
       await verifyOTP(userId, otp, params.phone);
       
       // If we reach here, verification was successful and user is logged in
@@ -118,7 +188,44 @@ const OTPVerificationScreen: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Pass phone if available for backend compatibility
+      // If email is provided, try MSG91 email OTP resend first
+      if (params.email) {
+        try {
+          const emailResendResponse = await otpService.resendEmail(params.email);
+          if (emailResendResponse.success) {
+            setTimer(60);
+            setCanResend(false);
+            setOtp('');
+            Alert.alert('Success', 'New email OTP sent successfully!');
+            return;
+          }
+        } catch (emailError: any) {
+          // MSG91 resend failed, fall back to backend
+          console.warn('[OTP] MSG91 email resend failed, using backend:', emailError);
+        }
+      }
+      
+      // If phone is provided, try MSG91 SMS OTP resend
+      if (params.phone) {
+        try {
+          const phoneNumber = params.phone.startsWith('+') ? params.phone : `+91${params.phone}`;
+          // Determine context: 'forgotPassword' or 'register' (default)
+          const context = params.type === 'forgotPassword' ? 'forgotPassword' : 'register';
+          const smsResendResponse = await otpService.resendSMS(phoneNumber, context);
+          if (smsResendResponse.success) {
+            setTimer(60);
+            setCanResend(false);
+            setOtp('');
+            Alert.alert('Success', 'New SMS OTP sent successfully!');
+            return;
+          }
+        } catch (smsError: any) {
+          // MSG91 resend failed, fall back to backend
+          console.warn('[OTP] MSG91 SMS resend failed, using backend:', smsError);
+        }
+      }
+      
+      // Default: Use backend resend (fallback)
       await resendOTP(userId, params.phone);
       setTimer(60);
       setCanResend(false);

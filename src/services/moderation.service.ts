@@ -40,14 +40,44 @@ export const moderationService = {
         formData.append('property_id', String(propertyId));
       }
 
-      const response = await api.post(API_ENDPOINTS.MODERATION_UPLOAD, formData, {
+      const response = await api.post(API_ENDPOINTS.MODERATE_AND_UPLOAD, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 30000, // 30 seconds for moderation
       });
 
-      return response;
+      // Handle different response statuses from moderation endpoint
+      // Backend returns: { status: "success"|"error", message: "...", data: { moderation_status, image_url, ... } }
+      if (response.success && response.data) {
+        const moderationStatus = response.data.moderation_status || response.data.status;
+        
+        // Map backend status to our format
+        let status: 'success' | 'approved' | 'pending' | 'rejected' | 'failed' = 'success';
+        if (moderationStatus === 'APPROVED' || moderationStatus === 'SAFE') {
+          status = 'approved';
+        } else if (moderationStatus === 'REJECTED' || moderationStatus === 'UNSAFE') {
+          status = 'rejected';
+        } else if (moderationStatus === 'NEEDS_REVIEW' || moderationStatus === 'PENDING') {
+          status = 'pending';
+        }
+
+        return {
+          status,
+          message: response.message || 'Image uploaded successfully',
+          image_url: response.data.image_url || response.data.url,
+          moderation_status: moderationStatus,
+          moderation_reason: response.data.moderation_reason || response.data.reason_code,
+        };
+      } else {
+        // Error response from backend
+        return {
+          status: 'rejected',
+          message: response.message || 'Image rejected by moderation',
+          moderation_status: response.data?.moderation_status || 'REJECTED',
+          moderation_reason: response.data?.moderation_reason || response.data?.reason_code,
+        };
+      }
     } catch (error: any) {
       console.error('Image upload with moderation error:', error);
       return {
@@ -95,15 +125,23 @@ export const moderationService = {
 
   // Get pending images (Admin only)
   getPendingImages: async () => {
-    const response = await api.get(API_ENDPOINTS.MODERATION_PENDING_IMAGES);
+    const response = await api.get(API_ENDPOINTS.ADMIN_MODERATION_QUEUE);
     return response;
   },
 
-  // Update moderation status (Admin only)
-  updateStatus: async (imageId: number, status: 'APPROVED' | 'REJECTED') => {
-    const response = await api.put(API_ENDPOINTS.MODERATION_UPDATE_STATUS, {
+  // Approve image (Admin only)
+  approveImage: async (imageId: number | string) => {
+    const response = await api.post(API_ENDPOINTS.ADMIN_MODERATION_APPROVE, {
       image_id: imageId,
-      status,
+    });
+    return response;
+  },
+
+  // Reject image (Admin only)
+  rejectImage: async (imageId: number | string, reason?: string) => {
+    const response = await api.post(API_ENDPOINTS.ADMIN_MODERATION_REJECT, {
+      image_id: imageId,
+      reason: reason || 'Image does not meet quality standards',
     });
     return response;
   },

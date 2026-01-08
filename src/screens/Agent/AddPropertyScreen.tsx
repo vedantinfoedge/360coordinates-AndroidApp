@@ -18,6 +18,8 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
+import {propertyService} from '../../services/property.service';
+import {moderationService} from '../../services/moderation.service';
 
 type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -70,7 +72,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [furnishing, setFurnishing] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<Array<{uri: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
   const [expectedPrice, setExpectedPrice] = useState('');
   const [priceNegotiable, setPriceNegotiable] = useState(false);
   const [maintenance, setMaintenance] = useState('');
@@ -133,7 +135,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       includeBase64: false,
     };
 
-    launchImageLibrary(options, (response: ImagePickerResponse) => {
+    launchImageLibrary(options, async (response: ImagePickerResponse) => {
       if (response.didCancel) {
         return;
       }
@@ -144,16 +146,74 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
 
       if (response.assets && response.assets.length > 0) {
-        const newPhotos = response.assets
+        const newPhotoUris = response.assets
           .map(asset => asset.uri)
           .filter((uri): uri is string => uri !== undefined);
         
-        if (photos.length + newPhotos.length > 10) {
+        const maxPhotos = 10;
+        const remainingSlots = maxPhotos - photos.length;
+        const photosToAdd = newPhotoUris.slice(0, remainingSlots);
+        
+        if (photos.length + photosToAdd.length > maxPhotos) {
           Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
-          setPhotos([...photos, ...newPhotos.slice(0, 10 - photos.length)]);
-        } else {
-          setPhotos([...photos, ...newPhotos]);
+          return;
         }
+
+        // Add new photos with initial status
+        const newPhotos = photosToAdd.map(uri => ({
+          uri,
+          moderationStatus: 'checking' as const,
+        }));
+        
+        const updatedPhotos = [...photos, ...newPhotos];
+        setPhotos(updatedPhotos);
+
+        // Validate each new image through moderation
+        photosToAdd.forEach(async (uri, index) => {
+          const actualIndex = photos.length + index;
+          try {
+            const result = await moderationService.uploadWithModeration(uri);
+            
+            // Update the specific photo's moderation status
+            setPhotos(prev => {
+              const updated = [...prev];
+              updated[actualIndex] = {
+                ...updated[actualIndex],
+                moderationStatus:
+                  result.moderation_status === 'APPROVED' || result.moderation_status === 'SAFE'
+                    ? 'APPROVED'
+                    : result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE'
+                    ? 'REJECTED'
+                    : 'PENDING',
+                moderationReason: result.moderation_reason,
+                imageUrl: result.image_url,
+              };
+              return updated;
+            });
+
+            // Show alert for rejected images
+            if (result.status === 'rejected' || result.moderation_status === 'REJECTED') {
+              Alert.alert(
+                'Image Rejected',
+                result.moderation_reason || result.message || 'Image does not meet quality standards. Please select a different image.',
+              );
+            } else if (result.status === 'pending' || result.moderation_status === 'PENDING') {
+              // Silent for pending - user can still proceed
+            }
+          } catch (error: any) {
+            console.error('Image moderation error:', error);
+            setPhotos(prev => {
+              const updated = [...prev];
+              updated[actualIndex] = {
+                ...updated[actualIndex],
+                moderationStatus: 'REJECTED',
+                moderationReason: error.message || 'Failed to validate image',
+              };
+              return updated;
+            });
+            Alert.alert('Validation Error', error.message || 'Failed to validate image');
+          }
+        });
       }
     });
   };
@@ -701,18 +761,46 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             {photos.length > 0 && (
               <View style={styles.photosPreview}>
-                {photos.map((photo, index) => (
-                  <View key={index} style={styles.photoPreviewItem}>
-                    <Image source={{uri: photo}} style={styles.photoPreviewImage} />
-                    <TouchableOpacity
-                      style={styles.photoRemoveButton}
-                      onPress={() => {
-                        setPhotos(prev => prev.filter((_, i) => i !== index));
-                      }}>
-                      <Text style={styles.photoRemoveText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                {photos.map((photo, index) => {
+                  const statusColor = 
+                    photo.moderationStatus === 'APPROVED' ? '#4CAF50' :
+                    photo.moderationStatus === 'REJECTED' ? colors.error :
+                    photo.moderationStatus === 'PENDING' ? '#FF9800' :
+                    photo.moderationStatus === 'checking' ? colors.textSecondary :
+                    'transparent';
+                  
+                  const statusText = 
+                    photo.moderationStatus === 'APPROVED' ? '✓' :
+                    photo.moderationStatus === 'REJECTED' ? '✗' :
+                    photo.moderationStatus === 'PENDING' ? '⏳' :
+                    photo.moderationStatus === 'checking' ? '...' :
+                    '';
+                  
+                  return (
+                    <View key={index} style={styles.photoPreviewItem}>
+                      <Image source={{uri: photo.uri}} style={styles.photoPreviewImage} />
+                      {photo.moderationStatus && (
+                        <View style={[styles.moderationBadge, {backgroundColor: statusColor}]}>
+                          <Text style={styles.moderationBadgeText}>{statusText}</Text>
+                        </View>
+                      )}
+                      {photo.moderationReason && photo.moderationStatus === 'REJECTED' && (
+                        <View style={styles.reasonBadge}>
+                          <Text style={styles.reasonText} numberOfLines={1}>
+                            {photo.moderationReason}
+                          </Text>
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={styles.photoRemoveButton}
+                        onPress={() => {
+                          setPhotos(prev => prev.filter((_, i) => i !== index));
+                        }}>
+                        <Text style={styles.photoRemoveText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
               </View>
             )}
           </View>
@@ -1358,6 +1446,35 @@ const styles = StyleSheet.create({
   photoPreviewImage: {
     width: '100%',
     height: '100%',
+  },
+  moderationBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  moderationBadgeText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  reasonBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 4,
+  },
+  reasonText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 8,
   },
   photoRemoveButton: {
     position: 'absolute',

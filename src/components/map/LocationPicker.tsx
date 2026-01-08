@@ -12,7 +12,7 @@ import {
 import Geolocation from 'react-native-geolocation-service';
 import MapViewComponent from './MapView';
 import {colors, spacing, typography, borderRadius} from '../../theme';
-import {locationService} from '../../services/location.service';
+import {reverseGeocode} from '../../utils/geocoding';
 import {log} from '../../utils/debug';
 
 // Conditionally import Mapbox
@@ -53,16 +53,14 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     setLoadingAddress(true);
     
     try {
-      // Reverse geocode to get address
+      // Reverse geocode to get address using Mapbox API
       const [longitude, latitude] = coordinate;
-      const response = await locationService.searchLocations(
-        `${latitude},${longitude}`,
-      );
+      const result = await reverseGeocode(latitude, longitude);
       
-      if (response.success && response.data?.locations?.[0]) {
-        const location = response.data.locations[0];
-        setAddress(location.name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      if (result && result.placeName) {
+        setAddress(result.placeName);
       } else {
+        // Fallback to coordinates if geocoding fails
         setAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
       }
     } catch (error) {
