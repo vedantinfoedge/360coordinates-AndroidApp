@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Alert, Image} from 'react-native';
 import {colors, spacing, typography, borderRadius} from '../theme';
 import {fixImageUrl} from '../utils/imageHelper';
@@ -29,7 +29,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 }) => {
   const [favorite, setFavorite] = useState(isFavorite);
 
+  // Sync favorite state when prop changes
+  React.useEffect(() => {
+    setFavorite(isFavorite);
+  }, [isFavorite]);
+
   const handleFavoritePress = () => {
+    // Optimistically update UI
     setFavorite(!favorite);
     if (onFavoritePress) {
       onFavoritePress();

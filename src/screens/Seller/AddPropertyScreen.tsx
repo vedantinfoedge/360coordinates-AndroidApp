@@ -1046,6 +1046,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 </TouchableOpacity>
               </View>
             </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>

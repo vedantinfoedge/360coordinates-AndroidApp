@@ -90,11 +90,8 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     try {
       setLoadingAddress(true);
       
-      // Request location permission
-      if (Platform.OS === 'android') {
-        const {check, request, PERMISSIONS, RESULTS} = require('react-native-permissions');
-        // For now, we'll use the permission already requested
-      }
+      // Note: react-native-geolocation-service handles permissions automatically
+      // For Android, ensure ACCESS_FINE_LOCATION permission is in AndroidManifest.xml
 
       // Get current location
       Geolocation.getCurrentPosition(

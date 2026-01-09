@@ -106,7 +106,46 @@ api.interceptors.response.use(
     
     // Provide user-friendly error messages based on status code
     if (statusCode === 403) {
-      errorMessage = 'Access denied. Please check your credentials or contact support.';
+      // Try to extract specific error message from backend
+      if (typeof errorData === 'string') {
+        try {
+          const parsed = JSON.parse(errorData);
+          errorMessage = parsed.message || parsed.error || errorMessage;
+        } catch {
+          // If not JSON, use the string if it's reasonable
+          if (errorData.length < 200 && !errorData.includes('<!DOCTYPE')) {
+            errorMessage = errorData;
+          }
+        }
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      } else if (errorData?.error) {
+        errorMessage = errorData.error;
+      } else if (errorData?.data?.message) {
+        errorMessage = errorData.data.message;
+      } else {
+        errorMessage = 'Access denied. You don\'t have permission to access this dashboard. Please try logging in with a different account type.';
+      }
+    } else if (statusCode === 400) {
+      // Validation errors
+      if (typeof errorData === 'string') {
+        try {
+          const parsed = JSON.parse(errorData);
+          errorMessage = parsed.message || parsed.error || 'Validation failed. Please check your input.';
+        } catch {
+          if (errorData.length < 200 && !errorData.includes('<!DOCTYPE')) {
+            errorMessage = errorData;
+          } else {
+            errorMessage = 'Validation failed. Please check your email, password, and selected role.';
+          }
+        }
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      } else if (errorData?.error) {
+        errorMessage = errorData.error;
+      } else {
+        errorMessage = 'Validation failed. Please check your email, password, and selected role.';
+      }
     } else if (statusCode === 404) {
       errorMessage = 'Service not found. Please try again later.';
     } else if (statusCode === 500) {

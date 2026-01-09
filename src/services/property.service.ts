@@ -160,22 +160,80 @@ export const propertyService = {
     // Fix image URLs in response
     if (response && response.success && response.data) {
       const property = fixPropertyImages(response.data.property || response.data);
-      const images = (response.data.images || []).map((img: any) => ({
-        ...img,
-        image_url: fixImageUrl(img.image_url || img.url),
-      }));
       
-      // Fix owner profile image
-      if (response.data.owner) {
-        response.data.owner.profile_image = fixImageUrl(response.data.owner.profile_image);
+      // Process images array - handle multiple formats
+      let images: any[] = [];
+      if (response.data.images && Array.isArray(response.data.images)) {
+        images = response.data.images
+          .map((img: any) => {
+            if (typeof img === 'string') {
+              // If image is a string URL, convert to object format
+              return {
+                image_url: fixImageUrl(img),
+                url: fixImageUrl(img),
+              };
+            } else if (img && typeof img === 'object') {
+              // If image is an object, fix the URL fields
+              return {
+                ...img,
+                image_url: fixImageUrl(img.image_url || img.url || img.path || ''),
+                url: fixImageUrl(img.url || img.image_url || img.path || ''),
+              };
+            }
+            return null;
+          })
+          .filter((img: any) => img && img.image_url && img.image_url !== '' && img.image_url !== 'https://via.placeholder.com/400x300?text=No+Image');
       }
+      
+      // Also check if property has images array directly
+      if (property.images && Array.isArray(property.images) && images.length === 0) {
+        images = property.images
+          .map((img: any) => {
+            if (typeof img === 'string') {
+              return {
+                image_url: fixImageUrl(img),
+                url: fixImageUrl(img),
+              };
+            } else if (img && typeof img === 'object') {
+              return {
+                ...img,
+                image_url: fixImageUrl(img.image_url || img.url || img.path || ''),
+                url: fixImageUrl(img.url || img.image_url || img.path || ''),
+              };
+            }
+            return null;
+          })
+          .filter((img: any) => img && img.image_url && img.image_url !== '' && img.image_url !== 'https://via.placeholder.com/400x300?text=No+Image');
+      }
+      
+      console.log('[PropertyService] Processed images:', {
+        count: images.length,
+        firstImage: images[0]?.image_url,
+      });
+      
+      // Fix owner/seller data
+      const owner = response.data.owner || response.data.seller || {};
+      if (owner) {
+        owner.profile_image = fixImageUrl(owner.profile_image);
+      }
+      
+      // Merge owner data into property
+      const propertyWithOwner = {
+        ...property,
+        seller_name: property.seller_name || owner.name || owner.full_name,
+        seller_email: property.seller_email || owner.email,
+        seller_phone: property.seller_phone || owner.phone,
+        seller_id: property.seller_id || owner.id || owner.user_id,
+        seller_verified: property.seller_verified || owner.verified,
+        owner: owner,
+      };
       
       return {
         ...response,
         data: {
           ...response.data,
           property: {
-            ...property,
+            ...propertyWithOwner,
             // Fix numeric fields
             latitude: property.latitude ? parseFloat(property.latitude) : null,
             longitude: property.longitude ? parseFloat(property.longitude) : null,

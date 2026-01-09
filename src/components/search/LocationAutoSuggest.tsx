@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  FlatList,
+  ScrollView,
 } from 'react-native';
 import {MAPBOX_ACCESS_TOKEN} from '../../config/mapbox.config';
 import {colors, spacing, typography} from '../../theme';
@@ -34,40 +34,23 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    // Clear previous timer
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
-
-    // Don't search if query is too short
-    if (!query || query.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    // Debounce API calls
-    debounceTimer.current = setTimeout(() => {
-      searchLocations(query);
-    }, debounceMs);
-
-    return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
-  }, [query]);
+  const isMountedRef = useRef(true);
 
   const searchLocations = async (searchQuery: string) => {
+    if (!isMountedRef.current) return;
+    
     try {
-      setLoading(true);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
       
       const encodedQuery = encodeURIComponent(searchQuery);
       const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=in&limit=30&autocomplete=true`;
 
       const response = await fetch(url);
       const data = await response.json();
+
+      if (!isMountedRef.current) return;
 
       if (data.features && Array.isArray(data.features)) {
         const formattedSuggestions: LocationSuggestion[] = data.features.map(
@@ -79,18 +62,64 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
             context: feature.context || [],
           }),
         );
-        setSuggestions(formattedSuggestions);
+        if (isMountedRef.current) {
+          setSuggestions(formattedSuggestions);
+        }
       } else {
-        setSuggestions([]);
+        if (isMountedRef.current) {
+          setSuggestions([]);
+        }
       }
     } catch (error) {
       console.error('Location autocomplete error:', error);
-      setSuggestions([]);
-      // Fallback to empty array on error
+      if (isMountedRef.current) {
+        setSuggestions([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // Clear previous timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // Don't search if query is too short
+    if (!query || query.length < 2) {
+      if (isMountedRef.current) {
+        setSuggestions([]);
+      }
+      return;
+    }
+
+    // Debounce API calls
+    debounceTimer.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        searchLocations(query);
+      }
+    }, debounceMs);
+
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, debounceMs]);
 
   const handleSelect = (location: LocationSuggestion) => {
     onSelect(location);
@@ -113,11 +142,14 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
           <Text style={styles.loadingText}>Searching...</Text>
         </View>
       ) : (
-        <FlatList
-          data={suggestions}
-          keyExtractor={item => item.id}
-          renderItem={({item}) => (
+        <ScrollView
+          style={styles.list}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={true}>
+          {suggestions.map((item) => (
             <TouchableOpacity
+              key={item.id}
               style={styles.suggestion}
               onPress={() => handleSelect(item)}>
               <Text style={styles.suggestionText} numberOfLines={1}>
@@ -129,10 +161,8 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
                 </Text>
               )}
             </TouchableOpacity>
-          )}
-          style={styles.list}
-          keyboardShouldPersistTaps="handled"
-        />
+          ))}
+        </ScrollView>
       )}
     </View>
   );

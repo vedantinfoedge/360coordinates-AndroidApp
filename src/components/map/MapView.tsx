@@ -44,7 +44,7 @@ interface MapViewProps {
     title?: string;
     description?: string;
     color?: string;
-    price?: number;
+    price?: number; // Price is optional (not needed for location picker)
     onPress?: () => void;
   }>;
   onLocationSelect?: (coordinate: [number, number]) => void;
@@ -64,7 +64,7 @@ const MapViewComponent: React.FC<MapViewProps> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<any>(null);
 
   useEffect(() => {
     initializeMapbox();
@@ -97,7 +97,7 @@ const MapViewComponent: React.FC<MapViewProps> = ({
     const Geolocation = require('react-native-geolocation-service').default;
     
     Geolocation.getCurrentPosition(
-      position => {
+      (position: any) => {
         const {latitude, longitude} = position.coords;
         const coordinate: [number, number] = [longitude, latitude];
         setUserLocation(coordinate);
@@ -113,7 +113,7 @@ const MapViewComponent: React.FC<MapViewProps> = ({
         
         log.location('Current location obtained', {latitude, longitude});
       },
-      error => {
+      (error: any) => {
         log.error('location', 'Error getting current location', error);
       },
       {
@@ -202,40 +202,62 @@ const MapViewComponent: React.FC<MapViewProps> = ({
           </PointAnnotation>
         )}
 
-        {/* Property markers with price labels (as per guide) */}
+        {/* Property markers with price tags (website style) or simple markers */}
         {markers.map(marker => {
-          // Format price for marker (₹X.XL format)
-          const formatPrice = (price: number) => {
-            if (price >= 10000000) {
-              return `₹${(price / 10000000).toFixed(1)}Cr`;
-            } else if (price >= 100000) {
-              return `₹${(price / 100000).toFixed(1)}L`;
-            } else if (price >= 1000) {
-              return `₹${(price / 1000).toFixed(1)}K`;
-            }
-            return `₹${price}`;
-          };
+          // Default purple (#8B5CF6), Selected orange (#F97316)
+          const markerColor = marker.color || '#8B5CF6';
+          const isSelected = markerColor === '#F97316';
+          const hasPrice = marker.price !== undefined && marker.price !== null;
           
-          const priceText = marker.price ? formatPrice(marker.price) : '';
+          // If marker has a price, show price tag
+          if (hasPrice) {
+            // Format price for marker - show exact price with proper formatting
+            const formatPrice = (price: number) => {
+              if (!price || price === 0) return '₹0';
+              // Format with Indian number system (lakhs, crores)
+              if (price >= 10000000) {
+                const crores = price / 10000000;
+                return crores % 1 === 0 ? `${crores.toFixed(0)}Cr` : `${crores.toFixed(1)}Cr`;
+              } else if (price >= 100000) {
+                const lakhs = price / 100000;
+                return lakhs % 1 === 0 ? `${lakhs.toFixed(0)}L` : `${lakhs.toFixed(1)}L`;
+              } else if (price >= 1000) {
+                const thousands = price / 1000;
+                return thousands % 1 === 0 ? `${thousands.toFixed(0)}K` : `${thousands.toFixed(1)}K`;
+              }
+              return price.toLocaleString('en-IN');
+            };
+            
+            const priceText = formatPrice(marker.price!);
+            
+            return (
+              <PointAnnotation
+                key={marker.id}
+                id={marker.id}
+                coordinate={marker.coordinate}
+                anchor={{x: 0.5, y: 0.5}}
+                onSelected={() => handleMarkerPress(marker.id)}>
+                <View style={[styles.priceTagMarker, isSelected && styles.priceTagMarkerSelected]}>
+                  <View style={[styles.priceTag, {backgroundColor: markerColor}]}>
+                    <Text style={styles.priceTagText} numberOfLines={1} adjustsFontSizeToFit={true} minimumFontScale={0.8}>
+                      ₹{priceText}
+                    </Text>
+                  </View>
+                </View>
+              </PointAnnotation>
+            );
+          }
           
+          // If no price, show simple colored marker (for location picker, etc.)
           return (
             <PointAnnotation
               key={marker.id}
               id={marker.id}
               coordinate={marker.coordinate}
-              anchor={{x: 0.5, y: 1}}
+              anchor={{x: 0.5, y: 0.5}}
               onSelected={() => handleMarkerPress(marker.id)}>
-              <View style={styles.markerContainer}>
-                {priceText ? (
-                  <View style={[styles.marker, {backgroundColor: marker.color || colors.primary}]}>
-                    <Text style={styles.markerText}>{priceText}</Text>
-                  </View>
-                ) : (
-                  <View style={[styles.marker, {backgroundColor: marker.color || colors.primary}]}>
-                    <View style={styles.markerInner} />
-                  </View>
-                )}
-                <View style={styles.markerDot} />
+              <View style={[styles.simpleMarker, {backgroundColor: markerColor}, isSelected && styles.simpleMarkerSelected]}>
+                <View style={styles.simpleMarkerDot} />
               </View>
             </PointAnnotation>
           );
@@ -297,38 +319,34 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     color: colors.textSecondary,
   },
-  markerContainer: {
+  // Price tag marker (website style)
+  priceTagMarker: {
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
-  marker: {
-    backgroundColor: colors.primary,
+  priceTagMarkerSelected: {
+    zIndex: 100, // Selected markers on top
+  },
+  priceTag: {
+    backgroundColor: '#8B5CF6', // Default purple
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: colors.surface,
-    minWidth: 50,
+    borderRadius: 20, // Pill-shaped
+    minWidth: 60,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  markerText: {
-    color: colors.surface,
-    fontWeight: 'bold',
+  priceTagText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
     fontSize: 12,
-  },
-  markerInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.surface,
-  },
-  markerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-    marginTop: 2,
+    textAlign: 'center',
   },
   userLocationMarker: {
     width: 20,
@@ -344,6 +362,34 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: colors.surface,
+  },
+  simpleMarker: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#8B5CF6',
+    borderWidth: 3,
+    borderColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  simpleMarkerSelected: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 4,
+    zIndex: 100,
+  },
+  simpleMarkerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: colors.surface,
   },
 });

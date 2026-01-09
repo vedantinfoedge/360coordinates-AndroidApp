@@ -66,20 +66,46 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Check user type access
   useEffect(() => {
-    loadDashboardData();
-    
-    // Auto-refresh every 60 seconds
-    refreshIntervalRef.current = setInterval(() => {
-      loadDashboardData(false); // Silent refresh
-    }, 60000);
+    if (user && user.user_type === 'agent') {
+      Alert.alert(
+        'Access Denied',
+        'You are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.reset({
+                index: 0,
+                routes: [{name: 'Agent' as never}],
+              });
+            },
+          },
+        ],
+        {cancelable: false}
+      );
+      return;
+    }
+  }, [user, navigation]);
 
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-    };
-  }, []);
+  useEffect(() => {
+    // Only load data if user is a seller
+    if (user && user.user_type === 'seller') {
+      loadDashboardData();
+    
+      // Auto-refresh every 60 seconds
+      refreshIntervalRef.current = setInterval(() => {
+        loadDashboardData(false); // Silent refresh
+      }, 60000);
+
+      return () => {
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+        }
+      };
+    }
+  }, [user]);
 
   const loadDashboardData = async (showLoading: boolean = true) => {
     try {
@@ -233,6 +259,28 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  // Show access denied message if user is an agent
+  if (user && user.user_type === 'agent') {
+    return (
+      <View style={styles.container}>
+        <SellerHeader
+          onProfilePress={() => navigation.navigate('Profile')}
+          onSupportPress={() => navigation.navigate('Support' as never)}
+          onLogoutPress={async () => {
+            await logout();
+          }}
+        />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorIcon}>🚫</Text>
+          <Text style={styles.errorTitle}>Access Denied</Text>
+          <Text style={styles.errorText}>
+            You are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (loading && !dashboardStats) {
     return (

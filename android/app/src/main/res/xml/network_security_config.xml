@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow HTTPS connections to production API -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">demo1.indiapropertys.com</domain>
+        <trust-anchors>
+            <!-- Trust system certificates -->
+            <certificates src="system" />
+            <!-- Trust user-added certificates (for debugging) -->
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- Base configuration: Allow cleartext traffic for development only -->
+    <!-- In production, this should be removed or set to false -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+

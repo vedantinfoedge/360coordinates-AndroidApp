@@ -16,6 +16,10 @@ export const userService = {
         if (response.data.user?.profile_image) {
           response.data.user.profile_image = fixImageUrl(response.data.user.profile_image);
         }
+        // Also check direct profile_image field
+        if (response.data.profile_image) {
+          response.data.profile_image = fixImageUrl(response.data.profile_image);
+        }
       }
       
       return response;
@@ -95,8 +99,17 @@ export const userService = {
           const userData = await AsyncStorage.getItem('@propertyapp_user');
           if (userData) {
             const user = JSON.parse(userData);
-            user.profile_image = response.data.url;
+            user.profile_image = fixImageUrl(response.data.url);
             await AsyncStorage.setItem('@propertyapp_user', JSON.stringify(user));
+            
+            // Also update AuthContext if available
+            try {
+              const {useAuth} = require('../context/AuthContext');
+              // Note: This will require the component to reload user data
+              // The profile screen should call getProfile() after upload
+            } catch (contextError) {
+              // Context not available, that's okay
+            }
           }
         } catch (storageError) {
           console.error('Error updating cached user data:', storageError);

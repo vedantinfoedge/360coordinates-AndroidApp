@@ -10,13 +10,14 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import {CompositeNavigationProp} from '@react-navigation/native';
+import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {BuyerTabParamList} from '../components/navigation/BuyerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../theme';
 import {favoriteService} from '../services/favorite.service';
+import {buyerService} from '../services/buyer.service';
 import {fixImageUrl} from '../utils/imageHelper';
 import BuyerHeader from '../components/BuyerHeader';
 import {useAuth} from '../context/AuthContext';
@@ -52,16 +53,26 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
     loadFavorites();
   }, []);
 
+  // Reload favorites when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadFavorites(1, false);
+    }, [])
+  );
+
   const loadFavorites = async (pageNum: number = 1, append: boolean = false) => {
     try {
       if (pageNum === 1) {
         setLoading(true);
       }
       
-      const response = await favoriteService.getFavorites(pageNum, 20);
+      // Use buyer service endpoint (matches the toggle endpoint)
+      const response = await buyerService.getFavorites({page: pageNum, limit: 20});
       
-      if (response && response.success && response.data?.properties) {
-        const formattedProperties = response.data.properties.map((prop: any) => ({
+      if (response && response.success && response.data) {
+        // Handle buyer service response format
+        const propertiesList = response.data.properties || response.data.favorites || [];
+        const formattedProperties = propertiesList.map((prop: any) => ({
           id: prop.id,
           title: prop.title || prop.property_title || 'Untitled Property',
           location: prop.location || prop.city || 'Location not specified',

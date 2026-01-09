@@ -16,11 +16,25 @@ export const otpService = {
       // Try MSG91 SDK first
       const {OTPWidget} = require('@msg91comm/sendotp-react-native');
       
-      // Switch to appropriate widget based on context
-      if (context === 'forgotPassword') {
-        await switchToForgotPasswordWidget();
-      } else {
-        await switchToSMSWidget(); // Registration SMS widget
+      // Ensure widget is initialized before switching
+      try {
+        // Switch to appropriate widget based on context
+        if (context === 'forgotPassword') {
+          await switchToForgotPasswordWidget();
+        } else {
+          await switchToSMSWidget(); // Registration SMS widget
+        }
+      } catch (switchError) {
+        // If switching fails, try to initialize first
+        console.warn('[OTP] Widget switch failed, initializing:', switchError);
+        const {initializeMSG91} = require('../config/msg91.config');
+        await initializeMSG91();
+        // Try switching again
+        if (context === 'forgotPassword') {
+          await switchToForgotPasswordWidget();
+        } else {
+          await switchToSMSWidget();
+        }
       }
       
       // Format phone number (ensure it starts with country code)
@@ -122,8 +136,18 @@ export const otpService = {
       // Try MSG91 SDK first
       const {OTPWidget} = require('@msg91comm/sendotp-react-native');
       
-      // Switch to Email widget
-      await switchToEmailWidget();
+      // Ensure widget is initialized before switching
+      try {
+        // Switch to Email widget
+        await switchToEmailWidget();
+      } catch (switchError) {
+        // If switching fails, try to initialize first
+        console.warn('[OTP] Widget switch failed, initializing:', switchError);
+        const {initializeMSG91} = require('../config/msg91.config');
+        await initializeMSG91();
+        // Try switching again
+        await switchToEmailWidget();
+      }
       
       const data = {
         identifier: email, // Email address for email OTP

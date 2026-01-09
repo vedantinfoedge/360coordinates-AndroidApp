@@ -34,27 +34,34 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
 
   const userData = user || {
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+91 98765 43210',
-    address: 'Mumbai, Maharashtra',
+    full_name: 'User',
+    email: '',
+    phone: '',
+    address: '',
   };
 
   const [isEditing, setIsEditing] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(user?.profile_image || null);
   const [formData, setFormData] = useState({
-    name: userData.name,
+    name: userData.full_name || '',
     phone: userData.phone || '',
-    email: userData.email,
+    email: userData.email || '',
     address: userData.address || '',
   });
 
   const [originalData, setOriginalData] = useState({
-    name: userData.name,
+    name: userData.full_name || '',
     phone: userData.phone || '',
-    email: userData.email,
+    email: userData.email || '',
     address: userData.address || '',
   });
+
+  // Update profile image when user changes
+  React.useEffect(() => {
+    if (user?.profile_image) {
+      setProfileImage(user.profile_image);
+    }
+  }, [user?.profile_image]);
 
   const handleEdit = () => {
     setOriginalData({...formData});
@@ -117,10 +124,25 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
               Alert.alert('Success', 'Profile picture updated successfully');
               // Update local state with new image URL
               if (uploadResponse.data?.url) {
-                setProfileImage(uploadResponse.data.url);
+                const {fixImageUrl} = require('../../utils/imageHelper');
+                const imageUrl = fixImageUrl(uploadResponse.data.url);
+                setProfileImage(imageUrl);
+                
+                // Reload user profile to get updated data from backend
+                try {
+                  const profileResponse = await userService.getProfile();
+                  if (profileResponse && profileResponse.success && profileResponse.data) {
+                    // Update local user state if needed
+                    const updatedUser = profileResponse.data.user || profileResponse.data;
+                    if (updatedUser.profile_image) {
+                      setProfileImage(fixImageUrl(updatedUser.profile_image));
+                    }
+                  }
+                } catch (profileError) {
+                  console.warn('Could not reload profile:', profileError);
+                  // Still use the uploaded URL
+                }
               }
-              // Reload user profile to get updated image URL
-              const {useAuth} = require('../../context/AuthContext');
             } else {
               Alert.alert('Error', uploadResponse.message || 'Failed to upload image');
             }
@@ -161,11 +183,15 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
               onPress={showImagePicker}
               activeOpacity={0.8}>
               {profileImage ? (
-                <Image source={{uri: profileImage}} style={styles.avatarImage} />
+                <Image 
+                  source={{uri: profileImage}} 
+                  style={styles.avatarImage}
+                  defaultSource={require('../../assets/logo.jpeg')}
+                />
               ) : (
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
-                    {(userData.full_name || '')
+                    {(userData.full_name || 'User')
                       .split(' ')
                       .map(n => n[0])
                       .join('')

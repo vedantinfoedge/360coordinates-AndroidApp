@@ -28,6 +28,7 @@ const SellerTabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={{
+        headerShown: false, // Hide default header bar
         headerStyle: {
           backgroundColor: colors.primary,
         },

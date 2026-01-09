@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Share,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -64,6 +65,40 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       
       if (response && response.success && response.data) {
         const propData = response.data.property || response.data;
+        
+        // Extract and fix images array properly
+        let imagesArray: string[] = [];
+        if (response.data.images && Array.isArray(response.data.images) && response.data.images.length > 0) {
+          // Images are already fixed in propertyService, extract URLs
+          imagesArray = response.data.images
+            .map((img: any) => {
+              if (typeof img === 'string') {
+                return fixImageUrl(img);
+              } else if (img && typeof img === 'object') {
+                return fixImageUrl(img.image_url || img.url || img.path || '');
+              }
+              return null;
+            })
+            .filter((url: string | null): url is string => url !== null && url !== '');
+        }
+        
+        // If no images array, try cover_image
+        if (imagesArray.length === 0 && propData.cover_image) {
+          const coverImageUrl = fixImageUrl(propData.cover_image);
+          if (coverImageUrl) {
+            imagesArray = [coverImageUrl];
+          }
+        }
+        
+        // Set images array on property
+        propData.images = imagesArray;
+        
+        console.log('[PropertyDetails] Loaded property with images:', {
+          imageCount: imagesArray.length,
+          firstImage: imagesArray[0],
+          propertyId: propData.id,
+        });
+        
         setProperty(propData);
         setIsFavorite(propData.is_favorite || false);
       } else {
@@ -89,6 +124,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       if (response && response.success) {
         const newFavoriteStatus = response.data?.is_favorite ?? !isFavorite;
         setIsFavorite(newFavoriteStatus);
+        // Update property object
+        setProperty({...property, is_favorite: newFavoriteStatus});
+      } else {
+        Alert.alert('Error', response?.message || 'Failed to update favorite');
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
@@ -98,15 +137,60 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
-  const handleChatWithOwner = () => {
+  const handleShareProperty = async () => {
     if (!property) return;
-    navigation.navigate('Chat', {
+    
+    try {
+      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
+      const priceText = property.price 
+        ? `₹${parseFloat(property.price).toLocaleString('en-IN')}${property.status === 'rent' ? '/month' : ''}`
+        : 'Price not available';
+      const shareMessage = `Check out this property!\n\n${property.title || 'Property'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nView more details: ${shareUrl}`;
+      
+      await Share.share({
+        message: shareMessage,
+        title: property.title || 'Property',
+      });
+    } catch (error: any) {
+      if (error.message !== 'User did not share') {
+        console.error('Error sharing property:', error);
+        Alert.alert('Error', 'Failed to share property. Please try again.');
+      }
+    }
+  };
+
+  const handleChatWithOwner = () => {
+    if (!property) {
+      Alert.alert('Error', 'Property information not available');
+      return;
+    }
+    
+    const sellerId = property.seller_id || property.owner?.id || property.owner?.user_id || property.user_id;
+    const sellerName = property.seller_name || property.owner?.name || property.owner?.full_name || 'Property Owner';
+    const propId = property.id || property.property_id;
+    const propTitle = property.title || property.property_title || 'Property';
+    
+    if (!sellerId) {
+      Alert.alert('Error', 'Owner information not available');
+      return;
+    }
+    
+    console.log('[PropertyDetails] Navigating to chat:', {
+      userId: sellerId,
+      userName: sellerName,
+      propertyId: propId,
+      propertyTitle: propTitle,
+    });
+    
+    // Navigate to chat conversation screen with Firebase
+    // Navigate to Chat tab, then to ChatConversation screen
+    (navigation as any).navigate('Chat', {
       screen: 'ChatConversation',
       params: {
-        userId: property.seller_id || property.seller_id || property.user_id,
-        userName: property.seller_name || property.seller_name || 'Property Owner',
-        propertyId: property.id || property.property_id,
-        propertyTitle: property.title || property.property_title,
+        userId: Number(sellerId),
+        userName: sellerName,
+        propertyId: Number(propId),
+        propertyTitle: propTitle,
       },
     });
   };
@@ -124,10 +208,26 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     );
   }
 
-  // Format property data for display
-  const propertyImages = property.images?.map((img: any) => 
-    typeof img === 'string' ? fixImageUrl(img) : fixImageUrl(img.image_url || img.url)
-  ) || [fixImageUrl(property.cover_image || '')].filter(Boolean);
+  // Format property data for display - images should already be fixed URLs
+  const propertyImages = property.images && Array.isArray(property.images) && property.images.length > 0
+    ? property.images
+        .map((img: any) => {
+          if (typeof img === 'string') {
+            return fixImageUrl(img);
+          } else if (img && typeof img === 'object') {
+            return fixImageUrl(img.image_url || img.url || img.path || '');
+          }
+          return null;
+        })
+        .filter((url: string | null): url is string => url !== null && url !== '' && url !== 'https://via.placeholder.com/400x300?text=No+Image')
+    : property.cover_image
+    ? [fixImageUrl(property.cover_image)].filter((url: string) => url && url !== '' && url !== 'https://via.placeholder.com/400x300?text=No+Image')
+    : [];
+  
+  console.log('[PropertyDetails] Property images for display:', {
+    count: propertyImages.length,
+    images: propertyImages,
+  });
   
   const formattedPrice = property.price 
     ? `₹${parseFloat(property.price).toLocaleString('en-IN')}`
@@ -144,9 +244,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         onLogoutPress={logout}
       />
 
-      {/* Favorite Button - Positioned below header */}
+      {/* Favorite and Share Buttons - Positioned below header */}
+      <View style={[styles.actionButtonsTop, {top: (insets.top + 60)}]}>
       <TouchableOpacity
-        style={[styles.favoriteButton, {top: (insets.top + 60)}]}
+          style={styles.favoriteButton}
         onPress={handleToggleFavorite}
         disabled={togglingFavorite}>
         <View style={styles.favoriteButtonInner}>
@@ -155,6 +256,15 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </Text>
         </View>
       </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.shareButtonTop}
+          onPress={handleShareProperty}>
+          <View style={styles.favoriteButtonInner}>
+            <Text style={styles.shareIcon}>🔗</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {/* Scrollable Content with Image */}
       <ScrollView
@@ -307,37 +417,6 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <Text style={styles.mapButtonText}>View on Map</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Owner Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Owner Information</Text>
-          <View style={styles.ownerCard}>
-            <View style={styles.ownerHeader}>
-              <View style={styles.ownerAvatar}>
-                <Text style={styles.ownerAvatarText}>
-                  {(property.seller_name || property.owner?.name || 'U')
-                    .split(' ')
-                    .map((n: string) => n[0])
-                    .join('')
-                    .toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.ownerInfo}>
-                <View style={styles.ownerNameRow}>
-                  <Text style={styles.ownerName}>
-                    {property.seller_name || property.owner?.name || 'Property Owner'}
-                  </Text>
-                  {(property.seller_verified || property.owner?.verified) && (
-                    <Text style={styles.verifiedBadge}>✓ Verified</Text>
-                  )}
-                </View>
-                <Text style={styles.ownerEmail}>
-                  {property.seller_email || property.owner?.email || 'Email not available'}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
       </ScrollView>
 
       {/* Fixed Action Buttons */}
@@ -372,27 +451,34 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               <View style={styles.contactItem}>
                 <Text style={styles.contactLabel}>Name</Text>
                 <Text style={styles.contactValue}>
-                  {property.seller_name || property.owner?.name || 'Property Owner'}
+                  {property.seller_name || property.owner?.name || property.owner?.full_name || 'Property Owner'}
                 </Text>
               </View>
-              {property.seller_phone && (
+              {(property.seller_phone || property.owner?.phone) && (
                 <View style={styles.contactItem}>
                   <Text style={styles.contactLabel}>Phone</Text>
                   <TouchableOpacity>
                     <Text style={[styles.contactValue, styles.contactLink]}>
-                      {property.seller_phone}
+                      {property.seller_phone || property.owner?.phone || 'Not available'}
                     </Text>
                   </TouchableOpacity>
                 </View>
               )}
-              {property.seller_email && (
+              {(property.seller_email || property.owner?.email) && (
                 <View style={styles.contactItem}>
                   <Text style={styles.contactLabel}>Email</Text>
                   <TouchableOpacity>
                     <Text style={[styles.contactValue, styles.contactLink]}>
-                      {property.seller_email}
+                      {property.seller_email || property.owner?.email || 'Not available'}
                     </Text>
                   </TouchableOpacity>
+                </View>
+              )}
+              {!property.seller_phone && !property.owner?.phone && !property.seller_email && !property.owner?.email && (
+                <View style={styles.contactItem}>
+                  <Text style={styles.contactValue}>
+                    Contact information not available
+                  </Text>
                 </View>
               )}
             </View>
@@ -400,7 +486,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               style={styles.modalChatButton}
               onPress={() => {
                 setShowContactModal(false);
-                handleChatWithOwner();
+                // Small delay to ensure modal closes before navigation
+                setTimeout(() => {
+                  handleChatWithOwner();
+                }, 300);
               }}>
               <Text style={styles.modalChatButtonText}>💬 Start Chat</Text>
             </TouchableOpacity>
@@ -491,10 +580,18 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: 'bold',
   },
-  favoriteButton: {
+  actionButtonsTop: {
     position: 'absolute',
     right: spacing.md,
     zIndex: 20,
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  favoriteButton: {
+    // Position handled by parent
+  },
+  shareButtonTop: {
+    // Position handled by parent
   },
   favoriteButtonInner: {
     width: 40,
@@ -517,6 +614,9 @@ const styles = StyleSheet.create({
   },
   favoriteIcon: {
     fontSize: 20,
+  },
+  shareIcon: {
+    fontSize: 18,
   },
   contentContainer: {
     backgroundColor: colors.background,

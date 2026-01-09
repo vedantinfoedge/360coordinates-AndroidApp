@@ -5,7 +5,9 @@ import ChatNavigator from '../../navigation/ChatNavigator';
 import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
 import FavoritesScreen from '../../screens/FavoritesScreen';
 import SearchResultsScreen from '../../screens/Buyer/SearchResultsScreen';
+import AllPropertiesScreen from '../../screens/Buyer/AllPropertiesScreen';
 import PropertyDetailsScreen from '../../screens/Buyer/PropertyDetailsScreen';
+import PropertyMapScreen from '../../screens/Buyer/PropertyMapScreen';
 import SupportScreen from '../../screens/Buyer/SupportScreen';
 import {colors} from '../../theme';
 import {Text} from 'react-native';
@@ -16,7 +18,10 @@ export type BuyerTabParamList = {
   Favorites: undefined;
   Profile: undefined;
   PropertyList: {searchQuery?: string} | undefined;
+  SearchResults: {searchQuery?: string; location?: string; listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
+  AllProperties: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
   PropertyDetails: {propertyId: string};
+  PropertyMap: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
   Support: undefined;
 };
 
@@ -26,6 +31,7 @@ const BuyerTabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={{
+        headerShown: false, // Hide default header bar
         headerStyle: {
           backgroundColor: colors.primary,
         },
@@ -113,10 +119,34 @@ const BuyerTabNavigator = () => {
         }}
       />
       <Tab.Screen
+        name="SearchResults"
+        component={SearchResultsScreen}
+        options={{
+          title: 'Search Results',
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="AllProperties"
+        component={AllPropertiesScreen}
+        options={{
+          title: 'All Properties',
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
         name="PropertyDetails"
         component={PropertyDetailsScreen}
         options={{
           title: 'Property Details',
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="PropertyMap"
+        component={PropertyMapScreen}
+        options={{
+          title: 'Map',
           tabBarButton: () => null, // Hide from tab bar
         }}
       />

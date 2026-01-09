@@ -18,7 +18,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string, userType?: string) => Promise<void>;
-  register: (name: string, email: string, phone: string, password: string, role: UserRole) => Promise<any>;
+  register: (name: string, email: string, phone: string, password: string, role: UserRole, emailToken?: string, phoneToken?: string) => Promise<any>;
   verifyOTP: (userId: number, otp: string) => Promise<void>;
   resendOTP: (userId: number) => Promise<void>;
   logout: () => Promise<void>;
@@ -52,14 +52,17 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
             const rawUserType = response.data.user_type || response.data.role || '';
             const normalizedUserType = rawUserType.toLowerCase() as UserRole;
             
+            // Get user data from response (could be in data.user or data directly)
+            const userDataFromResponse = response.data.user || response.data;
+            
             const userObj = {
-              id: response.data.id || response.data.user_id,
-              full_name: response.data.full_name || response.data.name,
-              email: response.data.email,
-              phone: response.data.phone,
+              id: userDataFromResponse.id || userDataFromResponse.user_id,
+              full_name: userDataFromResponse.full_name || userDataFromResponse.name || '',
+              email: userDataFromResponse.email || '',
+              phone: userDataFromResponse.phone || '',
               user_type: normalizedUserType || 'buyer', // Default to buyer if not found
-              profile_image: response.data.profile_image,
-              address: response.data.address,
+              profile_image: userDataFromResponse.profile_image || null,
+              address: userDataFromResponse.address || '',
             };
             setUser(userObj);
             await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userObj));
@@ -100,61 +103,97 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
   };
 
   const login = async (email: string, password: string, userType?: string) => {
-    const response: any = await authService.login(email, password, userType);
-    console.log('[AuthContext] Login Response:', JSON.stringify(response, null, 2));
-    console.log('[AuthContext] Expected userType:', userType);
-    
-    if (response && response.success) {
-      // Handle different response structures
-      const userData = response.data?.user || response.data || response.user;
+    try {
+      console.log('[AuthContext] Starting login with:', {email, userType});
+      const response: any = await authService.login(email, password, userType);
+      console.log('[AuthContext] Login Response:', JSON.stringify(response, null, 2));
+      console.log('[AuthContext] Expected userType:', userType);
       
-      if (userData) {
-        // Normalize user_type to lowercase - check multiple possible fields
-        const rawUserType = userData.user_type || userData.role || userData.user_role || '';
-        const normalizedUserType = rawUserType.toLowerCase().trim() as UserRole;
+      if (response && response.success) {
+        // Handle different response structures
+        const userData = response.data?.user || response.data || response.user;
         
-        console.log('[AuthContext] Raw user_type from backend:', rawUserType, 'Normalized:', normalizedUserType);
-        console.log('[AuthContext] Expected user_type from login:', userType);
+        console.log('[AuthContext] User data extracted:', userData);
         
-        // Prioritize the selected role from login screen if provided
-        // This allows users to switch between buyer/seller dashboards
-        let finalUserType: UserRole;
-        if (userType && (userType === 'seller' || userType === 'buyer' || userType === 'agent')) {
-          // Use the selected role from login screen
-          console.log('[AuthContext] Using selected role from login screen:', userType);
-          finalUserType = userType as UserRole;
-        } else if (normalizedUserType && 
-                   (normalizedUserType === 'seller' || normalizedUserType === 'buyer' || normalizedUserType === 'agent')) {
-          // Fall back to backend user_type if no role selected
-          console.log('[AuthContext] Using user_type from backend:', normalizedUserType);
-          finalUserType = normalizedUserType;
+        if (userData) {
+          // Normalize user_type to lowercase - check multiple possible fields
+          const rawUserType = userData.user_type || userData.role || userData.user_role || userData.userType || '';
+          const normalizedUserType = rawUserType.toLowerCase().trim() as UserRole;
+          
+          console.log('[AuthContext] Raw user_type from backend:', rawUserType, 'Normalized:', normalizedUserType);
+          console.log('[AuthContext] Expected user_type from login:', userType);
+          
+          // Role access rules (as per documentation):
+          // - Agent (registered) → Can ONLY login as "agent"
+          // - Buyer (registered) → Can login as "buyer" OR "seller"
+          // - Seller (registered) → Can login as "buyer" OR "seller"
+          let finalUserType: UserRole;
+          
+          // Check if user is registered as agent
+          if (normalizedUserType === 'agent') {
+            // Agents can only login as agent - always use backend value
+            console.log('[AuthContext] User is registered as agent - using agent role');
+            finalUserType = 'agent';
+          } else if (userType && typeof userType === 'string') {
+            // If userType was provided in login request, use it (allows buyer/seller switching)
+            // This is the login type, not the registered type
+            const loginUserType = userType.toLowerCase().trim() as UserRole;
+            if (loginUserType === 'seller' || loginUserType === 'buyer' || loginUserType === 'agent') {
+              console.log('[AuthContext] Using selected role from login screen:', loginUserType);
+              finalUserType = loginUserType;
+            } else {
+              // Invalid userType, fall back to backend
+              console.log('[AuthContext] Invalid userType, using backend value:', normalizedUserType);
+              finalUserType = (normalizedUserType || 'buyer') as UserRole;
+            }
+          } else if (normalizedUserType && 
+                     (normalizedUserType === 'seller' || normalizedUserType === 'buyer' || normalizedUserType === 'agent')) {
+            // Fall back to backend user_type if no role selected
+            console.log('[AuthContext] Using user_type from backend:', normalizedUserType);
+            finalUserType = normalizedUserType;
+          } else {
+            // Default to buyer if neither is valid
+            console.log('[AuthContext] Defaulting to buyer');
+            finalUserType = 'buyer';
+          }
+          
+          const userObj = {
+            id: userData.id || userData.user_id,
+            full_name: userData.full_name || userData.name || '',
+            email: userData.email || '',
+            phone: userData.phone || '',
+            user_type: finalUserType,
+            profile_image: userData.profile_image || null,
+            address: userData.address || '',
+          };
+          
+          console.log('[AuthContext] Setting user object:', JSON.stringify(userObj, null, 2));
+          setUser(userObj);
+          // Also save to AsyncStorage
+          await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userObj));
+          console.log('[AuthContext] Login successful, user set and saved');
         } else {
-          // Default to buyer if neither is valid
-          console.log('[AuthContext] Defaulting to buyer');
-          finalUserType = 'buyer';
+          console.error('[AuthContext] No user data in response');
+          throw new Error(response?.message || 'Login failed: No user data');
         }
-        
-        const userObj = {
-          id: userData.id || userData.user_id,
-          full_name: userData.full_name || userData.name || '',
-          email: userData.email || '',
-          phone: userData.phone || '',
-          user_type: finalUserType,
-          profile_image: userData.profile_image,
-          address: userData.address,
-        };
-        
-        console.log('[AuthContext] Setting user object:', JSON.stringify(userObj, null, 2));
-        setUser(userObj);
-        // Also save to AsyncStorage
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userObj));
       } else {
-        console.error('[AuthContext] No user data in response');
-        throw new Error(response?.message || 'Login failed: No user data');
+        console.error('[AuthContext] Login response not successful:', response);
+        const errorMsg = response?.message || 'Login failed. Please check your credentials.';
+        throw {
+          success: false,
+          message: errorMsg,
+          status: response?.status || 400,
+          error: response,
+        };
       }
-    } else {
-      console.error('[AuthContext] Login response not successful:', response);
-      throw new Error(response?.message || 'Login failed');
+    } catch (error: any) {
+      console.error('[AuthContext] Login error caught:', error);
+      // Re-throw 403 errors with their specific messages
+      if (error.status === 403) {
+        throw error; // Let LoginScreen handle the 403 error display
+      }
+      // Re-throw other errors
+      throw error;
     }
   };
 
@@ -164,13 +203,17 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     phone: string,
     password: string,
     role: UserRole,
+    emailToken?: string,
+    phoneToken?: string,
   ) => {
     const response: any = await authService.register({
-      full_name: name,
+      fullName: name,
       email,
       phone,
       password,
-      user_type: role,
+      userType: role,
+      emailVerificationToken: emailToken,
+      phoneVerificationToken: phoneToken,
     });
     
     if (response && response.success) {

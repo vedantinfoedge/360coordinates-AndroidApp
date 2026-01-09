@@ -21,7 +21,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
     if (onSearchPress) {
       onSearchPress();
     } else if (navigation) {
-      navigation.navigate('PropertyList', {searchQuery: value || ''});
+      navigation.navigate('SearchResults', {searchQuery: value || ''});
     }
   };
 

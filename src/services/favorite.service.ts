@@ -91,4 +91,49 @@ export const favoriteService = {
     );
     return response;
   },
+
+  // Toggle favorite (add if not favorited, remove if favorited)
+  toggleFavorite: async (propertyId: string | number) => {
+    try {
+      // First check if it's already favorited
+      const checkResponse = await favoriteService.checkFavorite(propertyId);
+      const isFavorited = checkResponse?.success && checkResponse?.data?.is_favorite;
+      
+      if (isFavorited) {
+        // Remove from favorites
+        const response = await favoriteService.removeFavorite(propertyId);
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            is_favorite: false,
+          },
+        };
+      } else {
+        // Add to favorites
+        const response = await favoriteService.addFavorite(propertyId);
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            is_favorite: true,
+          },
+        };
+      }
+    } catch (error: any) {
+      // If check fails, try to add (optimistic)
+      try {
+        const response = await favoriteService.addFavorite(propertyId);
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            is_favorite: true,
+          },
+        };
+      } catch (addError) {
+        throw error;
+      }
+    }
+  },
 };

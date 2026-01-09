@@ -1,1545 +1,1023 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
   FlatList,
-  Image,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
-import SearchBar from '../../components/SearchBar';
-import PropertyCard from '../../components/PropertyCard';
-import ProjectCard from '../../components/ProjectCard';
-import {propertyService} from '../../services/property.service';
-import {inquiryService} from '../../services/inquiry.service';
+import {sellerService, DashboardStats} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import {formatters} from '../../utils/formatters';
 
-type DashboardScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuyerTabParamList, 'Home'>,
+type AgentDashboardScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<AgentTabParamList, 'Dashboard'>,
   NativeStackNavigationProp<RootStackParamList>
-> & {
-  navigate: (screen: string, params?: any) => void;
-};
+>;
 
 type Props = {
-  navigation: DashboardScreenNavigationProp;
+  navigation: AgentDashboardScreenNavigationProp;
 };
 
-const DashboardScreen: React.FC<Props> = ({navigation}) => {
+interface RecentProperty {
+  id: number | string;
+  title: string;
+  location: string;
+  price: number;
+  status: 'sale' | 'rent';
+  project_type?: 'upcoming' | null;
+  cover_image?: string;
+  views: number;
+  inquiries: number;
+}
+
+interface RecentInquiry {
+  id: number;
+  property_id: number;
+  property_title: string;
+  buyer_id: number;
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string;
+  buyer_profile_image?: string;
+  message: string;
+  status: string;
+  created_at: string;
+}
+
+const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
-  const [searchType, setSearchType] = useState<'buy' | 'rent'>('buy');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [featuredProperties, setFeaturedProperties] = useState<any[]>([]);
-  const [upcomingProjects, setUpcomingProjects] = useState<any[]>([]);
-  const [propertiesLoading, setPropertiesLoading] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
+  const [recentInquiries, setRecentInquiries] = useState<RecentInquiry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'buyer':
-        return 'Buyer / Tenant';
-      case 'seller':
-        return 'Seller / Owner';
-      case 'agent':
-        return 'Agent / Builder';
-      default:
-        return 'User';
-    }
-  };
-
-  const getGreeting = () => {
-    if (user) {
-      return `Hello, ${user.full_name || 'User'}`;
-    }
-    return 'Welcome to PropertyApp';
-  };
-
-  // Load properties for buyer view
+  // Check user type access
   useEffect(() => {
-    if (user?.role === 'buyer') {
-      loadBuyerProperties();
-      loadBuyerProjects();
-    }
-  }, [user?.role, searchType]);
-
-  const loadBuyerProperties = async () => {
-    try {
-      setPropertiesLoading(true);
-      const response = await propertyService.getProperties({
-        status: 'approved',
-        limit: 10,
-        property_type: searchType === 'buy' ? 'sale' : 'rent',
-      });
+    if (user && user.user_type !== 'agent') {
+      const userTypeLabel = 
+        user.user_type === 'buyer' ? 'Buyer/Tenant' :
+        user.user_type === 'seller' ? 'Seller/Owner' :
+        user.user_type || 'User';
       
-      if (response && response.success) {
-        const propertiesData = response.data?.properties || response.data || [];
-        const formatted = propertiesData.map((prop: any) => ({
-          id: prop.id?.toString() || prop.property_id?.toString() || '',
-          name: prop.title || prop.property_title || 'Untitled Property',
+      Alert.alert(
+        'Access Denied',
+        `You are registered as ${userTypeLabel}. You cannot access this dashboard.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate back to appropriate dashboard
+              if (user.user_type === 'buyer') {
+                navigation.reset({
+                  index: 0,
+                  routes: [{name: 'Buyer' as never}],
+                });
+              } else if (user.user_type === 'seller') {
+                navigation.reset({
+                  index: 0,
+                  routes: [{name: 'Seller' as never}],
+                });
+              } else {
+                navigation.reset({
+                  index: 0,
+                  routes: [{name: 'Auth' as never}],
+                });
+              }
+            },
+          },
+        ],
+        {cancelable: false}
+      );
+      return;
+    }
+  }, [user, navigation]);
+
+  useEffect(() => {
+    // Only load data if user is an agent
+    if (user && user.user_type === 'agent') {
+      loadDashboardData();
+    
+      // Auto-refresh every 60 seconds
+      refreshIntervalRef.current = setInterval(() => {
+        loadDashboardData(false); // Silent refresh
+      }, 60000);
+
+      return () => {
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+        }
+      };
+    }
+  }, [user]);
+
+  const loadDashboardData = async (showLoading: boolean = true) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+      
+      // Load dashboard stats (agents use same endpoint as sellers)
+      const statsResponse = await sellerService.getDashboardStats();
+      
+      if (statsResponse.success && statsResponse.data) {
+        setDashboardStats(statsResponse.data);
+        setRecentInquiries(statsResponse.data.recent_inquiries || []);
+      }
+
+      // Load recent properties (first 3)
+      const propertiesResponse = await sellerService.getProperties({
+        page: 1,
+        limit: 3,
+      });
+
+      if (propertiesResponse.success && propertiesResponse.data) {
+        const properties = propertiesResponse.data.properties || propertiesResponse.data || [];
+        const formattedProperties: RecentProperty[] = properties.slice(0, 3).map((prop: any) => ({
+          id: prop.id || prop.property_id,
+          title: prop.title || prop.property_title || 'Untitled Property',
           location: prop.location || prop.city || 'Location not specified',
-          price: typeof prop.price === 'number'
-            ? `₹${prop.price.toLocaleString('en-IN')}${prop.status === 'rent' ? '/month' : ''}`
-            : prop.price || 'Price not available',
-          type: (prop.status === 'sale' || prop.property_status === 'sale') ? 'buy' : 'rent',
+          price: parseFloat(prop.price) || 0,
+          status: prop.status === 'rent' ? 'rent' : 'sale',
+          project_type: prop.project_type === 'upcoming' ? 'upcoming' : null,
+          cover_image: prop.cover_image || prop.image || prop.images?.[0],
+          views: prop.views || prop.view_count || 0,
+          inquiries: prop.inquiries || prop.inquiry_count || 0,
         }));
-        setFeaturedProperties(formatted);
+        setRecentProperties(formattedProperties);
       }
-    } catch (error) {
-      console.error('Error loading buyer properties:', error);
-      setFeaturedProperties([]);
+    } catch (error: any) {
+      console.error('Error loading dashboard data:', error);
+      if (showLoading) {
+        Alert.alert('Error', error?.message || 'Failed to load dashboard data');
+      }
     } finally {
-      setPropertiesLoading(false);
-    }
-  };
-
-  const loadBuyerProjects = async () => {
-    try {
-      const response = await propertyService.getProperties({
-        status: 'approved',
-        limit: 5,
-        sort_by: 'newest',
-      });
-      
-      if (response && response.success) {
-        const propertiesData = response.data?.properties || response.data || [];
-        const formatted = propertiesData.map((prop: any) => ({
-          id: prop.id?.toString() || prop.property_id?.toString() || '',
-          name: prop.title || prop.property_title || 'Untitled Property',
-          city: prop.city || prop.location || 'Location not specified',
-        }));
-        setUpcomingProjects(formatted);
+      if (showLoading) {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading projects:', error);
-      setUpcomingProjects([]);
+      setRefreshing(false);
     }
   };
 
-  // Filter properties based on selected type
-  const filteredProperties = featuredProperties.filter(
-    p => p.type === searchType,
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDashboardData(false);
+  };
+
+  const renderPropertyCard = ({item}: {item: RecentProperty}) => (
+    <TouchableOpacity
+      style={styles.propertyCard}
+      onPress={() =>
+        navigation.navigate('PropertyDetails', {propertyId: item.id})
+      }>
+      {item.cover_image && (
+        <Image
+          source={{uri: fixImageUrl(item.cover_image)}}
+          style={styles.propertyImage}
+        />
+      )}
+      <View style={styles.propertyCardContent}>
+        <View style={styles.propertyCardHeader}>
+          <View style={styles.propertyCardInfo}>
+            <View style={styles.propertyBadgeContainer}>
+              <View
+                style={[
+                  styles.propertyStatusBadge,
+                  {
+                    backgroundColor:
+                      item.status === 'sale' ? colors.success : colors.primary,
+                  },
+                ]}>
+                <Text style={styles.propertyStatusText}>
+                  {item.status === 'sale' ? 'For Sale' : 'For Rent'}
+                </Text>
+              </View>
+              {item.project_type === 'upcoming' && (
+                <View style={styles.projectTypeBadge}>
+                  <Text style={styles.projectTypeText}>Upcoming Project</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.propertyCardTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={styles.propertyLocationRow}>
+              <Text style={styles.locationIcon}>📍</Text>
+              <Text style={styles.propertyCardLocation} numberOfLines={1}>
+                {item.location}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.propertyCardStats}>
+          <Text style={styles.propertyStatText}>
+            👁️ {item.views} views
+          </Text>
+          <Text style={styles.propertyStatText}>
+            💬 {item.inquiries} inquiries
+          </Text>
+        </View>
+        <Text style={styles.propertyCardPrice}>
+          {formatters.price(item.price, item.status === 'rent')}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
-  // If user is buyer, show new Buyer Home Page
-  if (user?.role === 'buyer') {
+  const renderInquiryCard = ({item}: {item: RecentInquiry}) => (
+    <TouchableOpacity
+      style={styles.inquiryCard}
+      onPress={() =>
+        navigation.navigate('Inquiries', {inquiryId: item.id} as never)
+      }>
+      <View style={styles.inquiryCardHeader}>
+        {item.buyer_profile_image ? (
+          <Image
+            source={{uri: fixImageUrl(item.buyer_profile_image)}}
+            style={styles.inquiryAvatar}
+          />
+        ) : (
+          <View style={styles.inquiryAvatarPlaceholder}>
+            <Text style={styles.inquiryAvatarText}>
+              {item.buyer_name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+        <View style={styles.inquiryCardInfo}>
+          <Text style={styles.inquiryBuyerName} numberOfLines={1}>
+            {item.buyer_name}
+          </Text>
+          <Text style={styles.inquiryTime}>
+            {formatters.timeAgo(item.created_at)}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
+        {item.property_title}
+      </Text>
+      <Text style={styles.inquiryMessage} numberOfLines={2}>
+        {item.message}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // Show access denied message if user is not an agent
+  if (user && user.user_type !== 'agent') {
     return (
-      <View style={styles.buyerContainer}>
-        {/* Custom Header */}
+      <View style={styles.container}>
         <AgentHeader
           onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onLogoutPress={logout}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={async () => {
+            await logout();
+          }}
         />
-
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled={true}>
-          {/* Welcome Section */}
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeText}>
-              {user ? `Hello, ${(user.full_name || '').split(' ')[0]}` : 'Welcome'}
-            </Text>
-            <Text style={styles.welcomeSubtext}>
-              Find your dream property in India
-            </Text>
-          </View>
-
-          {/* Buy/Rent Toggle */}
-          <View style={styles.toggleContainer}>
-            <TouchableOpacity
-              style={[
-                styles.toggleButton,
-                searchType === 'buy' && styles.toggleButtonActive,
-              ]}
-              onPress={() => setSearchType('buy')}>
-              <Text
-                style={[
-                  styles.toggleText,
-                  searchType === 'buy' && styles.toggleTextActive,
-                ]}>
-                Buy
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.toggleButton,
-                searchType === 'rent' && styles.toggleButtonActive,
-              ]}
-              onPress={() => setSearchType('rent')}>
-              <Text
-                style={[
-                  styles.toggleText,
-                  searchType === 'rent' && styles.toggleTextActive,
-                ]}>
-                Rent
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Search Bar */}
-          <SearchBar
-            placeholder="Search by city, locality, project"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSearchPress={() => {
-              // Handle search
-            }}
-          />
-
-          {/* Quick Filters */}
-          <View style={styles.quickFiltersSection}>
-            <Text style={styles.sectionTitleSmall}>Quick Filters</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.quickFiltersContainer}>
-              {['Apartments', 'Villas', 'Plots', 'Commercial', 'PG/Hostel'].map(
-                (filter, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.quickFilterChip}>
-                    <Text style={styles.quickFilterText}>{filter}</Text>
-                  </TouchableOpacity>
-                ),
-              )}
-            </ScrollView>
-          </View>
-
-          {/* Featured Properties Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Featured Properties</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('PropertyList')}>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.horizontalScrollContainer}>
-              <FlatList
-                data={filteredProperties}
-                renderItem={({item}) => (
-                  <PropertyCard
-                    name={item.name}
-                    location={item.location}
-                    price={item.price}
-                    type={item.type}
-                    onPress={() =>
-                      navigation.navigate('PropertyDetails', {propertyId: item.id})
-                    }
-                  />
-                )}
-                keyExtractor={item => item.id}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalList}
-                scrollEnabled={true}
-                bounces={false}
-                decelerationRate="fast"
-                snapToInterval={296}
-                snapToAlignment="start"
-              />
-            </View>
-          </View>
-
-          {/* Upcoming Projects Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Upcoming Projects</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.horizontalScrollContainer}>
-              <FlatList
-                data={upcomingProjects}
-                renderItem={({item}) => (
-                  <ProjectCard
-                    name={item.name}
-                    city={item.city}
-                    onPress={() => {
-                      // Handle project press
-                    }}
-                  />
-                )}
-                keyExtractor={item => item.id}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalList}
-                scrollEnabled={true}
-                bounces={false}
-                decelerationRate="fast"
-                snapToInterval={276}
-                snapToAlignment="start"
-              />
-            </View>
-          </View>
-
-          {/* Bottom padding for tab bar */}
-          <View style={styles.bottomPadding} />
-        </ScrollView>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorIcon}>🚫</Text>
+          <Text style={styles.errorTitle}>Access Denied</Text>
+          <Text style={styles.errorText}>
+            You are registered as {user.user_type === 'buyer' ? 'Buyer/Tenant' : user.user_type === 'seller' ? 'Seller/Owner' : 'User'}. You cannot access this dashboard.
+          </Text>
+        </View>
       </View>
     );
   }
 
-  // Seller Dashboard
-  if (user?.role === 'seller') {
-    // Dummy data for seller dashboard
-    const sellerProperties = [
-      {
-        id: '1',
-        name: 'Villa in Lonavala',
-        location: 'Lonavala, Maharashtra',
-        price: '₹2.5 Cr',
-        image: '🏡',
-      },
-      {
-        id: '2',
-        name: '3BHK Apartment',
-        location: 'Mumbai, Maharashtra',
-        price: '₹1.8 Cr',
-        image: '🏢',
-      },
-    ];
-
-    const recentInquiries = [
-      {
-        id: '1',
-        name: 'Tejas Vilas KUMBHARKAR',
-        time: '9h ago',
-        property: 'Villa in Lonavala',
-        avatar: '👤',
-      },
-      {
-        id: '2',
-        name: 'Rajesh Kumar',
-        time: '2d ago',
-        property: '3BHK Apartment',
-        avatar: '👤',
-      },
-    ];
-
+  if (loading && !dashboardStats) {
     return (
-      <View style={styles.sellerContainer}>
-        {/* Custom Header */}
+      <View style={styles.container}>
         <AgentHeader
-          onProfilePress={() => (navigation as any).navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onLogoutPress={logout}
+          onProfilePress={() => navigation.navigate('Profile')}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={async () => {
+            await logout();
+          }}
         />
-        <ScrollView
-          style={styles.sellerScrollView}
-          showsVerticalScrollIndicator={false}>
-          {/* Welcome Banner */}
-          <View style={styles.sellerWelcomeBanner}>
-          <View style={styles.sellerWelcomeContent}>
-            <Text style={styles.sellerWelcomeText}>
-              Welcome back, {(user.full_name || '').split(' ')[0]}! 👋
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading dashboard...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const stats = dashboardStats || {
+    total_properties: 0,
+    active_properties: 0,
+    total_inquiries: 0,
+    new_inquiries: 0,
+    total_views: 0,
+    views_percentage_change: 0,
+    properties_by_status: {sale: 0, rent: 0},
+    recent_inquiries: [],
+  };
+
+  const daysRemaining = stats.subscription?.end_date
+    ? formatters.daysRemaining(stats.subscription.end_date)
+    : 0;
+
+  return (
+    <View style={styles.container}>
+      <AgentHeader
+        onProfilePress={() => navigation.navigate('Profile')}
+        onSupportPress={() => navigation.navigate('Support')}
+        onLogoutPress={async () => {
+          await logout();
+        }}
+        subscriptionDays={daysRemaining}
+      />
+
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }>
+        {/* Welcome Header */}
+        <View style={styles.welcomeHeader}>
+          <View>
+            <Text style={styles.greeting}>
+              Welcome back, {user?.name || 'Agent'}!
             </Text>
-            <Text style={styles.sellerWelcomeSubtext}>
+            <Text style={styles.subtitle}>
               Here's what's happening with your properties today
             </Text>
           </View>
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity
+              style={styles.addPropertyButton}
+              onPress={() => navigation.navigate('AddProperty')}>
+              <Text style={styles.addPropertyButtonText}>Add Property</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addPropertyButton, styles.addProjectButton]}
+              onPress={() => navigation.navigate('AddProperty', {isUpcomingProject: true} as never)}>
+              <Text style={styles.addPropertyButtonText}>Add Project</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Statistics Cards (2x2 Grid) */}
+        <View style={styles.statsGrid}>
+          {/* Card 1: Total Properties */}
           <TouchableOpacity
-            style={styles.sellerAddPropertyButton}
-            onPress={() => (navigation as any).navigate('AddProperty')}>
-            <Text style={styles.sellerAddPropertyIcon}>+</Text>
-            <Text style={styles.sellerAddPropertyText}>Add Property</Text>
+            style={styles.statCard}
+            onPress={() => navigation.navigate('Listings')}>
+            <View style={styles.statCardIcon}>
+              <Text style={styles.statIcon}>🏠</Text>
+            </View>
+            <Text style={styles.statNumber}>{stats.total_properties}</Text>
+            <Text style={styles.statLabel}>Total Properties</Text>
+            <View style={styles.activeBadge}>
+              <Text style={styles.activeBadgeText}>
+                {stats.active_properties} Active
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Card 2: Total Views */}
+          <View style={styles.statCard}>
+            <View style={styles.statCardIcon}>
+              <Text style={styles.statIcon}>👁️</Text>
+            </View>
+            <Text style={styles.statNumber}>
+              {formatters.formatNumber(stats.total_views)}
+            </Text>
+            <Text style={styles.statLabel}>Total Views</Text>
+            {stats.views_percentage_change > 0 ? (
+              <View style={styles.positiveIndicator}>
+                <Text style={styles.indicatorText}>
+                  {stats.views_percentage_change}% ↑
+                </Text>
+              </View>
+            ) : stats.views_percentage_change < 0 ? (
+              <View style={styles.negativeIndicator}>
+                <Text style={styles.indicatorText}>
+                  {Math.abs(stats.views_percentage_change)}% ↓
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.activeIndicator}>
+                <Text style={styles.indicatorText}>Active</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Card 3: Total Inquiries */}
+          <TouchableOpacity
+            style={styles.statCard}
+            onPress={() => navigation.navigate('Inquiries')}>
+            <View style={styles.statCardIcon}>
+              <Text style={styles.statIcon}>💬</Text>
+            </View>
+            <Text style={styles.statNumber}>{stats.total_inquiries}</Text>
+            <Text style={styles.statLabel}>Total Inquiries</Text>
+            {stats.new_inquiries > 0 && (
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>
+                  {stats.new_inquiries} New
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Card 4: Listing Status */}
+          <View style={styles.statCard}>
+            <View style={styles.statCardIcon}>
+              <Text style={styles.statIcon}>☀️</Text>
+            </View>
+            <Text style={styles.statLabel}>Listing Status</Text>
+            <View style={styles.statusPills}>
+              <View style={styles.statusPill}>
+                <Text style={styles.statusPillText}>
+                  {stats.properties_by_status.sale} Sale
+                </Text>
+              </View>
+              <View style={[styles.statusPill, styles.statusPillRent]}>
+                <Text style={styles.statusPillText}>
+                  {stats.properties_by_status.rent} Rent
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Quick Actions Grid (2x2) */}
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            onPress={() => navigation.navigate('AddProperty')}>
+            <Text style={styles.quickActionIcon}>➕</Text>
+            <Text style={styles.quickActionTitle}>Add New Property</Text>
+            <Text style={styles.quickActionDescription}>
+              List a new property for sale or rent
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            onPress={() => navigation.navigate('Listings')}>
+            <Text style={styles.quickActionIcon}>✏️</Text>
+            <Text style={styles.quickActionTitle}>Manage Properties</Text>
+            <Text style={styles.quickActionDescription}>
+              Edit, update or remove listings
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            onPress={() => navigation.navigate('Inquiries')}>
+            <Text style={styles.quickActionIcon}>💬</Text>
+            <Text style={styles.quickActionTitle}>View Inquiries</Text>
+            <Text style={styles.quickActionDescription}>
+              Respond to buyer inquiries
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            onPress={() => navigation.navigate('Profile')}>
+            <Text style={styles.quickActionIcon}>👤</Text>
+            <Text style={styles.quickActionTitle}>Update Profile</Text>
+            <Text style={styles.quickActionDescription}>
+              Manage your account settings
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Summary Cards */}
-        <View style={styles.sellerSummaryCards}>
-          {/* Total Properties Card */}
-          <View style={[styles.sellerSummaryCard, styles.sellerSummaryCardPrimary]}>
-            <View style={styles.sellerSummaryCardContent}>
-              <Text style={styles.sellerSummaryIcon}>🏠</Text>
-              <View style={styles.sellerSummaryInfo}>
-                <Text style={[styles.sellerSummaryLabel, styles.sellerSummaryLabelPrimary]}>
-                  Total Properties
-                </Text>
-                <Text style={[styles.sellerSummaryNumber, styles.sellerSummaryNumberPrimary]}>
-                  2
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.sellerBadgeActive, {backgroundColor: 'rgba(255, 255, 255, 0.3)'}]}>
-              <Text style={[styles.sellerBadgeText, {color: colors.surface}]}>ACTIVE</Text>
-            </View>
-          </View>
-
-          {/* People Showed Interest Card */}
-          <View style={styles.sellerSummaryCard}>
-            <View style={styles.sellerSummaryCardContent}>
-              <Text style={styles.sellerSummaryIcon}>👁️</Text>
-              <View style={styles.sellerSummaryInfo}>
-                <Text style={styles.sellerSummaryLabel}>People Showed Interest</Text>
-                <Text style={styles.sellerSummaryNumber}>167</Text>
-                <Text style={styles.sellerSummaryDescription}>
-                  167 people have viewed your properties
-                </Text>
-              </View>
-            </View>
-            <View style={styles.sellerBadgeSuccess}>
-              <Text style={styles.sellerBadgeText}>Active ↑</Text>
-            </View>
-          </View>
-
-          {/* Total Inquiries Card */}
-          <View style={styles.sellerSummaryCard}>
-            <View style={styles.sellerSummaryCardContent}>
-              <Text style={styles.sellerSummaryIcon}>💬</Text>
-              <View style={styles.sellerSummaryInfo}>
-                <Text style={styles.sellerSummaryLabel}>Total Inquiries</Text>
-                <Text style={styles.sellerSummaryNumber}>2</Text>
-              </View>
-            </View>
-            <View style={styles.sellerBadgeWarning}>
-              <Text style={styles.sellerBadgeText}>2 NEW</Text>
-            </View>
-          </View>
-
-          {/* Listing Status Card */}
-          <View style={styles.sellerSummaryCard}>
-            <View style={styles.sellerSummaryCardContent}>
-              <Text style={styles.sellerSummaryIcon}>⭐</Text>
-              <View style={styles.sellerSummaryInfo}>
-                <Text style={styles.sellerSummaryLabel}>Listing Status</Text>
-                <View style={styles.sellerStatusBadges}>
-                  <View style={styles.sellerStatusBadge}>
-                    <Text style={styles.sellerStatusBadgeText}>2 Sale</Text>
-                  </View>
-                  <View style={[styles.sellerStatusBadge, styles.sellerStatusBadgeInactive]}>
-                    <Text style={[styles.sellerStatusBadgeText, styles.sellerStatusBadgeTextInactive]}>
-                      0 Rent
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.sellerQuickActionsSection}>
-          <Text style={styles.sellerSectionTitle}>Quick Actions</Text>
-          <View style={styles.sellerQuickActionsGrid}>
+        {/* Recent Properties Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Your Properties</Text>
             <TouchableOpacity
-              style={styles.sellerQuickActionCard}
-              onPress={() => (navigation as any).navigate('AddProperty')}>
-              <Text style={styles.sellerQuickActionIcon}>➕</Text>
-              <Text style={styles.sellerQuickActionTitle}>Add New Property</Text>
-              <Text style={styles.sellerQuickActionSubtitle}>
-                List a new property for sale or rent
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.sellerQuickActionCard}
-              onPress={() => (navigation as any).navigate('MyProperties')}>
-              <Text style={styles.sellerQuickActionIcon}>✏️</Text>
-              <Text style={styles.sellerQuickActionTitle}>Manage Properties</Text>
-              <Text style={styles.sellerQuickActionSubtitle}>
-                Edit, update or remove listings
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.sellerQuickActionCard}
-              onPress={() => (navigation as any).navigate('Inquiries')}>
-              <Text style={styles.sellerQuickActionIcon}>💬</Text>
-              <Text style={styles.sellerQuickActionTitle}>View Inquiries</Text>
-              <Text style={styles.sellerQuickActionSubtitle}>
-                Respond to buyer inquiries
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.sellerQuickActionCard}
-              onPress={() => (navigation as any).navigate('Profile')}>
-              <Text style={styles.sellerQuickActionIcon}>👤</Text>
-              <Text style={styles.sellerQuickActionTitle}>Update Profile</Text>
-              <Text style={styles.sellerQuickActionSubtitle}>
-                Manage your account settings
-              </Text>
+              onPress={() => navigation.navigate('Listings')}>
+              <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Your Properties Section */}
-        <View style={styles.sellerSection}>
-          <View style={styles.sellerSectionHeader}>
-            <Text style={styles.sellerSectionTitle}>Your Properties</Text>
-            <TouchableOpacity
-              onPress={() => (navigation as any).navigate('MyProperties')}>
-              <Text style={styles.sellerSeeAllText}>View All →</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.sellerHorizontalScrollContainer}>
+          {recentProperties.length > 0 ? (
             <FlatList
-              data={sellerProperties}
-              renderItem={({item}) => (
-                <TouchableOpacity
-                  style={styles.sellerPropertyCard}
-                  onPress={() =>
-                    (navigation as any).navigate('PropertyDetails', {
-                      propertyId: item.id,
-                    })
-                  }>
-                  <View style={styles.sellerPropertyImage}>
-                    <Text style={styles.sellerPropertyImageIcon}>{item.image}</Text>
-                  </View>
-                  <View style={styles.sellerPropertyInfo}>
-                    <Text style={styles.sellerPropertyName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.sellerPropertyLocation} numberOfLines={1}>
-                      {item.location}
-                    </Text>
-                    <Text style={styles.sellerPropertyPrice}>{item.price}</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              keyExtractor={item => item.id}
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.sellerHorizontalList}
+              data={recentProperties}
+              renderItem={renderPropertyCard}
+              keyExtractor={item => String(item.id)}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
             />
-          </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateIcon}>🏠</Text>
+              <Text style={styles.emptyStateText}>No Properties Listed</Text>
+              <TouchableOpacity
+                style={styles.emptyStateButton}
+                onPress={() => navigation.navigate('AddProperty')}>
+                <Text style={styles.emptyStateButtonText}>Add Property</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Recent Inquiries Section */}
-        <View style={styles.sellerSection}>
-          <View style={styles.sellerSectionHeader}>
-            <View style={styles.sellerSectionTitleWithBadge}>
-              <Text style={styles.sellerSectionTitle}>Recent Inquiries</Text>
-              <View style={styles.sellerInquiryBadge}>
-                <Text style={styles.sellerInquiryBadgeText}>2</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={() => (navigation as any).navigate('Inquiries')}>
-              <Text style={styles.sellerSeeAllText}>View All →</Text>
-            </TouchableOpacity>
-          </View>
-          {recentInquiries.map(inquiry => (
-            <TouchableOpacity
-              key={inquiry.id}
-              style={styles.sellerInquiryItem}
-              onPress={() => (navigation as any).navigate('Inquiries')}>
-              <View style={styles.sellerInquiryAvatar}>
-                <Text style={styles.sellerInquiryAvatarText}>{inquiry.avatar}</Text>
-              </View>
-              <View style={styles.sellerInquiryInfo}>
-                <Text style={styles.sellerInquiryName}>{inquiry.name}</Text>
-                <Text style={styles.sellerInquiryProperty}>{inquiry.property}</Text>
-              </View>
-              <Text style={styles.sellerInquiryTime}>{inquiry.time}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-          {/* Bottom padding */}
-          <View style={styles.bottomPadding} />
-        </ScrollView>
-      </View>
-    );
-  }
-
-  // Agent Dashboard (similar to seller)
-  if (user?.role === 'agent') {
-    const [agentProperties, setAgentProperties] = useState<any[]>([]);
-    const [agentStats, setAgentStats] = useState({
-      totalListings: 0,
-      totalViews: 0,
-      totalInquiries: 0,
-      activeListings: 0,
-      pendingListings: 0,
-    });
-    const [recentInquiries, setRecentInquiries] = useState<any[]>([]);
-    const [agentLoading, setAgentLoading] = useState(true);
-
-    useEffect(() => {
-      if (user?.role === 'agent') {
-        loadAgentDashboardData();
-      }
-    }, [user?.role]);
-
-    const loadAgentDashboardData = async () => {
-      try {
-        setAgentLoading(true);
-        const [propertiesResponse, inquiriesResponse] = await Promise.all([
-          propertyService.getMyProperties(),
-          inquiryService.getInbox(),
-        ]);
-
-        // Process properties
-        if (propertiesResponse && propertiesResponse.success) {
-          const propertiesData = propertiesResponse.data?.properties || propertiesResponse.data || [];
-          
-          const formatted = propertiesData.slice(0, 5).map((prop: any) => ({
-            id: prop.id?.toString() || prop.property_id?.toString() || '',
-            name: prop.title || prop.property_title || 'Untitled Property',
-            location: prop.location || prop.city || 'Location not specified',
-            price: typeof prop.price === 'number'
-              ? `₹${prop.price.toLocaleString('en-IN')}${prop.status === 'rent' ? '/month' : ''}`
-              : prop.price || 'Price not available',
-            image: fixImageUrl(prop.cover_image || prop.image || ''),
-          }));
-
-          setAgentProperties(formatted);
-
-          // Calculate stats
-          const total = propertiesData.length;
-          const active = propertiesData.filter((p: any) => 
-            p.status === 'active' || p.property_status === 'active'
-          ).length;
-          const pending = propertiesData.filter((p: any) => 
-            p.status === 'pending' || p.property_status === 'pending'
-          ).length;
-          const totalViews = propertiesData.reduce((sum: number, p: any) => 
-            sum + (p.views || p.view_count || 0), 0
-          );
-
-          setAgentStats({
-            totalListings: total,
-            totalViews: totalViews,
-            activeListings: active,
-            pendingListings: pending,
-            totalInquiries: 0, // Will be set from inquiries
-          });
-        }
-
-        // Process inquiries
-        if (inquiriesResponse && inquiriesResponse.success) {
-          const inquiries = inquiriesResponse.data?.inquiries || inquiriesResponse.data || [];
-          
-          const formattedInquiries = inquiries.slice(0, 5).map((inq: any) => {
-            let time = 'Just now';
-            if (inq.created_at || inq.timestamp) {
-              const date = new Date(inq.created_at || inq.timestamp);
-              const now = new Date();
-              const diffMs = now.getTime() - date.getTime();
-              const diffHours = Math.floor(diffMs / 3600000);
-              const diffDays = Math.floor(diffMs / 86400000);
-              
-              if (diffHours < 1) time = 'Just now';
-              else if (diffHours < 24) time = `${diffHours}h ago`;
-              else if (diffDays === 1) time = 'Yesterday';
-              else if (diffDays < 7) time = `${diffDays}d ago`;
-              else time = date.toLocaleDateString();
-            }
-
-            return {
-              id: inq.id?.toString() || inq.inquiry_id?.toString() || '',
-              name: inq.sender_name || inq.buyer_name || 'Buyer',
-              time,
-              property: inq.property_title || inq.property_name || 'Property',
-              avatar: '👤',
-            };
-          });
-
-          setRecentInquiries(formattedInquiries);
-          setAgentStats(prev => ({
-            ...prev,
-            totalInquiries: Array.isArray(inquiries) ? inquiries.length : 0,
-          }));
-        }
-      } catch (error) {
-        console.error('Error loading agent dashboard:', error);
-        setAgentProperties([]);
-        setRecentInquiries([]);
-      } finally {
-        setAgentLoading(false);
-      }
-    };
-
-    return (
-      <View style={styles.sellerContainer}>
-        {/* Custom Header */}
-        <AgentHeader
-          onProfilePress={() => (navigation as any).navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onLogoutPress={logout}
-        />
-        <ScrollView
-          style={styles.sellerScrollView}
-          showsVerticalScrollIndicator={false}>
-          {/* Welcome Banner */}
-          <View style={styles.sellerWelcomeBanner}>
-            <View style={styles.sellerWelcomeContent}>
-              <Text style={styles.sellerWelcomeText}>
-                Welcome back, {(user.full_name || '').split(' ')[0]}! 👋
-              </Text>
-              <Text style={styles.sellerWelcomeSubtext}>
-                Here's what's happening with your listings today
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.sellerAddPropertyButton}
-              onPress={() => (navigation as any).navigate('AddProperty')}>
-              <Text style={styles.sellerAddPropertyIcon}>+</Text>
-              <Text style={styles.sellerAddPropertyText}>Add Property</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Summary Cards */}
-          <View style={styles.sellerSummaryCards}>
-            {/* Total Listings Card */}
-            <View style={[styles.sellerSummaryCard, styles.sellerSummaryCardPrimary]}>
-              <View style={styles.sellerSummaryCardContent}>
-                <Text style={styles.sellerSummaryIcon}>📋</Text>
-                <View style={styles.sellerSummaryInfo}>
-                  <Text style={[styles.sellerSummaryLabel, styles.sellerSummaryLabelPrimary]}>
-                    Total Listings
-                  </Text>
-                  <Text style={[styles.sellerSummaryNumber, styles.sellerSummaryNumberPrimary]}>
-                    {agentStats.totalListings}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Recent Inquiries</Text>
+              {stats.new_inquiries > 0 && (
+                <View style={styles.sectionBadge}>
+                  <Text style={styles.sectionBadgeText}>
+                    {stats.new_inquiries} New
                   </Text>
                 </View>
-              </View>
-              <View style={[styles.sellerBadgeActive, {backgroundColor: 'rgba(255, 255, 255, 0.3)'}]}>
-                <Text style={[styles.sellerBadgeText, {color: colors.surface}]}>ACTIVE</Text>
-              </View>
+              )}
             </View>
-
-            {/* People Showed Interest Card */}
-            <View style={styles.sellerSummaryCard}>
-              <View style={styles.sellerSummaryCardContent}>
-                <Text style={styles.sellerSummaryIcon}>👁️</Text>
-                <View style={styles.sellerSummaryInfo}>
-                  <Text style={styles.sellerSummaryLabel}>People Showed Interest</Text>
-                  <Text style={styles.sellerSummaryNumber}>{agentStats.totalViews}</Text>
-                  <Text style={styles.sellerSummaryDescription}>
-                    {agentStats.totalViews} people have viewed your listings
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.sellerBadgeSuccess}>
-                <Text style={styles.sellerBadgeText}>Active ↑</Text>
-              </View>
-            </View>
-
-            {/* Total Inquiries Card */}
-            <View style={styles.sellerSummaryCard}>
-              <View style={styles.sellerSummaryCardContent}>
-                <Text style={styles.sellerSummaryIcon}>💬</Text>
-                <View style={styles.sellerSummaryInfo}>
-                  <Text style={styles.sellerSummaryLabel}>Total Inquiries</Text>
-                  <Text style={styles.sellerSummaryNumber}>{agentStats.totalInquiries}</Text>
-                </View>
-              </View>
-              <View style={styles.sellerBadgeWarning}>
-                <Text style={styles.sellerBadgeText}>
-                  {agentStats.totalInquiries > 0 ? `${agentStats.totalInquiries} NEW` : '0 NEW'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Listing Status Card */}
-            <View style={styles.sellerSummaryCard}>
-              <View style={styles.sellerSummaryCardContent}>
-                <Text style={styles.sellerSummaryIcon}>⭐</Text>
-                <View style={styles.sellerSummaryInfo}>
-                  <Text style={styles.sellerSummaryLabel}>Listing Status</Text>
-                  <View style={styles.sellerStatusBadges}>
-                    <View style={styles.sellerStatusBadge}>
-                      <Text style={styles.sellerStatusBadgeText}>{agentStats.activeListings} Active</Text>
-                    </View>
-                    <View style={[styles.sellerStatusBadge, styles.sellerStatusBadgeInactive]}>
-                      <Text style={[styles.sellerStatusBadgeText, styles.sellerStatusBadgeTextInactive]}>
-                        {agentStats.pendingListings} Pending
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Inquiries')}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
           </View>
-
-          {/* Quick Actions */}
-          <View style={styles.sellerQuickActionsSection}>
-            <Text style={styles.sellerSectionTitle}>Quick Actions</Text>
-            <View style={styles.sellerQuickActionsGrid}>
-              <TouchableOpacity
-                style={styles.sellerQuickActionCard}
-                onPress={() => (navigation as any).navigate('AddProperty')}>
-                <Text style={styles.sellerQuickActionIcon}>➕</Text>
-                <Text style={styles.sellerQuickActionTitle}>Add New Property</Text>
-                <Text style={styles.sellerQuickActionSubtitle}>
-                  List a new property for sale or rent
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.sellerQuickActionCard}
-                onPress={() => (navigation as any).navigate('Listings')}>
-                <Text style={styles.sellerQuickActionIcon}>📋</Text>
-                <Text style={styles.sellerQuickActionTitle}>View Listings</Text>
-                <Text style={styles.sellerQuickActionSubtitle}>
-                  Manage all your property listings
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.sellerQuickActionCard}
-                onPress={() => (navigation as any).navigate('Inquiries')}>
-                <Text style={styles.sellerQuickActionIcon}>💬</Text>
-                <Text style={styles.sellerQuickActionTitle}>View Inquiries</Text>
-                <Text style={styles.sellerQuickActionSubtitle}>
-                  Respond to buyer inquiries
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.sellerQuickActionCard}
-                onPress={() => (navigation as any).navigate('Profile')}>
-                <Text style={styles.sellerQuickActionIcon}>👤</Text>
-                <Text style={styles.sellerQuickActionTitle}>Update Profile</Text>
-                <Text style={styles.sellerQuickActionSubtitle}>
-                  Manage your account settings
-                </Text>
-              </TouchableOpacity>
+          {recentInquiries.length > 0 ? (
+            <FlatList
+              data={recentInquiries.slice(0, 4)}
+              renderItem={renderInquiryCard}
+              keyExtractor={item => String(item.id)}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateIcon}>💬</Text>
+              <Text style={styles.emptyStateText}>No new inquiries</Text>
             </View>
-          </View>
-
-          {/* Your Listings Section */}
-          <View style={styles.sellerSection}>
-            <View style={styles.sellerSectionHeader}>
-              <Text style={styles.sellerSectionTitle}>Your Listings</Text>
-              <TouchableOpacity
-                onPress={() => (navigation as any).navigate('Listings')}>
-                <Text style={styles.sellerSeeAllText}>View All →</Text>
-              </TouchableOpacity>
-            </View>
-            {agentLoading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading properties...</Text>
-              </View>
-            ) : agentProperties.length > 0 ? (
-              <View style={styles.sellerHorizontalScrollContainer}>
-                <FlatList
-                  data={agentProperties}
-                  renderItem={({item}) => (
-                    <TouchableOpacity
-                      style={styles.sellerPropertyCard}
-                      onPress={() =>
-                        (navigation as any).navigate('PropertyDetails', {
-                          propertyId: item.id,
-                        })
-                      }>
-                      {item.image && item.image !== '🏢' && item.image !== '🏡' ? (
-                        <Image source={{uri: item.image}} style={styles.sellerPropertyImage} />
-                      ) : (
-                        <View style={styles.sellerPropertyImage}>
-                          <Text style={styles.sellerPropertyImageIcon}>🏠</Text>
-                        </View>
-                      )}
-                      <View style={styles.sellerPropertyInfo}>
-                        <Text style={styles.sellerPropertyName} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text style={styles.sellerPropertyLocation} numberOfLines={1}>
-                          {item.location}
-                        </Text>
-                        <Text style={styles.sellerPropertyPrice}>{item.price}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                  keyExtractor={item => item.id}
-                  horizontal={true}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.sellerHorizontalList}
-                />
-              </View>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No properties listed yet</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Recent Inquiries Section */}
-          <View style={styles.sellerSection}>
-            <View style={styles.sellerSectionHeader}>
-                <View style={styles.sellerSectionTitleWithBadge}>
-                <Text style={styles.sellerSectionTitle}>Recent Inquiries</Text>
-                {agentStats.totalInquiries > 0 && (
-                  <View style={styles.sellerInquiryBadge}>
-                    <Text style={styles.sellerInquiryBadgeText}>{agentStats.totalInquiries}</Text>
-                  </View>
-                )}
-              </View>
-              <TouchableOpacity
-                onPress={() => (navigation as any).navigate('Inquiries')}>
-                <Text style={styles.sellerSeeAllText}>View All →</Text>
-              </TouchableOpacity>
-            </View>
-            {recentInquiries.length > 0 ? (
-              recentInquiries.map(inquiry => (
-              <TouchableOpacity
-                key={inquiry.id}
-                style={styles.sellerInquiryItem}
-                onPress={() => (navigation as any).navigate('Inquiries')}>
-                <View style={styles.sellerInquiryAvatar}>
-                  <Text style={styles.sellerInquiryAvatarText}>{inquiry.avatar}</Text>
-                </View>
-                <View style={styles.sellerInquiryInfo}>
-                  <Text style={styles.sellerInquiryName}>{inquiry.name}</Text>
-                  <Text style={styles.sellerInquiryProperty}>{inquiry.property}</Text>
-                </View>
-                <Text style={styles.sellerInquiryTime}>{inquiry.time}</Text>
-              </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No inquiries yet</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Bottom padding */}
-          <View style={styles.bottomPadding} />
-        </ScrollView>
-      </View>
-    );
-  }
-
-  // Default dashboard for other roles
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.greeting}>{getGreeting()}</Text>
-        {user && (
-          <Text style={styles.roleText}>Role: {getRoleLabel(user.role)}</Text>
-        )}
-        <Text style={styles.subtitle}>Manage your listings</Text>
-      </View>
-
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>150+</Text>
-          <Text style={styles.statLabel}>Properties</Text>
+          )}
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>50+</Text>
-          <Text style={styles.statLabel}>Agents</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>200+</Text>
-          <Text style={styles.statLabel}>Clients</Text>
-        </View>
-      </View>
-
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => (navigation as any).navigate('PropertyList')}>
-          <Text style={styles.actionButtonText}>Browse Properties</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionButton, styles.secondaryButton]}
-          onPress={() => (navigation as any).navigate('AddProperty')}>
-          <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>
-            Add Property
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionButton, styles.secondaryButton]}
-          onPress={() => (navigation as any).navigate('Profile')}>
-          <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>
-            View Profile
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.recentSection}>
-        <Text style={styles.sectionTitle}>Recent Properties</Text>
-        <View style={styles.propertyCard}>
-          <View style={styles.propertyImagePlaceholder}>
-            <Text style={styles.placeholderText}>Property Image</Text>
-          </View>
-          <View style={styles.propertyInfo}>
-            <Text style={styles.propertyTitle}>Modern Apartment</Text>
-            <Text style={styles.propertyLocation}>New York, NY</Text>
-            <Text style={styles.propertyPrice}>$250,000</Text>
-          </View>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  buyerContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  welcomeSection: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  welcomeText: {
-    ...typography.h2,
-    color: colors.text,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  welcomeSubtext: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.xs,
-    shadowColor: colors.propertyCardShadow,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-  },
-  toggleButtonActive: {
-    backgroundColor: colors.cta,
-  },
-  toggleText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  toggleTextActive: {
-    color: colors.surface,
-  },
-  section: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
-    fontWeight: '700',
-  },
-  sectionTitleSmall: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  seeAllText: {
-    ...typography.caption,
-    color: colors.cta,
-    fontWeight: '600',
-  },
-  quickFiltersSection: {
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  quickFiltersContainer: {
-    paddingHorizontal: spacing.md,
-    paddingRight: spacing.lg,
-  },
-  quickFilterChip: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.round,
-    marginRight: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  quickFilterText: {
-    ...typography.caption,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  horizontalScrollContainer: {
-    height: 280,
-  },
-  horizontalList: {
-    paddingLeft: spacing.md,
-    paddingRight: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  bottomPadding: {
-    height: spacing.xxl,
-  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: spacing.lg,
-    backgroundColor: colors.surface,
-    marginBottom: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+  welcomeHeader: {
+    marginBottom: spacing.xl,
   },
   greeting: {
-    ...typography.h2,
+    ...typography.h1,
     color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  roleText: {
-    ...typography.body,
-    color: colors.accent,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: spacing.xs,
   },
   subtitle: {
     ...typography.body,
     color: colors.textSecondary,
+    fontSize: 14,
+    marginBottom: spacing.md,
   },
-  statsContainer: {
+  actionButtonsContainer: {
     flexDirection: 'row',
-    padding: spacing.md,
-    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  addPropertyButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  addProjectButton: {
+    backgroundColor: colors.accent || '#FF9800',
+  },
+  addPropertyButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
   },
   statCard: {
-    flex: 1,
+    width: '47%',
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginHorizontal: spacing.xs,
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statCardIcon: {
+    marginBottom: spacing.sm,
+  },
+  statIcon: {
+    fontSize: 32,
   },
   statNumber: {
-    ...typography.h2,
-    color: colors.accent,
+    ...typography.h1,
+    color: colors.text,
+    fontWeight: '700',
     marginBottom: spacing.xs,
   },
   statLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-  },
-  actionsContainer: {
-    padding: spacing.lg,
-  },
-  actionButton: {
-    backgroundColor: colors.cta,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  secondaryButton: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  actionButtonText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '600',
-  },
-  secondaryButtonText: {
-    color: colors.accent,
-  },
-  recentSection: {
-    padding: spacing.lg,
-  },
-  propertyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-  },
-  propertyImagePlaceholder: {
-    height: 200,
-    backgroundColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  propertyInfo: {
-    padding: spacing.md,
-  },
-  propertyTitle: {
-    ...typography.h3,
-    color: colors.text,
+    fontSize: 12,
     marginBottom: spacing.xs,
   },
-  propertyLocation: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  propertyPrice: {
-    ...typography.body,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  // Seller Dashboard Styles
-  sellerContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  sellerScrollView: {
-    flex: 1,
-  },
-  sellerWelcomeBanner: {
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sellerWelcomeContent: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  sellerWelcomeText: {
-    ...typography.h2,
-    color: colors.text,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  sellerWelcomeSubtext: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  sellerAddPropertyButton: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  sellerAddPropertyIcon: {
-    ...typography.h3,
-    color: colors.surface,
-    marginRight: spacing.xs,
-  },
-  sellerAddPropertyText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '600',
-  },
-  sellerSummaryCards: {
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  sellerSummaryCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    shadowColor: colors.propertyCardShadow,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sellerSummaryCardPrimary: {
-    backgroundColor: colors.primary,
-  },
-  sellerSummaryCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sellerSummaryIcon: {
-    fontSize: 32,
-    marginRight: spacing.md,
-  },
-  sellerSummaryInfo: {
-    flex: 1,
-  },
-  sellerSummaryLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  sellerSummaryNumber: {
-    ...typography.h1,
-    color: colors.text,
-    fontWeight: '700',
-  },
-  sellerSummaryLabelPrimary: {
-    ...typography.caption,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: spacing.xs,
-  },
-  sellerSummaryNumberPrimary: {
-    ...typography.h1,
-    color: colors.surface,
-    fontWeight: '700',
-  },
-  sellerSummaryDescription: {
-    ...typography.small,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  sellerBadgeActive: {
-    backgroundColor: colors.primary,
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  sellerBadgeSuccess: {
+  activeBadge: {
     backgroundColor: colors.success,
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
     borderRadius: borderRadius.sm,
-  },
-  sellerBadgeWarning: {
-    backgroundColor: colors.warning,
     alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
+    marginTop: spacing.xs,
   },
-  sellerBadgeText: {
-    ...typography.small,
+  activeBadgeText: {
+    ...typography.caption,
     color: colors.surface,
+    fontSize: 10,
     fontWeight: '600',
   },
-  sellerStatusBadges: {
-    flexDirection: 'row',
+  newBadge: {
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
     marginTop: spacing.xs,
-    gap: spacing.sm,
   },
-  sellerStatusBadge: {
+  newBadgeText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  positiveIndicator: {
+    backgroundColor: colors.success,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  negativeIndicator: {
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  activeIndicator: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  indicatorText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  statusPills: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  statusPill: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.md,
   },
-  sellerStatusBadgeInactive: {
-    backgroundColor: colors.border,
+  statusPillRent: {
+    backgroundColor: colors.accent || '#FF9800',
   },
-  sellerStatusBadgeText: {
-    ...typography.small,
+  statusPillText: {
+    ...typography.caption,
     color: colors.surface,
+    fontSize: 11,
     fontWeight: '600',
   },
-  sellerStatusBadgeTextInactive: {
-    color: colors.textSecondary,
-  },
-  sellerQuickActionsSection: {
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  sellerQuickActionsGrid: {
+  quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: spacing.sm,
     gap: spacing.md,
+    marginBottom: spacing.xl,
   },
-  sellerQuickActionCard: {
+  quickActionCard: {
     width: '47%',
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderStyle: 'dashed',
     alignItems: 'center',
-    minHeight: 140,
-    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  sellerQuickActionIcon: {
+  quickActionIcon: {
     fontSize: 32,
     marginBottom: spacing.sm,
   },
-  sellerQuickActionTitle: {
+  quickActionTitle: {
     ...typography.body,
     color: colors.text,
     fontWeight: '600',
-    textAlign: 'center',
     marginBottom: spacing.xs,
-  },
-  sellerQuickActionSubtitle: {
-    ...typography.small,
-    color: colors.textSecondary,
     textAlign: 'center',
   },
-  sellerSection: {
-    marginBottom: spacing.lg,
+  quickActionDescription: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+    textAlign: 'center',
   },
-  sellerSectionHeader: {
+  section: {
+    marginBottom: spacing.xl,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
   },
-  sellerSectionTitleWithBadge: {
+  sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  sellerSectionTitle: {
-    ...typography.h3,
+  sectionTitle: {
+    ...typography.h2,
     color: colors.text,
     fontWeight: '700',
   },
-  sellerSeeAllText: {
+  sectionBadge: {
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.md,
+  },
+  sectionBadgeText: {
     ...typography.caption,
-    color: colors.accent,
+    color: colors.surface,
+    fontSize: 10,
     fontWeight: '600',
   },
-  sellerHorizontalScrollContainer: {
-    height: 200,
+  viewAllText: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '600',
   },
-  sellerHorizontalList: {
-    paddingLeft: spacing.md,
-    paddingRight: spacing.md,
-  },
-  sellerPropertyCard: {
-    width: 260,
+  propertyCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    marginRight: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
     overflow: 'hidden',
-    shadowColor: colors.propertyCardShadow,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  sellerPropertyImage: {
-    height: 120,
-    backgroundColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+  propertyImage: {
+    width: '100%',
+    height: 180,
+    resizeMode: 'cover',
   },
-  sellerPropertyImageIcon: {
-    fontSize: 48,
-  },
-  sellerPropertyInfo: {
+  propertyCardContent: {
     padding: spacing.md,
   },
-  sellerPropertyName: {
-    ...typography.body,
+  propertyCardHeader: {
+    marginBottom: spacing.sm,
+  },
+  propertyBadgeContainer: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  propertyStatusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+  },
+  propertyStatusText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  projectTypeBadge: {
+    backgroundColor: colors.accent || '#FF9800',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+  },
+  projectTypeText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  propertyCardTitle: {
+    ...typography.h3,
     color: colors.text,
     fontWeight: '600',
     marginBottom: spacing.xs,
   },
-  sellerPropertyLocation: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  sellerPropertyPrice: {
-    ...typography.body,
-    color: colors.cta,
-    fontWeight: '600',
-  },
-  sellerInquiryBadge: {
-    backgroundColor: colors.error,
-    borderRadius: borderRadius.round,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xs,
-  },
-  sellerInquiryBadgeText: {
-    ...typography.small,
-    color: colors.surface,
-    fontWeight: '600',
-  },
-  sellerInquiryItem: {
+  propertyLocationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    marginHorizontal: spacing.md,
+    gap: spacing.xs,
+  },
+  locationIcon: {
+    fontSize: 12,
+  },
+  propertyCardLocation: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    flex: 1,
+  },
+  propertyCardStats: {
+    flexDirection: 'row',
+    gap: spacing.md,
     marginBottom: spacing.sm,
-    borderRadius: borderRadius.md,
-    shadowColor: colors.propertyCardShadow,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  propertyStatText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
+  propertyCardPrice: {
+    ...typography.h3,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  inquiryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
     shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 2,
   },
-  sellerInquiryAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.border,
+  inquiryCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  inquiryAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: spacing.sm,
+  },
+  inquiryAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
-  sellerInquiryAvatarText: {
-    fontSize: 24,
+  inquiryAvatarText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
   },
-  sellerInquiryInfo: {
+  inquiryCardInfo: {
     flex: 1,
   },
-  sellerInquiryName: {
+  inquiryBuyerName: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  inquiryTime: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
+  inquiryPropertyTitle: {
     ...typography.body,
     color: colors.text,
     fontWeight: '600',
     marginBottom: spacing.xs,
   },
-  sellerInquiryProperty: {
+  inquiryMessage: {
     ...typography.caption,
     color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
   },
-  sellerInquiryTime: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  loadingContainer: {
+  emptyState: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
     padding: spacing.xl,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  loadingText: {
+  emptyStateIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
+  },
+  emptyStateText: {
     ...typography.body,
     color: colors.textSecondary,
+    marginBottom: spacing.md,
   },
-  emptyContainer: {
-    padding: spacing.xl,
-    alignItems: 'center',
+  emptyStateButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
   },
-  emptyText: {
+  emptyStateButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
+  },
+  errorIcon: {
+    fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  errorTitle: {
+    ...typography.h2,
+    color: colors.text,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  errorText: {
     ...typography.body,
     color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    lineHeight: 22,
   },
 });
 
-export default DashboardScreen;
+export default AgentDashboardScreen;
 

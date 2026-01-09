@@ -14,12 +14,18 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth, UserRole} from '../../context/AuthContext';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
+
+// Storage keys for Remember Me feature
+const REMEMBERED_EMAIL_KEY = '@remembered_email';
+const REMEMBERED_PASSWORD_KEY = '@remembered_password';
+const REMEMBER_ME_ENABLED_KEY = '@remember_me_enabled';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -32,7 +38,7 @@ type Props = {
 
 const LoginScreen: React.FC<Props> = ({navigation}) => {
   const {login} = useAuth();
-  const [email, setEmail] = useState('snehashirke221@gmail.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('buyer');
   const [showPassword, setShowPassword] = useState(false);
@@ -99,19 +105,157 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
     animateBuildings();
   }, []);
 
-  const handleLogin = async () => {
+  // Load saved credentials on mount
+  useEffect(() => {
+    loadSavedCredentials();
+  }, []);
+
+  const loadSavedCredentials = async () => {
+    try {
+      const rememberMeEnabled = await AsyncStorage.getItem(REMEMBER_ME_ENABLED_KEY);
+      if (rememberMeEnabled === 'true') {
+        const savedEmail = await AsyncStorage.getItem(REMEMBERED_EMAIL_KEY);
+        const savedPassword = await AsyncStorage.getItem(REMEMBERED_PASSWORD_KEY);
+        
+        if (savedEmail) {
+          setEmail(savedEmail);
+        }
+        if (savedPassword) {
+          setPassword(savedPassword);
+        }
+        setRememberMe(true);
+      }
+    } catch (error) {
+      console.error('Error loading saved credentials:', error);
+    }
+  };
+
+  const saveCredentials = async (email: string, password: string) => {
+    try {
+      await AsyncStorage.setItem(REMEMBER_ME_ENABLED_KEY, 'true');
+      await AsyncStorage.setItem(REMEMBERED_EMAIL_KEY, email);
+      await AsyncStorage.setItem(REMEMBERED_PASSWORD_KEY, password);
+    } catch (error) {
+      console.error('Error saving credentials:', error);
+    }
+  };
+
+  const clearSavedCredentials = async () => {
+    try {
+      await AsyncStorage.removeItem(REMEMBER_ME_ENABLED_KEY);
+      await AsyncStorage.removeItem(REMEMBERED_EMAIL_KEY);
+      await AsyncStorage.removeItem(REMEMBERED_PASSWORD_KEY);
+    } catch (error) {
+      console.error('Error clearing saved credentials:', error);
+    }
+  };
+
+  const handleLogin = async (retryUserType?: UserRole) => {
     if (!email || !password) {
       Alert.alert('Error', 'Please enter email and password');
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
     setIsLoading(true);
+    // Ensure we have a valid userType string
+    const userTypeToUse: string = (retryUserType || selectedRole || 'buyer') as string;
+    
     try {
-      // Pass the selected role to login - backend may use it for validation
-      await login(email, password, selectedRole);
+      // Pass the selected role to login - backend requires userType
+      await login(email.trim(), password, userTypeToUse);
+      
+      // Save credentials if Remember Me is checked
+      if (rememberMe) {
+        await saveCredentials(email.trim(), password);
+      } else {
+        // Clear saved credentials if Remember Me is unchecked
+        await clearSavedCredentials();
+      }
+      
       // Navigation will be handled by AuthContext based on user_type returned from backend
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Login failed');
+      console.error('[LoginScreen] Login error:', error);
+      
+      // Handle validation errors (400)
+      if (error.status === 400) {
+        const errorMsg = error.message || error.error?.message || 'Validation failed. Please check your email, password, and selected role.';
+        Alert.alert('Validation Failed', errorMsg);
+        return;
+      }
+      
+      // Handle 403 errors with specific messages and auto-retry
+      if (error.status === 403) {
+        const errorMessage = error.message || error.error?.message || 'Access denied. You don\'t have permission to access this dashboard.';
+        const suggestedUserType = error.data?.suggestedUserType;
+        
+        console.log('[LoginScreen] 403 Error - Suggested user type:', suggestedUserType);
+        
+        // If we have a suggested user type and we're not already retrying, offer to auto-retry
+        if (suggestedUserType && !retryUserType && suggestedUserType !== userTypeToUse) {
+          const suggestedRoleLabel = getRoleLabel(suggestedUserType as UserRole);
+          
+          Alert.alert(
+            'Access Denied',
+            `${errorMessage}\n\nYou are registered as ${suggestedRoleLabel}. Would you like to switch to ${suggestedRoleLabel} login?`,
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+                onPress: () => {
+                  // Update selected role to match suggestion
+                  setSelectedRole(suggestedUserType as UserRole);
+                },
+              },
+              {
+                text: 'Switch & Login',
+                onPress: () => {
+                  setSelectedRole(suggestedUserType as UserRole);
+                  handleLogin(suggestedUserType as UserRole);
+                },
+              },
+            ],
+            {cancelable: false}
+          );
+        } else {
+          // Show error message with role information
+          let roleHint = '';
+          if (errorMessage.includes('Agent/Builder') || errorMessage.includes('agent')) {
+            roleHint = '\n\nYou are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.';
+            setSelectedRole('agent');
+          } else if (errorMessage.includes('Buyer/Tenant') || errorMessage.includes('buyer')) {
+            roleHint = '\n\nYou are registered as a Buyer/Tenant. You can access both Buyer and Seller dashboards.';
+            setSelectedRole('buyer');
+          } else if (errorMessage.includes('Seller/Owner') || errorMessage.includes('seller')) {
+            roleHint = '\n\nYou are registered as a Seller/Owner. You can access both Buyer and Seller dashboards.';
+            setSelectedRole('seller');
+          }
+          
+          Alert.alert(
+            'Access Denied',
+            errorMessage + roleHint,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Role already updated above
+                },
+              },
+            ]
+          );
+        }
+      } else if (error.status === 401) {
+        Alert.alert('Login Failed', 'Invalid email or password. Please check your credentials and try again.');
+      } else {
+        const errorMsg = error.message || error.error?.message || 'Login failed. Please try again.';
+        Alert.alert('Error', errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -297,7 +441,14 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.optionsRow}>
                 <TouchableOpacity
                   style={styles.checkboxContainer}
-                  onPress={() => setRememberMe(!rememberMe)}>
+                  onPress={async () => {
+                    const newRememberMe = !rememberMe;
+                    setRememberMe(newRememberMe);
+                    // If unchecking, clear saved credentials
+                    if (!newRememberMe) {
+                      await clearSavedCredentials();
+                    }
+                  }}>
                   <View
                     style={[
                       styles.checkbox,

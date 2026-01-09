@@ -47,6 +47,8 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const [phoneVerifying, setPhoneVerifying] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [emailToken, setEmailToken] = useState<string | null>(null);
+  const [phoneToken, setPhoneToken] = useState<string | null>(null);
 
   // Animation values
   const building1Anim = useRef(new Animated.Value(0)).current;
@@ -118,6 +120,10 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       const response = await otpService.sendEmail(email);
       if (response.success) {
         setEmailVerified(true);
+        // Store MSG91 token if available
+        if (response.data?.token || response.data?.verificationToken) {
+          setEmailToken(response.data.token || response.data.verificationToken);
+        }
         Alert.alert('Success', 'Verification email sent! Please check your inbox and enter the OTP when prompted.');
       } else {
         Alert.alert('Error', response.message || 'Failed to send verification email');
@@ -146,6 +152,10 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       const response = await otpService.sendSMS(`+91${phoneNumber}`);
       if (response.success) {
         setPhoneVerified(true);
+        // Store MSG91 token if available
+        if (response.data?.token || response.data?.verificationToken) {
+          setPhoneToken(response.data.token || response.data.verificationToken);
+        }
         Alert.alert('Success', 'Verification SMS sent! Please check your phone and enter the OTP when prompted.');
       } else {
         Alert.alert('Error', response.message || 'Failed to send verification SMS');
@@ -180,9 +190,23 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
 
+    // Check if email and phone are verified
+    if (!emailVerified || !phoneVerified) {
+      Alert.alert('Error', 'Please verify both email and phone number before registering');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const response = await register(name, email, phone.replace(/[^0-9]/g, ''), password, selectedRole);
+      const response = await register(
+        name,
+        email,
+        phone.replace(/[^0-9]/g, ''),
+        password,
+        selectedRole,
+        emailToken || undefined,
+        phoneToken || undefined,
+      );
       // If registration successful, navigate to OTP verification
       if (response && response.success && response.data?.user_id) {
         navigation.navigate('OTPVerification', {
@@ -364,6 +388,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                     onChangeText={(text) => {
                       setEmail(text);
                       setEmailVerified(false);
+                      setEmailToken(null);
                     }}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -403,6 +428,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                     onChangeText={(text) => {
                       setPhone(text);
                       setPhoneVerified(false);
+                      setPhoneToken(null);
                     }}
                   keyboardType="phone-pad"
                   maxLength={10}

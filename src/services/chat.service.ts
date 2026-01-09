@@ -109,7 +109,13 @@ export const chatService = {
     callback: (messages: any[]) => void,
   ): (() => void) | null => {
     try {
-      const db = require('@react-native-firebase/firestore').default();
+      const firestore = require('@react-native-firebase/firestore').default;
+      const db = firestore();
+      
+      if (!db) {
+        console.warn('Firebase Firestore not available');
+        return null;
+      }
       
       return db
         .collection('chats')
@@ -118,14 +124,20 @@ export const chatService = {
         .orderBy('timestamp', 'asc')
         .onSnapshot(
           (snapshot: any) => {
+            if (snapshot && !snapshot.empty) {
             const messages = snapshot.docs.map((doc: any) => ({
               id: doc.id,
               ...doc.data(),
             }));
             callback(messages);
+            } else {
+              callback([]);
+            }
           },
           (error: any) => {
             console.error('Error listening to messages:', error);
+            // Return empty array on error
+            callback([]);
           },
         );
     } catch (error) {

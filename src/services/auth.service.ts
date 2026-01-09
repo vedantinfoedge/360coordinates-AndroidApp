@@ -5,48 +5,175 @@ import {API_ENDPOINTS} from '../config/api.config';
 export const authService = {
   // Register
   register: async (userData: {
-    full_name: string;
+    fullName: string;
     email: string;
     phone: string;
     password: string;
-    user_type: string;
+    userType: string;
+    emailVerificationToken?: string;
+    phoneVerificationToken?: string;
   }) => {
-    const response = await api.post(API_ENDPOINTS.REGISTER, userData);
+    // Map to backend expected format
+    const registerData: any = {
+      fullName: userData.fullName,
+      email: userData.email,
+      phone: userData.phone,
+      password: userData.password,
+      userType: userData.userType,
+    };
+    
+    // Add MSG91 tokens if provided
+    if (userData.emailVerificationToken) {
+      registerData.emailVerificationToken = userData.emailVerificationToken;
+    }
+    if (userData.phoneVerificationToken) {
+      registerData.phoneVerificationToken = userData.phoneVerificationToken;
+    }
+    
+    const response = await api.post(API_ENDPOINTS.REGISTER, registerData);
     return response;
   },
 
   // Login
-  login: async (email: string, password: string, userType?: string) => {
-    const loginData: any = {email, password};
-    // Include user_type if provided (some backends may use this for validation)
-    if (userType) {
-      loginData.user_type = userType;
+  login: async (email: string, password: string, userType?: string): Promise<any> => {
+    // Normalize inputs
+    const normalizedEmail = email.trim().toLowerCase();
+    // CRITICAL: userType is required - default to 'buyer' if not provided
+    const normalizedUserType = (userType && typeof userType === 'string' ? userType : 'buyer').toLowerCase();
+    
+    // Login request MUST include userType (as per guide)
+    const loginData: any = {
+      email: normalizedEmail,
+      password: password,
+      userType: normalizedUserType, // CRITICAL: Must include this
+    };
+    
+    console.log('[AuthService] Login request:', {email: normalizedEmail, userType: normalizedUserType});
+    console.log('[AuthService] Request body:', JSON.stringify(loginData));
+    
+    try {
+      const response: any = await api.post(API_ENDPOINTS.LOGIN, loginData);
+      console.log('[AuthService] Response code: 200');
+      console.log('[AuthService] Login response:', JSON.stringify(response, null, 2));
+      console.log('[AuthService] Response success:', response?.success);
+      console.log('[AuthService] Response data:', response?.data);
+      
+      // Check if response is successful
+      if (!response || !response.success) {
+        const errorMsg = response?.message || 'Login failed. Please check your credentials.';
+        console.error('[AuthService] Login not successful:', errorMsg);
+        throw {
+          success: false,
+          message: errorMsg,
+          status: response?.status || 400,
+          error: response,
+        };
+      }
+      
+      // Handle success - save token and user data
+      if (response.success && response.data?.token) {
+        await AsyncStorage.setItem('@auth_token', response.data.token);
+        await AsyncStorage.setItem(
+          '@propertyapp_user',
+          JSON.stringify(response.data.user),
+        );
+        console.log('[AuthService] Token and user data saved successfully');
+      } else {
+        console.warn('[AuthService] No token in response:', response);
+      }
+      
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Login error:', error);
+      console.log('[AuthService] Error status:', error.status);
+      console.log('[AuthService] Error message:', error.message);
+      console.log('[AuthService] Error body:', JSON.stringify(error, null, 2));
+      
+      // Handle 403 errors - Wrong userType (as per guide)
+      if (error.status === 403) {
+        // Extract error message from various possible formats
+        let errorMessage = error.message || 'Access denied. You don\'t have permission to access this dashboard.';
+        
+        // Try to get message from error.error or error.response
+        if (error.error?.message) {
+          errorMessage = error.error.message;
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.error?.data?.message) {
+          errorMessage = error.error.data.message;
+        } else if (typeof error.error === 'string') {
+          errorMessage = error.error;
+        }
+        
+        console.log('[AuthService] 403 Error - Role access denied:', errorMessage);
+        
+        // Auto-detect correct userType from error message (as per guide)
+        // Only auto-retry for agents (they can only login as agent)
+        // For buyer/seller, don't auto-retry - let user choose
+        let correctType: string | null = null;
+        if (errorMessage.includes('Agent/Builder')) {
+          correctType = 'agent';
+        } else if (errorMessage.includes('Buyer/Tenant') && normalizedUserType !== 'buyer') {
+          // Only suggest buyer if they're not already trying buyer
+          correctType = 'buyer';
+        } else if (errorMessage.includes('Seller/Owner') && normalizedUserType !== 'seller') {
+          // Only suggest seller if they're not already trying seller
+          correctType = 'seller';
+        }
+        
+        // Auto-retry ONLY for agents (they can only login as agent)
+        // For buyer/seller switching, show error and let user manually select
+        if (correctType === 'agent' && correctType !== normalizedUserType) {
+          console.log('[AuthService] Auto-retrying with agent userType');
+          try {
+            return await authService.login(email, password, 'agent');
+          } catch (retryError: any) {
+            console.error('[AuthService] Auto-retry also failed:', retryError);
+            // Fall through to throw error
+          }
+        }
+        
+        // Create a structured error response
+        const errorResponse = {
+          success: false,
+          message: errorMessage,
+          status: 403,
+          error: error,
+        };
+        
+        // Add suggested user type
+        if (correctType) {
+          (errorResponse as any).data = {suggestedUserType: correctType};
+        }
+        
+        throw errorResponse;
+      }
+      
+      // Handle validation errors (400)
+      if (error.status === 400) {
+        const errorMessage = error.message || error.error?.message || 'Validation failed. Please check your email, password, and selected role.';
+        throw {
+          success: false,
+          message: errorMessage,
+          status: 400,
+          error: error,
+        };
+      }
+      
+      // Re-throw other errors
+      throw error;
     }
-    
-    console.log('[AuthService] Login request:', {email, userType});
-    const response = await api.post(API_ENDPOINTS.LOGIN, loginData);
-    console.log('[AuthService] Login response:', JSON.stringify(response, null, 2));
-    
-    if (response.success && response.data?.token) {
-      await AsyncStorage.setItem('@auth_token', response.data.token);
-      await AsyncStorage.setItem(
-        '@propertyapp_user',
-        JSON.stringify(response.data.user),
-      );
-    }
-    
-    return response;
   },
 
   // Verify OTP (exact backend structure: user_id, otp, phone)
   verifyOTP: async (userId: number, otp: string, phone?: string) => {
-    const response = await api.post(API_ENDPOINTS.VERIFY_OTP, {
+    const response: any = await api.post(API_ENDPOINTS.VERIFY_OTP, {
       user_id: userId,
       otp,
       phone: phone || '', // Phone is optional but backend may need it
     });
     
-    if (response.success && response.data?.token) {
+    if (response && response.success && response.data?.token) {
       await AsyncStorage.setItem('@auth_token', response.data.token);
       await AsyncStorage.setItem(
         '@propertyapp_user',
@@ -112,11 +239,11 @@ export const authService = {
       // When implemented, it should accept: { "refreshToken": "..." }
       // And return: { "success": true, "data": { "token": "new_jwt_token", "refreshToken": "new_refresh_token" } }
       
-      const response = await api.post(API_ENDPOINTS.REFRESH_TOKEN, {
+      const response: any = await api.post(API_ENDPOINTS.REFRESH_TOKEN, {
         refreshToken: refreshToken || '',
       });
       
-      if (response.success && response.data?.token) {
+      if (response && response.success && response.data?.token) {
         await AsyncStorage.setItem('@auth_token', response.data.token);
         if (response.data.refreshToken) {
           await AsyncStorage.setItem('@refresh_token', response.data.refreshToken);
@@ -133,7 +260,7 @@ export const authService = {
 
   // Verify Email (using OTP verify-email endpoint)
   verifyEmail: async (email: string, otp: string) => {
-    const response = await api.post(API_ENDPOINTS.OTP_VERIFY_EMAIL, {
+    const response: any = await api.post(API_ENDPOINTS.OTP_VERIFY_EMAIL, {
       email,
       otp,
     });
@@ -143,11 +270,11 @@ export const authService = {
   // Delete Account (user self-delete - backend endpoint not implemented yet)
   deleteAccount: async (password?: string) => {
     try {
-      const response = await api.delete(API_ENDPOINTS.DELETE_ACCOUNT, {
+      const response: any = await api.delete(API_ENDPOINTS.DELETE_ACCOUNT, {
         data: password ? {password} : {},
       });
       
-      if (response.success) {
+      if (response && response.success) {
         // Clear local storage on successful deletion
         await AsyncStorage.removeItem('@auth_token');
         await AsyncStorage.removeItem('@propertyapp_user');

@@ -25,9 +25,10 @@ import {propertyService} from '../../services/property.service';
 import {propertySearchService} from '../../services/propertySearch.service';
 import {commonService} from '../../services/common.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import {formatters} from '../../utils/formatters';
 
 type SearchResultsScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuyerTabParamList, 'PropertyList'>,
+  BottomTabNavigationProp<BuyerTabParamList, 'SearchResults' | 'PropertyList'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -36,28 +37,70 @@ type Props = {
   route?: {
     params?: {
       searchQuery?: string;
+      location?: string;
+      city?: string;
+      propertyType?: string;
+      budget?: string;
+      bedrooms?: string;
+      area?: string;
+      status?: 'sale' | 'rent';
+      listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel';
     };
   };
 };
 
+// Local Property type for this screen (price is formatted as string)
+interface Property {
+  id: string;
+  name: string;
+  location: string;
+  price: string; // Formatted price string (e.g., "₹50L", "₹5Cr", "₹10K/month")
+  type: 'buy' | 'rent' | 'pg-hostel';
+  bedrooms: number;
+  bathrooms: number;
+  area: string;
+  propertyType: string;
+  city: string;
+  state: string;
+  bhk: number;
+  cover_image: string;
+  is_favorite: boolean;
+}
+
 const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
   const {logout} = useAuth();
-  const initialQuery = route?.params?.searchQuery || '';
+  const routeParams = route?.params || {};
+  
+  // Initialize from route params (website-style search)
+  const initialLocation = routeParams.location || routeParams.searchQuery || '';
+  const initialCity = routeParams.city || '';
+  const initialPropertyType = routeParams.propertyType || '';
+  const initialBudget = routeParams.budget || '';
+  const initialBedrooms = routeParams.bedrooms || '';
+  const initialArea = routeParams.area || '';
+  const initialStatus = routeParams.status || (routeParams.listingType === 'buy' ? 'sale' : routeParams.listingType === 'rent' ? 'rent' : '');
+  const initialListingType = routeParams.listingType || 'all';
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [searchText, setSearchText] = useState(initialQuery);
+  const [searchText, setSearchText] = useState(initialLocation);
   const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [listingType, setListingType] = useState<ListingType | 'all'>('all');
-  const [selectedPropertyType, setSelectedPropertyType] = useState<string>('all');
-  const [selectedCity, setSelectedCity] = useState<string>('all');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [bedrooms, setBedrooms] = useState<number | null>(null);
+  // Filters - initialize with route params (website-style)
+  const [listingType, setListingType] = useState<ListingType | 'all'>(
+    initialListingType === 'buy' ? 'buy' : 
+    initialListingType === 'pg-hostel' ? 'pg-hostel' : 
+    initialListingType === 'rent' ? 'rent' : 'all'
+  );
+  const [selectedPropertyType, setSelectedPropertyType] = useState<string>(initialPropertyType || 'all');
+  const [selectedCity, setSelectedCity] = useState<string>(initialCity || 'all');
+  const [location, setLocation] = useState<string>(initialLocation);
+  const [budget, setBudget] = useState<string>(initialBudget);
+  const [bedrooms, setBedrooms] = useState<number | null>(initialBedrooms ? parseInt(initialBedrooms) : null);
+  const [area, setArea] = useState<string>(initialArea);
+  const [status, setStatus] = useState<'sale' | 'rent' | ''>(initialStatus);
   const [bathrooms, setBathrooms] = useState<number | null>(null);
   const [cities, setCities] = useState<string[]>(['all']);
 
@@ -81,29 +124,76 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           ? citiesData.map((city: any) => city.name || city.city_name || city).filter(Boolean)
           : [];
         setCities(['all', ...cityNames]);
+        
+        // After cities are loaded, check if search query matches a city
+        const currentQuery = searchText.trim() || initialLocation;
+        if (currentQuery) {
+          const matchedCity = cityNames.find((city: string) => 
+            city.toLowerCase() === currentQuery.toLowerCase()
+          );
+          if (matchedCity && selectedCity === 'all') {
+            setSelectedCity(matchedCity);
+            // Reload properties with city filter
+            setTimeout(() => loadProperties(), 100);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading cities:', error);
       // Fallback to common Indian cities
-      setCities(['all', 'Mumbai', 'Bangalore', 'Pune', 'Gurgaon', 'Hyderabad', 'Noida', 'Delhi']);
+      const fallbackCities = ['all', 'Mumbai', 'Bangalore', 'Pune', 'Gurgaon', 'Hyderabad', 'Noida', 'Delhi'];
+      setCities(fallbackCities);
+      
+      // Check if search query matches a fallback city
+      const currentQuery = searchText.trim() || initialLocation;
+      if (currentQuery) {
+        const matchedCity = fallbackCities.find((city: string) => 
+          city !== 'all' && city.toLowerCase() === currentQuery.toLowerCase()
+        );
+        if (matchedCity && selectedCity === 'all') {
+          setSelectedCity(matchedCity);
+          setTimeout(() => loadProperties(), 100);
+        }
+      }
     }
   };
 
-  // Load properties from API when filters change
+  // Debounced search - trigger API call when search text, location, or filters change
   useEffect(() => {
-    loadProperties();
-  }, [initialQuery, listingType, selectedCity]);
+    const searchTimeout = setTimeout(() => {
+      loadProperties();
+    }, 500); // Wait 500ms after user stops typing
 
-  // Apply client-side filters for price, bedrooms, bathrooms, property type
+    return () => clearTimeout(searchTimeout);
+  }, [searchText, location, listingType, selectedCity]);
+
+  // Load initial properties on mount
+  useEffect(() => {
+    if (initialLocation) {
+      setSearchText(initialLocation);
+      setLocation(initialLocation);
+      // Check if initialLocation matches a city name
+      const matchedCity = cities.find(city => 
+        city !== 'all' && city.toLowerCase() === initialLocation.toLowerCase().trim()
+      );
+      if (matchedCity) {
+        setSelectedCity(matchedCity);
+      }
+    }
+    // Delay loadProperties slightly to ensure state is set
+    const timer = setTimeout(() => {
+      loadProperties();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Apply client-side filters for property type, bedrooms, bathrooms
   useEffect(() => {
     if (properties.length > 0) {
       applyFilters();
     }
   }, [
-    searchText,
     selectedPropertyType,
-    minPrice,
-    maxPrice,
     bedrooms,
     bathrooms,
     properties,
@@ -113,51 +203,105 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     try {
       setLoading(true);
       
-      // Build search filters
-      const searchFilters: any = {};
-      if (listingType !== 'all') {
-        searchFilters.status = listingType === 'buy' ? 'sale' : listingType === 'rent' ? 'rent' : 'rent';
-      }
-      if (selectedCity !== 'all') {
-        searchFilters.city = selectedCity;
+      // Build search filters according to website API specification
+      const searchParams: any = {
+        limit: 100, // Website uses limit=100
+      };
+      
+      // Status (sale or rent) - required for filtering
+      if (status) {
+        searchParams.status = status;
+      } else if (listingType !== 'all') {
+        searchParams.status = listingType === 'buy' ? 'sale' : listingType === 'rent' ? 'rent' : 'rent';
       }
       
-      // Use search API if there's a query, otherwise use list API
+      // Location (preferred over city according to website spec)
+      const currentLocation = location.trim() || searchText.trim() || initialLocation;
+      if (currentLocation) {
+        searchParams.location = currentLocation;
+      }
+      
+      // City (used if location is not provided)
+      if (!currentLocation && selectedCity !== 'all') {
+        searchParams.city = selectedCity;
+      } else if (selectedCity !== 'all' && !currentLocation.includes(selectedCity)) {
+        // Add city if location doesn't already contain it
+        searchParams.city = selectedCity;
+      }
+      
+      // Property type (supports compound types like "Villa / Row House")
+      if (selectedPropertyType && selectedPropertyType !== 'all') {
+        searchParams.property_type = selectedPropertyType;
+      }
+      
+      // Budget range (format: "25L-50L", "5K-10K", etc.)
+      if (budget) {
+        searchParams.budget = budget;
+      }
+      
+      // Bedrooms (format: "2 BHK", "5+ BHK", etc.)
+      if (bedrooms) {
+        searchParams.bedrooms = bedrooms;
+      }
+      
+      // Area range (format: "1000-2000 sq ft", "10000+ sq ft", etc.)
+      if (area) {
+        searchParams.area = area;
+      }
+      
+      // Call API with website-style parameters
+      console.log('[SearchResultsScreen] API params:', searchParams);
+      
       let results: any[] = [];
-      
-      if (searchText.trim() || initialQuery) {
-        // Use search API with keyword
-        results = await propertySearchService.search(searchText || initialQuery, searchFilters);
-      } else {
-        // Use list API with filters
-        const response = await propertyService.getProperties({
-          ...searchFilters,
-          limit: 100, // Get more results for filtering
-        });
+      try {
+        const response = await propertyService.getProperties(searchParams);
+        console.log('[SearchResultsScreen] API response:', response);
         
         if (response && response.success) {
-          const propertiesData = response.data?.properties || response.data || [];
-          results = propertiesData;
+          results = response.data?.properties || response.data || [];
+          console.log('[SearchResultsScreen] Found', results.length, 'properties');
+        }
+      } catch (error) {
+        console.error('[SearchResultsScreen] API error:', error);
+        // Fallback: try without some filters if error occurs
+        try {
+          const fallbackParams: any = {limit: 100};
+          if (currentLocation) fallbackParams.location = currentLocation;
+          if (status || listingType !== 'all') {
+            fallbackParams.status = status || (listingType === 'buy' ? 'sale' : 'rent');
+          }
+          const fallbackResponse = await propertyService.getProperties(fallbackParams);
+          if (fallbackResponse && fallbackResponse.success) {
+            results = fallbackResponse.data?.properties || fallbackResponse.data || [];
+          }
+        } catch (fallbackError) {
+          console.error('[SearchResultsScreen] Fallback error:', fallbackError);
         }
       }
       
       // Format properties
-      const formattedProperties = results.map((prop: any) => ({
-        id: prop.id?.toString() || prop.property_id?.toString() || '',
-        name: prop.title || prop.property_title || prop.name || 'Untitled Property',
-        location: prop.location || prop.city || prop.address || 'Location not specified',
-        price: typeof prop.price === 'number' 
-          ? `₹${prop.price.toLocaleString('en-IN')}${prop.status === 'rent' ? '/month' : ''}`
-          : prop.price || 'Price not available',
-        type: (prop.status === 'sale' || prop.property_status === 'sale') ? 'buy' : 'rent',
-        bedrooms: parseInt(prop.bedrooms || '0'),
-        bathrooms: parseInt(prop.bathrooms || '0'),
-        area: prop.area || prop.carpet_area || '',
-        propertyType: prop.property_type || 'apartment',
-        city: prop.city || '',
-        state: prop.state || '',
-        bhk: prop.bedrooms || 0,
-      }));
+      const formattedProperties = results.map((prop: any) => {
+        const propStatus = prop.status || prop.property_status || 'sale';
+        const isRent = propStatus === 'rent';
+        const isPG = propStatus === 'pg' || (prop.property_type || '').toLowerCase().includes('pg') || (prop.property_type || '').toLowerCase().includes('hostel');
+        
+        return {
+          id: prop.id?.toString() || prop.property_id?.toString() || '',
+          name: prop.title || prop.property_title || prop.name || 'Untitled Property',
+          location: prop.location || prop.city || prop.address || 'Location not specified',
+          price: formatters.price(prop.price || 0, isRent),
+          type: isPG ? 'pg-hostel' : isRent ? 'rent' : 'buy',
+          bedrooms: parseInt(prop.bedrooms || '0'),
+          bathrooms: parseInt(prop.bathrooms || '0'),
+          area: prop.area || prop.carpet_area || '',
+          propertyType: prop.property_type || 'apartment',
+          city: prop.city || '',
+          state: prop.state || '',
+          bhk: prop.bedrooms || 0,
+          cover_image: fixImageUrl(prop.cover_image || prop.image || prop.images?.[0] || ''),
+          is_favorite: prop.is_favorite || false,
+        };
+      });
       
       setProperties(formattedProperties);
       setFilteredProperties(formattedProperties);
@@ -173,15 +317,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const applyFilters = () => {
     let filtered = [...properties];
 
-    // Search text filter
-    if (searchText.trim()) {
-      filtered = filtered.filter(
-        p =>
-          p.name.toLowerCase().includes(searchText.toLowerCase()) ||
-          p.location.toLowerCase().includes(searchText.toLowerCase()) ||
-          p.city.toLowerCase().includes(searchText.toLowerCase()),
-      );
-    }
+    // Note: Search text filtering is now done server-side via loadProperties
+    // This function only handles client-side filters (price, bedrooms, etc.)
 
     // Listing type (buy/rent/pg-hostel)
     if (listingType !== 'all') {
@@ -239,29 +376,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       });
     }
 
-    // Price filter
-    if (minPrice || maxPrice) {
-      filtered = filtered.filter(p => {
-        const priceStr = p.price.replace(/[₹,]/g, '').toLowerCase();
-        const isRent = priceStr.includes('month');
-        const priceNum = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
-
-        if (isRent || p.type === 'pg-hostel') {
-          // For rent and PG/Hostel, price is in thousands
-          const min = minPrice ? parseFloat(minPrice) : 0;
-          const max = maxPrice ? parseFloat(maxPrice) : Infinity;
-          return priceNum >= min && priceNum <= max;
-        } else {
-          // For buy properties, convert Cr to Lakhs
-          const priceInLakhs = priceStr.includes('cr')
-            ? priceNum * 100
-            : priceNum;
-          const min = minPrice ? parseFloat(minPrice) : 0;
-          const max = maxPrice ? parseFloat(maxPrice) : Infinity;
-          return priceInLakhs >= min && priceInLakhs <= max;
-        }
-      });
-    }
+    // Note: Price filtering is now done server-side via budget parameter
+    // No client-side price filtering needed
 
     setFilteredProperties(filtered);
   };
@@ -270,24 +386,79 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     setListingType('all');
     setSelectedPropertyType('all');
     setSelectedCity('all');
-    setMinPrice('');
-    setMaxPrice('');
+    setBudget('');
     setBedrooms(null);
+    setArea('');
+    setStatus('');
     setBathrooms(null);
     setSearchText('');
+    setLocation('');
   };
 
-  const renderProperty = ({item}: {item: Property}) => (
-    <PropertyCard
-      name={item.name}
-      location={item.location}
-      price={item.price}
-      type={item.type}
-      onPress={() =>
-        navigation.navigate('PropertyDetails', {propertyId: item.id})
+  const handleToggleFavorite = async (propertyId: string | number) => {
+    try {
+      const {buyerService} = await import('../../services/buyer.service');
+      const response = await buyerService.toggleFavorite(propertyId);
+      if (response && response.success) {
+        // Update property in list
+        setProperties(prev =>
+          prev.map(p =>
+            String(p.id) === String(propertyId)
+              ? {...p, is_favorite: response.data?.is_favorite ?? !p.is_favorite}
+              : p,
+          ),
+        );
+        setFilteredProperties(prev =>
+          prev.map(p =>
+            String(p.id) === String(propertyId)
+              ? {...p, is_favorite: response.data?.is_favorite ?? !p.is_favorite}
+              : p,
+          ),
+        );
       }
-    />
-  );
+    } catch (error: any) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const handleShareProperty = async (property: Property) => {
+    try {
+      const {Share} = require('react-native');
+      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
+      const shareMessage = `Check out this property: ${property.name}\nLocation: ${property.location}\nPrice: ${property.price}\n\nView more: ${shareUrl}`;
+      
+      await Share.share({
+        message: shareMessage,
+        title: property.name,
+      });
+    } catch (error: any) {
+      if (error.message !== 'User did not share') {
+        console.error('Error sharing property:', error);
+      }
+    }
+  };
+
+  const renderProperty = ({item}: {item: Property}) => {
+    // Determine property type for PropertyCard
+    const propertyType = item.type === 'buy' ? 'buy' : item.type === 'rent' ? 'rent' : 'pg-hostel';
+    
+    return (
+      <PropertyCard
+        image={item.cover_image}
+        name={item.name}
+        location={item.location}
+        price={item.price}
+        type={propertyType}
+        isFavorite={item.is_favorite || false}
+        onPress={() =>
+          navigation.navigate('PropertyDetails', {propertyId: item.id})
+        }
+        onFavoritePress={() => handleToggleFavorite(item.id)}
+        onSharePress={() => handleShareProperty(item)}
+        property={item}
+      />
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -308,6 +479,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             placeholderTextColor={colors.textSecondary}
             value={searchText}
             onChangeText={setSearchText}
+            onSubmitEditing={() => loadProperties()}
+            returnKeyType="search"
           />
           <TouchableOpacity
             style={styles.filterButton}
@@ -492,34 +665,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 </View>
               </View>
 
-              {/* Price Range */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Price Range</Text>
-                <View style={styles.priceInputContainer}>
-                  <View style={styles.priceInput}>
-                    <Text style={styles.priceLabel}>Min</Text>
-                    <TextInput
-                      style={styles.priceTextInput}
-                      placeholder="Min"
-                      placeholderTextColor={colors.textSecondary}
-                      value={minPrice}
-                      onChangeText={setMinPrice}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                  <View style={styles.priceInput}>
-                    <Text style={styles.priceLabel}>Max</Text>
-                    <TextInput
-                      style={styles.priceTextInput}
-                      placeholder="Max"
-                      placeholderTextColor={colors.textSecondary}
-                      value={maxPrice}
-                      onChangeText={setMaxPrice}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
-              </View>
             </ScrollView>
 
             {/* Apply Filters Button */}

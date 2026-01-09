@@ -6,7 +6,13 @@ import {colors} from '../theme';
 
 export type ChatStackParamList = {
   ChatList: undefined;
-  ChatConversation: {userId: string; userName: string};
+  ChatConversation: {
+    userId?: number | string;
+    userName?: string;
+    propertyId?: number | string;
+    propertyTitle?: string;
+    conversationId?: string | number;
+  };
 };
 
 const ChatStack = createNativeStackNavigator<ChatStackParamList>();
