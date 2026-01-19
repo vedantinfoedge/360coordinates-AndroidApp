@@ -529,6 +529,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                   const params = {
                     query: '',
                     location: '',
+<<<<<<< HEAD
                   };
 
                   // Primary: direct screen navigation within Buyer tabs
@@ -542,6 +543,17 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                       params,
                     });
                   }
+=======
+                    searchQuery: '',
+                    city: '',
+                    propertyType: '',
+                    budget: '',
+                    bedrooms: '',
+                    area: '',
+                    status: '',
+                    listingType: 'all', // Explicitly set to 'all' to show all properties
+                  } as never);
+>>>>>>> be9f5b9b6c6009f1463e83dfc59fa60236734322
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   Alert.alert('Error', 'Failed to load all properties. Please try again.');
