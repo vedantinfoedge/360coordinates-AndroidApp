@@ -13,6 +13,7 @@ import {
   Alert,
   Share,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
@@ -26,8 +27,7 @@ import {fixImageUrl, isValidImageUrl} from '../../utils/imageHelper';
 import BuyerHeader from '../../components/BuyerHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
-import {buyerService} from '../../services/buyer.service';
- import {Linking} from 'react-native';
+import {Linking} from 'react-native';
 
 type PropertyDetailsScreenNavigationProp = BottomTabNavigationProp<BuyerTabParamList, 'PropertyDetails'>;
 
@@ -50,6 +50,11 @@ interface PropertyImage {
   alt: string;
 }
 
+const TOTAL_INTERACTION_LIMIT = 5;
+const INTERACTION_STORAGE_KEY = 'interaction_remaining';
+const CONTACT_UNLOCK_PREFIX = 'contactUnlocked_';
+const CHAT_STARTED_PREFIX = 'chatStarted_';
+
 const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
   const {logout, user, isAuthenticated} = useAuth();
@@ -65,49 +70,46 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [togglingFavorite, setTogglingFavorite] = useState(false);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const imageScrollViewRef = useRef<ScrollView>(null);
-  
-  // Interaction limit state
-  const [interactionLimit, setInteractionLimit] = useState<{
-    remaining: number;
-    max: number;
-    used: number;
-    canPerform: boolean;
-    resetTime?: string;
-  } | null>(null);
-  const [checkingLimit, setCheckingLimit] = useState(false);
-  const [recordingInteraction, setRecordingInteraction] = useState(false);
+
+  const [interactionState, setInteractionState] = useState({
+    remaining: TOTAL_INTERACTION_LIMIT,
+    max: TOTAL_INTERACTION_LIMIT,
+  });
+  const [interactionLoading, setInteractionLoading] = useState(true);
+  const [contactUnlocked, setContactUnlocked] = useState(false);
+  const [chatUnlocked, setChatUnlocked] = useState(false);
+  const [processingContact, setProcessingContact] = useState(false);
+  const [processingChat, setProcessingChat] = useState(false);
 
   useEffect(() => {
     loadPropertyDetails();
   }, [route.params.propertyId]);
 
-  // Check interaction limit on load (only for buyers)
   useEffect(() => {
-    if (property && property.id && user && user.user_type === 'buyer') {
-      checkInteractionLimit();
+    initializeInteractionState();
+  }, []);
+
+  useEffect(() => {
+    if (property?.id) {
+      loadPropertyUnlockState(property.id);
+    } else {
+      setContactUnlocked(false);
+      setChatUnlocked(false);
     }
-  }, [property?.id, user?.user_type]);
+  }, [property?.id]);
 
   // Handle return from login - auto show contact details if user just logged in
   useEffect(() => {
     const params = route.params as any;
     if (params?.returnFromLogin === true && user && property && !showContactModal) {
       // User just logged in, automatically show contact details (one-time activity)
-      // Check limit first, then show contact
       const showContactAfterLogin = async () => {
-        // Wait a bit for interaction limit to be checked
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait a bit for interaction state to initialize
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Only show if user is buyer
         if (user.user_type === 'buyer') {
-          // Check limit first if not already checked
-          if (!interactionLimit) {
-            await checkInteractionLimit();
-            // Wait a bit more for limit check to complete
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-          
-          // Now show contact details (handleViewContact will check limit again)
+          // Now show contact details (handleViewContact will check limit and unlock state)
           handleViewContact();
         }
       };
@@ -342,6 +344,117 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
+  const initializeInteractionState = async () => {
+    try {
+      setInteractionLoading(true);
+      const stored = await AsyncStorage.getItem(INTERACTION_STORAGE_KEY);
+      let remaining = TOTAL_INTERACTION_LIMIT;
+
+      if (stored !== null) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 0) {
+          remaining = Math.min(parsed, TOTAL_INTERACTION_LIMIT);
+        }
+      } else {
+        await AsyncStorage.setItem(
+          INTERACTION_STORAGE_KEY,
+          TOTAL_INTERACTION_LIMIT.toString(),
+        );
+      }
+
+      setInteractionState({
+        remaining,
+        max: TOTAL_INTERACTION_LIMIT,
+      });
+    } catch (error) {
+      console.error('[PropertyDetails] Error loading interaction state:', error);
+      setInteractionState({
+        remaining: TOTAL_INTERACTION_LIMIT,
+        max: TOTAL_INTERACTION_LIMIT,
+      });
+    } finally {
+      setInteractionLoading(false);
+    }
+  };
+
+  const loadPropertyUnlockState = async (propertyId: string | number) => {
+    try {
+      const id = String(propertyId);
+      const keys = [
+        `${CONTACT_UNLOCK_PREFIX}${id}`,
+        `${CHAT_STARTED_PREFIX}${id}`,
+      ];
+      const results = await AsyncStorage.multiGet(keys);
+      const contactValue = results.find(item => item[0] === keys[0])?.[1];
+      const chatValue = results.find(item => item[0] === keys[1])?.[1];
+
+      setContactUnlocked(contactValue === 'true');
+      setChatUnlocked(chatValue === 'true');
+    } catch (error) {
+      console.error('[PropertyDetails] Error loading unlock state:', error);
+      setContactUnlocked(false);
+      setChatUnlocked(false);
+    }
+  };
+
+  const consumeInteraction = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(INTERACTION_STORAGE_KEY);
+      let remaining = TOTAL_INTERACTION_LIMIT;
+
+      if (stored !== null) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 0) {
+          remaining = Math.min(parsed, TOTAL_INTERACTION_LIMIT);
+        }
+      }
+
+      if (remaining <= 0) {
+        setInteractionState({
+          remaining: 0,
+          max: TOTAL_INTERACTION_LIMIT,
+        });
+        return {success: false, remaining: 0};
+      }
+
+      const newRemaining = remaining - 1;
+      await AsyncStorage.setItem(
+        INTERACTION_STORAGE_KEY,
+        newRemaining.toString(),
+      );
+      setInteractionState({
+        remaining: newRemaining,
+        max: TOTAL_INTERACTION_LIMIT,
+      });
+
+      return {success: true, remaining: newRemaining};
+    } catch (error) {
+      console.error('[PropertyDetails] Error consuming interaction:', error);
+      return {success: false, remaining: interactionState.remaining};
+    }
+  };
+
+  const unlockContactForProperty = async (propertyId: string | number) => {
+    try {
+      await AsyncStorage.setItem(
+        `${CONTACT_UNLOCK_PREFIX}${propertyId}`,
+        'true',
+      );
+      setContactUnlocked(true);
+    } catch (error) {
+      console.error('[PropertyDetails] Error unlocking contact:', error);
+    }
+  };
+
+  const markChatStartedForProperty = async (propertyId: string | number) => {
+    try {
+      await AsyncStorage.setItem(`${CHAT_STARTED_PREFIX}${propertyId}`, 'true');
+      setChatUnlocked(true);
+    } catch (error) {
+      console.error('[PropertyDetails] Error saving chat state:', error);
+    }
+  };
+
   const handleToggleFavorite = async () => {
     if (!property) return;
     
@@ -388,7 +501,11 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
-  const handleChatWithOwner = () => {
+  const handleChatWithOwner = async () => {
+    if (processingChat) {
+      return;
+    }
+
     // Check if user is logged in
     if (!user) {
       Alert.alert(
@@ -414,6 +531,11 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       Alert.alert('Error', 'Property information not available');
       return;
     }
+
+    if (interactionLoading) {
+      Alert.alert('Please wait', 'Loading your interaction balance...');
+      return;
+    }
     
     const sellerId = property.seller_id || property.owner?.id || property.owner?.user_id || property.user_id;
     // Prioritize seller object from backend, then fallback to flat fields
@@ -425,61 +547,40 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       Alert.alert('Error', 'Owner information not available');
       return;
     }
-    
-    console.log('[PropertyDetails] Navigating to chat:', {
-      userId: sellerId,
-      userName: sellerName,
-      propertyId: propId,
-      propertyTitle: propTitle,
-    });
-    
-    // Navigate to chat conversation screen with Firebase
-    // Navigate to Chat tab, then to ChatConversation screen
-    (navigation as any).navigate('Chat', {
-      screen: 'ChatConversation',
-      params: {
-        userId: Number(sellerId),
-        userName: sellerName,
-        propertyId: Number(propId),
-        propertyTitle: propTitle,
-      },
-    });
-  };
-
-  const checkInteractionLimit = async () => {
-    // Only check for buyers
-    if (!user || user.user_type !== 'buyer' || !property || !property.id) {
-      return;
-    }
 
     try {
-      setCheckingLimit(true);
-      const response = await buyerService.checkInteractionLimit(
-        property.id,
-        'view_owner'
-      );
-      const responseData = response as any;
-      
-      if (responseData && responseData.success && responseData.data) {
-        setInteractionLimit({
-          remaining: responseData.data.remaining_attempts || 0,
-          max: responseData.data.max_attempts || 5,
-          used: responseData.data.used_attempts || 0,
-          canPerform: responseData.data.can_perform_action !== false,
-          resetTime: responseData.data.reset_time,
-        });
+      setProcessingChat(true);
+
+      if (!chatUnlocked) {
+        const result = await consumeInteraction();
+        if (!result.success) {
+          Alert.alert(
+            'Interaction limit reached',
+            'Interaction limit reached. Upgrade to continue.',
+          );
+          return;
+        }
+        await markChatStartedForProperty(propId);
       }
-    } catch (error: any) {
-      console.error('[PropertyDetails] Error checking interaction limit:', error);
-      // Set default limit on error
-      setInteractionLimit({
-        remaining: 5,
-        max: 5,
-        used: 0,
-        canPerform: true,
+    
+      console.log('[PropertyDetails] Navigating to chat:', {
+        userId: sellerId,
+        userName: sellerName,
+        propertyId: propId,
+        propertyTitle: propTitle,
+      });
+      
+      (navigation as any).navigate('Chat', {
+        screen: 'ChatConversation',
+        params: {
+          userId: Number(sellerId),
+          userName: sellerName,
+          propertyId: Number(propId),
+          propertyTitle: propTitle,
+        },
       });
     } finally {
-      setCheckingLimit(false);
+      setProcessingChat(false);
     }
   };
 
@@ -490,6 +591,15 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       propertyId: property?.id,
       hasProperty: !!property,
     });
+    
+    if (processingContact) {
+      return;
+    }
+
+    if (!property || !property.id) {
+      Alert.alert('Error', 'Property information not available');
+      return;
+    }
     
     // Check if user is logged in
     if (!user) {
@@ -523,126 +633,52 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       return;
     }
 
-    // If already showing, just hide (no API call)
+    // If already showing, just hide (no interaction deduction)
     if (showContactModal) {
       console.log('[PropertyDetails] Hiding contact modal');
       setShowContactModal(false);
       return;
     }
 
-    // Check limit before showing (but allow if limit check hasn't completed yet)
-    if (interactionLimit && !interactionLimit.canPerform) {
+    // If contact already unlocked for this property, show immediately
+    if (contactUnlocked) {
+      setShowContactModal(true);
+      return;
+    }
+
+    if (interactionLoading) {
+      Alert.alert('Please wait', 'Loading your interaction balance...');
+      return;
+    }
+
+    if (interactionState.remaining <= 0) {
       Alert.alert(
-        'Daily Limit Reached',
-        `You have reached your daily interaction limit (${interactionLimit.max} attempts).\n\nPlease try again after 12 hours.`,
-        [{text: 'OK'}]
+        'Interaction limit reached',
+        'Interaction limit reached. Upgrade to continue.',
       );
       return;
     }
 
-    // Record interaction
     try {
-      setRecordingInteraction(true);
-      console.log('[PropertyDetails] Recording interaction for property:', property.id);
-      
-      const response = await buyerService.recordInteraction(
-        property.id,
-        'view_owner'
-      );
-      const responseData = response as any;
-      
-      console.log('[PropertyDetails] Record interaction response:', {
-        success: responseData?.success,
-        data: responseData?.data,
-        message: responseData?.message,
-        status: responseData?.status,
-      });
-      
-      if (responseData && responseData.success) {
-        // Update limit state
-        if (responseData.data) {
-          setInteractionLimit({
-            remaining: responseData.data.remaining_attempts || 0,
-            max: responseData.data.max_attempts || 5,
-            used: responseData.data.used_attempts || 0,
-            canPerform: responseData.data.can_perform_action !== false,
-            resetTime: responseData.data.reset_time,
-          });
-        }
-        
-        // Log property owner data before showing modal
-        console.log('[PropertyDetails] Property owner data:', {
-          seller_name: property.seller?.name || property.seller_name,
-          seller_phone: property.seller?.phone || property.seller_phone,
-          seller_email: property.seller?.email || property.seller_email,
-          owner: property.owner,
-          ownerName: property.owner?.name || property.owner?.full_name,
-          ownerPhone: property.owner?.phone,
-          ownerEmail: property.owner?.email,
-          seller: property.seller,
-          hasOwnerData: !!(property.owner || property.seller || property.seller_name || property.seller_phone || property.seller_email),
-        });
-        
-        // Show contact modal
-        setShowContactModal(true);
-        console.log('[PropertyDetails] Contact modal set to visible: true');
-      } else {
-        // Handle limit reached error
-        if (responseData?.status === 429 || responseData?.message?.includes('limit')) {
-          Alert.alert(
-            'Daily Limit Reached',
-            responseData.message || 'You have reached your daily interaction limit. Please try again after 12 hours.',
-            [{text: 'OK'}]
-          );
-          // Update limit state
-          if (responseData.data) {
-            setInteractionLimit({
-              remaining: responseData.data.remaining_attempts || 0,
-              max: responseData.data.max_attempts || 5,
-              used: responseData.data.used_attempts || 0,
-              canPerform: false,
-              resetTime: responseData.data.reset_time,
-            });
-          }
-        } else {
-          // Show contact details even if API call fails (for debugging)
-          console.warn('[PropertyDetails] API response not successful, but showing contact details');
-          setShowContactModal(true);
-          Alert.alert(
-            'Warning', 
-            responseData?.message || 'Unable to record interaction, but showing contact details.',
-            [{text: 'OK'}]
-          );
-        }
+      setProcessingContact(true);
+      const result = await consumeInteraction();
+
+      if (!result.success) {
+        Alert.alert(
+          'Interaction limit reached',
+          'Interaction limit reached. Upgrade to continue.',
+        );
+        return;
       }
+
+      await unlockContactForProperty(property.id);
+      setShowContactModal(true);
+      console.log('[PropertyDetails] Contact unlocked for property:', property.id);
     } catch (error: any) {
-      console.error('[PropertyDetails] Error recording interaction:', error);
-      console.error('[PropertyDetails] Error details:', {
-        message: error.message,
-        response: error.response,
-        status: error.response?.status,
-        data: error.response?.data,
-        stack: error.stack,
-      });
-      
-      if (error.response?.status === 429) {
-        Alert.alert(
-          'Daily Limit Reached',
-          'You have reached your daily interaction limit. Please try again after 12 hours.',
-          [{text: 'OK'}]
-        );
-      } else {
-        // Show contact details even if API call fails (for debugging/testing)
-        console.warn('[PropertyDetails] API call failed, but showing contact details anyway for debugging');
-        setShowContactModal(true);
-        Alert.alert(
-          'Warning', 
-          'Unable to record interaction, but showing contact details for testing.',
-          [{text: 'OK'}]
-        );
-      }
+      console.error('[PropertyDetails] Error in handleViewContact:', error);
+      Alert.alert('Error', 'Failed to process contact view. Please try again.');
     } finally {
-      setRecordingInteraction(false);
+      setProcessingContact(false);
     }
   };
 
@@ -1015,29 +1051,33 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <TouchableOpacity
           style={[
             styles.contactButton,
-            (!interactionLimit?.canPerform || recordingInteraction || checkingLimit) && styles.contactButtonDisabled,
+            (processingContact || interactionLoading) && styles.contactButtonDisabled,
           ]}
           onPress={handleViewContact}
-          disabled={recordingInteraction || checkingLimit || (!interactionLimit?.canPerform && !showContactModal)}>
+          disabled={processingContact || interactionLoading}>
           <Text style={styles.contactButtonText}>
             {showContactModal ? 'Hide Contact' : 'View Contact'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.chatButton}
-          onPress={handleChatWithOwner}>
+          style={[
+            styles.chatButton,
+            (processingChat || interactionLoading) && styles.contactButtonDisabled,
+          ]}
+          onPress={handleChatWithOwner}
+          disabled={processingChat || interactionLoading}>
           <Text style={styles.chatButtonText}>💬 Chat with Owner</Text>
         </TouchableOpacity>
       </View>
       
       {/* Interaction Limit Display */}
-      {user && user.user_type === 'buyer' && interactionLimit && (
+      {user && user.user_type === 'buyer' && !interactionLoading && (
         <View style={styles.limitContainer}>
           <Text style={[
             styles.limitText,
-            !interactionLimit.canPerform && styles.limitTextError,
+            interactionState.remaining <= 0 && styles.limitTextError,
           ]}>
-            {interactionLimit.remaining} / {interactionLimit.max} interactions remaining
+            Interactions Left: {interactionState.remaining} / {interactionState.max}
           </Text>
         </View>
       )}
@@ -1064,13 +1104,13 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             </View>
             
             {/* Interaction Limit Info */}
-            {user && user.user_type === 'buyer' && interactionLimit && (
+            {user && user.user_type === 'buyer' && !interactionLoading && (
               <View style={styles.modalLimitInfo}>
                 <Text style={[
                   styles.modalLimitText,
-                  !interactionLimit.canPerform && styles.modalLimitTextError,
+                  interactionState.remaining <= 0 && styles.modalLimitTextError,
                 ]}>
-                  {interactionLimit.remaining} / {interactionLimit.max} interactions remaining today
+                  Interactions Left: {interactionState.remaining} / {interactionState.max}
                 </Text>
               </View>
             )}
