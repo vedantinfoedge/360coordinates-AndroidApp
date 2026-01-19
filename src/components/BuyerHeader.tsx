@@ -16,9 +16,11 @@ interface BuyerHeaderProps {
   onSupportPress?: () => void;
   onLogoutPress?: () => void;
   onSignInPress?: () => void;
+  onSignUpPress?: () => void;
   showProfile?: boolean;
   showLogout?: boolean;
   showSignIn?: boolean;
+  showSignUp?: boolean;
 }
 
 const BuyerHeader: React.FC<BuyerHeaderProps> = ({
@@ -26,9 +28,11 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
   onSupportPress,
   onLogoutPress,
   onSignInPress,
+  onSignUpPress,
   showProfile = true,
   showLogout = true,
   showSignIn = false,
+  showSignUp = false,
 }) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const insets = useSafeAreaInsets();
@@ -97,7 +101,20 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
                       setMenuVisible(false);
                       onSignInPress();
                     }}>
-                    <Text style={styles.menuItemText}>Sign In</Text>
+                    <Text style={styles.menuItemText}>Login</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {showSignUp && onSignUpPress && (
+                <>
+                  <View style={styles.menuDivider} />
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onSignUpPress();
+                    }}>
+                    <Text style={styles.menuItemText}>Sign Up</Text>
                   </TouchableOpacity>
                 </>
               )}

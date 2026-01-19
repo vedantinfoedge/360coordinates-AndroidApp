@@ -331,8 +331,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support')}
           onLogoutPress={isAuthenticated ? logout : undefined}
+          onSignInPress={() => navigation.navigate('Auth' as never, {screen: 'Login'} as never)}
+          onSignUpPress={() => navigation.navigate('Auth' as never, {screen: 'Register'} as never)}
+          showProfile={isAuthenticated}
           showLogout={isAuthenticated}
-          showSignIn={false}
+          showSignIn={!isAuthenticated}
+          showSignUp={!isAuthenticated}
         />
         <View style={styles.loadingContainer}>
           <Text style={styles.errorIcon}>🚫</Text>
@@ -351,8 +355,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
         onLogoutPress={isAuthenticated ? logout : undefined}
+        onSignInPress={() => navigation.navigate('Auth' as never, {screen: 'Login'} as never)}
+        onSignUpPress={() => navigation.navigate('Auth' as never, {screen: 'Register'} as never)}
+        showProfile={isAuthenticated}
         showLogout={isAuthenticated}
-        showSignIn={false}
+        showSignIn={!isAuthenticated}
+        showSignUp={!isAuthenticated}
       />
 
       <ScrollView
