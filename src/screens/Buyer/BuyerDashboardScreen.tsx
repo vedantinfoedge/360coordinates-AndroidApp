@@ -525,12 +525,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             <TouchableOpacity
               onPress={() => {
                 try {
-                  // Pass listing type filter to show filtered properties in list view
-                  const params: any = {};
-                  if (listingType !== 'all') {
-                    params.listingType = listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType;
-                  }
-                  navigation.navigate('AllProperties', params as never);
+                  // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
+                  navigation.navigate('SearchResults', {
+                    query: '',
+                    location: '',
+                  } as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   Alert.alert('Error', 'Failed to load all properties. Please try again.');
