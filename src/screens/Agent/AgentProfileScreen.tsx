@@ -10,10 +10,11 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import {launchImageLibrary} from 'react-native-image-picker';
+import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../../navigation/AppNavigator';
 import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
@@ -175,51 +176,72 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const handleImagePicker = () => {
-    launchImageLibrary(
-      {
-        mediaType: 'photo',
-        quality: 0.8,
-        maxWidth: 800,
-        maxHeight: 800,
-      },
-      async response => {
-        if (response.didCancel || response.errorCode) {
-          return;
-        }
-
-        if (response.assets && response.assets[0]) {
-          try {
-            setSaving(true);
-            const uploadResponse: any = await userService.uploadProfileImage(
-              response.assets[0].uri || '',
-            );
-
-              if (uploadResponse && uploadResponse.success && uploadResponse.data?.url) {
-              const imageUrl = fixImageUrl(uploadResponse.data.url);
-              if (imageUrl) {
-                setProfileImage(imageUrl);
-                // Update user context
-                if (user) {
-                  setUser({
-                    ...user,
-                    profile_image: imageUrl,
-                  });
-                }
-              }
-              Alert.alert('Success', 'Profile picture updated successfully');
-            } else {
-              Alert.alert('Error', (uploadResponse && uploadResponse.message) || 'Failed to upload image');
-            }
-          } catch (error: any) {
-            console.error('Error uploading image:', error);
-            Alert.alert('Error', error?.message || 'Failed to upload image');
-          } finally {
-            setSaving(false);
-          }
-        }
-      },
+  const showImagePicker = () => {
+    Alert.alert(
+      'Select Profile Image',
+      'Choose an option',
+      [
+        {text: 'Camera', onPress: () => handleImagePicker('camera')},
+        {text: 'Gallery', onPress: () => handleImagePicker('gallery')},
+        {text: 'Cancel', style: 'cancel'},
+      ],
+      {cancelable: true},
     );
+  };
+
+  const handleImagePicker = (source: 'camera' | 'gallery') => {
+    const options = {
+      mediaType: 'photo' as MediaType,
+      quality: 0.8,
+      maxWidth: 800,
+      maxHeight: 800,
+    };
+
+    const callback = async (response: ImagePickerResponse) => {
+      if (response.didCancel || response.errorCode) {
+        if (response.errorMessage) {
+          Alert.alert('Error', response.errorMessage);
+        }
+        return;
+      }
+
+      if (response.assets && response.assets[0]) {
+        try {
+          setSaving(true);
+          const uploadResponse: any = await userService.uploadProfileImage(
+            response.assets[0].uri || '',
+          );
+
+          if (uploadResponse && uploadResponse.success && uploadResponse.data?.url) {
+            const imageUrl = fixImageUrl(uploadResponse.data.url);
+            if (imageUrl) {
+              setProfileImage(imageUrl);
+              // Update user context
+              if (user) {
+                setUser({
+                  ...user,
+                  profile_image: imageUrl,
+                });
+              }
+            }
+            Alert.alert('Success', 'Profile picture updated successfully');
+          } else {
+            Alert.alert('Error', (uploadResponse && uploadResponse.message) || 'Failed to upload image');
+          }
+        } catch (error: any) {
+          console.error('Error uploading image:', error);
+          Alert.alert('Error', error?.message || 'Failed to upload image');
+        } finally {
+          setSaving(false);
+        }
+      }
+    };
+
+    if (source === 'camera') {
+      launchCamera(options, callback);
+    } else {
+      launchImageLibrary(options, callback);
+    }
   };
 
   const handleLogout = async () => {
@@ -271,7 +293,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.avatarText}>{getInitials(formData.full_name || 'Agent')}</Text>
               </View>
             )}
-            <TouchableOpacity style={styles.editPhotoButton} onPress={handleImagePicker}>
+            <TouchableOpacity style={styles.editPhotoButton} onPress={showImagePicker}>
               <Text style={styles.editPhotoText}>📷</Text>
             </TouchableOpacity>
           </View>

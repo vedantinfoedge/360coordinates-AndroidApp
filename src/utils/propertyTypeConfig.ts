@@ -67,6 +67,10 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
   const isPGHostel = propertyType === 'PG / Hostel';
 
   // Return configuration based on property type
+  // Note: "Row House/ Farm House" matches both isResidentialStandard and isFarmHouse
+  // According to PROPERTY_TYPE_FIELDS.md, it's listed under Standard Residential (with balconies)
+  // The Farm House section is a note for when treated as farmhouse (no balconies)
+  // Since we can't distinguish in UI, we use Standard Residential config
   if (isResidentialStandard) {
     return {
       showBedrooms: true,
@@ -91,7 +95,7 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
       showBathrooms: true,
       bathroomsRequired: true,
       showBalconies: true,
-      showFloor: false,
+      showFloor: true, // Updated: Independent House should show Floor
       showTotalFloors: true,
       showFacing: true,
       showAge: true,
@@ -109,23 +113,6 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
       bathroomsRequired: true,
       showBalconies: true,
       showFloor: true,
-      showTotalFloors: true,
-      showFacing: true,
-      showAge: true,
-      showFurnishing: true,
-      showCarpetArea: true,
-      areaLabel: 'Built-up Area',
-    };
-  }
-
-  if (isFarmHouse) {
-    return {
-      showBedrooms: true,
-      bedroomsRequired: true,
-      showBathrooms: true,
-      bathroomsRequired: true,
-      showBalconies: false, // No balconies for Farm House
-      showFloor: false,
       showTotalFloors: true,
       showFacing: true,
       showAge: true,
@@ -163,7 +150,7 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
       showTotalFloors: true,
       showFacing: true,
       showAge: true,
-      showFurnishing: true,
+      showFurnishing: false, // Updated: Commercial Shop should NOT show Furnishing
       showCarpetArea: true,
       areaLabel: 'Built-up Area',
     };
@@ -178,7 +165,7 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
       showBalconies: false,
       showFloor: false,
       showTotalFloors: false,
-      showFacing: false,
+      showFacing: true, // Updated: Plot / Land should show Facing
       showAge: false,
       showFurnishing: false,
       showCarpetArea: false,
@@ -192,7 +179,7 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
       bedroomsRequired: true,
       showBathrooms: true,
       bathroomsRequired: true,
-      showBalconies: true,
+      showBalconies: false, // Updated: PG / Hostel should NOT show Balconies
       showFloor: true,
       showTotalFloors: true,
       showFacing: true,
