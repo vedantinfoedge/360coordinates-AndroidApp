@@ -365,18 +365,13 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => {
-            console.log('[BuyerDashboard] Support button pressed - starting navigation');
-            // Delay navigation to allow modal to close completely
-            setTimeout(() => {
-              try {
-                console.log('[BuyerDashboard] Attempting to navigate to Support screen');
-                (navigation as any).navigate('Support');
-                console.log('[BuyerDashboard] Navigation call completed');
-              } catch (error: any) {
-                console.error('[BuyerDashboard] Error navigating to Support:', error);
-                Alert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
-              }
-            }, 200);
+            try {
+              console.log('[BuyerDashboard] Navigating to Support screen');
+              navigation.navigate('Support' as never);
+            } catch (error: any) {
+              console.error('[BuyerDashboard] Error navigating to Support:', error);
+              Alert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
+            }
           }}
           onLogoutPress={isLoggedIn ? logout : undefined}
           onSignInPress={() => {
@@ -408,18 +403,13 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => {
-          console.log('[BuyerDashboard] Support button pressed - starting navigation');
-          // Delay navigation to allow modal to close completely
-          setTimeout(() => {
-            try {
-              console.log('[BuyerDashboard] Attempting to navigate to Support screen');
-              (navigation as any).navigate('Support');
-              console.log('[BuyerDashboard] Navigation call completed');
-            } catch (error: any) {
-              console.error('[BuyerDashboard] Error navigating to Support:', error);
-              Alert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
-            }
-          }, 200);
+          try {
+            console.log('[BuyerDashboard] Navigating to Support screen');
+            navigation.navigate('Support' as never);
+          } catch (error: any) {
+            console.error('[BuyerDashboard] Error navigating to Support:', error);
+            Alert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
+          }
         }}
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={() => {
@@ -551,7 +541,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             <TouchableOpacity
               onPress={() => {
                 try {
-                  // Explore Properties -> See All should open Search (SearchResults) with ALL properties (no filters)
+                  // Explore Properties -> See All should open SearchResults with ALL properties
                   const params: any = {
                     query: '',
                     location: '',
@@ -569,8 +559,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                     params.listingType = 'pg-hostel';
                   }
 
-                  // Navigate to the Search tab (which shows SearchResultsScreen)
-                  (navigation as any).navigate('Search', params as never);
+                  // Navigate directly to SearchResults screen
+                  console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
+                  navigation.navigate('SearchResults', params as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   Alert.alert('Error', 'Failed to load all properties. Please try again.');
