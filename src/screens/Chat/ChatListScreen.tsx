@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Animated,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -71,12 +73,35 @@ interface ChatListItem {
 }
 
 const ChatListScreen: React.FC<Props> = ({navigation}) => {
-  const {logout, user} = useAuth();
+  const {logout, user, isAuthenticated} = useAuth();
+  const insets = useSafeAreaInsets();
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(30)).current;
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [propertyCache, setPropertyCache] = useState<Record<string, any>>({});
   const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Check if user is guest
+  const isLoggedIn = Boolean(user && isAuthenticated);
+  const isGuest = !isLoggedIn;
+
+  // Animate popup when component mounts
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   // Set up listener when component mounts or user changes
   useEffect(() => {
@@ -522,13 +547,92 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     );
   };
 
+  // Show login prompt if user is not authenticated (guest)
+  if (!isAuthenticated || !user) {
+    return (
+      <View style={styles.container}>
+        <BuyerHeader
+          onProfilePress={() => {}}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={() => {}}
+          onSignInPress={() => {
+            console.log('[ChatList] Navigating to Login screen');
+            (navigation as any).navigate('Auth', {
+              screen: 'Login',
+              params: {returnTo: 'Chats'},
+            });
+          }}
+          onSignUpPress={() => {
+            console.log('[ChatList] Navigating to Register screen');
+            (navigation as any).navigate('Auth', {screen: 'Register'});
+          }}
+          showLogout={false}
+          showProfile={false}
+          showSignIn={true}
+          showSignUp={true}
+        />
+        <Animated.View
+          style={[
+            styles.loginContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{translateY: slideAnim}],
+              paddingTop: insets.top + 70,
+            },
+          ]}>
+          <View style={styles.loginContent}>
+            <View style={styles.loginIconContainer}>
+              <Text style={styles.loginIcon}>💬</Text>
+            </View>
+            <Text style={styles.loginTitle}>Login Required</Text>
+            <Text style={styles.loginSubtitle}>
+              Please login to view and manage your chats
+            </Text>
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={() => {
+                (navigation as any).navigate('Auth', {
+                  screen: 'Login',
+                  params: {returnTo: 'Chats'},
+                });
+              }}
+              activeOpacity={0.8}>
+              <Text style={styles.loginButtonText}>Login / Register</Text>
+            </TouchableOpacity>
+            <Text style={styles.loginNote}>
+              Login to access your conversations with property owners
+            </Text>
+          </View>
+        </Animated.View>
+      </View>
+    );
+  }
+
   if (loading && chatList.length === 0) {
     return (
       <View style={styles.container}>
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={logout}
+          onLogoutPress={isLoggedIn ? logout : undefined}
+          onSignInPress={
+            isGuest
+              ? () =>
+                  (navigation as any).navigate('Auth', {
+                    screen: 'Login',
+                    params: {returnTo: 'Chats'},
+                  })
+              : undefined
+          }
+          onSignUpPress={
+            isGuest
+              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+              : undefined
+          }
+          showLogout={isLoggedIn}
+          showProfile={isLoggedIn}
+          showSignIn={isGuest}
+          showSignUp={isGuest}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -543,7 +647,25 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={logout}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={
+          isGuest
+            ? () =>
+                (navigation as any).navigate('Auth', {
+                  screen: 'Login',
+                  params: {returnTo: 'Chats'},
+                })
+            : undefined
+        }
+        onSignUpPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            : undefined
+        }
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
       {chatList.length > 0 ? (
         <FlatList
@@ -709,6 +831,79 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  loginContent: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    borderWidth: 2,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loginIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  loginIcon: {
+    fontSize: 50,
+  },
+  loginTitle: {
+    ...typography.h1,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  loginSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 22,
+  },
+  loginButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  loginButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  loginNote: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 18,
   },
 });
 

@@ -81,8 +81,12 @@ const faqs = [
 
 const SupportScreen: React.FC<Props> = ({navigation}) => {
   const insets = useSafeAreaInsets();
-  const {logout} = useAuth();
+  const {logout, user, isAuthenticated} = useAuth();
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
+  
+  // Check if user is guest
+  const isLoggedIn = Boolean(user && isAuthenticated);
+  const isGuest = !isLoggedIn;
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -137,7 +141,21 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
         onSupportPress={() => {
           // Already on support page - do nothing
         }}
-        onLogoutPress={logout}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            : undefined
+        }
+        onSignUpPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            : undefined
+        }
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
 
       <ScrollView

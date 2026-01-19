@@ -219,6 +219,11 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
         navigation.getParent()?.navigate('MainTabs' as never, {
           screen: 'Profile',
         } as never);
+      } else if (returnTo === 'Chats') {
+        // Navigate back to MainTabs and then to Chats
+        navigation.getParent()?.navigate('MainTabs' as never, {
+          screen: 'Chats',
+        } as never);
       } else if (returnTo === 'PropertyDetails' && propertyId) {
         // Navigate back to PropertyDetails screen with flag to auto-show contact
         // Navigate to MainTabs -> Search -> PropertyDetails

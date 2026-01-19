@@ -189,6 +189,19 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           onProfilePress={() => {}}
           onSupportPress={() => {}}
           onLogoutPress={() => {}}
+          onSignInPress={() => {
+            (navigation as any).navigate('Auth', {
+              screen: 'Login',
+              params: {returnTo: 'Profile'},
+            });
+          }}
+          onSignUpPress={() => {
+            (navigation as any).navigate('Auth', {screen: 'Register'});
+          }}
+          showLogout={false}
+          showProfile={false}
+          showSignIn={true}
+          showSignUp={true}
         />
         <Animated.View
           style={[
@@ -238,6 +251,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           navigation.navigate('Support' as never);
         }}
         onLogoutPress={handleLogout}
+        showLogout={true}
+        showProfile={true}
+        showSignIn={false}
+        showSignUp={false}
       />
 
       <ScrollView 

@@ -308,10 +308,13 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       return () => {
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
         }
       };
     }
-  }, [user, loadDashboardData]);
+    // Only depend on user.user_type to avoid recreating interval unnecessarily
+    // loadDashboardData is memoized with empty deps, so it's stable
+  }, [user?.user_type, loadDashboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);

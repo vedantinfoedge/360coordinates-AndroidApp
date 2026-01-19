@@ -8,13 +8,14 @@ import {
   ScrollView,
   Alert,
   Modal,
-  SafeAreaView,
   Image,
   Platform,
   PermissionsAndroid,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import {useRoute} from '@react-navigation/native';
 import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
@@ -44,6 +45,9 @@ type Props = {
 type PropertyStatus = 'sell' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
+  const route = useRoute();
+  const routeParams = route.params as {isUpcomingProject?: boolean} | undefined;
+  const isUpcomingProject = routeParams?.isUpcomingProject === true;
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sell');
@@ -1111,7 +1115,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             {/* Progress Steps */}
-            <View style={styles.progressContainer}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={isUpcomingProject ? styles.progressContainerScroll : styles.progressContainerWrapper}
+              contentContainerStyle={isUpcomingProject ? styles.progressContent : styles.progressContainer}>
               {steps.map((step, index) => {
                 const status = getStepStatus(step.id);
                 return (
@@ -1148,7 +1156,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {/* Content */}
             <ScrollView
@@ -1236,6 +1244,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.text,
     fontWeight: '600',
+  },
+  progressContainerWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   progressContainer: {
     flexDirection: 'row',
@@ -1876,6 +1888,303 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
+  },
+  progressContainerScroll: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    maxHeight: 100,
+  },
+  progressContent: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    gap: spacing.xs,
+  },
+  buttonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  typeButtonActive: {
+    borderColor: colors.accent,
+    borderWidth: 2,
+    backgroundColor: colors.accent + '20',
+  },
+  typeButtonTextActive: {
+    color: colors.accent,
+    fontWeight: '600',
+  },
+  configButton: {
+    width: '30%',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+    position: 'relative',
+  },
+  configButtonActive: {
+    borderColor: colors.accent,
+    borderWidth: 2,
+    backgroundColor: colors.accent + '20',
+  },
+  configButtonText: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  configButtonTextActive: {
+    color: colors.accent,
+    fontWeight: '600',
+  },
+  checkmark: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    fontSize: 16,
+    color: colors.accent,
+    fontWeight: 'bold',
+  },
+  amenityCheckmark: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    fontSize: 16,
+    color: colors.accent,
+    fontWeight: 'bold',
+  },
+  imageStatusOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  approvedOverlay: {
+    backgroundColor: 'rgba(76, 175, 80, 0.8)',
+  },
+  rejectedOverlay: {
+    backgroundColor: 'rgba(244, 67, 54, 0.8)',
+  },
+  imageStatusText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  removeAndRetryButton: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+  },
+  removeAndRetryText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  previewScroll: {
+    maxHeight: 400,
+  },
+  previewSection: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  previewSectionTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  previewLabel: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 13,
+    flex: 1,
+  },
+  previewValue: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  disabledInput: {
+    backgroundColor: colors.border + '40',
+    color: colors.textSecondary,
+  },
+  autoFilledInput: {
+    backgroundColor: colors.border + '40',
+  },
+  autoFilledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    gap: spacing.sm,
+  },
+  autoFilledBadgeText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  editButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  editButtonText: {
+    ...typography.caption,
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  coordinatesContainer: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  coordinatesText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  removeButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  removeButtonText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  priceDisplay: {
+    ...typography.caption,
+    color: colors.accent,
+    fontSize: 12,
+    marginTop: spacing.xs,
+    fontWeight: '600',
+  },
+  submitButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  submitButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  nextButtonDisabled: {
+    backgroundColor: colors.border,
+    opacity: 0.6,
+  },
+  imageItem: {
+    width: 100,
+    height: 100,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  projectImage: {
+    width: '100%',
+    height: '100%',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageText: {
+    color: colors.surface,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  imageUploadButton: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: 200,
+    backgroundColor: colors.surfaceSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    fontSize: 48,
+    marginBottom: spacing.sm,
+  },
+  imagePlaceholderLabel: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  uploadButton: {
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  uploadButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  imageCountText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginBottom: spacing.xs,
+  },
+  warningText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 12,
+    marginBottom: spacing.sm,
+  },
+  imagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
 });
 

@@ -63,11 +63,21 @@ api.interceptors.response.use(
     return data;
   },
   async error => {
-    // Log error
-    log.error('API', `Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+    // Log error with detailed information
+    const errorDetails = {
       status: error.response?.status,
+      statusText: error.response?.statusText,
       message: error.message,
-    });
+      data: error.response?.data,
+      url: error.config?.url,
+      method: error.config?.method,
+    };
+    
+    // Log full error details as JSON for better debugging
+    console.error(`[API] Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, JSON.stringify(errorDetails, null, 2));
+    
+    // Also use the log utility
+    log.error('API', `Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, errorDetails);
 
     if (error.response?.status === 401) {
       // Token expired - try to refresh token first
@@ -132,6 +142,22 @@ api.interceptors.response.use(
         errorMessage = errorData.data.message;
       } else {
         errorMessage = 'Access denied. You don\'t have permission to access this dashboard. Please try logging in with a different account type.';
+      }
+      
+      // Extract suggested user type from error message for better UX
+      let suggestedType: string | null = null;
+      const messageLower = errorMessage.toLowerCase();
+      if (messageLower.includes('agent') || messageLower.includes('builder')) {
+        suggestedType = 'agent';
+      } else if (messageLower.includes('buyer') || messageLower.includes('tenant')) {
+        suggestedType = 'buyer';
+      } else if (messageLower.includes('seller') || messageLower.includes('owner')) {
+        suggestedType = 'seller';
+      }
+      
+      // Add suggested type to error object for components to use
+      if (suggestedType) {
+        (error as any).suggestedUserType = suggestedType;
       }
     } else if (statusCode === 400) {
       // Validation errors

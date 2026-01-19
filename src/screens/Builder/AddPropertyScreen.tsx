@@ -8,15 +8,15 @@ import {
   ScrollView,
   Alert,
   Modal,
-  SafeAreaView,
   Image,
   Platform,
   PermissionsAndroid,
   ActivityIndicator,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import {BuilderTabParamList} from '../../components/navigation/BuilderTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
@@ -27,8 +27,8 @@ import {extractStateFromContext} from '../../utils/geocoding';
 import {useAuth} from '../../context/AuthContext';
 import {formatters} from '../../utils/formatters';
 
-type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
+type AddPropertyScreenNavigationProp = BottomTabNavigationProp<
+  BuilderTabParamList,
   'AddProperty'
 >;
 

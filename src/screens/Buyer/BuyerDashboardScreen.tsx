@@ -76,19 +76,18 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     loadToken();
   }, [user, isAuthenticated]); // Reload token when auth state changes
 
-  // Simplified login check: user exists OR isAuthenticated is true
-  // For guest users: user is null and isAuthenticated is false
-  const isLoggedIn = Boolean(user && isAuthenticated);
+  // Fixed login check: user exists OR token exists OR isAuthenticated is true
+  // For guest users: user is null, token is null, and isAuthenticated is false
+  const isLoggedIn = Boolean(user || token || isAuthenticated);
   const isGuest = !isLoggedIn;
 
-  // Debug logs to verify auth state
+  // Debug logs to verify auth state (MANDATORY DEBUG)
   useEffect(() => {
     console.log('[BuyerDashboard] AUTH DEBUG:');
-    console.log('  - user:', user ? `exists (${user.email})` : 'null');
-    console.log('  - token:', token ? 'exists' : 'null');
-    console.log('  - isAuthenticated:', isAuthenticated);
-    console.log('  - isLoggedIn (computed):', isLoggedIn);
-    console.log('  - isGuest (computed):', isGuest);
+    console.log('user:', user);
+    console.log('isAuthenticated:', isAuthenticated);
+    console.log('token:', token);
+    console.log('isLoggedIn:', isLoggedIn);
     console.log('  - Header props will be:', {
       showLogout: isLoggedIn,
       showSignIn: isGuest,
@@ -369,11 +368,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           onLogoutPress={isLoggedIn ? logout : undefined}
           onSignInPress={() => {
             console.log('[BuyerDashboard] Navigating to Login screen');
-            navigation.navigate('Auth' as never, {screen: 'Login'} as never);
+            (navigation as any).navigate('Auth', {screen: 'Login'});
           }}
           onSignUpPress={() => {
             console.log('[BuyerDashboard] Navigating to Register screen');
-            navigation.navigate('Auth' as never, {screen: 'Register'} as never);
+            (navigation as any).navigate('Auth', {screen: 'Register'});
           }}
           showProfile={isLoggedIn}
           showLogout={isLoggedIn}
@@ -399,16 +398,16 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={() => {
           console.log('[BuyerDashboard] Navigating to Login screen');
-          navigation.navigate('Auth' as never, {screen: 'Login'} as never);
+          (navigation as any).navigate('Auth', {screen: 'Login'});
         }}
         onSignUpPress={() => {
           console.log('[BuyerDashboard] Navigating to Register screen');
-          navigation.navigate('Auth' as never, {screen: 'Register'} as never);
+          (navigation as any).navigate('Auth', {screen: 'Register'});
         }}
-        showProfile={Boolean(isLoggedIn)}
-        showLogout={Boolean(isLoggedIn)}
-        showSignIn={Boolean(isGuest)}
-        showSignUp={Boolean(isGuest)}
+        showProfile={isLoggedIn}
+        showLogout={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
 
       <ScrollView

@@ -72,8 +72,12 @@ interface Property {
 
 const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
-  const {logout} = useAuth();
+  const {logout, user, isAuthenticated} = useAuth();
   const routeParams = route?.params || {};
+  
+  // Check if user is guest
+  const isLoggedIn = Boolean(user && isAuthenticated);
+  const isGuest = !isLoggedIn;
   
   // PART B: Safely read location from route params with trimming
   // Handle null/undefined/empty/spaces safely - empty location is valid
@@ -718,7 +722,21 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         onSupportPress={() => {
           // Navigate to support - can add later
         }}
-        onLogoutPress={logout}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            : undefined
+        }
+        onSignUpPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            : undefined
+        }
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
 
       {/* Search Bar */}
