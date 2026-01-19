@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {useAuth} from '../../context/AuthContext';
+import AgentHeader from '../../components/AgentHeader';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -41,7 +43,9 @@ const inquiries: Inquiry[] = [
   },
 ];
 
-const InquiriesScreen: React.FC<Props> = () => {
+const InquiriesScreen: React.FC<Props> = ({navigation}) => {
+  const {logout} = useAuth();
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new':
@@ -87,6 +91,11 @@ const InquiriesScreen: React.FC<Props> = () => {
 
   return (
     <View style={styles.container}>
+      <AgentHeader
+        onProfilePress={() => navigation.navigate('Profile')}
+        onSupportPress={() => navigation.navigate('Support')}
+        onLogoutPress={logout}
+      />
       <FlatList
         data={inquiries}
         renderItem={renderInquiry}

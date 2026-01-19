@@ -1,7 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Alert, Image} from 'react-native';
 import {colors, spacing, typography, borderRadius} from '../theme';
-import {fixImageUrl} from '../utils/imageHelper';
 
 interface PropertyCardProps {
   image?: string;
@@ -14,6 +13,7 @@ interface PropertyCardProps {
   onSharePress?: () => void;
   isFavorite?: boolean;
   property?: any; // Full property object for compatibility
+  style?: any; // Optional style prop for card container
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -26,13 +26,20 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   onFavoritePress,
   onSharePress,
   isFavorite = false,
+  style,
 }) => {
   const [favorite, setFavorite] = useState(isFavorite);
+  const [imageError, setImageError] = useState(false);
 
   // Sync favorite state when prop changes
   React.useEffect(() => {
     setFavorite(isFavorite);
   }, [isFavorite]);
+
+  // Reset image error when image URL changes
+  React.useEffect(() => {
+    setImageError(false);
+  }, [image]);
 
   const handleFavoritePress = () => {
     // Optimistically update UI
@@ -59,20 +66,25 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, style]}
       onPress={onPress}
       activeOpacity={0.8}>
       {/* Property Image */}
       <View style={styles.imageContainer}>
-        {image ? (
+        {image && !imageError ? (
           <Image
-            source={{uri: fixImageUrl(image)}}
+            source={{uri: image}}
             style={styles.image}
             resizeMode="cover"
+            onError={() => {
+              console.warn('[PropertyCard] Failed to load image:', image);
+              setImageError(true);
+            }}
           />
         ) : (
           <View style={styles.imagePlaceholder}>
-            <Text style={styles.imagePlaceholderText}>Property Image</Text>
+            <Text style={styles.imagePlaceholderText}>🏠</Text>
+            <Text style={styles.imagePlaceholderText}>No Image</Text>
           </View>
         )}
 

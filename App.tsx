@@ -14,6 +14,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import {initializeMapbox} from './src/config/mapbox.config';
 import {initializeFirebase} from './src/config/firebase.config';
 import {initializeMSG91} from './src/config/msg91.config';
+import {notificationService} from './src/services/notification.service';
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
@@ -38,6 +39,20 @@ function App(): React.JSX.Element {
       initializeMSG91();
     } catch (error) {
       console.warn('MSG91 initialization failed (app will continue without MSG91):', error);
+    }
+
+    // Initialize push notifications (will fail gracefully if not configured)
+    try {
+      notificationService.initialize();
+      notificationService.createNotificationChannel();
+      // Request permission and get FCM token
+      notificationService.requestPermission().then(token => {
+        if (token) {
+          console.log('[App] Push notifications initialized with token:', token);
+        }
+      });
+    } catch (error) {
+      console.warn('Push notification initialization failed (app will continue without notifications):', error);
     }
   }, []);
 

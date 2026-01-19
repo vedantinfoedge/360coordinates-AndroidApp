@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
@@ -38,9 +39,18 @@ type Props = {
 
 const LoginScreen: React.FC<Props> = ({navigation}) => {
   const {login} = useAuth();
+  const route = useRoute();
+  const params = (route.params as any) || {};
+  const returnTo = params.returnTo;
+  const propertyId = params.propertyId;
+  const autoShowContact = params.autoShowContact;
+  const userTypeParam = params.userType;
+  const targetDashboard = params.targetDashboard;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('buyer');
+  const [selectedRole, setSelectedRole] = useState<UserRole>(
+    (userTypeParam as UserRole) || 'buyer'
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -110,6 +120,16 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
     loadSavedCredentials();
   }, []);
 
+  // Set selectedRole from route params if provided
+  useEffect(() => {
+    if (userTypeParam) {
+      const role = userTypeParam.toLowerCase().trim() as UserRole;
+      if (role === 'seller' || role === 'buyer' || role === 'agent') {
+        setSelectedRole(role);
+      }
+    }
+  }, [userTypeParam]);
+
   const loadSavedCredentials = async () => {
     try {
       const rememberMeEnabled = await AsyncStorage.getItem(REMEMBER_ME_ENABLED_KEY);
@@ -164,12 +184,26 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
     }
 
     setIsLoading(true);
-    // Ensure we have a valid userType string
+    // Ensure we have a valid userType string - CRITICAL: Use selectedRole from UI
     const userTypeToUse: string = (retryUserType || selectedRole || 'buyer') as string;
+    
+    console.log('[LoginScreen] 🔐 Login attempt:', {
+      email: email.trim(),
+      selectedRole,
+      retryUserType,
+      userTypeToUse,
+    });
     
     try {
       // Pass the selected role to login - backend requires userType
+      // Backend validates role access:
+      // - Buyer/Tenant (registered) → Can login as "buyer" OR "seller" ✅
+      // - Seller/Owner (registered) → Can login as "buyer" OR "seller" ✅
+      // - Agent/Builder (registered) → Can ONLY login as "agent" (403 if try buyer/seller) ❌
+      // IMPORTANT: We pass userTypeToUse which is the selected role from the UI
       await login(email.trim(), password, userTypeToUse);
+      
+      console.log('[LoginScreen] ✅ Login successful, navigation will happen automatically based on userType:', userTypeToUse);
       
       // Save credentials if Remember Me is checked
       if (rememberMe) {
@@ -179,7 +213,34 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
         await clearSavedCredentials();
       }
       
-      // Navigation will be handled by AuthContext based on user_type returned from backend
+      // If returnTo is specified, navigate back to that screen
+      if (returnTo === 'Profile') {
+        // Navigate back to MainTabs and then to Profile
+        navigation.getParent()?.navigate('MainTabs' as never, {
+          screen: 'Profile',
+        } as never);
+      } else if (returnTo === 'PropertyDetails' && propertyId) {
+        // Navigate back to PropertyDetails screen with flag to auto-show contact
+        // Navigate to MainTabs -> Search -> PropertyDetails
+        const parentNav = navigation.getParent();
+        if (parentNav) {
+          (parentNav as any).navigate('MainTabs', {
+            screen: 'Search',
+            params: {
+              screen: 'PropertyDetails',
+              params: {
+                propertyId: propertyId,
+                returnFromLogin: true,
+              },
+            },
+          });
+        }
+      } else {
+        // Navigation will be handled automatically by AppNavigator
+        // It will check for targetDashboard in AsyncStorage (set by InitialScreen)
+        // and navigate to the appropriate dashboard (Seller, Agent, or Builder)
+        // If no targetDashboard, it will navigate based on user.user_type
+      }
     } catch (error: any) {
       console.error('[LoginScreen] Login error:', error);
       
@@ -372,7 +433,10 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
                     styles.roleButton,
                     selectedRole === role.value && styles.roleButtonSelected,
                   ]}
-                  onPress={() => setSelectedRole(role.value)}
+                  onPress={() => {
+                    console.log('[LoginScreen] Role selected:', role.value);
+                    setSelectedRole(role.value);
+                  }}
                   activeOpacity={0.7}>
                   <View style={styles.roleButtonInner}>
                     <Text style={styles.roleIcon}>{role.icon}</Text>
@@ -466,7 +530,10 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
               {/* Sign In Button */}
               <TouchableOpacity
                 style={styles.signInButton}
-                onPress={handleLogin}
+                onPress={() => {
+                  console.log('[LoginScreen] Sign In button pressed, selectedRole:', selectedRole);
+                  handleLogin();
+                }}
                 disabled={isLoading}>
                 <Text style={styles.signInButtonText}>
                   {isLoading

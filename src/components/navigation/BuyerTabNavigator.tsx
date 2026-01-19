@@ -1,33 +1,38 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {View, Text} from 'react-native';
 import BuyerDashboardScreen from '../../screens/Buyer/BuyerDashboardScreen';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
-import FavoritesScreen from '../../screens/FavoritesScreen';
 import SearchResultsScreen from '../../screens/Buyer/SearchResultsScreen';
 import AllPropertiesScreen from '../../screens/Buyer/AllPropertiesScreen';
 import PropertyDetailsScreen from '../../screens/Buyer/PropertyDetailsScreen';
 import PropertyMapScreen from '../../screens/Buyer/PropertyMapScreen';
 import SupportScreen from '../../screens/Buyer/SupportScreen';
-import {colors} from '../../theme';
-import {Text} from 'react-native';
+import FavoritesScreen from '../../screens/FavoritesScreen';
+import {colors, spacing} from '../../theme';
+import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
 
 export type BuyerTabParamList = {
   Home: undefined;
+  Search: undefined;
+  Chats: undefined;
+  Profile: undefined;
   Chat: undefined;
   Favorites: undefined;
-  Profile: undefined;
   PropertyList: {searchQuery?: string} | undefined;
   SearchResults: {searchQuery?: string; location?: string; listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
   AllProperties: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
   PropertyDetails: {propertyId: string};
-  PropertyMap: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
+  PropertyMap: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'; propertyId?: string | number} | undefined;
   Support: undefined;
 };
 
 const Tab = createBottomTabNavigator<BuyerTabParamList>();
 
 const BuyerTabNavigator = () => {
+  const unreadCount = useUnreadChatCount();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -46,10 +51,10 @@ const BuyerTabNavigator = () => {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingTop: 6,
-          paddingBottom: 6,
-          paddingHorizontal: 0,
-          height: 58,
+          paddingTop: 4,
+          paddingBottom: 20,
+          paddingHorizontal: 30,
+          height: 65,
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: {width: 0, height: -2},
@@ -59,19 +64,23 @@ const BuyerTabNavigator = () => {
         tabBarItemStyle: {
           flex: 1,
           paddingVertical: 2,
+          paddingHorizontal: 40,
           justifyContent: 'center',
           alignItems: 'center',
+          minHeight: 56,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: 0,
           marginBottom: 0,
           textAlign: 'center',
         },
         tabBarIconStyle: {
           marginTop: 0,
           marginBottom: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
       }}>
       <Tab.Screen
@@ -80,25 +89,59 @@ const BuyerTabNavigator = () => {
         options={{
           title: 'Home',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>🏠</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>🏠</Text>
+          ),
         }}
       />
       <Tab.Screen
-        name="Chat"
+        name="Search"
+        component={SearchResultsScreen}
+        options={{
+          title: 'Search',
+          headerShown: false,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>🔍</Text>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Chats"
         component={ChatNavigator}
         options={{
-          title: 'Chat',
+          title: 'Chats',
           headerShown: false,
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>💬</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Favorites"
-        component={FavoritesScreen}
-        options={{
-          title: 'Favorites',
-          headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>❤️</Text>,
+          tabBarIcon: ({color}) => (
+            <View style={{position: 'relative', alignItems: 'center', justifyContent: 'center'}}>
+              <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
+              {unreadCount > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -8,
+                    backgroundColor: '#FF3B30',
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                    borderWidth: 2,
+                    borderColor: colors.surface,
+                  }}>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 10,
+                      fontWeight: 'bold',
+                    }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
       <Tab.Screen
@@ -107,7 +150,27 @@ const BuyerTabNavigator = () => {
         options={{
           title: 'Profile',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>👤</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>👤</Text>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Chat"
+        component={ChatNavigator}
+        options={{
+          title: 'Chat',
+          headerShown: false,
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{
+          title: 'Favorites',
+          headerShown: false, // Hide default header for custom header
+          tabBarButton: () => null, // Hide from tab bar
         }}
       />
       <Tab.Screen

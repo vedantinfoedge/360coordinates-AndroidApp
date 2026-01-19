@@ -15,19 +15,27 @@ interface BuyerHeaderProps {
   onProfilePress?: () => void;
   onSupportPress?: () => void;
   onLogoutPress?: () => void;
+  onSignInPress?: () => void;
+  showProfile?: boolean;
+  showLogout?: boolean;
+  showSignIn?: boolean;
 }
 
 const BuyerHeader: React.FC<BuyerHeaderProps> = ({
   onProfilePress,
   onSupportPress,
   onLogoutPress,
+  onSignInPress,
+  showProfile = true,
+  showLogout = true,
+  showSignIn = false,
 }) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.safeArea, styles.stickyHeader, {paddingTop: insets.top}]}>
-      <View style={styles.header}>
+    <View style={[styles.safeArea, styles.stickyHeader]}>
+      <View style={[styles.header, {paddingTop: insets.top}]}>
         {/* Logo */}
         <View style={styles.logoContainer}>
           <Image
@@ -59,15 +67,19 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
             activeOpacity={1}
             onPress={() => setMenuVisible(false)}>
             <View style={styles.menuContainer} onStartShouldSetResponder={() => true}>
+              {showProfile && onProfilePress && (
+                <>
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => {
                   setMenuVisible(false);
-                  onProfilePress?.();
+                      onProfilePress();
                 }}>
                 <Text style={styles.menuItemText}>View Profile</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
+                </>
+              )}
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => {
@@ -76,17 +88,34 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
                 }}>
                 <Text style={styles.menuItemText}>Support</Text>
               </TouchableOpacity>
+              {showSignIn && onSignInPress && (
+                <>
+                  <View style={styles.menuDivider} />
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onSignInPress();
+                    }}>
+                    <Text style={styles.menuItemText}>Sign In</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {showLogout && onLogoutPress && (
+                <>
               <View style={styles.menuDivider} />
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => {
                   setMenuVisible(false);
-                  onLogoutPress?.();
+                      onLogoutPress();
                 }}>
                 <Text style={[styles.menuItemText, styles.logoutText]}>
                   Logout
                 </Text>
               </TouchableOpacity>
+                </>
+              )}
             </View>
           </TouchableOpacity>
         </Modal>
@@ -112,14 +141,19 @@ const styles = StyleSheet.create({
     }),
   },
   stickyHeader: {
-    position: 'relative',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
+    minHeight: 60,
     backgroundColor: '#022b5f', // Navbar bg color
     borderBottomWidth: 0,
   },
@@ -128,8 +162,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   logoImage: {
-    width: 120,
-    height: 32,
+    width: 140,
+    height: 40,
   },
   menuButton: {
     padding: spacing.xs,

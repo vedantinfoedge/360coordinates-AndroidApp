@@ -10,12 +10,14 @@ import {
 } from 'react-native';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {moderationService, ImageUploadResult} from '../../services/moderation.service';
+import {formatDetectionShort} from '../../services/detection.service';
 
 interface ImageWithModeration {
   uri: string;
   moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking';
   moderationReason?: string;
   imageUrl?: string;
+  detection?: ImageUploadResult['detection']; // Detection details
 }
 
 interface ImageUploadWithModerationProps {
@@ -55,7 +57,7 @@ const ImageUploadWithModeration: React.FC<ImageUploadWithModerationProps> = ({
       // Call moderation endpoint
       const result = await moderationService.uploadWithModeration(imageUri, propertyId);
 
-      // Update image with moderation result
+      // Update image with moderation result including detection details
       const finalImages = [...images];
       finalImages[index] = {
         ...finalImages[index],
@@ -67,6 +69,7 @@ const ImageUploadWithModeration: React.FC<ImageUploadWithModerationProps> = ({
             : 'PENDING',
         moderationReason: result.moderation_reason,
         imageUrl: result.image_url,
+        detection: result.detection, // Include detection details
       };
       onImagesChange(finalImages);
 
@@ -75,17 +78,42 @@ const ImageUploadWithModeration: React.FC<ImageUploadWithModerationProps> = ({
         onImageValidated(finalImages[index], result);
       }
 
-      // Show alert for rejected images
+      // Show alert for rejected images with detection details
       if (result.status === 'rejected' || result.moderation_status === 'REJECTED') {
-        Alert.alert(
-          'Image Rejected',
-          result.moderation_reason || result.message || 'Image does not meet quality standards',
-        );
+        let alertMessage = result.moderation_reason || result.message || 'Image does not meet quality standards';
+        
+        // Add detection details if available
+        if (result.detection) {
+          const detectionParts: string[] = [];
+          if (result.detection.humanDetected) {
+            detectionParts.push(`👤 Human detected (${result.detection.facesCount + result.detection.humanObjectsCount} detections)`);
+          }
+          if (result.detection.animalDetected) {
+            detectionParts.push(`🐾 Animal detected: ${result.detection.detectedAnimals.join(', ')}`);
+          }
+          
+          if (detectionParts.length > 0) {
+            alertMessage += '\n\n' + detectionParts.join('\n');
+          }
+        }
+        
+        Alert.alert('Image Rejected', alertMessage);
       } else if (result.status === 'pending' || result.moderation_status === 'PENDING') {
-        Alert.alert(
-          'Image Pending Review',
-          'This image is pending admin review and will be approved shortly.',
-        );
+        let alertMessage = 'This image is pending admin review and will be approved shortly.';
+        
+        // Add detection details if available
+        if (result.detection && (result.detection.humanDetected || result.detection.animalDetected)) {
+          const detectionParts: string[] = [];
+          if (result.detection.humanDetected) {
+            detectionParts.push(`👤 Human detected (${result.detection.facesCount + result.detection.humanObjectsCount} detections)`);
+          }
+          if (result.detection.animalDetected) {
+            detectionParts.push(`🐾 Animal detected: ${result.detection.detectedAnimals.join(', ')}`);
+          }
+          alertMessage += '\n\nDetected: ' + detectionParts.join(', ');
+        }
+        
+        Alert.alert('Image Pending Review', alertMessage);
       }
 
       return result;
@@ -169,6 +197,18 @@ const ImageUploadWithModeration: React.FC<ImageUploadWithModerationProps> = ({
             </View>
           )}
 
+          {/* Detection Details Badge */}
+          {image.detection && (image.detection.humanDetected || image.detection.animalDetected) && (
+            <View style={styles.detectionBadge}>
+              <Text style={styles.detectionText} numberOfLines={1}>
+                {image.detection.humanDetected ? '👤 ' : ''}
+                {image.detection.animalDetected ? '🐾 ' : ''}
+                {formatDetectionShort(image.detection)}
+              </Text>
+            </View>
+          )}
+
+          {/* Moderation Reason */}
           {image.moderationReason && image.moderationStatus === 'REJECTED' && (
             <View style={styles.reasonContainer}>
               <Text style={styles.reasonText} numberOfLines={2}>
@@ -221,6 +261,22 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.surface,
     fontSize: 10,
+    fontWeight: '600',
+  },
+  detectionBadge: {
+    position: 'absolute',
+    bottom: 28, // Above reason container
+    left: spacing.xs,
+    right: spacing.xs,
+    backgroundColor: 'rgba(255, 152, 0, 0.9)', // Orange warning color
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  detectionText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 9,
     fontWeight: '600',
   },
   reasonContainer: {

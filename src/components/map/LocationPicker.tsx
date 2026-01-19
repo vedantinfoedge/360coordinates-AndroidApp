@@ -199,7 +199,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
         {/* Map */}
         <View style={styles.mapContainer}>
           <MapViewComponent
-            initialCenter={selectedLocation || [77.2090, 28.6139]}
+            initialCenter={selectedLocation || [73.8567, 18.5204]} // Pune coordinates [longitude, latitude]
             initialZoom={15}
             onLocationSelect={handleMapPress}
             interactive={true}

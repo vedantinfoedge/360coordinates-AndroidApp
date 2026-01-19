@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {useAuth} from '../context/AuthContext';
+import BuyerHeader from '../components/BuyerHeader';
 import {propertySearchService} from '../services/propertySearch.service';
 import {fixImageUrl} from '../utils/imageHelper';
 
@@ -32,6 +34,7 @@ interface Property {
 }
 
 const SearchScreen: React.FC<Props> = ({navigation}) => {
+  const {logout} = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
@@ -153,6 +156,11 @@ const SearchScreen: React.FC<Props> = ({navigation}) => {
 
   return (
     <View style={styles.container}>
+      <BuyerHeader
+        onProfilePress={() => navigation.navigate('Profile')}
+        onSupportPress={() => navigation.navigate('Support')}
+        onLogoutPress={logout}
+      />
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}

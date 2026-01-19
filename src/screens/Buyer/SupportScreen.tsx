@@ -135,7 +135,7 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => {
-          // Already on support page
+          // Already on support page - do nothing
         }}
         onLogoutPress={logout}
       />

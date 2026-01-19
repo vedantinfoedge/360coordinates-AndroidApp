@@ -43,42 +43,108 @@ export const compressImage = async (
 };
 
 /**
- * Fix image URL - Convert relative paths to absolute URLs
- * According to guide: Images from backend are already full URLs, but we handle both cases
+ * Fixes and normalizes image URLs
+ * Handles various URL formats from backend
  * 
  * Backend may return:
  * - Full URL: "https://demo1.indiapropertys.com/backend/uploads/properties/images/img_1.jpg"
  * - Relative path: "uploads/properties/111/img_1767328756_69574bf41e6d4.jpeg"
+ * - Relative path with slash: "/uploads/properties/img.jpg"
  * 
  * @param imagePath Relative or absolute image path from API
- * @returns Full absolute image URL
+ * @returns Full absolute image URL or null if invalid
  */
-export const fixImageUrl = (imagePath: string | null | undefined): string => {
-  if (!imagePath) {
-    return 'https://via.placeholder.com/400x300?text=No+Image';
+export const fixImageUrl = (imagePath: string | null | undefined): string | null => {
+  // Input validation
+  if (!imagePath || typeof imagePath !== 'string') {
+    return null;
   }
-
-  // If already a full URL (as per guide, backend returns full URLs), return as is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
+  
+  const trimmed = imagePath.trim();
+  
+  // Check for invalid values
+  if (!trimmed || 
+      trimmed === 'null' || 
+      trimmed === 'undefined' || 
+      trimmed === '' ||
+      trimmed.length === 0) {
+    return null;
   }
+  
+  // Already full URL (backend should normalize, but verify)
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    // Validate URL format - be lenient with validation
+    try {
+      const urlObj = new URL(trimmed);
+      // Only allow http and https protocols
+      if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+        return trimmed;
+      }
+      console.warn('[fixImageUrl] Invalid URL protocol:', trimmed, 'Protocol:', urlObj.protocol);
+      return null;
+    } catch (e) {
+      // URL validation failed, but if it starts with http/https, trust it
+      // Some valid URLs might fail URL constructor (encoding, etc.)
+      // Log but still return the URL if it looks valid
+      const isLikelyValid = trimmed.match(/^https?:\/\/[^\s]+$/i);
+      if (isLikelyValid) {
+        console.warn('[fixImageUrl] URL validation failed but appears valid:', trimmed);
+        return trimmed;
+      }
+      console.warn('[fixImageUrl] Invalid URL format:', trimmed, 'Error:', e);
+      return null;
+    }
+  }
+  
+  // Relative path starting with /uploads/
+  if (trimmed.startsWith('/uploads/')) {
+    return `${API_CONFIG.BASE_URL}${trimmed}`;
+  }
+  
+  // Relative path starting with uploads/ (no leading slash)
+  if (trimmed.startsWith('uploads/')) {
+    return `${API_CONFIG.BASE_URL}/${trimmed}`;
+  }
+  
+  // Backend should normalize all URLs, so this shouldn't happen
+  // But handle it gracefully - try to construct URL
+  if (trimmed.includes('/') || trimmed.includes('\\')) {
+    // Looks like a path, try to construct URL
+    const cleanPath = trimmed.startsWith('/') ? trimmed.slice(1) : trimmed;
+    return `${API_CONFIG.BASE_URL}/${cleanPath}`;
+  }
+  
+  // Unexpected format
+  console.warn('[fixImageUrl] Unexpected URL format:', trimmed);
+  return null;
+};
 
-  // Handle relative paths (fallback for older data or edge cases)
-  // Remove leading slash if present
-  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-
-  // Backend returns paths like: "uploads/properties/111/img_xxx.jpeg"
-  // Need to prepend BASE_URL (not UPLOAD_URL)
-  return `${API_CONFIG.BASE_URL}/${cleanPath}`;
+/**
+ * Check if an image URL is valid
+ * @param url Image URL to validate
+ * @returns true if URL is valid, false otherwise
+ */
+export const isValidImageUrl = (url: string | null | undefined): boolean => {
+  if (!url || typeof url !== 'string') return false;
+  
+  try {
+    const urlObj = new URL(url);
+    return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') &&
+           url.startsWith('http');
+  } catch {
+    return false;
+  }
 };
 
 /**
  * Get full image URL from backend (alias for fixImageUrl)
+ * Returns placeholder if URL is invalid
  * @param imagePath Relative or absolute image path
- * @returns Full image URL
+ * @returns Full image URL or placeholder
  */
 export const getImageUrl = (imagePath: string | null | undefined): string => {
-  return fixImageUrl(imagePath);
+  const fixed = fixImageUrl(imagePath);
+  return fixed || 'https://via.placeholder.com/400x300?text=No+Image';
 };
 
 /**

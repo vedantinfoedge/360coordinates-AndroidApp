@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useMemo} from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Image,
   Platform,
   PermissionsAndroid,
+  Dimensions,
 } from 'react-native';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
@@ -24,6 +25,15 @@ import {moderationService} from '../../services/moderation.service';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
 import LocationPicker from '../../components/map/LocationPicker';
+import {
+  GuidePropertyType,
+  getPropertyTypeConfig,
+  getAvailableAmenitiesForPropertyType,
+  PROPERTY_TYPES,
+  AMENITIES_LIST,
+} from '../../utils/propertyTypeConfig';
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -34,47 +44,15 @@ type Props = {
   navigation: AddPropertyScreenNavigationProp;
 };
 
-type PropertyType = 'sell' | 'rent';
-type PropertyCategory = 
-  | 'apartment' 
-  | 'villa' 
-  | 'independent-house' 
-  | 'rowhouse' 
-  | 'penthouse' 
-  | 'studio-apartment' 
-  | 'commercial-office' 
-  | 'commercial-shop' 
-  | 'warehouse-godown' 
-  | 'plot-land' 
-  | 'pg-hostel' 
-  | '';
-
-const amenitiesList = [
-  {id: 'parking', label: 'Parking', icon: '🚗'},
-  {id: 'lift', label: 'Lift', icon: '🛗'},
-  {id: 'security', label: '24x7 Security', icon: '👮'},
-  {id: 'power_backup', label: 'Power Backup', icon: '⚡'},
-  {id: 'gym', label: 'Gym', icon: '🏋️'},
-  {id: 'swimming_pool', label: 'Swimming Pool', icon: '🏊'},
-  {id: 'garden', label: 'Garden', icon: '🌳'},
-  {id: 'clubhouse', label: 'Club House', icon: '🏛️'},
-  {id: 'playground', label: "Children's Play Area", icon: '🎢'},
-  {id: 'cctv', label: 'CCTV', icon: '📹'},
-  {id: 'intercom', label: 'Intercom', icon: '📞'},
-  {id: 'fire_safety', label: 'Fire Safety', icon: '🔥'},
-  {id: 'water_supply', label: '24x7 Water', icon: '💧'},
-  {id: 'gas_pipeline', label: 'Gas Pipeline', icon: '🔥'},
-  {id: 'wifi', label: 'WiFi', icon: '📶'},
-  {id: 'ac', label: 'Air Conditioning', icon: '❄️'},
-  {id: 'electricity', label: 'Electricity', icon: '⚡'},
-];
+type PropertyStatus = 'sale' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
-  const [propertyType, setPropertyType] = useState<PropertyType>('sell');
-  const [propertyCategory, setPropertyCategory] = useState<PropertyCategory>('');
+  const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sale');
+  const [propertyType, setPropertyType] = useState<GuidePropertyType | ''>('');
   const [location, setLocation] = useState('');
+  const [locationSelected, setLocationSelected] = useState(false); // Track if location was selected from autosuggest
   const [state, setState] = useState('');
   const [additionalAddress, setAdditionalAddress] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -92,7 +70,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [furnishing, setFurnishing] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<Array<{uri: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
+  const [photos, setPhotos] = useState<Array<{uri: string; base64?: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
   const [expectedPrice, setExpectedPrice] = useState('');
   const [priceNegotiable, setPriceNegotiable] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
@@ -107,82 +85,33 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     {id: 5, name: 'Pricing', icon: '💰'},
   ];
 
-  // Field visibility configuration based on property type
-  const getFieldVisibility = () => {
-    const isResidential = ['apartment', 'villa', 'independent-house', 'rowhouse', 'penthouse', 'studio-apartment'].includes(propertyCategory);
-    const isCommercial = ['commercial-office', 'commercial-shop', 'warehouse-godown'].includes(propertyCategory);
-    const isLand = propertyCategory === 'plot-land';
-    const isPG = propertyCategory === 'pg-hostel';
-    const isFarmHouse = propertyCategory === 'rowhouse';
-    const isStudio = propertyCategory === 'studio-apartment';
-    const isCommercialShop = propertyCategory === 'commercial-shop';
+  // Get field visibility configuration based on property type (using guide utility)
+  const fieldVisibility = useMemo(() => {
+    if (!propertyType) {
+      return {
+        showBedrooms: false,
+        bedroomsRequired: false,
+        showBathrooms: false,
+        bathroomsRequired: false,
+        showBalconies: false,
+        showFloor: false,
+        showTotalFloors: false,
+        showFacing: false,
+        showAge: false,
+        showFurnishing: false,
+        showCarpetArea: false,
+        areaLabel: 'Built-up Area' as const,
+      };
+    }
+    return getPropertyTypeConfig(propertyType);
+  }, [propertyType]);
 
-    return {
-      showBedrooms: !isLand && !isCommercial,
-      showBathrooms: !isLand && (isResidential || isPG || isCommercial),
-      showBalconies: !isLand && !isCommercial && !isFarmHouse && !isPG,
-      showFloor: !isLand,
-      showTotalFloors: !isLand,
-      showFacing: true, // Always show
-      showFurnishing: !isLand && !isCommercialShop,
-      showAge: !isLand,
-      showCarpetArea: !isLand,
-      areaLabel: isLand ? 'Plot Area' : 'Built-up Area',
-      bedroomsRequired: isResidential && !isStudio,
-      bathroomsRequired: isResidential || isPG,
-      furnishingRequired: isResidential && !isCommercialShop,
-    };
-  };
-
-  const fieldVisibility = getFieldVisibility();
-
-  // Get available amenities based on property type
-  const getAvailableAmenities = () => {
-    if (!propertyCategory) return amenitiesList;
-    
-    const isResidential = ['apartment', 'villa', 'independent-house', 'rowhouse', 'penthouse', 'studio-apartment'].includes(propertyCategory);
-    const isFarmHouse = propertyCategory === 'rowhouse';
-    const isCommercialOffice = propertyCategory === 'commercial-office';
-    const isCommercialShop = propertyCategory === 'commercial-shop';
-    const isLand = propertyCategory === 'plot-land';
-    const isPG = propertyCategory === 'pg-hostel';
-
-    return amenitiesList.filter(amenity => {
-      // Plot/Land only gets specific amenities
-      if (isLand) {
-        return ['security', 'water_supply', 'cctv', 'electricity'].includes(amenity.id);
-      }
-      
-      // PG/Hostel amenities
-      if (isPG) {
-        return !['lift', 'gym', 'swimming_pool', 'garden', 'clubhouse', 'playground', 'gas_pipeline'].includes(amenity.id);
-      }
-      
-      // Commercial Office amenities
-      if (isCommercialOffice) {
-        return !['gym', 'swimming_pool', 'garden', 'clubhouse', 'playground', 'gas_pipeline'].includes(amenity.id);
-      }
-      
-      // Commercial Shop amenities
-      if (isCommercialShop) {
-        return !['lift', 'gym', 'swimming_pool', 'garden', 'clubhouse', 'playground', 'intercom', 'gas_pipeline'].includes(amenity.id);
-      }
-      
-      // Farm House (no lift, no balconies)
-      if (isFarmHouse) {
-        return amenity.id !== 'lift';
-      }
-      
-      // Residential properties get all amenities except electricity
-      if (isResidential) {
-        return amenity.id !== 'electricity';
-      }
-      
-      return true;
-    });
-  };
-
-  const availableAmenities = getAvailableAmenities();
+  // Get available amenities based on property type (using guide utility)
+  const availableAmenities = useMemo(() => {
+    if (!propertyType) return AMENITIES_LIST;
+    const allowedAmenityIds = getAvailableAmenitiesForPropertyType(propertyType);
+    return AMENITIES_LIST.filter(amenity => allowedAmenityIds.includes(amenity.id));
+  }, [propertyType]);
 
   const toggleAmenity = (amenityId: string) => {
     setSelectedAmenities(prev =>
@@ -228,9 +157,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.8,
+      quality: 0.8 as const,
       selectionLimit: 10 - photos.length,
-      includeBase64: false,
+      includeBase64: true, // Enable base64 for direct upload without moderation
     };
 
     launchImageLibrary(options, async (response: ImagePickerResponse) => {
@@ -244,86 +173,53 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
 
       if (response.assets && response.assets.length > 0) {
-        const newPhotoUris = response.assets
-          .map(asset => asset.uri)
-          .filter((uri): uri is string => uri !== undefined);
-        
         const maxPhotos = 10;
         const remainingSlots = maxPhotos - photos.length;
-        const photosToAdd = newPhotoUris.slice(0, remainingSlots);
+        const assetsToAdd = response.assets.slice(0, remainingSlots);
         
-        if (photos.length + photosToAdd.length > maxPhotos) {
+        if (photos.length + assetsToAdd.length > maxPhotos) {
           Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
           return;
         }
 
-        // Add new photos with initial status
-        const newPhotos = photosToAdd.map(uri => ({
-          uri,
-          moderationStatus: 'checking' as const,
-        }));
+        // Auto-approve all images and convert to base64 format
+        // Skip moderation for now as per user request
+        const newPhotos = assetsToAdd.map(asset => {
+          // Get base64 string (format: "data:image/jpeg;base64,/9j/4AAQSkZJRg...")
+          const imageType = asset.type || 'jpeg';
+          const base64String = asset.base64 
+            ? `data:image/${imageType};base64,${asset.base64}` 
+            : undefined;
+          
+          return {
+            uri: asset.uri || '',
+            base64: base64String,
+            moderationStatus: 'APPROVED' as const, // Auto-approve for now
+            moderationReason: undefined,
+            imageUrl: undefined, // We'll use base64 instead
+          };
+        });
         
         const updatedPhotos = [...photos, ...newPhotos];
         setPhotos(updatedPhotos);
-
-        // Validate each new image through moderation
-        photosToAdd.forEach(async (uri, index) => {
-          const actualIndex = photos.length + index;
-          try {
-            const result = await moderationService.uploadWithModeration(uri);
-            
-            // Update the specific photo's moderation status
-            setPhotos(prev => {
-              const updated = [...prev];
-              updated[actualIndex] = {
-                ...updated[actualIndex],
-                moderationStatus:
-                  result.moderation_status === 'APPROVED' || result.moderation_status === 'SAFE'
-                    ? 'APPROVED'
-                    : result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE'
-                    ? 'REJECTED'
-                    : 'PENDING',
-                moderationReason: result.moderation_reason,
-                imageUrl: result.image_url,
-              };
-              return updated;
-            });
-
-            // Show alert for rejected images
-            if (result.status === 'rejected' || result.moderation_status === 'REJECTED') {
-              Alert.alert(
-                'Image Rejected',
-                result.moderation_reason || result.message || 'Image does not meet quality standards. Please select a different image.',
-              );
-            } else if (result.status === 'pending' || result.moderation_status === 'PENDING') {
-              // Silent for pending - user can still proceed
-            }
-          } catch (error: any) {
-            console.error('Image moderation error:', error);
-            setPhotos(prev => {
-              const updated = [...prev];
-              updated[actualIndex] = {
-                ...updated[actualIndex],
-                moderationStatus: 'REJECTED',
-                moderationReason: error.message || 'Failed to validate image',
-              };
-              return updated;
-            });
-            Alert.alert('Validation Error', error.message || 'Failed to validate image');
-          }
-        });
+        
+        console.log('[AddProperty] Added', newPhotos.length, 'images (auto-approved, base64 ready)');
       }
     });
   };
 
   const handleNext = () => {
-    // Validation
+    // Validation based on guide specifications
     if (currentStep === 1) {
       if (!propertyTitle.trim()) {
         Alert.alert('Error', 'Please enter property title');
         return;
       }
-      if (!propertyCategory) {
+      if (propertyTitle.trim().length > 255) {
+        Alert.alert('Error', 'Title must be less than 255 characters');
+        return;
+      }
+      if (!propertyType) {
         Alert.alert('Error', 'Please select property type');
         return;
       }
@@ -337,12 +233,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         Alert.alert('Error', 'Please enter state');
         return;
       }
-      if (!facing) {
+      if (fieldVisibility.showFacing && !facing) {
         Alert.alert('Error', 'Please select facing direction');
         return;
       }
-      const fieldVisibility = getFieldVisibility();
-      if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyCategory !== 'studio-apartment') {
+      if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment') {
         Alert.alert('Error', 'Please select number of bedrooms');
         return;
       }
@@ -354,7 +249,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         Alert.alert('Error', `Please enter ${fieldVisibility.areaLabel.toLowerCase()}`);
         return;
       }
-      if (fieldVisibility.furnishingRequired && !furnishing) {
+      const areaValue = parseFloat(builtUpArea);
+      if (isNaN(areaValue) || areaValue <= 0) {
+        Alert.alert('Error', `${fieldVisibility.areaLabel} must be a positive number`);
+        return;
+      }
+      if (fieldVisibility.showFurnishing && !furnishing) {
         Alert.alert('Error', 'Please select furnishing status');
         return;
       }
@@ -366,6 +266,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
       if (description.trim().length < 100) {
         Alert.alert('Error', 'Description must be at least 100 characters');
+        return;
+      }
+      if (description.trim().length > 1000) {
+        Alert.alert('Error', 'Description cannot exceed 1000 characters');
         return;
       }
       // Check for mobile numbers (Indian format: 10 digits, may have +91)
@@ -383,7 +287,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     }
     if (currentStep === 5) {
       if (!expectedPrice.trim()) {
-        Alert.alert('Error', 'Please enter expected price');
+        Alert.alert('Error', propertyStatus === 'sale' ? 'Please enter expected price' : 'Please enter monthly rent');
+        return;
+      }
+      const priceValue = parseFloat(expectedPrice.replace(/[^0-9.]/g, ''));
+      if (isNaN(priceValue) || priceValue <= 0) {
+        Alert.alert('Error', 'Price must be a positive number');
         return;
       }
     }
@@ -407,122 +316,85 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Map property category to database property_type
-      const propertyTypeMap: {[key: string]: string} = {
-        'apartment': 'Apartment',
-        'villa': 'Villa / Banglow',
-        'independent-house': 'Independent House',
-        'rowhouse': 'Row House/ Farm House',
-        'penthouse': 'Penthouse',
-        'studio-apartment': 'Studio Apartment',
-        'commercial-office': 'Commercial Office',
-        'commercial-shop': 'Commercial Shop',
-        'warehouse-godown': 'Warehouse / Godown',
-        'plot-land': 'Plot / Land / Industrial Property',
-        'pg-hostel': 'PG / Hostel',
-      };
+      // Collect images as base64 strings (auto-approved, skip moderation)
+      // According to guide: images can be sent as URLs or base64 strings in the request body
+      // For now, we're using base64 strings for all approved images
+      const imageBase64Strings = photos
+        .filter(p => p.moderationStatus === 'APPROVED' && p.base64) // Only include approved images with base64
+        .map(p => p.base64!)
+        .filter((base64): base64 is string => base64 !== undefined && base64 !== null);
+      
+      console.log('[AddProperty] Total photos:', photos.length, 'Approved photos with base64:', imageBase64Strings.length);
 
+      // Property type is already in the correct format from guide
       const propertyData = {
-        title: propertyTitle,
-        status: propertyType === 'sell' ? 'sale' : 'rent',
-        property_type: propertyTypeMap[propertyCategory] || propertyCategory,
-        location: location,
-        state: state || null,
-        additional_address: additionalAddress || null,
+        title: propertyTitle.trim(),
+        status: propertyStatus, // 'sale' or 'rent'
+        property_type: propertyType, // Already in guide format (e.g., 'Apartment', 'Villa / Banglow')
+        location: location.trim(),
+        state: state.trim(),
+        additional_address: additionalAddress.trim() || null,
         latitude: latitude || null,
         longitude: longitude || null,
-        bedrooms: bedrooms?.toString() || (propertyCategory === 'studio-apartment' ? '0' : null),
+        bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
         bathrooms: bathrooms?.toString() || null,
         balconies: balconies?.toString() || null,
         area: parseFloat(builtUpArea) || 0,
         carpet_area: carpetArea ? parseFloat(carpetArea) : null,
-        floor: floor || null,
+        floor: floor.trim() || null,
         total_floors: totalFloors ? parseInt(totalFloors) : null,
         facing: facing || null,
         age: propertyAge || null,
         furnishing: furnishing || null,
-        description: description || null,
+        description: description.trim(),
         price: parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0,
-        price_negotiable: priceNegotiable ? 1 : 0,
-        deposit_amount: propertyType === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : null,
+        price_negotiable: priceNegotiable,
+        deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : null,
         maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
         amenities: selectedAmenities,
+        // Include images as base64 strings in the request (as per guide)
+        images: imageBase64Strings.length > 0 ? imageBase64Strings : undefined,
       };
 
-      // Create property first
-      const response = await propertyService.createProperty(propertyData);
+      console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
+      console.log('[AddProperty] Images included as base64:', imageBase64Strings.length);
+      console.log('[AddProperty] Property data:', JSON.stringify({...propertyData, images: `[${imageBase64Strings.length} base64 images]`}, null, 2));
+
+      // Create property with images included in request (as per guide)
+      // Use 'seller' userType to use correct endpoint
+      const response: any = await propertyService.createProperty(propertyData, 'seller');
       
-      if (response.success) {
-        const propertyId = response.data?.property_id || response.data?.id || response.data?.property?.id;
+      console.log('[AddProperty] Property creation response:', JSON.stringify(response, null, 2));
+      
+      if (response && response.success) {
+        // Property created successfully with images (all auto-approved)
+        const imageCount = imageBase64Strings.length;
+        const propertyData = response.data?.property || response.data;
         
-        // Images are already validated through moderation when selected
-        // Only upload approved images or re-upload if needed
-        if (propertyId && photos.length > 0) {
-          try {
-            const approvedPhotos = photos.filter(
-              p => p.moderationStatus === 'APPROVED' && p.imageUrl
-            );
-            const pendingPhotos = photos.filter(
-              p => p.moderationStatus === 'PENDING' && p.imageUrl
-            );
-            const rejectedPhotos = photos.filter(p => p.moderationStatus === 'REJECTED');
-            
-            // Re-upload images that don't have imageUrl yet (shouldn't happen, but safety check)
-            const photosNeedingUpload = photos.filter(
-              p => (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') && !p.imageUrl
-            );
-            
-            if (photosNeedingUpload.length > 0) {
-              const uploadResults = await Promise.all(
-                photosNeedingUpload.map(photo => 
-                  moderationService.uploadWithModeration(photo.uri, propertyId)
-                )
-              );
-              
-              // Update photos with image URLs
-              uploadResults.forEach((result, index) => {
-                const photoIndex = photos.findIndex(p => p.uri === photosNeedingUpload[index].uri);
-                if (photoIndex >= 0 && result.image_url) {
-                  setPhotos(prev => {
-                    const updated = [...prev];
-                    updated[photoIndex] = {
-                      ...updated[photoIndex],
-                      imageUrl: result.image_url,
-                    };
-                    return updated;
-                  });
-                }
-              });
-            }
-            
-            const totalApproved = approvedPhotos.length;
-            const totalPending = pendingPhotos.length;
-            const totalRejected = rejectedPhotos.length;
-            
-            if (totalRejected > 0) {
-              Alert.alert(
-                'Image Moderation',
-                `${totalRejected} image(s) were rejected and removed. ${totalApproved} approved, ${totalPending} pending review.`
-              );
-            } else if (totalPending > 0) {
-              Alert.alert(
-                'Image Moderation',
-                `${totalPending} image(s) are pending admin review. ${totalApproved} approved.`
-              );
-            } else if (totalApproved > 0) {
-              console.log('[AddProperty] All images uploaded and approved successfully');
-            }
-          } catch (imageError: any) {
-            console.error('[AddProperty] Error uploading images:', imageError);
-            Alert.alert('Warning', 'Property created but some images failed to upload. You can add images later.');
+        // Log returned property data to verify images were saved
+        if (propertyData) {
+          console.log('[AddProperty] Property created with ID:', propertyData.id || propertyData.property_id);
+          console.log('[AddProperty] Property cover_image:', propertyData.cover_image);
+          console.log('[AddProperty] Property images array:', propertyData.images);
+          
+          if (!propertyData.cover_image && propertyData.images && propertyData.images.length > 0) {
+            console.warn('[AddProperty] Warning: Property created but cover_image not set. First image:', propertyData.images[0]);
+          }
+          if (imageCount > 0 && (!propertyData.cover_image && !propertyData.images)) {
+            console.error('[AddProperty] Error: Images were sent but not returned in response!');
           }
         }
         
-        Alert.alert('Success', 'Property listed successfully!', [
-          {text: 'OK', onPress: () => navigation.goBack()},
-        ]);
+        Alert.alert(
+          'Success', 
+          `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
+          [{text: 'OK', onPress: () => navigation.goBack()}]
+        );
       } else {
-        Alert.alert('Error', response.message || 'Failed to create property');
+        const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
+        console.error('[AddProperty] Property creation failed:', errorMessage);
+        console.error('[AddProperty] Full error response:', JSON.stringify(response, null, 2));
+        Alert.alert('Error', errorMessage);
       }
     } catch (error: any) {
       console.error('Submit error:', error);
@@ -567,12 +439,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>I want to</Text>
+              <Text style={styles.label}>I want to <Text style={styles.required}>*</Text></Text>
               <View style={styles.typeButtonsContainer}>
                 <TouchableOpacity
                   style={styles.typeButton}
-                  onPress={() => setPropertyType('sell')}>
-                  {propertyType === 'sell' ? (
+                  onPress={() => setPropertyStatus('sale')}>
+                  {propertyStatus === 'sale' ? (
                     <LinearGradient
                       colors={['#8B5CF6', '#6D28D9']}
                       start={{x: 0, y: 0}}
@@ -591,20 +463,20 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
                 <TouchableOpacity
                   style={styles.typeButton}
-                  onPress={() => setPropertyType('rent')}>
-                  {propertyType === 'rent' ? (
+                  onPress={() => setPropertyStatus('rent')}>
+                  {propertyStatus === 'rent' ? (
                     <LinearGradient
                       colors={['#8B5CF6', '#6D28D9']}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 0}}
                       style={styles.typeButtonGradient}>
                       <Text style={styles.typeButtonIcon}>🔑</Text>
-                      <Text style={styles.typeButtonTextSelected}>Rent / Lease</Text>
+                      <Text style={styles.typeButtonTextSelected}>Rent</Text>
                     </LinearGradient>
                   ) : (
                     <View style={styles.typeButtonUnselected}>
                       <Text style={styles.typeButtonIcon}>🔑</Text>
-                      <Text style={styles.typeButtonText}>Rent / Lease</Text>
+                      <Text style={styles.typeButtonText}>Rent</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -615,192 +487,38 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.label}>
                 Property Type <Text style={styles.required}>*</Text>
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.propertyTypeScroll}>
-                <View style={styles.propertyTypeGrid}>
-                  {/* Residential Properties */}
+              <View style={styles.propertyTypeGrid}>
+                {PROPERTY_TYPES.map((type) => (
                   <TouchableOpacity
+                    key={type.value}
                     style={[
                       styles.propertyTypeButton,
-                      propertyCategory === 'apartment' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('apartment')}>
-                    <Text style={styles.propertyTypeIcon}>🏢</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'apartment' && styles.propertyTypeTextActive,
-                      ]}>
-                      Apartment
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'villa' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('villa')}>
-                    <Text style={styles.propertyTypeIcon}>🏡</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'villa' && styles.propertyTypeTextActive,
-                      ]}>
-                      Villa / Banglow
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'independent-house' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('independent-house')}>
-                    <Text style={styles.propertyTypeIcon}>🏘️</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'independent-house' && styles.propertyTypeTextActive,
-                      ]}>
-                      Independent House
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'rowhouse' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('rowhouse')}>
-                    <Text style={styles.propertyTypeIcon}>🏘️</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'rowhouse' && styles.propertyTypeTextActive,
-                      ]}>
-                      Row House/ Farm House
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'penthouse' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('penthouse')}>
-                    <Text style={styles.propertyTypeIcon}>🌆</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'penthouse' && styles.propertyTypeTextActive,
-                      ]}>
-                      Penthouse
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'studio-apartment' && styles.propertyTypeButtonActive,
+                      propertyType === type.value && styles.propertyTypeButtonActive,
                     ]}
                     onPress={() => {
-                      setPropertyCategory('studio-apartment');
-                      setBedrooms(0); // Auto-set to 0 for studio
+                      setPropertyType(type.value);
+                      // Auto-set bedrooms to 0 for Studio Apartment
+                      if (type.value === 'Studio Apartment') {
+                        setBedrooms(0);
+                      } else {
+                        // Reset bedrooms for other types
+                        setBedrooms(null);
+                      }
+                      // Clear amenities when property type changes (they'll be filtered)
+                      setSelectedAmenities([]);
                     }}>
-                    <Text style={styles.propertyTypeIcon}>🛏️</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'studio-apartment' && styles.propertyTypeTextActive,
-                      ]}>
-                      Studio Apartment
-                    </Text>
+                    <Text style={styles.propertyTypeIcon}>{type.icon}</Text>
+                      <Text
+                        style={[
+                          styles.propertyTypeText,
+                          propertyType === type.value && styles.propertyTypeTextActive,
+                        ]}
+                        numberOfLines={2}>
+                        {type.label}
+                      </Text>
                   </TouchableOpacity>
-
-                  {/* Commercial Properties */}
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'commercial-office' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('commercial-office')}>
-                    <Text style={styles.propertyTypeIcon}>🏢</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'commercial-office' && styles.propertyTypeTextActive,
-                      ]}>
-                      Commercial Office
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'commercial-shop' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('commercial-shop')}>
-                    <Text style={styles.propertyTypeIcon}>🏪</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'commercial-shop' && styles.propertyTypeTextActive,
-                      ]}>
-                      Commercial Shop
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'warehouse-godown' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('warehouse-godown')}>
-                    <Text style={styles.propertyTypeIcon}>🏪</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'warehouse-godown' && styles.propertyTypeTextActive,
-                      ]}>
-                      Warehouse / Godown
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Land */}
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'plot-land' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('plot-land')}>
-                    <Text style={styles.propertyTypeIcon}>📐</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'plot-land' && styles.propertyTypeTextActive,
-                      ]}>
-                      Plot / Land
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* PG/Hostel */}
-                  <TouchableOpacity
-                    style={[
-                      styles.propertyTypeButton,
-                      propertyCategory === 'pg-hostel' && styles.propertyTypeButtonActive,
-                    ]}
-                    onPress={() => setPropertyCategory('pg-hostel')}>
-                    <Text style={styles.propertyTypeIcon}>🛏️</Text>
-                    <Text
-                      style={[
-                        styles.propertyTypeText,
-                        propertyCategory === 'pg-hostel' && styles.propertyTypeTextActive,
-                      ]}>
-                      PG / Hostel
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
+                ))}
+              </View>
             </View>
           </View>
         );
@@ -823,12 +541,26 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter locality, area or landmark"
                   placeholderTextColor={colors.textSecondary}
                   value={location}
-                  onChangeText={setLocation}
+                  onChangeText={(text) => {
+                    setLocation(text);
+                    // Reset locationSelected when user starts typing/editing
+                    if (locationSelected) {
+                      setLocationSelected(false);
+                    }
+                  }}
+                  onFocus={() => {
+                    // Allow autosuggest when user focuses on the input
+                    // Only if they haven't selected a location or are editing
+                    if (locationSelected && location.length >= 2) {
+                      setLocationSelected(false);
+                    }
+                  }}
                 />
                 <LocationAutoSuggest
                   query={location}
                   onSelect={(locationData) => {
                     setLocation(locationData.placeName || locationData.name);
+                    setLocationSelected(true); // Mark location as selected
                     if (locationData.coordinates) {
                       setLatitude(locationData.coordinates[1]);
                       setLongitude(locationData.coordinates[0]);
@@ -841,8 +573,33 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       }
                     }
                   }}
-                  visible={location.length >= 2}
+                  visible={location.length >= 2 && !locationSelected}
                 />
+              </View>
+              
+              {/* Property Location on Map - Below Location Input */}
+              <View style={styles.mapContainer}>
+                <Text style={styles.mapLabel}>Property Location on Map (Optional)</Text>
+                <TouchableOpacity 
+                  style={styles.mapButton}
+                  onPress={() => setLocationPickerVisible(true)}>
+                  <LinearGradient
+                    colors={['#8B5CF6', '#6D28D9']}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 0}}
+                    style={styles.mapButtonGradient}>
+                    <Text style={styles.mapButtonIcon}>📍</Text>
+                    <Text style={styles.mapButtonText}>Add Location on Map</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <Text style={styles.mapButtonSubtext}>
+                  Select exact location on map for better visibility
+                </Text>
+                {latitude && longitude && (
+                  <Text style={styles.coordinateText}>
+                    Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -882,30 +639,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Property Location on Map (Optional)</Text>
-              <TouchableOpacity 
-                style={styles.mapButton}
-                onPress={() => setLocationPickerVisible(true)}>
-                <LinearGradient
-                  colors={['#8B5CF6', '#6D28D9']}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 0}}
-                  style={styles.mapButtonGradient}>
-                  <Text style={styles.mapButtonIcon}>📍</Text>
-                  <Text style={styles.mapButtonText}>Add Location on Map</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-              <Text style={styles.mapButtonSubtext}>
-                Select exact location on map for better visibility
-              </Text>
-              {latitude && longitude && (
-                <Text style={styles.coordinateText}>
-                  Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
-                </Text>
-              )}
-            </View>
-
             <LocationPicker
               visible={locationPickerVisible}
               initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
@@ -923,10 +656,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             {fieldVisibility.showBedrooms && (
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>
-                  {propertyCategory === 'studio-apartment' ? 'Studio' : 'Bedrooms'} 
+                  {propertyType === 'Studio Apartment' ? 'Studio' : 'Bedrooms'} 
                   {fieldVisibility.bedroomsRequired && <Text style={styles.required}>*</Text>}
                 </Text>
-                {propertyCategory === 'studio-apartment' ? (
+                {propertyType === 'Studio Apartment' ? (
                   <View style={styles.studioButton}>
                     <Text style={styles.studioButtonText}>Studio (0 Bedrooms)</Text>
                   </View>
@@ -1325,7 +1058,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </TouchableOpacity>
             </View>
 
-            {propertyType === 'rent' && (
+            {propertyStatus === 'rent' && (
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Security Deposit</Text>
                 <View style={styles.priceInputContainer}>
@@ -1373,15 +1106,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Type:</Text>
                 <Text style={styles.summaryValue}>
-                  {propertyCategory === 'apartment'
-                    ? 'Apartment'
-                    : propertyCategory === 'villa'
-                    ? 'Villa / Banglow'
-                    : propertyCategory === 'house'
-                    ? 'Independent House'
-                    : propertyCategory === 'rowhouse'
-                    ? 'Row House/ Farm House'
-                    : 'N/A'}
+                  {propertyType || 'N/A'}
                 </Text>
               </View>
               <View style={styles.summaryRow}>
@@ -1556,6 +1281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    minHeight: 70,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -1745,10 +1471,12 @@ const styles = StyleSheet.create({
   propertyTypeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    marginHorizontal: -spacing.xs / 2, // Negative margin for spacing
   },
   propertyTypeButton: {
-    width: '47%',
+    width: '48%', // Two columns with space between
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1757,6 +1485,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 100,
+    marginHorizontal: spacing.xs / 2, // Half margin on each side
+    marginBottom: spacing.md,
   },
   propertyTypeButtonActive: {
     borderColor: '#8B5CF6',
@@ -1778,6 +1508,19 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     fontWeight: '600',
   },
+  mapContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  mapLabel: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: spacing.sm,
+  },
   mapButton: {
     borderRadius: borderRadius.md,
     overflow: 'hidden',
@@ -1788,10 +1531,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
-    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
   },
   mapButtonIcon: {
     fontSize: 18,
+    marginRight: spacing.xs,
   },
   mapButtonText: {
     ...typography.body,
@@ -1803,6 +1547,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 12,
+    marginTop: spacing.xs,
   },
   numberButtonsContainer: {
     flexDirection: 'row',
@@ -1873,10 +1618,14 @@ const styles = StyleSheet.create({
   amenitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    justifyContent: 'flex-start',
+    marginTop: spacing.sm,
+    marginHorizontal: -spacing.xs, // Negative margin for spacing
   },
   amenityButton: {
-    width: '30%',
+    width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 4) / 3, // Responsive width for 3 columns
+    minWidth: 90, // Minimum width for small screens
+    maxWidth: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 4) / 3, // Max width same as width
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1885,6 +1634,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 90,
+    marginHorizontal: spacing.xs / 2, // Half margin on each side
+    marginBottom: spacing.md, // Bottom margin for wrapping
   },
   amenityButtonActive: {
     borderColor: '#8B5CF6',
@@ -2184,9 +1935,6 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
-  },
-  propertyTypeScroll: {
-    marginTop: spacing.sm,
   },
   locationInputContainer: {
     position: 'relative',

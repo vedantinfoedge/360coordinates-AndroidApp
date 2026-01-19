@@ -1,5 +1,11 @@
 import api from './api.service';
 import {API_ENDPOINTS} from '../config/api.config';
+import {analyzeDetection} from './detection.service';
+import {
+  ModerationApiResponse,
+  ModerationData,
+  EnhancedImageUploadResult,
+} from './moderation.types';
 
 export type ModerationStatus = 'SAFE' | 'UNSAFE' | 'PENDING';
 
@@ -14,12 +20,15 @@ export interface ModerationResult {
   message?: string;
 }
 
+// Legacy interface for backwards compatibility
 export interface ImageUploadResult {
   status: 'success' | 'approved' | 'pending' | 'rejected' | 'failed';
   message: string;
   image_url?: string;
   moderation_status?: 'SAFE' | 'UNSAFE' | 'PENDING' | 'APPROVED' | 'REJECTED';
   moderation_reason?: string;
+  // Optional detection details (for new implementation)
+  detection?: ReturnType<typeof analyzeDetection>;
 }
 
 export const moderationService = {
@@ -48,9 +57,10 @@ export const moderationService = {
       });
 
       // Handle different response statuses from moderation endpoint
-      // Backend returns: { status: "success"|"error", message: "...", data: { moderation_status, image_url, ... } }
+      // Backend returns: { status: "success"|"error", message: "...", data: { moderation_status, image_url, faces, objects, labels, ... } }
       if (response.success && response.data) {
-        const moderationStatus = response.data.moderation_status || response.data.status;
+        const moderationData: ModerationData = response.data;
+        const moderationStatus = moderationData.moderation_status || (response as any).status;
         
         // Map backend status to our format
         let status: 'success' | 'approved' | 'pending' | 'rejected' | 'failed' = 'success';
@@ -62,20 +72,29 @@ export const moderationService = {
           status = 'pending';
         }
 
+        // Analyze detection data (faces, objects, labels)
+        const detection = analyzeDetection(moderationData);
+
         return {
           status,
           message: response.message || 'Image uploaded successfully',
-          image_url: response.data.image_url || response.data.url,
+          image_url: moderationData.image_url || (response.data as any).url,
           moderation_status: moderationStatus,
-          moderation_reason: response.data.moderation_reason || response.data.reason_code,
+          moderation_reason: moderationData.moderation_reason || (response.data as any).reason_code || (response as ModerationApiResponse).moderation_reason,
+          detection, // Include detection analysis
+          rawData: moderationData, // Include raw data for debugging
         };
       } else {
         // Error response from backend
+        const errorData = response.data as ModerationData | undefined;
+        const detection = errorData ? analyzeDetection(errorData) : undefined;
+        
         return {
           status: 'rejected',
           message: response.message || 'Image rejected by moderation',
-          moderation_status: response.data?.moderation_status || 'REJECTED',
-          moderation_reason: response.data?.moderation_reason || response.data?.reason_code,
+          moderation_status: errorData?.moderation_status || 'REJECTED',
+          moderation_reason: errorData?.moderation_reason || (response.data as any)?.reason_code || (response as ModerationApiResponse).moderation_reason,
+          detection, // Include detection even for errors
         };
       }
     } catch (error: any) {

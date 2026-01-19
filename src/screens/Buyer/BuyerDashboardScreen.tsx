@@ -13,6 +13,7 @@ import {
   Alert,
   Share,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -23,7 +24,6 @@ import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
-import ProjectCard from '../../components/ProjectCard';
 import {buyerService, Property} from '../../services/buyer.service';
 import {favoriteService} from '../../services/favorite.service';
 import {fixImageUrl} from '../../utils/imageHelper';
@@ -41,35 +41,34 @@ type Props = {
 interface TopCity {
   id: string;
   name: string;
-  image: string;
+  image: any; // Image source (require() result)
 }
 
 const TOP_CITIES: TopCity[] = [
-  {id: 'mumbai', name: 'Mumbai', image: '🏙️'},
-  {id: 'delhi', name: 'Delhi', image: '🏛️'},
-  {id: 'bangalore', name: 'Bangalore', image: '🌆'},
-  {id: 'hyderabad', name: 'Hyderabad', image: '🏢'},
-  {id: 'chennai', name: 'Chennai', image: '🌊'},
-  {id: 'pune', name: 'Pune', image: '🏘️'},
-  {id: 'kolkata', name: 'Kolkata', image: '🎭'},
-  {id: 'ahmedabad', name: 'Ahmedabad', image: '🏗️'},
+  {id: 'mumbai', name: 'Mumbai', image: require('../../assets/Mumbai.png')},
+  {id: 'delhi', name: 'Delhi', image: require('../../assets/Delhi.png')},
+  {id: 'bangalore', name: 'Bangalore', image: require('../../assets/Bangalore.png')},
+  {id: 'hyderabad', name: 'Hyderabad', image: require('../../assets/Hyderabad.png')},
+  {id: 'chennai', name: 'Chennai', image: require('../../assets/Chennai.png')},
+  {id: 'pune', name: 'Pune', image: require('../../assets/Pune.png')},
+  {id: 'kolkata', name: 'Kolkata', image: require('../../assets/kolkata.png')},
+  {id: 'ahmedabad', name: 'Ahmedabad', image: require('../../assets/Ahmedabad.png')},
 ];
 
 type ListingType = 'all' | 'sale' | 'rent' | 'pg';
 
 const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
+  const insets = useSafeAreaInsets();
   const [listingType, setListingType] = useState<ListingType>('all');
   const [properties, setProperties] = useState<Property[]>([]);
-  const [upcomingProjects, setUpcomingProjects] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
-  const [projectsLoading, setProjectsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLocation, setSearchLocation] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Check user type access
   useEffect(() => {
@@ -99,40 +98,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     if (user && user.user_type !== 'agent') {
       loadDashboardData();
     
-      // Auto-refresh every 60 seconds for all data
+      // Auto-refresh every 10 seconds for all data
       refreshIntervalRef.current = setInterval(() => {
         loadDashboardData(false); // Silent refresh
-      }, 60000);
-
-      // Auto-refresh upcoming projects every 30 seconds for real-time updates
-      const projectsInterval = setInterval(async () => {
-        try {
-          setProjectsLoading(true);
-          const projectsResponse = await buyerService.getProperties({
-            limit: 20,
-            project_type: 'upcoming',
-          });
-          if (projectsResponse.success && projectsResponse.data) {
-            const allProjects = projectsResponse.data.properties || [];
-            const upcoming = allProjects.filter((p: any) => 
-              p.project_type === 'upcoming' || 
-              p.status === 'upcoming' ||
-              p.type === 'upcoming'
-            );
-            setUpcomingProjects(upcoming.length > 0 ? upcoming : allProjects.slice(0, 5));
-          }
-        } catch (error) {
-          console.error('Error refreshing upcoming projects:', error);
-        } finally {
-          setProjectsLoading(false);
-        }
-      }, 30000); // Refresh every 30 seconds
+      }, 10000);
 
       return () => {
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
         }
-        clearInterval(projectsInterval);
       };
     }
   }, [user, listingType]); // Reload when listing type changes
@@ -154,17 +128,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
       // Note: 'all' shows all properties (no filter)
       
-      // Load properties and projects in parallel
-      const [propertiesResponse, projectsResponse] = await Promise.all([
-        buyerService.getProperties({
-          limit: 10,
-          ...(statusFilter && {status: statusFilter}),
-        }),
-        buyerService.getProperties({
-          limit: 20,
-          project_type: 'upcoming', // Filter for upcoming projects
-        }),
-      ]);
+      // Load properties
+      const propertiesResponse = await buyerService.getProperties({
+        limit: 10,
+        ...(statusFilter && {status: statusFilter}),
+      });
 
       if (propertiesResponse.success && propertiesResponse.data) {
         let filteredProperties = propertiesResponse.data.properties || [];
@@ -186,17 +154,6 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           .filter(p => p.is_favorite)
           .map(p => p.id);
         setFavoriteIds(new Set(favorites));
-      }
-
-      if (projectsResponse.success && projectsResponse.data) {
-        const allProjects = projectsResponse.data.properties || [];
-        // Filter for upcoming projects if backend doesn't filter
-        const upcoming = allProjects.filter((p: any) => 
-          p.project_type === 'upcoming' || 
-          p.status === 'upcoming' ||
-          p.type === 'upcoming'
-        );
-        setUpcomingProjects(upcoming.length > 0 ? upcoming : allProjects.slice(0, 5));
       }
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
@@ -226,29 +183,26 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       // Close location suggestions
       setShowLocationSuggestions(false);
       
-      // Get the search location text (trimmed)
+      // Get the search location text (trimmed) - allow empty search now
+      // If empty, user will be redirected to SearchResultsScreen showing all available properties
       const searchLocationText = (searchLocation || searchQuery || '').trim();
-      
-      // If no location is provided, show an alert
-      if (!searchLocationText) {
-        Alert.alert('Search Required', 'Please enter a location to search for properties.');
-        return;
-      }
       
       // Navigate to SearchResults with search params (website-style API params)
       const params: any = {};
       
-      // Location (preferred over city according to website spec) - this is the key parameter for searching
-      params.location = searchLocationText;
-      
-      // Also set searchQuery for backward compatibility
-      params.searchQuery = searchLocationText;
-      
-      // Extract city from location if it's a city name (optional, for better filtering)
-      const locationText = searchLocationText.toLowerCase();
-      const matchedCity = TOP_CITIES.find(city => city.name.toLowerCase() === locationText);
-      if (matchedCity) {
-        params.city = matchedCity.name;
+      // Location (preferred over city according to website spec) - optional now
+      // If no location provided, SearchResults will show all available properties
+      if (searchLocationText) {
+        params.location = searchLocationText;
+        // Also set searchQuery for backward compatibility
+        params.searchQuery = searchLocationText;
+        
+        // Extract city from location if it's a city name (optional, for better filtering)
+        const locationText = searchLocationText.toLowerCase();
+        const matchedCity = TOP_CITIES.find(city => city.name.toLowerCase() === locationText);
+        if (matchedCity) {
+          params.city = matchedCity.name;
+        }
       }
       
       // Add listing type filter
@@ -266,6 +220,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
       
       console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
+      // Always navigate to SearchResults - even without location input, it will show all properties
       navigation.navigate('SearchResults', params as never);
     } catch (error: any) {
       console.error('Error navigating to search:', error);
@@ -275,7 +230,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
   const handleToggleFavorite = async (propertyId: number) => {
     try {
-      const response = await buyerService.toggleFavorite(propertyId);
+      const response = await buyerService.toggleFavorite(propertyId) as any;
       if (response && response.success) {
         // Determine favorite status from response
         const isFavorite = response.data?.is_favorite ?? response.data?.favorite ?? !favoriteIds.has(propertyId);
@@ -299,7 +254,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         
         console.log(`Property ${propertyId} ${isFavorite ? 'added to' : 'removed from'} favorites`);
       } else {
-        Alert.alert('Error', response?.message || 'Failed to update favorite');
+        Alert.alert('Error', (response as any)?.message || 'Failed to update favorite');
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
@@ -330,36 +285,35 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const renderPropertyCard = ({item}: {item: Property}) => (
-    <PropertyCard
-      image={fixImageUrl(item.cover_image || item.images?.[0])}
-      name={item.title}
-      location={item.location}
-      price={formatters.price(item.price, item.status === 'rent')}
-      type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-      onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
-      onFavoritePress={() => handleToggleFavorite(item.id)}
-      onSharePress={() => handleShareProperty(item)}
-      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
-      property={item}
-    />
-  );
-
-  const renderProjectCard = ({item}: {item: Property}) => (
-    <ProjectCard
-      name={item.title}
-      city={item.location}
-      image={fixImageUrl(item.cover_image || item.images?.[0])}
-      onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
-    />
-  );
+  const renderPropertyCard = ({item}: {item: Property}) => {
+    const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+    return (
+      <PropertyCard
+        image={imageUrl || undefined}
+        name={item.title}
+        location={item.location}
+        price={formatters.price(item.price, item.status === 'rent')}
+        type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
+        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+        onFavoritePress={() => handleToggleFavorite(item.id)}
+        onSharePress={() => handleShareProperty(item)}
+        isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+        property={item}
+        style={styles.propertyCardStyle}
+      />
+    );
+  };
 
   const renderCityCard = ({item}: {item: TopCity}) => (
     <TouchableOpacity
       style={styles.cityCard}
       onPress={() => handleCityPress(item.name)}>
       <View style={styles.cityImageContainer}>
-        <Text style={styles.cityEmoji}>{item.image}</Text>
+        <Image 
+          source={item.image} 
+          style={styles.cityImage}
+          resizeMode="cover"
+        />
       </View>
       <Text style={styles.cityName}>{item.name}</Text>
     </TouchableOpacity>
@@ -395,7 +349,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + 70}]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -530,45 +484,16 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           ) : properties.length > 0 ? (
             <FlatList
               data={properties}
-              horizontal
-              showsHorizontalScrollIndicator={false}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
               keyExtractor={item => String(item.id)}
               contentContainerStyle={styles.propertiesList}
               renderItem={renderPropertyCard}
+              ItemSeparatorComponent={() => <View style={styles.propertySeparator} />}
             />
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No properties found</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Upcoming Projects Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Upcoming Projects</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('CityProjects' as never)}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          {projectsLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Loading projects...</Text>
-            </View>
-          ) : upcomingProjects.length > 0 ? (
-            <FlatList
-              data={upcomingProjects}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={item => String(item.id)}
-              contentContainerStyle={styles.projectsList}
-              renderItem={renderProjectCard}
-            />
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No projects available</Text>
             </View>
           )}
         </View>
@@ -755,12 +680,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   propertiesList: {
-    paddingLeft: spacing.lg,
+    paddingHorizontal: spacing.lg,
     gap: spacing.md,
   },
-  projectsList: {
-    paddingLeft: spacing.lg,
-    gap: spacing.md,
+  propertyCardStyle: {
+    width: '100%',
+    marginRight: 0,
+  },
+  propertySeparator: {
+    height: spacing.md,
   },
   citiesList: {
     paddingLeft: spacing.lg,
@@ -770,6 +698,8 @@ const styles = StyleSheet.create({
     width: 100,
     alignItems: 'center',
     marginRight: spacing.md,
+    paddingTop: spacing.xxl,
+    paddingHorizontal:spacing.md,
   },
   cityImageContainer: {
     width: 100,
@@ -781,9 +711,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  cityEmoji: {
-    fontSize: 40,
+  cityImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: borderRadius.lg,
   },
   cityName: {
     ...typography.body,

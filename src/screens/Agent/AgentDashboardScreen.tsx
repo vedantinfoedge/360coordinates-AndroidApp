@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  ImageBackground,
+  Animated,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -61,11 +63,32 @@ interface RecentInquiry {
 const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [allProperties, setAllProperties] = useState<any[]>([]);
   const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
   const [recentInquiries, setRecentInquiries] = useState<RecentInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    // Entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   // Check user type access
   useEffect(() => {
@@ -113,10 +136,10 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
     if (user && user.user_type === 'agent') {
       loadDashboardData();
     
-      // Auto-refresh every 60 seconds
+      // Auto-refresh every 10 seconds
       refreshIntervalRef.current = setInterval(() => {
         loadDashboardData(false); // Silent refresh
-      }, 60000);
+      }, 10000);
 
       return () => {
         if (refreshIntervalRef.current) {
@@ -132,22 +155,79 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         setLoading(true);
       }
       
-      // Load dashboard stats (agents use same endpoint as sellers)
-      const statsResponse = await sellerService.getDashboardStats();
-      
-      if (statsResponse.success && statsResponse.data) {
-        setDashboardStats(statsResponse.data);
-        setRecentInquiries(statsResponse.data.recent_inquiries || []);
+      // Try to get stats from API, but we'll calculate from properties if not available
+      let apiStats: DashboardStats | null = null;
+      try {
+        const statsResponse: any = await sellerService.getDashboardStats();
+        
+        if (statsResponse && statsResponse.success && statsResponse.data) {
+          apiStats = statsResponse.data;
+          setRecentInquiries(statsResponse.data.recent_inquiries || []);
+        }
+      } catch (statsError: any) {
+        // If dashboard stats endpoint doesn't exist (404), we'll calculate from properties
+        if (statsError?.status !== 404 && statsError?.response?.status !== 404) {
+          console.warn('[AgentDashboard] Error loading API stats:', statsError);
+        }
       }
 
-      // Load recent properties (first 3)
+      // Load all properties to calculate dynamic stats
       const propertiesResponse = await sellerService.getProperties({
         page: 1,
-        limit: 3,
+        limit: 100, // Get all properties for stats calculation
       });
 
       if (propertiesResponse.success && propertiesResponse.data) {
         const properties = propertiesResponse.data.properties || propertiesResponse.data || [];
+        
+        // Store all properties for stats calculation
+        setAllProperties(properties);
+        
+        // Calculate dynamic stats from properties
+        const totalProperties = properties.length;
+        const activeProperties = properties.filter((prop: any) => {
+          const isActive = prop.is_active === 1 || prop.is_active === true || 
+                          prop.status === 'active' || prop.status === 1;
+          return isActive;
+        }).length;
+        
+        const totalViews = properties.reduce((sum: number, prop: any) => {
+          return sum + (prop.views_count || prop.views || prop.view_count || 0);
+        }, 0);
+        
+        const totalInquiries = properties.reduce((sum: number, prop: any) => {
+          return sum + (prop.inquiry_count || prop.inquiries || prop.inquiry_count || 0);
+        }, 0);
+        
+        const propertiesByStatus = {
+          sale: properties.filter((prop: any) => prop.status === 'sale' || prop.status === 'sell').length,
+          rent: properties.filter((prop: any) => prop.status === 'rent').length,
+        };
+        
+        // Use API stats if available, otherwise use calculated stats from properties
+        const finalStats: DashboardStats = apiStats ? {
+          ...apiStats,
+          // Override with calculated values for accuracy
+          total_properties: totalProperties,
+          active_properties: activeProperties,
+          total_views: totalViews,
+          total_inquiries: totalInquiries,
+          properties_by_status: propertiesByStatus,
+        } : {
+          total_properties: totalProperties,
+          active_properties: activeProperties,
+          total_inquiries: totalInquiries,
+          new_inquiries: 0,
+          total_views: totalViews,
+          views_percentage_change: 0,
+          properties_by_status: propertiesByStatus,
+          recent_inquiries: [],
+          subscription: null,
+        };
+        
+        setDashboardStats(finalStats);
+        
+        // Format recent properties (first 3)
         const formattedProperties: RecentProperty[] = properties.slice(0, 3).map((prop: any) => ({
           id: prop.id || prop.property_id,
           title: prop.title || prop.property_title || 'Untitled Property',
@@ -155,15 +235,16 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
           price: parseFloat(prop.price) || 0,
           status: prop.status === 'rent' ? 'rent' : 'sale',
           project_type: prop.project_type === 'upcoming' ? 'upcoming' : null,
-          cover_image: prop.cover_image || prop.image || prop.images?.[0],
-          views: prop.views || prop.view_count || 0,
+          cover_image: fixImageUrl(prop.cover_image || prop.image || prop.images?.[0]) || undefined,
+          views: prop.views || prop.view_count || prop.views_count || 0,
           inquiries: prop.inquiries || prop.inquiry_count || 0,
         }));
         setRecentProperties(formattedProperties);
       }
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
-      if (showLoading) {
+      // Only show alert for non-404 errors
+      if (showLoading && error?.status !== 404 && error?.response?.status !== 404) {
         Alert.alert('Error', error?.message || 'Failed to load dashboard data');
       }
     } finally {
@@ -179,18 +260,54 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
     loadDashboardData(false);
   };
 
-  const renderPropertyCard = ({item}: {item: RecentProperty}) => (
-    <TouchableOpacity
-      style={styles.propertyCard}
-      onPress={() =>
-        navigation.navigate('PropertyDetails', {propertyId: item.id})
-      }>
-      {item.cover_image && (
-        <Image
-          source={{uri: fixImageUrl(item.cover_image)}}
-          style={styles.propertyImage}
-        />
-      )}
+  const renderPropertyCard = ({item}: {item: RecentProperty}) => {
+    // Validate and fix image URL for Android - improved handling
+    let imageUrl: string | null = null;
+    if (item.cover_image) {
+      const trimmed = String(item.cover_image).trim();
+      if (trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') {
+        // Ensure URL is properly formatted for Android
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          imageUrl = trimmed;
+        } else {
+          // Re-fix the URL in case it wasn't properly fixed earlier
+          const fixed = fixImageUrl(trimmed);
+          if (fixed && (fixed.startsWith('http://') || fixed.startsWith('https://'))) {
+            imageUrl = fixed;
+          }
+        }
+      }
+    }
+    
+    return (
+      <TouchableOpacity
+        style={styles.propertyCard}
+        onPress={() =>
+          navigation.navigate('PropertyDetails', {propertyId: item.id})
+        }>
+        {imageUrl ? (
+          <Image
+            source={{uri: imageUrl}}
+            style={styles.propertyImage}
+            resizeMode="cover"
+            onError={(error) => {
+              console.error(`[AgentDashboard] Image load error for property ${item.id}:`, {
+                uri: imageUrl,
+                error: error.nativeEvent?.error || 'Unknown error',
+              });
+            }}
+            onLoadStart={() => {
+              console.log(`[AgentDashboard] Loading image for property ${item.id}:`, imageUrl);
+            }}
+            onLoadEnd={() => {
+              console.log(`[AgentDashboard] Image loaded successfully for property ${item.id}`);
+            }}
+          />
+        ) : (
+          <View style={styles.propertyImagePlaceholder}>
+            <Text style={styles.propertyImagePlaceholderText}>🏠</Text>
+          </View>
+        )}
       <View style={styles.propertyCardContent}>
         <View style={styles.propertyCardHeader}>
           <View style={styles.propertyCardInfo}>
@@ -237,7 +354,8 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         </Text>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   const renderInquiryCard = ({item}: {item: RecentInquiry}) => (
     <TouchableOpacity
@@ -349,29 +467,39 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }>
-        {/* Welcome Header */}
-        <View style={styles.welcomeHeader}>
-          <View>
-            <Text style={styles.greeting}>
-              Welcome back, {user?.name || 'Agent'}!
-            </Text>
-            <Text style={styles.subtitle}>
-              Here's what's happening with your properties today
-            </Text>
-          </View>
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={styles.addPropertyButton}
-              onPress={() => navigation.navigate('AddProperty')}>
-              <Text style={styles.addPropertyButtonText}>Add Property</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.addPropertyButton, styles.addProjectButton]}
-              onPress={() => navigation.navigate('AddProperty', {isUpcomingProject: true} as never)}>
-              <Text style={styles.addPropertyButtonText}>Add Project</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [{translateY: slideAnim}],
+          }}>
+          {/* Agent Header */}
+          <ImageBackground
+            source={require('../../assets/sellproperty.jpg')}
+            style={styles.agentHeader}
+            imageStyle={styles.agentHeaderImage}>
+            <View style={styles.agentHeaderOverlay}>
+              <View style={styles.agentHeaderContent}>
+                <Text style={styles.agentGreeting}>
+                  Welcome, {user?.full_name?.split(' ')[0] || 'Agent'}!
+                </Text>
+                <Text style={styles.agentSubtitle}>
+                  Manage your properties and track leads
+                </Text>
+              </View>
+              <View style={styles.actionButtonsContainer}>
+                <TouchableOpacity
+                  style={styles.addPropertyButton}
+                  onPress={() => navigation.navigate('AddProperty')}>
+                  <Text style={styles.addPropertyButtonText}>+ Add Property</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.addProjectButton}
+                  onPress={() => navigation.navigate('AddProperty', {isUpcomingProject: true} as never)}>
+                  <Text style={styles.addProjectButtonText}>+ Add Project</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ImageBackground>
 
         {/* Statistics Cards (2x2 Grid) */}
         <View style={styles.statsGrid}>
@@ -564,6 +692,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
             </View>
           )}
         </View>
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -591,41 +720,70 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  welcomeHeader: {
+  agentHeader: {
     marginBottom: spacing.xl,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    minHeight: 180,
   },
-  greeting: {
+  agentHeaderImage: {
+    borderRadius: borderRadius.xl,
+  },
+  agentHeaderOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    padding: spacing.lg,
+    minHeight: 180,
+    justifyContent: 'space-between',
+  },
+  agentHeaderContent: {
+    marginBottom: spacing.md,
+  },
+  agentGreeting: {
     ...typography.h1,
-    color: colors.text,
+    color: colors.surface,
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
-  subtitle: {
+  agentSubtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: colors.surface,
     fontSize: 14,
-    marginBottom: spacing.md,
+    opacity: 0.9,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
+    gap: spacing.md,
+    marginTop: spacing.sm,
   },
   addPropertyButton: {
     flex: 1,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addProjectButton: {
-    backgroundColor: colors.accent || '#FF9800',
+    flex: 1,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addPropertyButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  addProjectButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: 14,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -832,6 +990,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 180,
     resizeMode: 'cover',
+  },
+  propertyImagePlaceholder: {
+    width: '100%',
+    height: 180,
+    backgroundColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  propertyImagePlaceholderText: {
+    fontSize: 48,
+    opacity: 0.5,
   },
   propertyCardContent: {
     padding: spacing.md,

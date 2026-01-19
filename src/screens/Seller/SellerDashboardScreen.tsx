@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  ImageBackground,
+  Animated,
+  Dimensions,
 } from 'react-native';
-import {CompositeNavigationProp} from '@react-navigation/native';
+import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
@@ -22,6 +25,8 @@ import SellerHeader from '../../components/SellerHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 type SellerDashboardScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<SellerTabParamList, 'Dashboard'>,
@@ -60,11 +65,32 @@ interface RecentInquiry {
 const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [allProperties, setAllProperties] = useState<any[]>([]);
   const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
   const [recentInquiries, setRecentInquiries] = useState<RecentInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    // Entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   // Check user type access
   useEffect(() => {
@@ -89,61 +115,168 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     }
   }, [user, navigation]);
 
-  useEffect(() => {
-    // Only load data if user is a seller
-    if (user && user.user_type === 'seller') {
-      loadDashboardData();
-    
-      // Auto-refresh every 60 seconds
-      refreshIntervalRef.current = setInterval(() => {
-        loadDashboardData(false); // Silent refresh
-      }, 60000);
-
-      return () => {
-        if (refreshIntervalRef.current) {
-          clearInterval(refreshIntervalRef.current);
-        }
-      };
-    }
-  }, [user]);
-
-  const loadDashboardData = async (showLoading: boolean = true) => {
+  const loadDashboardData = useCallback(async (showLoading: boolean = true) => {
     try {
       if (showLoading) {
         setLoading(true);
       }
       
-      // Load dashboard stats
-      const statsResponse = await sellerService.getDashboardStats();
+      // Try to get stats first - if successful, we only need 3 properties for display
+      let apiStats: DashboardStats | null = null;
+      let statsSuccess = false;
       
-      if (statsResponse.success && statsResponse.data) {
-        setDashboardStats(statsResponse.data);
-        setRecentInquiries(statsResponse.data.recent_inquiries || []);
+      try {
+        const statsResponse: any = await sellerService.getDashboardStats();
+        if (statsResponse && statsResponse.success && statsResponse.data) {
+          apiStats = statsResponse.data;
+          setRecentInquiries(statsResponse.data.recent_inquiries || []);
+          statsSuccess = true; // API stats available, can use smaller limit
+        }
+      } catch (statsError: any) {
+        // If dashboard stats endpoint doesn't exist (404), we'll calculate from properties
+        if (statsError?.status !== 404 && statsError?.response?.status !== 404) {
+          console.warn('[SellerDashboard] Error loading API stats:', statsError);
+        }
       }
 
-      // Load recent properties (first 3)
-      const propertiesResponse = await sellerService.getProperties({
+      // Load properties - use smaller limit if stats API worked
+      const propertiesLimit = statsSuccess ? 10 : 20; // Only need 3 for display, but fetch a few more for stats calc if needed
+      const propertiesResponse: any = await sellerService.getProperties({
         page: 1,
-        limit: 3,
+        limit: propertiesLimit,
       });
 
-      if (propertiesResponse.success && propertiesResponse.data) {
-        const properties = propertiesResponse.data.properties || propertiesResponse.data || [];
-        const formattedProperties: RecentProperty[] = properties.slice(0, 3).map((prop: any) => ({
-          id: prop.id || prop.property_id,
-          title: prop.title || prop.property_title || 'Untitled Property',
-          location: prop.location || prop.city || 'Location not specified',
-          price: parseFloat(prop.price) || 0,
-          status: prop.status === 'rent' ? 'rent' : 'sale',
-          cover_image: prop.cover_image || prop.image || prop.images?.[0],
-          views: prop.views || prop.view_count || 0,
-          inquiries: prop.inquiries || prop.inquiry_count || 0,
-        }));
+      const response = propertiesResponse as any;
+      console.log('[SellerDashboard] Raw API response:', JSON.stringify(response, null, 2));
+      
+      if (response && response.success && response.data) {
+        // Handle different response structures
+        let properties: any[] = [];
+        
+        if (response.data.properties && Array.isArray(response.data.properties)) {
+          properties = response.data.properties;
+          console.log('[SellerDashboard] Using response.data.properties:', properties.length);
+        } else if (Array.isArray(response.data)) {
+          properties = response.data;
+          console.log('[SellerDashboard] Using response.data (array):', properties.length);
+        } else {
+          const dataKeys = Object.keys(response.data);
+          console.log('[SellerDashboard] Response.data keys:', dataKeys);
+          for (const key of dataKeys) {
+            if (Array.isArray(response.data[key])) {
+              properties = response.data[key];
+              console.log('[SellerDashboard] Using response.data[' + key + ']:', properties.length);
+              break;
+            }
+          }
+        }
+        
+        // Log sample property to see structure
+        if (properties.length > 0) {
+          console.log('[SellerDashboard] Sample property (first):', {
+            id: properties[0].id,
+            title: properties[0].title,
+            cover_image: properties[0].cover_image,
+            image: properties[0].image,
+            images: properties[0].images,
+            allKeys: Object.keys(properties[0]),
+          });
+        }
+        
+        // Store all properties for stats calculation
+        setAllProperties(properties);
+        
+        // Calculate dynamic stats from properties
+        const totalProperties = properties.length;
+        const activeProperties = properties.filter((prop: any) => {
+          const isActive = prop.is_active === 1 || prop.is_active === true || 
+                          prop.status === 'active' || prop.status === 1;
+          return isActive;
+        }).length;
+        
+        const totalViews = properties.reduce((sum: number, prop: any) => {
+          return sum + (prop.views_count || prop.views || prop.view_count || 0);
+        }, 0);
+        
+        const totalInquiries = properties.reduce((sum: number, prop: any) => {
+          return sum + (prop.inquiry_count || prop.inquiries || prop.inquiry_count || 0);
+        }, 0);
+        
+        const propertiesByStatus = {
+          sale: properties.filter((prop: any) => prop.status === 'sale' || prop.status === 'sell').length,
+          rent: properties.filter((prop: any) => prop.status === 'rent').length,
+        };
+        
+        // Use API stats if available, otherwise use calculated stats from properties
+        const finalStats: DashboardStats = apiStats ? {
+          ...apiStats,
+          // Override with calculated values for accuracy
+          total_properties: totalProperties,
+          active_properties: activeProperties,
+          total_views: totalViews,
+          total_inquiries: totalInquiries,
+          properties_by_status: propertiesByStatus,
+        } : {
+          total_properties: totalProperties,
+          active_properties: activeProperties,
+          total_inquiries: totalInquiries,
+          new_inquiries: 0,
+          total_views: totalViews,
+          views_percentage_change: 0,
+          properties_by_status: propertiesByStatus,
+          recent_inquiries: [],
+          subscription: null,
+        };
+        
+        setDashboardStats(finalStats);
+        
+        // Format recent properties (first 3)
+        const formattedProperties: RecentProperty[] = properties.slice(0, 3).map((prop: any) => {
+          // Try multiple image fields - backend might store images in different formats
+          const rawImage = prop.cover_image || prop.image || prop.images?.[0] || prop.property_image || 
+                          (Array.isArray(prop.images) && prop.images.length > 0 ? prop.images[0] : null);
+          const imageUrl = fixImageUrl(rawImage);
+          const propId = prop.id || prop.property_id;
+          
+          // Log image processing for debugging
+          if (propId) {
+            console.log(`[SellerDashboard] Property ${propId} image processing:`, {
+              rawImage: rawImage,
+              fixedUrl: imageUrl,
+              hasRawImage: !!rawImage,
+              hasFixedUrl: !!imageUrl,
+              cover_image: prop.cover_image,
+              image: prop.image,
+              images: prop.images,
+            });
+          }
+          
+          return {
+            id: propId,
+            title: prop.title || prop.property_title || 'Untitled Property',
+            location: prop.location || prop.city || 'Location not specified',
+            price: parseFloat(prop.price || '0') || 0,
+            status: (prop.status === 'rent' ? 'rent' : 'sale') as 'sale' | 'rent',
+            cover_image: imageUrl || undefined,
+            views: prop.views || prop.view_count || prop.views_count || 0,
+            inquiries: prop.inquiries || prop.inquiry_count || 0,
+          };
+        });
+        
+        console.log('[SellerDashboard] Formatted properties:', formattedProperties.map(p => ({
+          id: p.id,
+          title: p.title,
+          cover_image: p.cover_image,
+        })));
+        
         setRecentProperties(formattedProperties);
+      } else {
+        setRecentProperties([]);
       }
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
-      if (showLoading) {
+      // Only show alert for non-404 errors
+      if (showLoading && error?.status !== 404 && error?.response?.status !== 404) {
         Alert.alert('Error', error?.message || 'Failed to load dashboard data');
       }
     } finally {
@@ -152,67 +285,155 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
       setRefreshing(false);
     }
-  };
+  }, []);
+
+      // Load data when screen is focused (e.g., returning from AddProperty)
+      // Only reload if we don't have data yet, to avoid unnecessary API calls
+      useFocusEffect(
+        useCallback(() => {
+          if (user && user.user_type === 'seller' && !dashboardStats) {
+            loadDashboardData(true); // Only load if no data exists
+          }
+        }, [user, loadDashboardData, dashboardStats])
+      );
+
+  useEffect(() => {
+    // Only load data if user is a seller
+    if (user && user.user_type === 'seller') {
+      // Auto-refresh every 10 seconds
+      refreshIntervalRef.current = setInterval(() => {
+        loadDashboardData(false); // Silent refresh
+      }, 10000);
+
+      return () => {
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+        }
+      };
+    }
+  }, [user, loadDashboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);
     loadDashboardData(false);
   };
 
-  const renderPropertyCard = ({item}: {item: RecentProperty}) => (
-    <TouchableOpacity
-      style={styles.propertyCard}
-      onPress={() =>
-        navigation.navigate('PropertyDetails', {propertyId: item.id})
-      }>
-      {item.cover_image && (
-        <Image
-          source={{uri: fixImageUrl(item.cover_image)}}
-          style={styles.propertyImage}
-        />
-      )}
-      <View style={styles.propertyCardContent}>
-        <View style={styles.propertyCardHeader}>
-          <View style={styles.propertyCardInfo}>
-            <View style={styles.propertyBadgeContainer}>
-              <View
-                style={[
-                  styles.propertyStatusBadge,
-                  {
-                    backgroundColor:
-                      item.status === 'sale' ? colors.success : colors.primary,
-                  },
-                ]}>
-                <Text style={styles.propertyStatusText}>
-                  {item.status === 'sale' ? 'For Sale' : 'For Rent'}
+  const renderPropertyCard = ({item}: {item: RecentProperty}) => {
+    // Validate and fix image URL for Android - improved handling
+    let imageUrl: string | null = null;
+    
+    if (item.cover_image) {
+      const trimmed = String(item.cover_image).trim();
+      if (trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') {
+        // Ensure URL is properly formatted for Android
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          // Validate URL format
+          try {
+            new URL(trimmed);
+            imageUrl = trimmed;
+          } catch (e) {
+            // Invalid URL format, try fixing
+            const fixed = fixImageUrl(trimmed);
+            if (fixed) {
+              imageUrl = fixed;
+            }
+          }
+        } else {
+          // Re-fix the URL in case it wasn't properly fixed earlier
+          const fixed = fixImageUrl(trimmed);
+          if (fixed && (fixed.startsWith('http://') || fixed.startsWith('https://'))) {
+            imageUrl = fixed;
+          }
+        }
+      }
+    }
+    
+    return (
+      <PropertyImageCard
+        imageUrl={imageUrl}
+        propertyId={item.id}
+        onPress={() => navigation.navigate('PropertyDetails', {propertyId: item.id})}
+        style={styles.propertyCard}>
+        <View style={styles.propertyCardContent}>
+          <View style={styles.propertyCardHeader}>
+            <View style={styles.propertyCardInfo}>
+              <View style={styles.propertyBadgeContainer}>
+                <View
+                  style={[
+                    styles.propertyStatusBadge,
+                    {
+                      backgroundColor:
+                        item.status === 'sale' ? colors.success : colors.primary,
+                    },
+                  ]}>
+                  <Text style={styles.propertyStatusText}>
+                    {item.status === 'sale' ? 'For Sale' : 'For Rent'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.propertyCardTitle} numberOfLines={1}>
+                {item.title}
+              </Text>
+              <View style={styles.propertyLocationRow}>
+                <Text style={styles.locationIcon}>📍</Text>
+                <Text style={styles.propertyCardLocation} numberOfLines={1}>
+                  {item.location}
                 </Text>
               </View>
             </View>
-            <Text style={styles.propertyCardTitle} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <View style={styles.propertyLocationRow}>
-              <Text style={styles.locationIcon}>📍</Text>
-              <Text style={styles.propertyCardLocation} numberOfLines={1}>
-                {item.location}
-              </Text>
-            </View>
           </View>
-        </View>
-        <View style={styles.propertyCardStats}>
-          <Text style={styles.propertyStatText}>
-            👁️ {item.views} people interested
+          <View style={styles.propertyCardStats}>
+            <Text style={styles.propertyStatText}>
+              👁️ {item.views} people interested
+            </Text>
+            <Text style={styles.propertyStatText}>
+              💬 {item.inquiries} inquiries
+            </Text>
+          </View>
+          <Text style={styles.propertyCardPrice}>
+            {formatters.price(item.price, item.status === 'rent')}
           </Text>
-          <Text style={styles.propertyStatText}>
-            💬 {item.inquiries} inquiries
-          </Text>
         </View>
-        <Text style={styles.propertyCardPrice}>
-          {formatters.price(item.price, item.status === 'rent')}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </PropertyImageCard>
+    );
+  };
+
+  // Property Image Card Component with error handling
+  const PropertyImageCard: React.FC<{
+    imageUrl: string | null;
+    propertyId: number | string;
+    onPress: () => void;
+    style: any;
+    children: React.ReactNode;
+  }> = ({imageUrl, propertyId, onPress, style, children}) => {
+    const [hasError, setHasError] = useState(false);
+    
+    // Reset error state when imageUrl changes
+    React.useEffect(() => {
+      setHasError(false);
+    }, [imageUrl]);
+    
+    return (
+      <TouchableOpacity style={style} onPress={onPress}>
+        {imageUrl && !hasError ? (
+          <Image
+            source={{uri: imageUrl}}
+            style={styles.propertyImage}
+            resizeMode="cover"
+            onError={() => {
+              // Silently handle image errors - show placeholder instead
+              setHasError(true);
+            }}
+          />
+        ) : (
+          <View style={styles.propertyImagePlaceholder}>
+            <Text style={styles.propertyImagePlaceholderText}>🏠</Text>
+          </View>
+        )}
+        {children}
+      </TouchableOpacity>
+    );
+  };
 
   const renderInquiryCard = ({item}: {item: RecentInquiry}) => (
     <TouchableOpacity
@@ -333,29 +554,42 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }>
-        {/* Welcome Header */}
-        <View style={styles.welcomeHeader}>
-          <View>
-            <Text style={styles.greeting}>
-              Welcome back, {user?.name || 'Seller'}!
-            </Text>
-            <Text style={styles.subtitle}>
-              Here's what's happening with your properties today
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.addPropertyButton}
-            onPress={() => navigation.navigate('AddProperty')}>
-            <Text style={styles.addPropertyButtonText}>Add Property</Text>
-          </TouchableOpacity>
-        </View>
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [{translateY: slideAnim}],
+          }}>
+          {/* Seller Header */}
+          <ImageBackground
+            source={require('../../assets/sellproperty.jpg')}
+            style={styles.sellerHeader}
+            imageStyle={styles.sellerHeaderImage}>
+            <View style={styles.sellerHeaderOverlay}>
+              <View style={styles.sellerHeaderContent}>
+                <Text style={styles.sellerGreeting}>
+                  Welcome back, {user?.full_name?.split(' ')[0] || user?.name || 'Seller'}!
+                </Text>
+                <Text style={styles.sellerSubtitle}>
+                  Here's what's happening with your properties today
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.addPropertyButton}
+                onPress={() => navigation.navigate('AddProperty')}>
+                <Text style={styles.addPropertyButtonText}>+ Add Property</Text>
+              </TouchableOpacity>
+            </View>
+          </ImageBackground>
 
         {/* Statistics Cards (2x2 Grid) */}
         <View style={styles.statsGrid}>
           {/* Card 1: Total Properties */}
           <TouchableOpacity
             style={styles.statCard}
-            onPress={() => navigation.navigate('MyProperties')}>
+            onPress={() => {
+              console.log('[SellerDashboard] Navigating to MyProperties tab');
+              navigation.navigate('MyProperties');
+            }}>
             <View style={styles.statCardIcon}>
               <Text style={styles.statIcon}>🏠</Text>
             </View>
@@ -452,7 +686,10 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
           <TouchableOpacity
             style={styles.quickActionCard}
-            onPress={() => navigation.navigate('MyProperties')}>
+            onPress={() => {
+              console.log('[SellerDashboard] Navigating to MyProperties from quick actions');
+              navigation.navigate('MyProperties');
+            }}>
             <Text style={styles.quickActionIcon}>✏️</Text>
             <Text style={styles.quickActionTitle}>Manage Properties</Text>
             <Text style={styles.quickActionDescription}>
@@ -486,7 +723,10 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Your Properties</Text>
             <TouchableOpacity
-              onPress={() => navigation.navigate('MyProperties')}>
+              onPress={() => {
+                console.log('[SellerDashboard] Navigating to MyProperties from View All');
+                navigation.navigate('MyProperties');
+              }}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -544,6 +784,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             </View>
           )}
         </View>
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -558,6 +799,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.lg,
+  },
+  errorIcon: {
+    fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  errorTitle: {
+    ...typography.h2,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   loadingText: {
     marginTop: spacing.md,
@@ -571,45 +830,65 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  welcomeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  sellerHeader: {
     marginBottom: spacing.xl,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    minHeight: 180,
   },
-  greeting: {
+  sellerHeaderImage: {
+    borderRadius: borderRadius.xl,
+  },
+  sellerHeaderOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    padding: spacing.lg,
+    minHeight: 180,
+    justifyContent: 'space-between',
+  },
+  sellerHeaderContent: {
+    marginBottom: spacing.md,
+  },
+  sellerGreeting: {
     ...typography.h1,
-    color: colors.text,
+    color: colors.surface,
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
-  subtitle: {
+  sellerSubtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: colors.surface,
     fontSize: 14,
+    opacity: 0.9,
   },
   addPropertyButton: {
     backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: borderRadius.md,
+    alignSelf: 'flex-start',
   },
   addPropertyButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 14,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
     marginBottom: spacing.xl,
+    justifyContent: 'space-between',
+    marginHorizontal: -spacing.xs, // Negative margin for spacing between cards
   },
   statCard: {
-    width: '47%',
+    width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2, // Responsive width calculation with proper spacing
+    minWidth: 150, // Minimum width for very small screens
+    maxWidth: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2, // Max width same as width for consistent grid
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
+    marginHorizontal: spacing.xs / 2, // Half margin on each side for spacing
+    marginBottom: spacing.md, // Bottom margin for wrapping
     borderWidth: 1,
     borderColor: colors.border,
     shadowColor: '#000',
@@ -702,14 +981,16 @@ const styles = StyleSheet.create({
   },
   statusPills: {
     flexDirection: 'row',
-    gap: spacing.xs,
     marginTop: spacing.xs,
+    flexWrap: 'wrap',
   },
   statusPill: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
+    marginRight: spacing.xs,
+    marginBottom: spacing.xs,
   },
   statusPillRent: {
     backgroundColor: colors.accent || '#FF9800',
@@ -723,14 +1004,19 @@ const styles = StyleSheet.create({
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
     marginBottom: spacing.xl,
+    justifyContent: 'space-between',
+    marginHorizontal: -spacing.xs, // Negative margin for spacing between cards
   },
   quickActionCard: {
-    width: '47%',
+    width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2, // Responsive width calculation with proper spacing
+    minWidth: 150, // Minimum width for very small screens
+    maxWidth: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2, // Max width same as width for consistent grid
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
+    marginHorizontal: spacing.xs / 2, // Half margin on each side for spacing
+    marginBottom: spacing.md, // Bottom margin for wrapping
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
@@ -769,7 +1055,7 @@ const styles = StyleSheet.create({
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    flexWrap: 'wrap',
   },
   sectionTitle: {
     ...typography.h2,
@@ -781,6 +1067,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.md,
+    marginLeft: spacing.sm,
   },
   sectionBadgeText: {
     ...typography.caption,
@@ -805,11 +1092,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    maxWidth: '100%', // Ensure it doesn't overflow
   },
   propertyImage: {
     width: '100%',
-    height: 180,
+    height: Math.min(180, SCREEN_WIDTH * 0.5), // Responsive height
     resizeMode: 'cover',
+    backgroundColor: colors.border,
+  },
+  propertyImagePlaceholder: {
+    width: '100%',
+    height: Math.min(180, SCREEN_WIDTH * 0.5), // Responsive height
+    backgroundColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  propertyImagePlaceholderText: {
+    fontSize: 48,
+    opacity: 0.5,
   },
   propertyCardContent: {
     padding: spacing.md,
@@ -841,10 +1141,11 @@ const styles = StyleSheet.create({
   propertyLocationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    marginTop: spacing.xs / 2,
   },
   locationIcon: {
     fontSize: 12,
+    marginRight: spacing.xs,
   },
   propertyCardLocation: {
     ...typography.caption,
@@ -854,16 +1155,18 @@ const styles = StyleSheet.create({
   },
   propertyCardStats: {
     flexDirection: 'row',
-    gap: spacing.md,
     marginBottom: spacing.sm,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    flexWrap: 'wrap',
   },
   propertyStatText: {
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 11,
+    marginRight: spacing.md,
+    marginBottom: spacing.xs,
   },
   propertyCardPrice: {
     ...typography.h3,

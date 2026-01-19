@@ -180,22 +180,28 @@ export const buyerService = {
     return response;
   },
 
-  // Record interaction (view, call, whatsapp, email)
+  // Record interaction (view, call, whatsapp, email, view_owner, chat_owner)
   recordInteraction: async (
     propertyId: string | number,
-    interactionType: 'view' | 'call' | 'whatsapp' | 'email',
+    actionType: 'view' | 'call' | 'whatsapp' | 'email' | 'view_owner' | 'chat_owner',
   ) => {
     const response = await api.post(API_ENDPOINTS.BUYER_INTERACTION_RECORD, {
       property_id: propertyId,
-      interaction_type: interactionType,
+      action_type: actionType, // Use action_type as per guide
     });
     return response;
   },
 
   // Check interaction limit
-  checkInteractionLimit: async (propertyId: string | number) => {
+  checkInteractionLimit: async (
+    propertyId: string | number,
+    actionType: string = 'view_owner',
+  ) => {
     const response = await api.get(API_ENDPOINTS.BUYER_INTERACTION_CHECK, {
-      params: {property_id: propertyId},
+      params: {
+        property_id: propertyId,
+        action_type: actionType, // Use action_type as per guide
+      },
     });
     return response;
   },

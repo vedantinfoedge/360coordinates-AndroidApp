@@ -13,7 +13,8 @@ export const colors = {
   // Text colors
   text: '#022b5f', // Dark Navy - Primary text
   textSecondary: '#666666', // Gray for secondary text
-  textTertiary: '#999999', // Light gray for tertiary text
+  textTertiary: '#999999',
+  textblack:'#000000',// black text color 
   
   // UI elements
   border: '#E0E0E0', // Light gray border

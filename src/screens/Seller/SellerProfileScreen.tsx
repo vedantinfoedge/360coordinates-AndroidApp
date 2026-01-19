@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,12 @@ import {
   TouchableOpacity,
   TextInput,
   SafeAreaView,
+  Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import {launchImageLibrary} from 'react-native-image-picker';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -17,6 +22,8 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import Button from '../../components/common/Button';
+import {userService} from '../../services/user.service';
+import {fixImageUrl} from '../../utils/imageHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<SellerTabParamList, 'Profile'>,
@@ -28,7 +35,11 @@ type Props = {
 };
 
 const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout} = useAuth();
+  const {user, logout, setUser} = useAuth();
+  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(user?.profile_image || null);
 
   const userData = user || {
     full_name: 'John Doe',
@@ -52,6 +63,65 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
     address: userData.address || '',
   });
 
+  // Load profile data on mount
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  // Update form data and profile image when user changes
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.full_name || '',
+        phone: user.phone || '',
+        email: user.email || '',
+        address: user.address || '',
+      });
+      setOriginalData({
+        name: user.full_name || '',
+        phone: user.phone || '',
+        email: user.email || '',
+        address: user.address || '',
+      });
+      if (user.profile_image) {
+        setProfileImage(fixImageUrl(user.profile_image));
+      }
+    }
+  }, [user]);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+      const response: any = await userService.getProfile('seller');
+      if (response && response.success && response.data) {
+        const profile = response.data.profile || response.data;
+        const userData = response.data.user || user;
+        
+        setFormData({
+          name: profile.full_name || userData?.full_name || '',
+          phone: userData?.phone || user?.phone || '',
+          email: userData?.email || user?.email || '',
+          address: profile.address || '',
+        });
+        setOriginalData({
+          name: profile.full_name || userData?.full_name || '',
+          phone: userData?.phone || user?.phone || '',
+          email: userData?.email || user?.email || '',
+          address: profile.address || '',
+        });
+        if (profile.profile_image) {
+          setProfileImage(fixImageUrl(profile.profile_image));
+        } else if (userData?.profile_image) {
+          setProfileImage(fixImageUrl(userData.profile_image));
+        }
+      }
+    } catch (error: any) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEdit = () => {
     setOriginalData({...formData});
     setIsEditing(true);
@@ -62,19 +132,91 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
     setIsEditing(false);
   };
 
-  const handleSave = () => {
-    // TODO: Save to backend
-    setIsEditing(false);
-    // Update original data
-    setOriginalData({...formData});
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const response: any = await userService.updateProfile({
+        full_name: formData.name,
+        address: formData.address,
+      });
+      
+      if (response && (response.success || (response.data && response.data.success))) {
+        // Update user context
+        if (user) {
+          setUser({
+            ...user,
+            full_name: formData.name,
+            address: formData.address,
+          });
+        }
+        setOriginalData({...formData});
+        setIsEditing(false);
+        Alert.alert('Success', 'Profile updated successfully');
+      } else {
+        Alert.alert('Error', (response && (response.message || response.data?.message)) || 'Failed to update profile');
+      }
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', error?.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = async () => {
     await logout();
   };
 
+  const handleImagePicker = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 800,
+        maxHeight: 800,
+      },
+      async response => {
+        if (response.didCancel || response.errorCode) {
+          return;
+        }
+
+        if (response.assets && response.assets[0]) {
+          try {
+            setSaving(true);
+            const uploadResponse: any = await userService.uploadProfileImage(
+              response.assets[0].uri || '',
+            );
+
+            if (uploadResponse && uploadResponse.success && uploadResponse.data?.url) {
+              const imageUrl = fixImageUrl(uploadResponse.data.url);
+              if (imageUrl) {
+                setProfileImage(imageUrl);
+                // Update user context
+                if (user) {
+                  setUser({
+                    ...user,
+                    profile_image: imageUrl,
+                  });
+                }
+              }
+              Alert.alert('Success', 'Profile picture updated successfully');
+            } else {
+              Alert.alert('Error', (uploadResponse && uploadResponse.message) || 'Failed to upload image');
+            }
+          } catch (error: any) {
+            console.error('Error uploading image:', error);
+            Alert.alert('Error', error?.message || 'Failed to upload image');
+          } finally {
+            setSaving(false);
+          }
+        }
+      },
+    );
+  };
+
   const getRoleLabel = (role?: string) => {
-    switch (role) {
+    const userType = role || user?.user_type;
+    switch (userType) {
       case 'buyer':
         return 'Buyer';
       case 'seller':
@@ -84,6 +226,15 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       default:
         return 'User';
     }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const memberSince = '20 December';
@@ -98,30 +249,36 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         onLogoutPress={handleLogout}
       />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{paddingTop:0}}>
         {/* Top Purple Section */}
         <View style={styles.topSection}>
           {/* Profile Picture */}
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {(userData.full_name || '')
-                  .split(' ')
-                  .map(n => n[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2)}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.editPhotoButton}>
-              <Text style={styles.editPhotoText}>📷</Text>
+            {profileImage ? (
+              <Image source={{uri: profileImage}} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {getInitials(userData.full_name || 'User')}
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.editPhotoButton} onPress={handleImagePicker} disabled={saving}>
+              {saving ? (
+                <ActivityIndicator size="small" color={colors.surface} />
+              ) : (
+                <Text style={styles.editPhotoText}>📷</Text>
+              )}
             </TouchableOpacity>
           </View>
 
           <Text style={styles.name}>{userData.full_name || 'User'}</Text>
           <Text style={styles.email}>{userData.email}</Text>
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{getRoleLabel(user?.role)}</Text>
+            <Text style={styles.roleText}>{getRoleLabel(user?.user_type)}</Text>
           </View>
           <Text style={styles.memberSince}>Member since {memberSince}</Text>
         </View>
@@ -139,8 +296,12 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-                  <Text style={styles.saveButtonText}>Save</Text>
+                <TouchableOpacity onPress={handleSave} style={styles.saveButton} disabled={saving}>
+                  {saving ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             )}
@@ -200,7 +361,10 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('MyProperties')}>
+            onPress={() => {
+              console.log('[SellerProfile] Navigating to MyProperties');
+              navigation.navigate('MyProperties');
+            }}>
             <Text style={styles.menuIcon}>🏘️</Text>
             <Text style={styles.menuText}>My Properties</Text>
             <Text style={styles.menuArrow}>→</Text>
@@ -248,7 +412,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topSection: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#FFFFFF',
     paddingTop: spacing.xl,
     paddingBottom: spacing.xl,
     paddingHorizontal: spacing.lg,
@@ -262,15 +426,22 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
-    borderColor: colors.surface,
+    borderColor: colors.secondary,
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
+    borderColor: colors.secondary,
   },
   avatarText: {
     ...typography.h1,
-    color: colors.primary,
+    color: colors.textblack,
     fontWeight: '700',
   },
   editPhotoButton: {
@@ -291,13 +462,13 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.h2,
-    color: colors.surface,
+    color: colors.textblack,
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
   email: {
     ...typography.body,
-    color: colors.surface,
+    color: colors.textblack,
     opacity: 0.9,
     marginBottom: spacing.sm,
   },
@@ -305,7 +476,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
+    borderRadius: borderRadius.round,
     marginBottom: spacing.sm,
   },
   roleText: {
@@ -315,7 +486,7 @@ const styles = StyleSheet.create({
   },
   memberSince: {
     ...typography.caption,
-    color: colors.surface,
+    color: colors.textblack,
     opacity: 0.8,
   },
   section: {

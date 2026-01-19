@@ -11,6 +11,16 @@
         </trust-anchors>
     </domain-config>
     
+    <!-- Allow cleartext traffic for localhost (Metro bundler) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- Allow any local network for development -->
+        <domain includeSubdomains="true">10.0.0.0</domain>
+        <domain includeSubdomains="true">192.168.0.0</domain>
+    </domain-config>
+    
     <!-- Base configuration: Allow cleartext traffic for development only -->
     <!-- In production, this should be removed or set to false -->
     <base-config cleartextTrafficPermitted="false">

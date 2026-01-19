@@ -12,6 +12,7 @@ export type ChatStackParamList = {
     propertyId?: number | string;
     propertyTitle?: string;
     conversationId?: string | number;
+    receiverRole?: 'agent' | 'seller'; // Role of the receiver (seller or agent)
   };
 };
 

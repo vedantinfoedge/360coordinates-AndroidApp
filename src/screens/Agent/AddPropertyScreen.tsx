@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useMemo} from 'react';
 import {
   View,
   Text,
@@ -14,15 +14,23 @@ import {
   PermissionsAndroid,
 } from 'react-native';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {moderationService} from '../../services/moderation.service';
+import LocationPicker from '../../components/map/LocationPicker';
+import {
+  GuidePropertyType,
+  getPropertyTypeConfig,
+  getAvailableAmenitiesForPropertyType,
+  PROPERTY_TYPES,
+  AMENITIES_LIST,
+} from '../../utils/propertyTypeConfig';
 
-type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
+type AddPropertyScreenNavigationProp = BottomTabNavigationProp<
+  AgentTabParamList,
   'AddProperty'
 >;
 
@@ -30,34 +38,17 @@ type Props = {
   navigation: AddPropertyScreenNavigationProp;
 };
 
-type PropertyType = 'sell' | 'rent';
-type PropertyCategory = 'apartment' | 'villa' | 'house' | 'rowhouse' | '';
-
-const amenitiesList = [
-  {id: 'parking', label: 'Parking', icon: '🚗'},
-  {id: 'lift', label: 'Lift', icon: '🛗'},
-  {id: 'security', label: '24x7 Security', icon: '👮'},
-  {id: 'power', label: 'Power Backup', icon: '⚡'},
-  {id: 'gym', label: 'Gym', icon: '🏋️'},
-  {id: 'pool', label: 'Swimming Pool', icon: '🏊'},
-  {id: 'garden', label: 'Garden', icon: '🌳'},
-  {id: 'clubhouse', label: 'Club House', icon: '🏛️'},
-  {id: 'playarea', label: "Children's Play Area", icon: '🛝'},
-  {id: 'cctv', label: 'CCTV', icon: '📹'},
-  {id: 'intercom', label: 'Intercom', icon: '📞'},
-  {id: 'firesafety', label: 'Fire Safety', icon: '🔥'},
-  {id: 'water', label: '24x7 Water', icon: '💧'},
-  {id: 'gas', label: 'Gas Pipeline', icon: '🔥'},
-  {id: 'wifi', label: 'WiFi', icon: '📶'},
-  {id: 'ac', label: 'Air Conditioning', icon: '❄️'},
-];
+type PropertyStatus = 'sell' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
-  const [propertyType, setPropertyType] = useState<PropertyType>('sell');
-  const [propertyCategory, setPropertyCategory] = useState<PropertyCategory>('');
+  const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sell');
+  const [propertyType, setPropertyType] = useState<GuidePropertyType | ''>('');
   const [location, setLocation] = useState('');
+  const [locationSelected, setLocationSelected] = useState(false);
+  const [state, setState] = useState('');
+  const [additionalAddress, setAdditionalAddress] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
@@ -66,15 +57,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [balconies, setBalconies] = useState<number | null>(null);
   const [builtUpArea, setBuiltUpArea] = useState('');
   const [carpetArea, setCarpetArea] = useState('');
+  const [floor, setFloor] = useState('');
   const [totalFloors, setTotalFloors] = useState('');
   const [facing, setFacing] = useState('');
   const [propertyAge, setPropertyAge] = useState('');
   const [furnishing, setFurnishing] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<Array<{uri: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
+  const [photos, setPhotos] = useState<Array<{uri: string; base64?: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
   const [expectedPrice, setExpectedPrice] = useState('');
   const [priceNegotiable, setPriceNegotiable] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
   const [maintenance, setMaintenance] = useState('');
 
   const totalSteps = 5;
@@ -85,6 +78,34 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     {id: 4, name: 'Photos', icon: '📷'},
     {id: 5, name: 'Pricing', icon: '💰'},
   ];
+
+  // Get field visibility configuration based on property type (using guide utility)
+  const fieldVisibility = useMemo(() => {
+    if (!propertyType) {
+      return {
+        showBedrooms: false,
+        bedroomsRequired: false,
+        showBathrooms: false,
+        bathroomsRequired: false,
+        showBalconies: false,
+        showFloor: false,
+        showTotalFloors: false,
+        showFacing: false,
+        showAge: false,
+        showFurnishing: false,
+        showCarpetArea: false,
+        areaLabel: 'Built-up Area' as const,
+      };
+    }
+    return getPropertyTypeConfig(propertyType);
+  }, [propertyType]);
+
+  // Get available amenities based on property type
+  const availableAmenities = useMemo(() => {
+    if (!propertyType) return AMENITIES_LIST;
+    const allowedAmenityIds = getAvailableAmenitiesForPropertyType(propertyType);
+    return AMENITIES_LIST.filter(amenity => allowedAmenityIds.includes(amenity.id));
+  }, [propertyType]);
 
   const toggleAmenity = (amenityId: string) => {
     setSelectedAmenities(prev =>
@@ -130,9 +151,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.8,
+      quality: 0.8 as const,
       selectionLimit: 10 - photos.length,
-      includeBase64: false,
+      includeBase64: true, // Enable base64 for direct upload without moderation
     };
 
     launchImageLibrary(options, async (response: ImagePickerResponse) => {
@@ -146,74 +167,37 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
 
       if (response.assets && response.assets.length > 0) {
-        const newPhotoUris = response.assets
-          .map(asset => asset.uri)
-          .filter((uri): uri is string => uri !== undefined);
-        
         const maxPhotos = 10;
         const remainingSlots = maxPhotos - photos.length;
-        const photosToAdd = newPhotoUris.slice(0, remainingSlots);
+        const assetsToAdd = response.assets.slice(0, remainingSlots);
         
-        if (photos.length + photosToAdd.length > maxPhotos) {
+        if (photos.length + assetsToAdd.length > maxPhotos) {
           Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
           return;
         }
 
-        // Add new photos with initial status
-        const newPhotos = photosToAdd.map(uri => ({
-          uri,
-          moderationStatus: 'checking' as const,
-        }));
+        // Auto-approve all images and convert to base64 format
+        // Skip moderation for now as per user request
+        const newPhotos = assetsToAdd.map(asset => {
+          // Get base64 string (format: "data:image/jpeg;base64,/9j/4AAQSkZJRg...")
+          const imageType = asset.type || 'jpeg';
+          const base64String = asset.base64 
+            ? `data:image/${imageType};base64,${asset.base64}` 
+            : undefined;
+          
+          return {
+            uri: asset.uri || '',
+            base64: base64String,
+            moderationStatus: 'APPROVED' as const, // Auto-approve for now
+            moderationReason: undefined,
+            imageUrl: undefined, // We'll use base64 instead
+          };
+        });
         
         const updatedPhotos = [...photos, ...newPhotos];
         setPhotos(updatedPhotos);
-
-        // Validate each new image through moderation
-        photosToAdd.forEach(async (uri, index) => {
-          const actualIndex = photos.length + index;
-          try {
-            const result = await moderationService.uploadWithModeration(uri);
-            
-            // Update the specific photo's moderation status
-            setPhotos(prev => {
-              const updated = [...prev];
-              updated[actualIndex] = {
-                ...updated[actualIndex],
-                moderationStatus:
-                  result.moderation_status === 'APPROVED' || result.moderation_status === 'SAFE'
-                    ? 'APPROVED'
-                    : result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE'
-                    ? 'REJECTED'
-                    : 'PENDING',
-                moderationReason: result.moderation_reason,
-                imageUrl: result.image_url,
-              };
-              return updated;
-            });
-
-            // Show alert for rejected images
-            if (result.status === 'rejected' || result.moderation_status === 'REJECTED') {
-              Alert.alert(
-                'Image Rejected',
-                result.moderation_reason || result.message || 'Image does not meet quality standards. Please select a different image.',
-              );
-            } else if (result.status === 'pending' || result.moderation_status === 'PENDING') {
-              // Silent for pending - user can still proceed
-            }
-          } catch (error: any) {
-            console.error('Image moderation error:', error);
-            setPhotos(prev => {
-              const updated = [...prev];
-              updated[actualIndex] = {
-                ...updated[actualIndex],
-                moderationStatus: 'REJECTED',
-                moderationReason: error.message || 'Failed to validate image',
-              };
-              return updated;
-            });
-            Alert.alert('Validation Error', error.message || 'Failed to validate image');
-          }
-        });
+        
+        console.log('[AddProperty] Added', newPhotos.length, 'images (auto-approved, base64 ready)');
       }
     });
   };
@@ -225,8 +209,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         Alert.alert('Error', 'Please enter property title');
         return;
       }
-      if (!propertyCategory) {
+      if (!propertyType) {
         Alert.alert('Error', 'Please select property type');
+        return;
+      }
+      if (propertyTitle.length > 255) {
+        Alert.alert('Error', 'Title must be less than 255 characters');
         return;
       }
     }
@@ -235,16 +223,24 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         Alert.alert('Error', 'Please enter location');
         return;
       }
-      if (bedrooms === null) {
+      if (!state.trim()) {
+        Alert.alert('Error', 'Please enter state');
+        return;
+      }
+      if (fieldVisibility.showFacing && !facing) {
+        Alert.alert('Error', 'Please select facing direction');
+        return;
+      }
+      if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment') {
         Alert.alert('Error', 'Please select number of bedrooms');
         return;
       }
-      if (bathrooms === null) {
+      if (fieldVisibility.bathroomsRequired && bathrooms === null) {
         Alert.alert('Error', 'Please select number of bathrooms');
         return;
       }
       if (!builtUpArea.trim()) {
-        Alert.alert('Error', 'Please enter built-up area');
+        Alert.alert('Error', `Please enter ${fieldVisibility.areaLabel}`);
         return;
       }
     }
@@ -253,10 +249,35 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         Alert.alert('Error', 'Please enter property description');
         return;
       }
+      if (description.length < 100) {
+        Alert.alert('Error', 'Description must be at least 100 characters');
+        return;
+      }
+      if (description.trim().length > 1000) {
+        Alert.alert('Error', 'Description cannot exceed 1000 characters');
+        return;
+      }
+      // Check for mobile numbers (Indian format: 10 digits, may have +91)
+      const mobileRegex = /(\+91[\s-]?)?[6-9]\d{9}/g;
+      if (mobileRegex.test(description)) {
+        Alert.alert('Error', 'Description cannot contain mobile numbers');
+        return;
+      }
+      // Check for email addresses
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      if (emailRegex.test(description)) {
+        Alert.alert('Error', 'Description cannot contain email addresses');
+        return;
+      }
     }
     if (currentStep === 5) {
       if (!expectedPrice.trim()) {
-        Alert.alert('Error', 'Please enter expected price');
+        Alert.alert('Error', propertyStatus === 'sell' ? 'Please enter expected price' : 'Please enter monthly rent');
+        return;
+      }
+      const priceValue = parseFloat(expectedPrice.replace(/[^0-9.]/g, ''));
+      if (isNaN(priceValue) || priceValue <= 0) {
+        Alert.alert('Error', 'Price must be a positive number');
         return;
       }
     }
@@ -274,10 +295,74 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const handleSubmit = () => {
-    Alert.alert('Success', 'Property listed successfully!', [
-      {text: 'OK', onPress: () => navigation.goBack()},
-    ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+
+      // Collect images as base64 strings (auto-approved, skip moderation)
+      const imageBase64Strings = photos
+        .filter(p => p.moderationStatus === 'APPROVED' && p.base64)
+        .map(p => p.base64!)
+        .filter((base64): base64 is string => base64 !== undefined && base64 !== null);
+      
+      console.log('[AddProperty] Total photos:', photos.length, 'Approved photos with base64:', imageBase64Strings.length);
+
+      // Property type is already in the correct format from guide
+      const propertyData = {
+        title: propertyTitle.trim(),
+        status: propertyStatus === 'sell' ? 'sale' : 'rent', // Map 'sell' to 'sale'
+        property_type: propertyType, // Already in guide format (e.g., 'Apartment', 'Villa / Banglow')
+        location: location.trim(),
+        state: state.trim() || null,
+        additional_address: additionalAddress.trim() || null,
+        latitude: latitude || null,
+        longitude: longitude || null,
+        bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+        bathrooms: bathrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+        balconies: balconies?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+        area: parseFloat(builtUpArea) || 0,
+        carpet_area: carpetArea ? parseFloat(carpetArea) : null,
+        floor: floor.trim() || null,
+        total_floors: totalFloors ? parseInt(totalFloors) : null,
+        facing: facing || null,
+        age: propertyAge || null,
+        furnishing: furnishing || null,
+        description: description.trim(),
+        price: parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0,
+        price_negotiable: priceNegotiable,
+        maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
+        amenities: selectedAmenities,
+        // Include images as base64 strings in the request
+        images: imageBase64Strings.length > 0 ? imageBase64Strings : undefined,
+      };
+
+      console.log('[AddProperty] Creating property with endpoint: /agent/properties/add.php');
+      console.log('[AddProperty] Images included as base64:', imageBase64Strings.length);
+
+      // Create property with images included in request
+      // Use 'agent' userType to use correct endpoint
+      const response: any = await propertyService.createProperty(propertyData, 'agent');
+      
+      if (response && response.success) {
+        const imageCount = imageBase64Strings.length;
+        Alert.alert(
+          'Success', 
+          `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
+          [{text: 'OK', onPress: () => navigation.goBack()}]
+        );
+      } else {
+        const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
+        console.error('[AddProperty] Property creation failed:', errorMessage);
+        Alert.alert('Error', errorMessage);
+      }
+    } catch (error: any) {
+      console.error('Submit error:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to create property. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -319,19 +404,19 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.typeButtonsContainer}>
                 <TouchableOpacity
                   style={styles.typeButton}
-                  onPress={() => setPropertyType('sell')}>
-                  <View style={propertyType === 'sell' ? styles.typeButtonSelected : styles.typeButtonUnselected}>
+                  onPress={() => setPropertyStatus('sell')}>
+                  <View style={propertyStatus === 'sell' ? styles.typeButtonSelected : styles.typeButtonUnselected}>
                     <Text style={styles.typeButtonIcon}>🏷️</Text>
-                    <Text style={propertyType === 'sell' ? styles.typeButtonTextSelected : styles.typeButtonText}>Sell</Text>
+                    <Text style={propertyStatus === 'sell' ? styles.typeButtonTextSelected : styles.typeButtonText}>Sell</Text>
                   </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.typeButton}
-                  onPress={() => setPropertyType('rent')}>
-                  <View style={propertyType === 'rent' ? styles.typeButtonSelected : styles.typeButtonUnselected}>
+                  onPress={() => setPropertyStatus('rent')}>
+                  <View style={propertyStatus === 'rent' ? styles.typeButtonSelected : styles.typeButtonUnselected}>
                     <Text style={styles.typeButtonIcon}>🔑</Text>
-                    <Text style={propertyType === 'rent' ? styles.typeButtonTextSelected : styles.typeButtonText}>Rent / Lease</Text>
+                    <Text style={propertyStatus === 'rent' ? styles.typeButtonTextSelected : styles.typeButtonText}>Rent / Lease</Text>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -342,69 +427,36 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 Property Type <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.propertyTypeGrid}>
-                <TouchableOpacity
-                  style={[
-                    styles.propertyTypeButton,
-                    propertyCategory === 'apartment' && styles.propertyTypeButtonActive,
-                  ]}
-                  onPress={() => setPropertyCategory('apartment')}>
-                  <Text style={styles.propertyTypeIcon}>🏢</Text>
-                  <Text
+                {PROPERTY_TYPES.map((type) => (
+                  <TouchableOpacity
+                    key={type.value}
                     style={[
-                      styles.propertyTypeText,
-                      propertyCategory === 'apartment' && styles.propertyTypeTextActive,
-                    ]}>
-                    Apartment
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.propertyTypeButton,
-                    propertyCategory === 'villa' && styles.propertyTypeButtonActive,
-                  ]}
-                  onPress={() => setPropertyCategory('villa')}>
-                  <Text style={styles.propertyTypeIcon}>🏡</Text>
-                  <Text
-                    style={[
-                      styles.propertyTypeText,
-                      propertyCategory === 'villa' && styles.propertyTypeTextActive,
-                    ]}>
-                    Villa / Banglow
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.propertyTypeButton,
-                    propertyCategory === 'house' && styles.propertyTypeButtonActive,
-                  ]}
-                  onPress={() => setPropertyCategory('house')}>
-                  <Text style={styles.propertyTypeIcon}>🏠</Text>
-                  <Text
-                    style={[
-                      styles.propertyTypeText,
-                      propertyCategory === 'house' && styles.propertyTypeTextActive,
-                    ]}>
-                    Independent House
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.propertyTypeButton,
-                    propertyCategory === 'rowhouse' && styles.propertyTypeButtonActive,
-                  ]}
-                  onPress={() => setPropertyCategory('rowhouse')}>
-                  <Text style={styles.propertyTypeIcon}>🏘️</Text>
-                  <Text
-                    style={[
-                      styles.propertyTypeText,
-                      propertyCategory === 'rowhouse' && styles.propertyTypeTextActive,
-                    ]}>
-                    Row House/ Farm House
-                  </Text>
-                </TouchableOpacity>
+                      styles.propertyTypeButton,
+                      propertyType === type.value && styles.propertyTypeButtonActive,
+                    ]}
+                    onPress={() => {
+                      setPropertyType(type.value);
+                      // Auto-set bedrooms to 0 for Studio Apartment
+                      if (type.value === 'Studio Apartment') {
+                        setBedrooms(0);
+                      } else {
+                        // Reset bedrooms for other types
+                        setBedrooms(null);
+                      }
+                      // Clear amenities when property type changes (they'll be filtered)
+                      setSelectedAmenities([]);
+                    }}>
+                    <Text style={styles.propertyTypeIcon}>{type.icon}</Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyType === type.value && styles.propertyTypeTextActive,
+                      ]}
+                      numberOfLines={2}>
+                      {type.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           </View>
@@ -427,12 +479,45 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter locality, area or landmark"
                 placeholderTextColor={colors.textSecondary}
                 value={location}
-                onChangeText={setLocation}
+                onChangeText={(text) => {
+                  setLocation(text);
+                  // Reset locationSelected when user starts typing/editing
+                  if (locationSelected) {
+                    setLocationSelected(false);
+                  }
+                }}
               />
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Property Location on Map</Text>
+              <Text style={styles.label}>
+                State <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter state"
+                placeholderTextColor={colors.textSecondary}
+                value={state}
+                onChangeText={setState}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Additional Address</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Enter additional address details (building name, landmark, etc.)"
+                placeholderTextColor={colors.textSecondary}
+                value={additionalAddress}
+                onChangeText={setAdditionalAddress}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Property Location on Map (Optional)</Text>
               <TouchableOpacity
                 style={styles.mapButton}
                 onPress={() => setLocationPickerVisible(true)}>
@@ -461,145 +546,154 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <LocationPicker
               visible={locationPickerVisible}
-              initialLocation={
-                latitude && longitude
-                  ? {latitude, longitude}
-                  : undefined
-              }
-              onLocationSelect={selectedLocation => {
-                setLatitude(selectedLocation.latitude);
-                setLongitude(selectedLocation.longitude);
-                if (selectedLocation.address) {
-                  setLocation(selectedLocation.address);
+              initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
+              onLocationSelect={(locationData) => {
+                setLatitude(locationData.latitude);
+                setLongitude(locationData.longitude);
+                if (locationData.address) {
+                  setLocation(locationData.address);
                 }
                 setLocationPickerVisible(false);
               }}
               onClose={() => setLocationPickerVisible(false)}
             />
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Bedrooms <Text style={styles.required}>*</Text>
-              </Text>
-              <View style={styles.numberButtonsContainer}>
-                {[1, 2, 3, 4, 5].map(num => (
+            {fieldVisibility.showBedrooms && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  {propertyType === 'Studio Apartment' ? 'Studio' : 'Bedrooms'} 
+                  {fieldVisibility.bedroomsRequired && <Text style={styles.required}>*</Text>}
+                </Text>
+                {propertyType === 'Studio Apartment' ? (
+                  <View style={styles.studioButton}>
+                    <Text style={styles.studioButtonText}>Studio (0 Bedrooms)</Text>
+                  </View>
+                ) : (
+                  <View style={styles.numberButtonsContainer}>
+                    {[1, 2, 3, 4, 5].map(num => (
+                      <TouchableOpacity
+                        key={num}
+                        style={[
+                          styles.numberButton,
+                          bedrooms === num && styles.numberButtonActive,
+                        ]}
+                        onPress={() => setBedrooms(num)}>
+                        <Text
+                          style={[
+                            styles.numberButtonText,
+                            bedrooms === num && styles.numberButtonTextActive,
+                          ]}>
+                          {num}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                      style={[
+                        styles.numberButton,
+                        bedrooms === 6 && styles.numberButtonActive,
+                      ]}
+                      onPress={() => setBedrooms(6)}>
+                      <Text
+                        style={[
+                          styles.numberButtonText,
+                          bedrooms === 6 && styles.numberButtonTextActive,
+                        ]}>
+                        5+
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {fieldVisibility.showBathrooms && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  Bathrooms {fieldVisibility.bathroomsRequired && <Text style={styles.required}>*</Text>}
+                </Text>
+                <View style={styles.numberButtonsContainer}>
+                  {[1, 2, 3, 4].map(num => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[
+                        styles.numberButton,
+                        bathrooms === num && styles.numberButtonActive,
+                      ]}
+                      onPress={() => setBathrooms(num)}>
+                      <Text
+                        style={[
+                          styles.numberButtonText,
+                          bathrooms === num && styles.numberButtonTextActive,
+                        ]}>
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                   <TouchableOpacity
-                    key={num}
                     style={[
                       styles.numberButton,
-                      bedrooms === num && styles.numberButtonActive,
+                      bathrooms === 5 && styles.numberButtonActive,
                     ]}
-                    onPress={() => setBedrooms(num)}>
+                    onPress={() => setBathrooms(5)}>
                     <Text
                       style={[
                         styles.numberButtonText,
-                        bedrooms === num && styles.numberButtonTextActive,
+                        bathrooms === 5 && styles.numberButtonTextActive,
                       ]}>
-                      {num}
+                      4+
                     </Text>
                   </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.numberButton,
-                    bedrooms === 6 && styles.numberButtonActive,
-                  ]}
-                  onPress={() => setBedrooms(6)}>
-                  <Text
-                    style={[
-                      styles.numberButtonText,
-                      bedrooms === 6 && styles.numberButtonTextActive,
-                    ]}>
-                    5+
-                  </Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            )}
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Bathrooms <Text style={styles.required}>*</Text>
-              </Text>
-              <View style={styles.numberButtonsContainer}>
-                {[1, 2, 3, 4].map(num => (
+            {fieldVisibility.showBalconies && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Balconies</Text>
+                <View style={styles.numberButtonsContainer}>
+                  {[0, 1, 2, 3].map(num => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[
+                        styles.numberButton,
+                        balconies === num && styles.numberButtonActive,
+                      ]}
+                      onPress={() => setBalconies(num)}>
+                      <Text
+                        style={[
+                          styles.numberButtonText,
+                          balconies === num && styles.numberButtonTextActive,
+                        ]}>
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                   <TouchableOpacity
-                    key={num}
                     style={[
                       styles.numberButton,
-                      bathrooms === num && styles.numberButtonActive,
+                      balconies === 4 && styles.numberButtonActive,
                     ]}
-                    onPress={() => setBathrooms(num)}>
+                    onPress={() => setBalconies(4)}>
                     <Text
                       style={[
                         styles.numberButtonText,
-                        bathrooms === num && styles.numberButtonTextActive,
+                        balconies === 4 && styles.numberButtonTextActive,
                       ]}>
-                      {num}
+                      3+
                     </Text>
                   </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.numberButton,
-                    bathrooms === 5 && styles.numberButtonActive,
-                  ]}
-                  onPress={() => setBathrooms(5)}>
-                  <Text
-                    style={[
-                      styles.numberButtonText,
-                      bathrooms === 5 && styles.numberButtonTextActive,
-                    ]}>
-                    4+
-                  </Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Balconies</Text>
-              <View style={styles.numberButtonsContainer}>
-                {[0, 1, 2, 3].map(num => (
-                  <TouchableOpacity
-                    key={num}
-                    style={[
-                      styles.numberButton,
-                      balconies === num && styles.numberButtonActive,
-                    ]}
-                    onPress={() => setBalconies(num)}>
-                    <Text
-                      style={[
-                        styles.numberButtonText,
-                        balconies === num && styles.numberButtonTextActive,
-                      ]}>
-                      {num}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.numberButton,
-                    balconies === 4 && styles.numberButtonActive,
-                  ]}
-                  onPress={() => setBalconies(4)}>
-                  <Text
-                    style={[
-                      styles.numberButtonText,
-                      balconies === 4 && styles.numberButtonTextActive,
-                    ]}>
-                    3+
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Built-up Area <Text style={styles.required}>*</Text>
+                {fieldVisibility.areaLabel} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.areaInputContainer}>
                 <TextInput
                   style={[styles.input, styles.areaInput]}
-                  placeholder="Enter area"
+                  placeholder={fieldVisibility.areaLabel === 'Plot Area' ? 'Enter plot area' : 'Enter area'}
                   placeholderTextColor={colors.textSecondary}
                   value={builtUpArea}
                   onChangeText={setBuiltUpArea}
@@ -609,77 +703,98 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Carpet Area</Text>
-              <View style={styles.areaInputContainer}>
+            {fieldVisibility.showCarpetArea && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Carpet Area</Text>
+                <View style={styles.areaInputContainer}>
+                  <TextInput
+                    style={[styles.input, styles.areaInput]}
+                    placeholder="Enter area"
+                    placeholderTextColor={colors.textSecondary}
+                    value={carpetArea}
+                    onChangeText={setCarpetArea}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.areaUnit}>sq.ft</Text>
+                </View>
+              </View>
+            )}
+
+            {fieldVisibility.showFloor && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Floor Number</Text>
                 <TextInput
-                  style={[styles.input, styles.areaInput]}
-                  placeholder="Enter area"
+                  style={styles.input}
+                  placeholder="e.g., 5 or Ground"
                   placeholderTextColor={colors.textSecondary}
-                  value={carpetArea}
-                  onChangeText={setCarpetArea}
+                  value={floor}
+                  onChangeText={setFloor}
+                />
+              </View>
+            )}
+
+            {fieldVisibility.showTotalFloors && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Total Floors</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Total floors in building"
+                  placeholderTextColor={colors.textSecondary}
+                  value={totalFloors}
+                  onChangeText={setTotalFloors}
                   keyboardType="numeric"
                 />
-                <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
-            </View>
+            )}
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Total Floors</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Total floors in building"
-                placeholderTextColor={colors.textSecondary}
-                value={totalFloors}
-                onChangeText={setTotalFloors}
-                keyboardType="numeric"
+            {fieldVisibility.showFacing && (
+              <Dropdown
+                label="Facing"
+                placeholder="Select facing direction"
+                options={[
+                  {label: 'North', value: 'North'},
+                  {label: 'South', value: 'South'},
+                  {label: 'East', value: 'East'},
+                  {label: 'West', value: 'West'},
+                  {label: 'North-East', value: 'North-East'},
+                  {label: 'North-West', value: 'North-West'},
+                  {label: 'South-East', value: 'South-East'},
+                  {label: 'South-West', value: 'South-West'},
+                ]}
+                value={facing}
+                onSelect={setFacing}
               />
-            </View>
+            )}
 
-            <Dropdown
-              label="Facing"
-              placeholder="Select facing direction"
-              options={[
-                {label: 'North', value: 'north'},
-                {label: 'South', value: 'south'},
-                {label: 'East', value: 'east'},
-                {label: 'West', value: 'west'},
-                {label: 'North-East', value: 'north-east'},
-                {label: 'North-West', value: 'north-west'},
-                {label: 'South-East', value: 'south-east'},
-                {label: 'South-West', value: 'south-west'},
-              ]}
-              value={facing}
-              onSelect={setFacing}
-            />
+            {fieldVisibility.showAge && (
+              <Dropdown
+                label="Property Age"
+                placeholder="Select property age"
+                options={[
+                  {label: 'New Construction', value: 'New Construction'},
+                  {label: 'Less than 1 Year', value: 'Less than 1 Year'},
+                  {label: '1-5 Years', value: '1-5 Years'},
+                  {label: '5-10 Years', value: '5-10 Years'},
+                  {label: '10+ Years', value: '10+ Years'},
+                ]}
+                value={propertyAge}
+                onSelect={setPropertyAge}
+              />
+            )}
 
-            <Dropdown
-              label="Property Age"
-              placeholder="Select property age"
-              options={[
-                {label: 'Under Construction', value: 'under-construction'},
-                {label: '0-1 Years', value: '0-1'},
-                {label: '1-5 Years', value: '1-5'},
-                {label: '5-10 Years', value: '5-10'},
-                {label: '10-15 Years', value: '10-15'},
-                {label: '15-20 Years', value: '15-20'},
-                {label: '20+ Years', value: '20+'},
-              ]}
-              value={propertyAge}
-              onSelect={setPropertyAge}
-            />
-
-            <Dropdown
-              label="Furnishing"
-              placeholder="Select furnishing status"
-              options={[
-                {label: 'Unfurnished', value: 'unfurnished'},
-                {label: 'Semi-Furnished', value: 'semi-furnished'},
-                {label: 'Fully Furnished', value: 'fully-furnished'},
-              ]}
-              value={furnishing}
-              onSelect={setFurnishing}
-            />
+            {fieldVisibility.showFurnishing && (
+              <Dropdown
+                label="Furnishing"
+                placeholder="Select furnishing status"
+                options={[
+                  {label: 'Unfurnished', value: 'Unfurnished'},
+                  {label: 'Semi-Furnished', value: 'Semi-Furnished'},
+                  {label: 'Fully-Furnished', value: 'Fully-Furnished'},
+                ]}
+                value={furnishing}
+                onSelect={setFurnishing}
+              />
+            )}
           </View>
         );
 
@@ -694,7 +809,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Select Amenities</Text>
               <View style={styles.amenitiesGrid}>
-                {amenitiesList.map(amenity => (
+                {availableAmenities.map(amenity => (
                   <TouchableOpacity
                     key={amenity.id}
                     style={[
@@ -723,7 +838,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Describe your property in detail. Mention unique features, nearby landmarks, connectivity, etc."
+                placeholder="Describe your property in detail (minimum 100 characters required). Mention unique features, nearby landmarks, connectivity, etc. Note: Mobile numbers and email addresses are not allowed."
                 placeholderTextColor={colors.textSecondary}
                 value={description}
                 onChangeText={setDescription}
@@ -732,7 +847,14 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 textAlignVertical="top"
                 maxLength={1000}
               />
-              <Text style={styles.charCount}>{description.length}/1000</Text>
+              <Text style={styles.charCount}>
+                Characters: {description.length}/1000 (min: 100)
+              </Text>
+              {description.length > 0 && description.length < 100 && (
+                <Text style={styles.errorText}>
+                  Description must be at least 100 characters
+                </Text>
+              )}
             </View>
           </View>
         );
@@ -814,13 +936,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Expected Price <Text style={styles.required}>*</Text>
+                {propertyStatus === 'sell' ? 'Expected Price' : 'Monthly Rent'} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.priceInputContainer}>
                 <Text style={styles.currencySymbol}>₹</Text>
                 <TextInput
                   style={[styles.input, styles.priceInput]}
-                  placeholder="Enter expected price"
+                  placeholder={propertyStatus === 'sell' ? 'Enter expected price' : 'Enter monthly rent'}
                   placeholderTextColor={colors.textSecondary}
                   value={expectedPrice}
                   onChangeText={setExpectedPrice}
@@ -840,6 +962,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.checkboxLabel}>Price is negotiable</Text>
               </TouchableOpacity>
             </View>
+
+            {propertyStatus === 'rent' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Deposit Amount</Text>
+                <View style={styles.priceInputContainer}>
+                  <Text style={styles.currencySymbol}>₹</Text>
+                  <TextInput
+                    style={[styles.input, styles.priceInput]}
+                    placeholder="Enter deposit amount"
+                    placeholderTextColor={colors.textSecondary}
+                    value={depositAmount}
+                    onChangeText={setDepositAmount}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Maintenance (per month)</Text>
@@ -869,15 +1008,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Type:</Text>
                 <Text style={styles.summaryValue}>
-                  {propertyCategory === 'apartment'
-                    ? 'Apartment'
-                    : propertyCategory === 'villa'
-                    ? 'Villa / Banglow'
-                    : propertyCategory === 'house'
-                    ? 'Independent House'
-                    : propertyCategory === 'rowhouse'
-                    ? 'Row House/ Farm House'
-                    : 'N/A'}
+                  {propertyType || 'N/A'}
                 </Text>
               </View>
               <View style={styles.summaryRow}>
@@ -1039,6 +1170,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    minHeight: 70,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -1183,6 +1315,12 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: spacing.xs,
   },
+  errorText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 12,
+    marginTop: spacing.xs,
+  },
   typeButtonsContainer: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -1300,6 +1438,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  studioButton: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  studioButtonText: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
   },
   numberButton: {
     width: 60,

@@ -1,93 +1,145 @@
-import api from './api.service';
-import {API_ENDPOINTS} from '../config/api.config';
-
 /**
- * Notification Service
- * 
- * Note: Backend notification endpoints need to be implemented.
- * This service is ready to use once backend endpoints are available.
+ * Firebase Cloud Messaging (FCM) Notification Service
+ * Handles push notifications for new chat messages
  */
-export const notificationService = {
-  // Get all notifications for current user
-  getNotifications: async (page: number = 1, limit: number = 20) => {
+
+import messaging from '@react-native-firebase/messaging';
+import {Alert, Platform} from 'react-native';
+
+class NotificationService {
+  private fcmToken: string | null = null;
+  private chatListRefreshCallback: (() => void) | null = null;
+
+  /**
+   * Request notification permissions and get FCM token
+   */
+  async requestPermission(): Promise<string | null> {
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(limit),
-      });
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+      if (enabled) {
+        console.log('[Notifications] Authorization status:', authStatus);
+        
+        // Get FCM token
+        const token = await messaging().getToken();
+        this.fcmToken = token;
+        console.log('[Notifications] FCM Token:', token);
+        
+        // TODO: Send token to backend to associate with user
+        // await api.post('/users/fcm-token', { fcmToken: token });
+        
+        return token;
+      } else {
+        console.log('[Notifications] Permission not granted');
+        return null;
+      }
+    } catch (error) {
+      console.error('[Notifications] Error requesting permission:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get current FCM token
+   */
+  async getToken(): Promise<string | null> {
+    try {
+      if (!this.fcmToken) {
+        this.fcmToken = await messaging().getToken();
+      }
+      return this.fcmToken;
+    } catch (error) {
+      console.error('[Notifications] Error getting token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Register a callback to refresh chat list when notifications arrive
+   */
+  setChatListRefreshCallback(callback: (() => void) | null) {
+    this.chatListRefreshCallback = callback;
+    console.log('[Notifications] Chat list refresh callback registered');
+  }
+
+  /**
+   * Trigger chat list refresh if callback is registered
+   */
+  private triggerChatListRefresh() {
+    if (this.chatListRefreshCallback) {
+      console.log('[Notifications] Triggering chat list refresh');
+      this.chatListRefreshCallback();
+    }
+  }
+
+  /**
+   * Initialize notification listeners
+   */
+  initialize() {
+    // Foreground message handler - app is open
+    messaging().onMessage(async remoteMessage => {
+      console.log('[Notifications] Message received in foreground:', remoteMessage);
       
-      const response = await api.get(
-        `${API_ENDPOINTS.NOTIFICATIONS_LIST}?${params.toString()}`,
-      );
-      return response;
-    } catch (error: any) {
-      if (error.status === 404) {
-        return {
-          success: false,
-          message: 'Notifications endpoint not available',
-          data: {
-            notifications: [],
-            pagination: {
-              current_page: page,
-              total_pages: 0,
-              total: 0,
-            },
-          },
-        };
+      // Trigger chat list refresh when new message notification arrives
+      if (remoteMessage.data?.type === 'chat' || remoteMessage.notification) {
+        this.triggerChatListRefresh();
       }
-      throw error;
-    }
-  },
+      
+      if (remoteMessage.notification) {
+        // Show local notification when app is in foreground
+        Alert.alert(
+          remoteMessage.notification.title || 'New Message',
+          remoteMessage.notification.body || 'You have a new message',
+          [{text: 'OK'}],
+        );
+      }
+    });
 
-  // Mark notification as read
-  markAsRead: async (notificationId: string | number) => {
-    try {
-      const response = await api.post(API_ENDPOINTS.NOTIFICATIONS_MARK_READ, {
-        notification_id: notificationId,
+    // Note: Background message handler is registered in index.js
+    // This is required for React Native Firebase - must be at top level
+
+    // Notification opened from quit state
+    messaging()
+      .getInitialNotification()
+      .then(remoteMessage => {
+        if (remoteMessage) {
+          console.log('[Notifications] Notification opened from quit state:', remoteMessage);
+          // Handle navigation to chat if needed
+        }
       });
-      return response;
-    } catch (error: any) {
-      if (error.status === 404) {
-        throw new Error('Mark as read endpoint not available');
-      }
-      throw error;
-    }
-  },
 
-  // Delete notification
-  deleteNotification: async (notificationId: string | number) => {
-    try {
-      const response = await api.delete(
-        `${API_ENDPOINTS.NOTIFICATIONS_DELETE}?id=${notificationId}`,
-      );
-      return response;
-    } catch (error: any) {
-      if (error.status === 404) {
-        throw new Error('Delete notification endpoint not available');
+    // Notification opened from background state
+    messaging().onNotificationOpenedApp(remoteMessage => {
+      console.log('[Notifications] Notification opened from background:', remoteMessage);
+      // Trigger refresh when notification is opened
+      if (remoteMessage.data?.type === 'chat' || remoteMessage.notification) {
+        this.triggerChatListRefresh();
       }
-      throw error;
-    }
-  },
+      // Handle navigation to chat if needed
+    });
 
-  // Register device for push notifications (FCM)
-  registerDevice: async (fcmToken: string, deviceType: string = 'android', deviceId?: string) => {
-    try {
-      const response = await api.post(API_ENDPOINTS.NOTIFICATIONS_REGISTER_DEVICE, {
-        fcmToken,
-        deviceType,
-        deviceId,
-      });
-      return response;
-    } catch (error: any) {
-      if (error.status === 404) {
-        console.warn('Device registration endpoint not available');
-        return {
-          success: false,
-          message: 'Device registration endpoint not available',
-        };
-      }
-      throw error;
-    }
-  },
-};
+    // Token refresh handler
+    messaging().onTokenRefresh(token => {
+      console.log('[Notifications] FCM Token refreshed:', token);
+      this.fcmToken = token;
+      // TODO: Update token in backend
+      // await api.post('/users/fcm-token', { fcmToken: token });
+    });
+  }
 
+  /**
+   * Create notification channel for Android (required for Android 8.0+)
+   */
+  async createNotificationChannel() {
+    if (Platform.OS === 'android') {
+      // Android notification channels are created automatically by React Native Firebase
+      // But you can customize them if needed
+      console.log('[Notifications] Android notification channel will be created automatically');
+    }
+  }
+}
+
+export const notificationService = new NotificationService();

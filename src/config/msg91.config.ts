@@ -3,6 +3,40 @@
  * 
  * Widget IDs and Auth Tokens for Email and SMS OTP verification
  * These are provided by MSG91 dashboard
+ * 
+ * VERIFIED CREDENTIALS (Updated):
+ * - SMS Widget ID: 356c7067734f373437333438 ✓
+ * - SMS Auth Token (Token ID): 481618TcNAx989nvQ69410832P1 ✓
+ * - SMS Auth Key (API Key): 481618A2cCSUpaZHTW6936c356P1 (for backend API)
+ * - SMS Template ID: 356c6c6c4141303836323334 (for backend API)
+ * 
+ * NOTE: The widget uses tokenAuth parameter which should be the Auth Token (Token ID).
+ * If widget still fails, try using SMS_AUTH_KEY instead of SMS_AUTH_TOKEN in MSG91WebWidget.tsx
+ * 
+ * FORMAT REQUIREMENTS:
+ * - Widget ID: Should be a hex string (usually 24 characters)
+ * - Auth Token: Should start with numbers and contain alphanumeric characters
+ * - Phone number format: Should be 91XXXXXXXXXX (no + sign, 12 digits total)
+ * 
+ * IMPORTANT: MOBILE INTEGRATION MUST BE ENABLED
+ * - Go to MSG91 Dashboard → OTP → Your Widget → Settings
+ * - Enable "Mobile Integration" option
+ * - Without this, you'll get error: "Mobile requests are not allowed for this widget"
+ * 
+ * IMPORTANT: IP WHITELISTING
+ * - If you get "IPBlocked" error (code 408), your IP is blocked
+ * - Go to MSG91 Dashboard → Settings → IP Whitelisting
+ * - Either whitelist your IP address OR disable IP whitelisting
+ * - For production apps, disable IP whitelisting to allow all users
+ * 
+ * TROUBLESHOOTING:
+ * If widget fails, check:
+ * 1. ✅ Mobile Integration is ENABLED in widget settings (REQUIRED for React Native)
+ * 2. ✅ IP Whitelisting is DISABLED or your IP is whitelisted (to avoid IPBlocked errors)
+ * 3. Widget ID and Auth Token are correct in MSG91 dashboard
+ * 4. Widget is active/enabled in MSG91 dashboard
+ * 5. Check browser console logs for detailed error messages
+ * 6. Try using Auth Key instead of Auth Token (uncomment line 59 in MSG91WebWidget.tsx)
  */
 export const MSG91_CONFIG = {
   // Email Verification Widget ID
@@ -14,8 +48,14 @@ export const MSG91_CONFIG = {
   // SMS Widget ID (for Registration)
   SMS_WIDGET_ID: '356c7067734f373437333438',
   
-  // SMS Auth Token (for Registration)
+  // SMS Auth Token (Token ID) - Used for widget initialization
   SMS_AUTH_TOKEN: '481618TcNAx989nvQ69410832P1',
+  
+  // SMS Auth Key (API Key) - Used for backend API calls
+  SMS_AUTH_KEY: '481618A2cCSUpaZHTW6936c356P1',
+  
+  // SMS Template ID - Used for backend API calls
+  SMS_TEMPLATE_ID: '356c6c6c4141303836323334',
   
   // Forgot Password SMS Widget ID
   FORGOT_PASSWORD_WIDGET_ID: '356c686b6c57353338333631',
@@ -38,9 +78,10 @@ export const initializeMSG91 = async () => {
     const {OTPWidget} = require('@msg91comm/sendotp-react-native');
     
     // Initialize with SMS Widget (default, can be switched for email)
+    // FIX: Pass tokenAuth as string, not object (per MSG91 SDK docs)
     OTPWidget.initializeWidget(
       MSG91_CONFIG.SMS_WIDGET_ID,
-      {authToken: MSG91_CONFIG.SMS_AUTH_TOKEN}
+      MSG91_CONFIG.SMS_AUTH_TOKEN
     );
     
     currentWidgetId = MSG91_CONFIG.SMS_WIDGET_ID;
@@ -63,9 +104,10 @@ export const switchToEmailWidget = async () => {
     const {OTPWidget} = require('@msg91comm/sendotp-react-native');
     
     if (currentWidgetId !== MSG91_CONFIG.EMAIL_WIDGET_ID) {
+      // FIX: Pass tokenAuth as string, not object (per MSG91 SDK docs)
       OTPWidget.initializeWidget(
         MSG91_CONFIG.EMAIL_WIDGET_ID,
-        {authToken: MSG91_CONFIG.EMAIL_AUTH_TOKEN}
+        MSG91_CONFIG.EMAIL_AUTH_TOKEN
       );
       
       currentWidgetId = MSG91_CONFIG.EMAIL_WIDGET_ID;
@@ -89,9 +131,10 @@ export const switchToSMSWidget = async () => {
     const {OTPWidget} = require('@msg91comm/sendotp-react-native');
     
     if (currentWidgetId !== MSG91_CONFIG.SMS_WIDGET_ID) {
+      // FIX: Pass tokenAuth as string, not object (per MSG91 SDK docs)
       OTPWidget.initializeWidget(
         MSG91_CONFIG.SMS_WIDGET_ID,
-        {authToken: MSG91_CONFIG.SMS_AUTH_TOKEN}
+        MSG91_CONFIG.SMS_AUTH_TOKEN
       );
       
       currentWidgetId = MSG91_CONFIG.SMS_WIDGET_ID;
@@ -115,9 +158,10 @@ export const switchToForgotPasswordWidget = async () => {
     const {OTPWidget} = require('@msg91comm/sendotp-react-native');
     
     if (currentWidgetId !== MSG91_CONFIG.FORGOT_PASSWORD_WIDGET_ID) {
+      // FIX: Pass tokenAuth as string, not object (per MSG91 SDK docs)
       OTPWidget.initializeWidget(
         MSG91_CONFIG.FORGOT_PASSWORD_WIDGET_ID,
-        {authToken: MSG91_CONFIG.FORGOT_PASSWORD_AUTH_TOKEN}
+        MSG91_CONFIG.FORGOT_PASSWORD_AUTH_TOKEN
       );
       
       currentWidgetId = MSG91_CONFIG.FORGOT_PASSWORD_WIDGET_ID;

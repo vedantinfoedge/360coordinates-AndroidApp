@@ -104,9 +104,22 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const handleReply = (inquiryId: string | number) => {
-    // Navigate to reply screen or show reply modal
-    Alert.alert('Reply', 'Reply functionality will be implemented');
+  const handleReply = (inquiry: Inquiry) => {
+    // Navigate to chat conversation with the buyer
+    const buyerId = inquiry.id || inquiry.property_id;
+    const buyerName = inquiry.buyer_name || 'Buyer';
+    const propertyId = inquiry.property_id;
+    const propertyTitle = inquiry.property_title || 'Property';
+    
+    navigation.navigate('Chat' as any, {
+      screen: 'ChatConversation',
+      params: {
+        userId: Number(buyerId),
+        userName: buyerName,
+        propertyId: Number(propertyId),
+        propertyTitle: propertyTitle,
+      },
+    });
   };
 
   const renderInquiry = ({item}: {item: Inquiry}) => (
@@ -142,8 +155,8 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
         )}
         <TouchableOpacity
           style={[styles.actionButton, styles.replyButton]}
-          onPress={() => handleReply(item.id)}>
-          <Text style={[styles.actionButtonText, styles.replyButtonText]}>Reply</Text>
+          onPress={() => handleReply(item)}>
+          <Text style={[styles.actionButtonText, styles.replyButtonText]}>💬 Chat</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

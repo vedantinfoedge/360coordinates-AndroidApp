@@ -10,7 +10,9 @@ import {
   Image,
   Alert,
   Platform,
+  Animated,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -22,7 +24,7 @@ import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuyerTabParamList, 'Profile'>,
+  BottomTabNavigationProp<any, 'Profile'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -31,7 +33,25 @@ type Props = {
 };
 
 const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout} = useAuth();
+  const {user, logout, isAuthenticated} = useAuth();
+  const insets = useSafeAreaInsets();
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(30)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const userData = user || {
     full_name: 'User',
@@ -161,6 +181,52 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
+  // Show login prompt if user is not authenticated
+  if (!isAuthenticated || !user) {
+    return (
+      <View style={styles.container}>
+        <BuyerHeader
+          onProfilePress={() => {}}
+          onSupportPress={() => {}}
+          onLogoutPress={() => {}}
+        />
+        <Animated.View
+          style={[
+            styles.loginContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{translateY: slideAnim}],
+              paddingTop: insets.top + 70,
+            },
+          ]}>
+          <View style={styles.loginContent}>
+            <View style={styles.loginIconContainer}>
+              <Text style={styles.loginIcon}>👤</Text>
+            </View>
+            <Text style={styles.loginTitle}>Login Required</Text>
+            <Text style={styles.loginSubtitle}>
+              Please login to view and manage your profile
+            </Text>
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={() => {
+                navigation.navigate('Auth' as never, {
+                  screen: 'Login',
+                  params: {returnTo: 'Profile'},
+                } as never);
+              }}
+              activeOpacity={0.8}>
+              <Text style={styles.loginButtonText}>Login / Register</Text>
+            </TouchableOpacity>
+            <Text style={styles.loginNote}>
+              Login to access your favorites, inquiries, and saved properties
+            </Text>
+          </View>
+        </Animated.View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Custom Header */}
@@ -169,12 +235,15 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           // Already on profile page
         }}
         onSupportPress={() => {
-          // Handle support
+          navigation.navigate('Support' as never);
         }}
         onLogoutPress={handleLogout}
       />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{paddingTop: insets.top + 60}}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
@@ -542,6 +611,79 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
     marginLeft: spacing.lg,
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  loginContent: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    borderWidth: 2,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loginIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  loginIcon: {
+    fontSize: 50,
+  },
+  loginTitle: {
+    ...typography.h1,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  loginSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 22,
+  },
+  loginButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  loginButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  loginNote: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 18,
   },
 });
 

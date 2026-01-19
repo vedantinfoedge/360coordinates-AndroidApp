@@ -10,7 +10,7 @@ import {colors} from '../theme';
 
 export type AuthStackParamList = {
   Onboarding: undefined;
-  Login: undefined;
+  Login: {returnTo?: string; propertyId?: string; autoShowContact?: boolean; userType?: string; targetDashboard?: string; requireAuth?: boolean} | undefined;
   Register: undefined;
   ForgotPassword: undefined;
   OTPVerification: {userId?: number; user_id?: number; phone?: string; email?: string; type?: 'register' | 'forgotPassword'};

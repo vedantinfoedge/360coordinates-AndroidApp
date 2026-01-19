@@ -28,7 +28,7 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.safeArea, {paddingTop: insets.top}]}>
+    <View style={[styles.safeArea, styles.stickyHeader, {paddingTop: insets.top}]}>
       <View style={styles.header}>
         {/* Logo */}
         <TouchableOpacity
@@ -130,12 +130,16 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  stickyHeader: {
+    position: 'relative',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
+    minHeight: 70,
     backgroundColor: '#022b5f', // Navbar bg color
     borderBottomWidth: 0,
   },
@@ -144,8 +148,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   logoImage: {
-    width: 120,
-    height: 32,
+    width: 140,
+    height: 40,
   },
   menuButton: {
     padding: spacing.xs,

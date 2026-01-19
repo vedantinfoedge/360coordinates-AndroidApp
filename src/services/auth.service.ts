@@ -12,6 +12,8 @@ export const authService = {
     userType: string;
     emailVerificationToken?: string;
     phoneVerificationToken?: string;
+    emailOtp?: string; // Backend OTP fallback
+    phoneOtp?: string; // Backend OTP fallback
   }) => {
     // Map to backend expected format
     const registerData: any = {
@@ -22,12 +24,20 @@ export const authService = {
       userType: userData.userType,
     };
     
-    // Add MSG91 tokens if provided
+    // Add MSG91 tokens if provided (preferred method)
     if (userData.emailVerificationToken) {
       registerData.emailVerificationToken = userData.emailVerificationToken;
     }
     if (userData.phoneVerificationToken) {
       registerData.phoneVerificationToken = userData.phoneVerificationToken;
+    }
+    
+    // Add backend OTP fallback if MSG91 tokens not available
+    if (!userData.emailVerificationToken && userData.emailOtp) {
+      registerData.emailOtp = userData.emailOtp;
+    }
+    if (!userData.phoneVerificationToken && userData.phoneOtp) {
+      registerData.phoneOtp = userData.phoneOtp;
     }
     
     const response = await api.post(API_ENDPOINTS.REGISTER, registerData);
@@ -214,9 +224,46 @@ export const authService = {
   },
 
   // Get current user
-  getCurrentUser: async () => {
+  // Uses correct endpoint based on user type: /api/buyer/profile/get.php or /api/seller/profile/get.php
+  // Note: userType here is the login type (buyer/seller/agent), not the registered type
+  getCurrentUser: async (userType?: string) => {
     try {
-      const response = await api.get(API_ENDPOINTS.USER_PROFILE);
+      // Determine user type from parameter or from stored user data
+      let finalUserType = userType;
+      if (!finalUserType) {
+        try {
+          const userData = await AsyncStorage.getItem('@propertyapp_user');
+          if (userData) {
+            const parsed = JSON.parse(userData);
+            finalUserType = parsed.user_type;
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+      
+      // Normalize user type
+      const normalizedUserType = finalUserType?.toLowerCase() || 'buyer';
+      
+      // Use correct endpoint based on user type
+      // Buyers and Sellers use different endpoints, Agents might use seller endpoint or need their own
+      let endpoint: string;
+      if (normalizedUserType === 'buyer') {
+        endpoint = API_ENDPOINTS.BUYER_PROFILE_GET;
+      } else if (normalizedUserType === 'seller') {
+        endpoint = API_ENDPOINTS.SELLER_PROFILE_GET;
+      } else if (normalizedUserType === 'agent') {
+        // Agents might use seller endpoint or need their own endpoint
+        // For now, use seller endpoint (backend might handle it)
+        endpoint = API_ENDPOINTS.SELLER_PROFILE_GET;
+      } else {
+        // Default to buyer for unknown types
+        endpoint = API_ENDPOINTS.BUYER_PROFILE_GET;
+      }
+      
+      console.log('[AuthService] Fetching profile from:', endpoint, 'for userType:', normalizedUserType);
+      
+      const response = await api.get(endpoint);
       return response;
     } catch (error: any) {
       // If 404, the endpoint might not exist yet - return graceful error

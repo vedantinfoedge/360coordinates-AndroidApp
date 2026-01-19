@@ -50,9 +50,21 @@ export const sellerService = {
     limit?: number;
     status?: 'sale' | 'rent';
   }) => {
-    const response = await api.get(API_ENDPOINTS.SELLER_PROPERTIES_LIST, {
-      params,
-    });
+    // Build query string for GET request
+    let url = API_ENDPOINTS.SELLER_PROPERTIES_LIST;
+    if (params) {
+      const queryParams = new URLSearchParams();
+      if (params.page) queryParams.append('page', String(params.page));
+      if (params.limit) queryParams.append('limit', String(params.limit));
+      if (params.status) queryParams.append('status', params.status);
+      const queryString = queryParams.toString();
+      if (queryString) {
+        url += `?${queryString}`;
+      }
+    }
+    console.log('[SellerService] Fetching properties from:', url);
+    const response = await api.get(url);
+    console.log('[SellerService] Properties response:', JSON.stringify(response, null, 2));
     return response;
   },
 

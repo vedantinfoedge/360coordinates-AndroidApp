@@ -49,6 +49,7 @@ interface PropertyMapViewProps {
   initialZoom?: number;
   showListToggle?: boolean;
   listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel';
+  selectedPropertyId?: string | number; // Property ID to highlight on map
 }
 
 const PropertyMapView: React.FC<PropertyMapViewProps> = ({
@@ -58,14 +59,22 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   initialZoom = 12,
   showListToggle = true,
   listingType = 'all',
+  selectedPropertyId: propSelectedPropertyId,
 }) => {
   const [properties, setProperties] = useState<Property[]>(initialProperties || []);
   const [loading, setLoading] = useState(!initialProperties);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
+    propSelectedPropertyId ? String(propSelectedPropertyId) : null
+  );
   const [isFavorite, setIsFavorite] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(initialCenter);
+  const [mapZoom, setMapZoom] = useState<number>(initialZoom);
+  
+  // Store current property ID (from PropertyDetailsScreen) separately
+  const currentPropertyId = propSelectedPropertyId ? String(propSelectedPropertyId) : null;
 
   useEffect(() => {
     if (!initialProperties) {
@@ -89,6 +98,121 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       setProperties(filtered);
     }
   }, [listingType, initialProperties]);
+
+  // Load selected property and center map on it
+  useEffect(() => {
+    if (propSelectedPropertyId) {
+      loadSelectedPropertyAndRelated();
+    }
+  }, [propSelectedPropertyId]);
+
+  const loadSelectedPropertyAndRelated = async () => {
+    if (!propSelectedPropertyId) return;
+    
+    try {
+      setLoading(true);
+      
+      // Load the selected property details
+      const propertyResponse = await propertyService.getPropertyDetails(propSelectedPropertyId);
+      const responseData = propertyResponse as any;
+      
+      if (responseData && responseData.success && responseData.data?.property) {
+        const currentProperty = responseData.data.property;
+        
+        // If property has coordinates, center map on it
+        if (currentProperty.latitude && currentProperty.longitude) {
+          const lat = parseFloat(currentProperty.latitude);
+          const lng = parseFloat(currentProperty.longitude);
+          setMapCenter([lng, lat]);
+          setMapZoom(14); // Zoom in closer for single property
+          
+          // Set as selected property
+          const formattedProperty: Property = {
+            id: currentProperty.id,
+            title: currentProperty.title || currentProperty.property_title || 'Property',
+            location: currentProperty.location || currentProperty.city || 'Location not specified',
+            price: parseFloat(currentProperty.price || '0'),
+            status: currentProperty.status || currentProperty.property_status || 'sale',
+            latitude: lat,
+            longitude: lng,
+            cover_image: currentProperty.cover_image || currentProperty.image,
+          };
+          
+          setSelectedProperty(formattedProperty);
+          setSelectedPropertyId(String(currentProperty.id));
+          checkFavoriteStatus(String(currentProperty.id));
+          
+          // Load related properties (same area, similar type)
+          await loadRelatedProperties(lat, lng, currentProperty.status || currentProperty.property_status);
+        }
+      }
+    } catch (error) {
+      log.error('property', 'Error loading selected property', error);
+      // Fallback to regular property loading
+      loadProperties();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRelatedProperties = async (centerLat: number, centerLng: number, propertyStatus?: string) => {
+    try {
+      // Build status filter based on listing type or property status
+      let statusFilter: 'sale' | 'rent' | 'pg' | undefined = undefined;
+      if (listingType === 'buy') {
+        statusFilter = 'sale';
+      } else if (listingType === 'rent') {
+        statusFilter = 'rent';
+      } else if (listingType === 'pg-hostel') {
+        statusFilter = 'pg';
+      } else if (propertyStatus) {
+        statusFilter = propertyStatus as 'sale' | 'rent' | 'pg';
+      }
+      
+      const params: any = {
+        limit: 50,
+        latitude: centerLat,
+        longitude: centerLng,
+        radius: 5, // 5km radius for related properties
+      };
+      
+      if (statusFilter) {
+        params.status = statusFilter;
+      }
+      
+      const response = await propertyService.getProperties(params);
+      
+      if (response.success && response.data?.properties) {
+        let formattedProperties = response.data.properties
+          .filter((prop: any) => 
+            prop.latitude && 
+            prop.longitude &&
+            String(prop.id) !== String(propSelectedPropertyId) // Exclude current property
+          )
+          .map((prop: any) => ({
+            id: prop.id,
+            title: prop.title || prop.property_title,
+            location: prop.location || prop.city || 'Location not specified',
+            price: parseFloat(prop.price || '0'),
+            status: prop.status || prop.property_status || 'sale',
+            property_type: prop.property_type || prop.type || '',
+            latitude: parseFloat(prop.latitude),
+            longitude: parseFloat(prop.longitude),
+            cover_image: prop.cover_image || prop.image,
+          }));
+        
+        // Add current property to the list if it exists
+        if (selectedProperty) {
+          formattedProperties = [selectedProperty, ...formattedProperties];
+        }
+        
+        setProperties(formattedProperties);
+        log.property(`Loaded ${formattedProperties.length} related properties for map`);
+      }
+    } catch (error) {
+      log.error('property', 'Error loading related properties', error);
+    }
+  };
 
   const loadProperties = async () => {
     try {
@@ -199,8 +323,20 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   };
 
   const getMarkerColor = (propertyId: string | number) => {
-    // Orange (#F97316) if selected, Purple (#8B5CF6) if not
-    return selectedPropertyId === String(propertyId) ? '#F97316' : '#8B5CF6';
+    const propIdStr = String(propertyId);
+    
+    // Green (#10B981) if it's the current property (from PropertyDetailsScreen)
+    if (currentPropertyId && currentPropertyId === propIdStr) {
+      return '#10B981'; // Green color for current property
+    }
+    
+    // Orange (#F97316) if selected/clicked on map
+    if (selectedPropertyId === propIdStr) {
+      return '#F97316'; // Orange color for selected property
+    }
+    
+    // Purple (#8B5CF6) for all other properties
+    return '#8B5CF6'; // Purple color for other properties
   };
 
   // Format price for marker display (as per guide: ₹X.XL format)
@@ -291,13 +427,13 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       {viewMode === 'map' && (
         <View style={styles.mapContainer}>
           <MapViewComponent
-            initialCenter={initialCenter}
-            initialZoom={initialZoom}
+            initialCenter={mapCenter || initialCenter}
+            initialZoom={mapZoom || initialZoom}
             markers={markers}
             interactive={true}
           />
 
-          {/* Selected Property Card - Popup (as per guide) */}
+          {/* Selected Property Card - Compact Popup (aside the pin) */}
           {selectedProperty && (
             <View style={styles.propertyCardOverlay}>
               <TouchableOpacity
@@ -319,7 +455,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                   setSelectedProperty(null);
                   setSelectedPropertyId(null);
                 }}>
-                {/* Image Section (65% height) */}
+                {/* Compact Image Section */}
                 <View style={styles.popupCardImageContainer}>
                   {selectedProperty.cover_image ? (
                     <Image
@@ -329,33 +465,13 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                     />
                   ) : (
                     <View style={styles.popupCardImagePlaceholder}>
-                      <Text style={styles.imagePlaceholderText}>No Image</Text>
+                      <Text style={styles.imagePlaceholderText}>📷</Text>
                     </View>
                   )}
                   
-                  {/* Image Overlay */}
+                  {/* Image Overlay - Compact */}
                   <View style={styles.popupCardImageOverlay}>
-                    {/* Left: Action Buttons */}
-                    <View style={styles.popupCardActionButtons}>
-                      <TouchableOpacity
-                        style={[styles.popupCardHeartBtn, isFavorite && styles.popupCardHeartBtnActive]}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleToggleFavorite();
-                        }}>
-                        <Text style={styles.actionButtonIcon}>{isFavorite ? '❤️' : '🤍'}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.popupCardShareBtn}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleShare();
-                        }}>
-                        <Text style={styles.actionButtonIcon}>🔗</Text>
-                      </TouchableOpacity>
-                    </View>
-                    
-                    {/* Right: Close Button */}
+                    {/* Close Button - Top Right */}
                     <TouchableOpacity
                       style={styles.popupCardCloseBtn}
                       onPress={(e) => {
@@ -368,18 +484,47 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                   </View>
                 </View>
                 
-                {/* Content Section (35% height) */}
+                {/* Compact Content Section */}
                 <View style={styles.popupCardContent}>
-                  <Text style={styles.popupCardTitle} numberOfLines={2}>
-                    {selectedProperty.title?.toUpperCase() || 'PROPERTY'}
+                  <Text style={styles.popupCardTitle} numberOfLines={1}>
+                    {selectedProperty.title || 'Property'}
                   </Text>
-                  <Text style={styles.popupCardDescription} numberOfLines={2}>
+                  <Text style={styles.popupCardDescription} numberOfLines={1}>
                     {selectedProperty.location || 'Location not specified'}
                   </Text>
                   <View style={styles.popupCardPriceSection}>
                     <Text style={styles.popupCardPrice}>
                       {formatters.price(selectedProperty.price, selectedProperty.status === 'rent')}
                     </Text>
+                  </View>
+                  {/* Action Buttons Row */}
+                  <View style={styles.popupCardActionRow}>
+                    <TouchableOpacity
+                      style={[styles.popupCardActionBtn, isFavorite && styles.popupCardActionBtnActive]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleToggleFavorite();
+                      }}>
+                      <Text style={styles.actionButtonText}>{isFavorite ? '❤️' : '🤍'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.popupCardActionBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleShare();
+                      }}>
+                      <Text style={styles.actionButtonText}>🔗</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.popupCardViewBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        if (onPropertyPress) {
+                          onPropertyPress(selectedProperty);
+                        }
+                      }}>
+                      <Text style={styles.viewButtonText}>View</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -474,8 +619,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: spacing.md,
+    paddingRight: spacing.md,
     zIndex: 1000,
+    pointerEvents: 'box-none',
   },
   overlayTouchable: {
     position: 'absolute',
@@ -483,31 +632,25 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   propertyCard: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    maxHeight: 450,
-    width: SCREEN_WIDTH < 768 ? '100%' : Math.min(380, SCREEN_WIDTH * 0.9),
-    minWidth: SCREEN_WIDTH < 480 ? 280 : 320,
-    maxWidth: 380,
+    borderRadius: 12,
+    width: Math.min(280, SCREEN_WIDTH * 0.75),
+    maxWidth: 280,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
     overflow: 'hidden',
-    alignSelf: 'center',
+    pointerEvents: 'auto',
   },
-  // Image Section (65% of card)
+  // Compact Image Section (50% of card)
   popupCardImageContainer: {
     width: '100%',
-    flex: 0,
-    height: '65%',
-    minHeight: 200,
-    maxHeight: 270,
+    height: 140,
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#F0F0F0',
@@ -515,7 +658,6 @@ const styles = StyleSheet.create({
   popupCardImage: {
     width: '100%',
     height: '100%',
-    minHeight: 200,
   },
   popupCardImagePlaceholder: {
     width: '100%',
@@ -525,8 +667,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
   },
   imagePlaceholderText: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontSize: 32,
   },
   popupCardImageOverlay: {
     position: 'absolute',
@@ -535,89 +676,85 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'flex-start',
-    padding: 12,
-  },
-  popupCardActionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-start',
-  },
-  popupCardHeartBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  popupCardHeartBtnActive: {
-    backgroundColor: 'rgba(220, 38, 38, 0.8)',
-  },
-  popupCardShareBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 8,
   },
   popupCardCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionButtonIcon: {
-    fontSize: 18,
-    color: '#FFFFFF',
-  },
   closeButtonIcon: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-  // Content Section (35% of card)
+  // Compact Content Section (50% of card)
   popupCardContent: {
-    paddingTop: 10,
-    paddingHorizontal: 14,
-    paddingBottom: 12,
-    flex: 0,
-    height: '35%',
-    justifyContent: 'space-between',
+    padding: spacing.sm,
+    paddingTop: spacing.xs,
   },
   popupCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 4,
+    lineHeight: 16,
+  },
+  popupCardDescription: {
+    fontSize: 11,
+    color: '#717171',
+    marginBottom: 6,
+    lineHeight: 14,
+  },
+  popupCardPriceSection: {
+    marginBottom: 8,
+  },
+  popupCardPrice: {
     fontSize: 15,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginTop: 10,
-    marginBottom: 3,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-    lineHeight: 19.5,
-    textTransform: 'uppercase',
   },
-  popupCardDescription: {
-    fontSize: 12,
-    color: '#717171',
-    marginTop: 3,
-    marginBottom: 0,
-    lineHeight: 16.8,
-  },
-  popupCardPriceSection: {
+  popupCardActionRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    marginTop: 8,
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
-  popupCardPrice: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
+  popupCardActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  popupCardActionBtnActive: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+  },
+  actionButtonText: {
+    fontSize: 14,
+  },
+  popupCardViewBtn: {
+    flex: 1,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  viewButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.surface,
   },
   listContent: {
     padding: spacing.md,

@@ -161,54 +161,46 @@ export const propertyService = {
     if (response && response.success && response.data) {
       const property = fixPropertyImages(response.data.property || response.data);
       
-      // Process images array - handle multiple formats
-      let images: any[] = [];
+      // Process images array - Backend returns array of string URLs
+      // Format: ["https://...", "https://...", ...]
+      let images: string[] = [];
+      
+      // Check response.data.images first (if backend returns it at top level)
       if (response.data.images && Array.isArray(response.data.images)) {
         images = response.data.images
           .map((img: any) => {
             if (typeof img === 'string') {
-              // If image is a string URL, convert to object format
-              return {
-                image_url: fixImageUrl(img),
-                url: fixImageUrl(img),
-              };
-            } else if (img && typeof img === 'object') {
-              // If image is an object, fix the URL fields
-              return {
-                ...img,
-                image_url: fixImageUrl(img.image_url || img.url || img.path || ''),
-                url: fixImageUrl(img.url || img.image_url || img.path || ''),
-              };
+              // Backend already provides full URLs, but we'll normalize them
+              const trimmed = img.trim();
+              return trimmed && trimmed !== '' && trimmed !== 'null' ? fixImageUrl(trimmed) : null;
             }
             return null;
           })
-          .filter((img: any) => img && img.image_url && img.image_url !== '' && img.image_url !== 'https://via.placeholder.com/400x300?text=No+Image');
+          .filter((url: string | null): url is string => url !== null && url !== '' && url !== 'https://via.placeholder.com/400x300?text=No+Image');
       }
       
-      // Also check if property has images array directly
+      // Check property.images (main location - backend returns images here)
       if (property.images && Array.isArray(property.images) && images.length === 0) {
         images = property.images
           .map((img: any) => {
             if (typeof img === 'string') {
-              return {
-                image_url: fixImageUrl(img),
-                url: fixImageUrl(img),
-              };
+              // Backend already provides full URLs
+              const trimmed = img.trim();
+              return trimmed && trimmed !== '' && trimmed !== 'null' ? fixImageUrl(trimmed) : null;
             } else if (img && typeof img === 'object') {
-              return {
-                ...img,
-                image_url: fixImageUrl(img.image_url || img.url || img.path || ''),
-                url: fixImageUrl(img.url || img.image_url || img.path || ''),
-              };
+              // Handle object format (fallback)
+              const url = img.image_url || img.url || img.path || img.image || '';
+              return url ? fixImageUrl(url) : null;
             }
             return null;
           })
-          .filter((img: any) => img && img.image_url && img.image_url !== '' && img.image_url !== 'https://via.placeholder.com/400x300?text=No+Image');
+          .filter((url: string | null): url is string => url !== null && url !== '' && url !== 'https://via.placeholder.com/400x300?text=No+Image');
       }
       
       console.log('[PropertyService] Processed images:', {
         count: images.length,
-        firstImage: images[0]?.image_url,
+        firstImage: images[0],
+        allImages: images,
       });
       
       // Fix owner/seller data
@@ -241,7 +233,7 @@ export const propertyService = {
             area: parseFloat(property.area || '0'),
             carpet_area: parseFloat(property.carpet_area || '0'),
           },
-          images,
+          images, // Array of string URLs
         },
       };
     }
@@ -280,27 +272,35 @@ export const propertyService = {
     return propertyService.getProperties(params);
   },
 
-  // Create property
-  createProperty: async (propertyData: any) => {
-    // Check if propertyData contains images to upload
+  // Create property (for sellers - uses /seller/properties/add.php)
+  createProperty: async (propertyData: any, userType: 'seller' | 'agent' = 'seller') => {
+    // According to guide: images can be sent as base64 strings or URLs in the request body
+    // Extract images from propertyData
     const {images, ...dataWithoutImages} = propertyData;
     
-    // First create the property
-    const response = await api.post(API_ENDPOINTS.PROPERTY_CREATE, dataWithoutImages);
+    // Prepare the request data
+    const requestData = {
+      ...dataWithoutImages,
+      // Include images array if provided (as URLs or base64 strings)
+      images: images && Array.isArray(images) && images.length > 0 ? images : undefined,
+    };
     
-    // If property created successfully and images are provided, upload them
-    if (response && response.success && images && Array.isArray(images) && images.length > 0) {
-      const propertyId = response.data?.property_id || response.data?.id || response.data?.property?.id;
-      if (propertyId) {
-        try {
-          await propertyService.uploadImages(propertyId, images);
-          console.log('[PropertyService] Property created and images uploaded');
-        } catch (imageError) {
-          console.error('[PropertyService] Error uploading images:', imageError);
-          // Don't fail the whole operation if images fail
-        }
+    // Remove undefined/null values
+    Object.keys(requestData).forEach(key => {
+      if (requestData[key] === undefined || requestData[key] === null || requestData[key] === '') {
+        delete requestData[key];
       }
-    }
+    });
+    
+    // Use correct endpoint based on user type
+    const endpoint = userType === 'seller' 
+      ? API_ENDPOINTS.SELLER_PROPERTIES_ADD 
+      : API_ENDPOINTS.PROPERTY_CREATE; // Fallback for agents (may need separate endpoint)
+    
+    console.log('[PropertyService] Creating property with endpoint:', endpoint);
+    console.log('[PropertyService] Request data:', JSON.stringify(requestData, null, 2));
+    
+    const response = await api.post(endpoint, requestData);
     
     return response;
   },
@@ -316,10 +316,31 @@ export const propertyService = {
 
   // Delete property
   deleteProperty: async (propertyId: string | number) => {
-    const response = await api.delete(
-      `${API_ENDPOINTS.PROPERTY_DELETE}?id=${propertyId}`,
-    );
-    return response;
+    console.log('[PropertyService] Deleting property:', propertyId);
+    // Try with query param first (standard REST API format)
+    try {
+      const response = await api.delete(
+        `${API_ENDPOINTS.PROPERTY_DELETE}?id=${propertyId}`,
+      );
+      console.log('[PropertyService] Delete response:', response);
+      return response;
+    } catch (error: any) {
+      // If query param fails, try with property_id in body (some APIs prefer this)
+      if (error?.status === 400 || error?.status === 404) {
+        console.log('[PropertyService] Trying delete with property_id in body');
+        try {
+          const response = await api.delete(API_ENDPOINTS.PROPERTY_DELETE, {
+            data: { property_id: propertyId },
+          });
+          console.log('[PropertyService] Delete response (body method):', response);
+          return response;
+        } catch (bodyError: any) {
+          console.error('[PropertyService] Delete failed with both methods:', bodyError);
+          throw bodyError;
+        }
+      }
+      throw error;
+    }
   },
 
   // Get user's properties

@@ -1,5 +1,6 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {View, Text} from 'react-native';
 import SellerDashboardScreen from '../../screens/Seller/SellerDashboardScreen';
 import SellerPropertiesScreen from '../../screens/Seller/SellerPropertiesScreen';
 import ChatNavigator from '../../navigation/ChatNavigator';
@@ -8,8 +9,8 @@ import SellerPropertyDetailsScreen from '../../screens/Seller/SellerPropertyDeta
 import AddPropertyScreen from '../../screens/Seller/AddPropertyScreen';
 import SellerInquiriesScreen from '../../screens/Seller/SellerInquiriesScreen';
 import SellerSupportScreen from '../../screens/Seller/SellerSupportScreen';
-import {colors} from '../../theme';
-import {Text} from 'react-native';
+import {colors, spacing} from '../../theme';
+import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
 
 export type SellerTabParamList = {
   Dashboard: undefined;
@@ -25,6 +26,8 @@ export type SellerTabParamList = {
 const Tab = createBottomTabNavigator<SellerTabParamList>();
 
 const SellerTabNavigator = () => {
+  const unreadCount = useUnreadChatCount();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -38,13 +41,15 @@ const SellerTabNavigator = () => {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
+        tabBarLabelPosition: 'below-icon',
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingTop: 6,
-          paddingBottom: 6,
-          height: 58,
+          paddingTop: 4,
+          paddingBottom: 20,
+          paddingHorizontal: 30,
+          height: 65,
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: {width: 0, height: -2},
@@ -54,19 +59,23 @@ const SellerTabNavigator = () => {
         tabBarItemStyle: {
           flex: 1,
           paddingVertical: 2,
+          paddingHorizontal: 40,
           justifyContent: 'center',
           alignItems: 'center',
+          minHeight: 56,
         },
         tabBarLabelStyle: {
-          marginTop: 2,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
+          marginTop: 0,
           marginBottom: 0,
           textAlign: 'center',
         },
         tabBarIconStyle: {
           marginTop: 0,
           marginBottom: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
       }}>
       <Tab.Screen
@@ -75,7 +84,9 @@ const SellerTabNavigator = () => {
         options={{
           title: 'Dashboard',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>📊</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>🏠</Text>
+          ),
         }}
       />
       <Tab.Screen
@@ -83,7 +94,9 @@ const SellerTabNavigator = () => {
         component={SellerPropertiesScreen}
         options={{
           title: 'My Properties',
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>🏘️</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>📋</Text>
+          ),
         }}
       />
       <Tab.Screen
@@ -92,7 +105,37 @@ const SellerTabNavigator = () => {
         options={{
           title: 'Chat',
           headerShown: false,
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>💬</Text>,
+          tabBarIcon: ({color}) => (
+            <View style={{position: 'relative', alignItems: 'center', justifyContent: 'center'}}>
+              <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
+              {unreadCount > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -8,
+                    backgroundColor: '#FF3B30',
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                    borderWidth: 2,
+                    borderColor: colors.surface,
+                  }}>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 10,
+                      fontWeight: 'bold',
+                    }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
       <Tab.Screen
@@ -101,7 +144,9 @@ const SellerTabNavigator = () => {
         options={{
           title: 'Profile',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>👤</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>👤</Text>
+          ),
         }}
       />
       <Tab.Screen

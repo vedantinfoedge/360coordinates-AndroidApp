@@ -43,11 +43,8 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [emailVerifying, setEmailVerifying] = useState(false);
   const [phoneVerifying, setPhoneVerifying] = useState(false);
-  const [emailVerified, setEmailVerified] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
-  const [emailToken, setEmailToken] = useState<string | null>(null);
   const [phoneToken, setPhoneToken] = useState<string | null>(null);
 
   // Animation values
@@ -109,31 +106,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     animateBuildings();
   }, []);
 
-  const handleEmailVerify = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email first');
-      return;
-    }
-    
-    setEmailVerifying(true);
-    try {
-      const response = await otpService.sendEmail(email);
-      if (response.success) {
-        setEmailVerified(true);
-        // Store MSG91 token if available
-        if (response.data?.token || response.data?.verificationToken) {
-          setEmailToken(response.data.token || response.data.verificationToken);
-        }
-        Alert.alert('Success', 'Verification email sent! Please check your inbox and enter the OTP when prompted.');
-      } else {
-        Alert.alert('Error', response.message || 'Failed to send verification email');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send verification email');
-    } finally {
-      setEmailVerifying(false);
-    }
-  };
+  // Email is automatically accepted (no verification needed)
 
   const handlePhoneVerify = async () => {
     if (!phone) {
@@ -141,31 +114,104 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
     
-    const phoneNumber = phone.replace(/[^0-9]/g, '');
-    if (phoneNumber.length !== 10) {
+    // Format phone number (matching website workflow)
+    // Website accepts: 10 digits (starts with 6-9) or 12 digits (starts with 91)
+    // Format: 91XXXXXXXXXX (country code + number, no + sign)
+    const digits = phone.replace(/\D/g, '');
+    
+    let formattedPhone = '';
+    if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) {
+      formattedPhone = '91' + digits; // Add country code
+    } else if (digits.length === 12 && digits.startsWith('91')) {
+      formattedPhone = digits; // Already formatted
+    } else {
       Alert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
     
+    // Use native MSG91 SDK instead of WebView widget for faster performance
     setPhoneVerifying(true);
     try {
-      const response = await otpService.sendSMS(`+91${phoneNumber}`);
+      const response = await otpService.sendSMS(formattedPhone, 'register');
+      
       if (response.success) {
         setPhoneVerified(true);
-        // Store MSG91 token if available
-        if (response.data?.token || response.data?.verificationToken) {
-          setPhoneToken(response.data.token || response.data.verificationToken);
+        
+        // Extract token from response (if available)
+        const token = response.token || response.data?.token || response.data?.verificationToken;
+        if (token) {
+          setPhoneToken(token);
+          console.log('[Register] Phone verification token stored:', token);
         }
+        
+        // Store reqId for verification if needed
+        if (response.reqId) {
+          console.log('[Register] OTP Request ID:', response.reqId);
+        }
+        
         Alert.alert('Success', 'Verification SMS sent! Please check your phone and enter the OTP when prompted.');
       } else {
         Alert.alert('Error', response.message || 'Failed to send verification SMS');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send verification SMS');
+      // Log full error details for debugging
+      console.error('[Register] MSG91 SDK failed:', JSON.stringify({
+        status: error?.status,
+        message: error?.message,
+        error: error?.error,
+        responseData: error?.response?.data,
+        originalError: error?.originalError,
+      }, null, 2));
+      
+      // Provide more helpful error messages
+      let errorMessage = error?.message || 'Failed to send verification SMS. Please try again.';
+      
+      // Check for specific error types and provide actionable messages
+      if (error?.status === 500) {
+        if (error?.message?.includes('Empty response')) {
+          errorMessage = 'Server error: The backend returned an empty response. The server may be experiencing issues. Please try again later or contact support.';
+        } else {
+          errorMessage = 'Server error occurred. The backend service is currently unavailable. Please try again in a few moments or contact support.';
+        }
+      } else if (error?.message?.includes('IP Blocked') || error?.originalError?.response?.message === 'IPBlocked') {
+        errorMessage = 'MSG91 IP Blocked: Your IP address is blocked in MSG91 dashboard. Please whitelist your IP address or disable IP whitelisting in MSG91 dashboard settings.';
+      } else if (error?.message?.includes('Mobile Integration not enabled') || error?.originalError?.message?.includes('Mobile requests are not allowed')) {
+        errorMessage = 'MSG91 Mobile Integration is not enabled. This needs to be configured in the MSG91 dashboard. The app will use the backend API as a fallback, but it appears to be experiencing issues as well.';
+      } else if (error?.message?.includes('Invalid phone number')) {
+        errorMessage = 'Please enter a valid 10-digit Indian mobile number (starting with 6-9).';
+      } else if (error?.message?.includes('Authentication Failure')) {
+        errorMessage = 'MSG91 authentication failed. Please verify the widget credentials are correct.';
+      }
+      
+      // Show detailed error for debugging, but user-friendly message
+      Alert.alert(
+        'Unable to Send OTP',
+        errorMessage + '\n\n' + 
+        'Troubleshooting:\n' +
+        '1. Check your internet connection\n' +
+        '2. Verify your phone number is correct\n' +
+        '3. Try again in a few moments\n' +
+        '4. If the problem persists, contact support',
+        [
+          {
+            text: 'OK',
+            style: 'default',
+          },
+          {
+            text: 'Retry',
+            style: 'default',
+            onPress: () => {
+              // Retry sending OTP
+              handlePhoneVerify();
+            },
+          },
+        ]
+      );
     } finally {
       setPhoneVerifying(false);
     }
   };
+
 
   const handleRegister = async () => {
     if (!name || !email || !phone || !password || !confirmPassword) {
@@ -190,25 +236,82 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
 
-    // Check if email and phone are verified
-    if (!emailVerified || !phoneVerified) {
-      Alert.alert('Error', 'Please verify both email and phone number before registering');
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    // Check if phone is verified (email is automatically accepted)
+    if (!phoneVerified) {
+      Alert.alert('Error', 'Please verify your phone number before registering');
       return;
     }
 
     setIsLoading(true);
     try {
+      // Extract actual token from MSG91 response (matching website workflow)
+      // Website handles JSON format tokens
+      let actualPhoneToken = phoneToken;
+      if (phoneToken) {
+        try {
+          const parsed = typeof phoneToken === 'string' 
+            ? JSON.parse(phoneToken) 
+            : phoneToken;
+          
+          // Website extracts: parsed.message || parsed.token || parsed.verificationToken || original
+          actualPhoneToken = parsed?.message || 
+                             parsed?.token || 
+                             parsed?.verificationToken || 
+                             phoneToken;
+        } catch (e) {
+          // Not JSON, use as-is
+          actualPhoneToken = phoneToken;
+        }
+      }
+      
+      // Format phone for registration (matching website: +91XXXXXXXXXX)
+      const phoneDigits = phone.replace(/\D/g, '');
+      let formattedPhoneForRegistration = '';
+      if (phoneDigits.length === 10) {
+        formattedPhoneForRegistration = '+91' + phoneDigits;
+      } else if (phoneDigits.length === 12 && phoneDigits.startsWith('91')) {
+        formattedPhoneForRegistration = '+' + phoneDigits;
+      } else {
+        formattedPhoneForRegistration = '+91' + phoneDigits.slice(-10); // Fallback
+      }
+      
       const response = await register(
         name,
         email,
-        phone.replace(/[^0-9]/g, ''),
+        formattedPhoneForRegistration,
         password,
         selectedRole,
-        emailToken || undefined,
-        phoneToken || undefined,
+        undefined, // No email token needed (email auto-verified)
+        actualPhoneToken || undefined,
       );
-      // If registration successful, navigate to OTP verification
-      if (response && response.success && response.data?.user_id) {
+      
+      // Handle registration response (matching website workflow)
+      if (response && response.success) {
+        // Check if auto-login happened (token and user in response)
+        if (response.data?.token && response.data?.user) {
+          // Auto-login successful - navigate to dashboard (AppNavigator will handle routing)
+          Alert.alert(
+            'Success',
+            `Registration successful! Welcome, ${name}!`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Navigation will be handled automatically by AppNavigator
+                  // based on user type from AuthContext
+                },
+              },
+            ],
+          );
+        } else if (response.data?.user_id) {
+          // Legacy flow: OTP verification required
         navigation.navigate('OTPVerification', {
           userId: response.data.user_id,
           user_id: response.data.user_id, // Support both formats
@@ -216,6 +319,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
           email: email,
           type: 'register',
         });
+        }
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Registration failed');
@@ -371,44 +475,18 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                 />
               </View>
 
-              {/* Email Input with Verify Button */}
+              {/* Email Input (No verification needed) */}
               <View style={styles.inputContainer}>
-                <View style={styles.labelRow}>
                 <Text style={styles.label}>Email Address</Text>
-                  {emailVerified && (
-                    <Text style={styles.verifiedBadge}>✓ Verified</Text>
-                  )}
-                </View>
-                <View style={styles.inputWithButton}>
                 <TextInput
                   style={styles.input}
                   placeholder="Enter your email"
                   placeholderTextColor={colors.textSecondary}
                   value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      setEmailVerified(false);
-                      setEmailToken(null);
-                    }}
+                  onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
-                  <TouchableOpacity
-                    style={[
-                      styles.verifyButton,
-                      emailVerified && styles.verifyButtonVerified,
-                    ]}
-                    onPress={handleEmailVerify}
-                    disabled={!email || emailVerifying || emailVerified}>
-                    {emailVerifying ? (
-                      <ActivityIndicator size="small" color={colors.surface} />
-                    ) : emailVerified ? (
-                      <Text style={styles.verifyButtonText}>✓</Text>
-                    ) : (
-                      <Text style={styles.verifyButtonText}>Verify</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
               </View>
 
               {/* Phone Input with Verify Button */}
@@ -525,6 +603,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
           </View>
         </ScrollView>
       </ImageBackground>
+
     </KeyboardAvoidingView>
   );
 };

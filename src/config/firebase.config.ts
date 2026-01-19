@@ -26,20 +26,24 @@ export const firebaseConfig = {
  * This should be called in App.tsx or index.js
  * 
  * Note: Firebase is initialized automatically via google-services.json for Android
- * and GoogleService-Info.plist for iOS. This function just logs initialization status.
+ * and GoogleService-Info.plist for iOS. 
+ * 
+ * IMPORTANT: React Native Firebase auto-initializes from native config files.
+ * No manual initialization is needed. This function is a no-op that exists for
+ * compatibility. Firebase will be available when native modules are properly linked.
  */
 export const initializeFirebase = (): void => {
-  try {
-    // Firebase is initialized via google-services.json for Android
-    // and GoogleService-Info.plist for iOS
-    // No manual initialization needed if native modules are linked
-    
-    // The actual initialization happens via native modules
-    // This function just logs that we're checking for Firebase
-    console.log('Firebase initialization check - native modules will handle initialization');
-  } catch (error) {
-    // Firebase not installed or not configured - app will continue without it
-    console.warn('Firebase not available (app will continue without Firebase):', error);
+  // React Native Firebase auto-initializes from google-services.json
+  // No manual initialization needed - just verify the module can be imported
+  // We don't actually call firestore() here to avoid triggering native module checks
+  // that would cause errors if Firebase isn't properly linked yet
+  
+  // Silent initialization - Firebase will work when properly configured
+  // The actual Firebase operations in firebase.service.ts will handle errors gracefully
+  if (__DEV__) {
+    console.log('[Firebase] Firebase will auto-initialize from native config files');
+    console.log('[Firebase] Ensure google-services.json is in android/app/ for Android');
+    console.log('[Firebase] Ensure GoogleService-Info.plist is in ios/ for iOS');
   }
 };
 

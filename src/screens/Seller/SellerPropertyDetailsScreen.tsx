@@ -1,9 +1,24 @@
 import React from 'react';
-import {View, Text, StyleSheet, SafeAreaView} from 'react-native';
+import {View, Text, StyleSheet} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useAuth} from '../../context/AuthContext';
+import SellerHeader from '../../components/SellerHeader';
 
-const SellerPropertyDetailsScreen = () => {
+type Props = {
+  navigation: NativeStackNavigationProp<any>;
+};
+
+const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation}) => {
+  const {logout} = useAuth();
+  
   return (
     <SafeAreaView style={styles.container}>
+      <SellerHeader
+        onProfilePress={() => navigation.navigate('Profile')}
+        onSupportPress={() => navigation.navigate('Support')}
+        onLogoutPress={logout}
+      />
       <View style={styles.content}>
         <Text style={styles.title}>Seller Property Details</Text>
       </View>

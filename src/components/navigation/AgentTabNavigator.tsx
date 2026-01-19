@@ -6,6 +6,7 @@ import AgentInquiriesScreen from '../../screens/Agent/AgentInquiriesScreen';
 import AgentProfileScreen from '../../screens/Agent/AgentProfileScreen';
 import AgentPropertyDetailsScreen from '../../screens/Agent/AgentPropertyDetailsScreen';
 import AddPropertyScreen from '../../screens/Agent/AddPropertyScreen';
+import EditPropertyScreen from '../../screens/Agent/EditPropertyScreen';
 import AgentSupportScreen from '../../screens/Agent/AgentSupportScreen';
 import {colors} from '../../theme';
 import {Text} from 'react-native';
@@ -17,6 +18,7 @@ export type AgentTabParamList = {
   Profile: undefined;
   PropertyDetails: {propertyId: string};
   AddProperty: undefined;
+  EditProperty: {propertyId: string | number};
   Support: undefined;
 };
 
@@ -36,13 +38,15 @@ const AgentTabNavigator = () => {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
+        tabBarLabelPosition: 'below-icon',
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingTop: 6,
-          paddingBottom: 6,
-          height: 58,
+          paddingTop: 4,
+          paddingBottom: 20,
+          paddingHorizontal: 30,
+          height: 65,
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: {width: 0, height: -2},
@@ -52,19 +56,23 @@ const AgentTabNavigator = () => {
         tabBarItemStyle: {
           flex: 1,
           paddingVertical: 2,
+          paddingHorizontal: 40,
           justifyContent: 'center',
           alignItems: 'center',
+          minHeight: 56,
         },
         tabBarLabelStyle: {
-          marginTop: 2,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
+          marginTop: 0,
           marginBottom: 0,
           textAlign: 'center',
         },
         tabBarIconStyle: {
           marginTop: 0,
           marginBottom: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
       }}>
       <Tab.Screen
@@ -73,7 +81,9 @@ const AgentTabNavigator = () => {
         options={{
           title: 'Dashboard',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>📊</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>🏠</Text>
+          ),
         }}
       />
       <Tab.Screen
@@ -81,7 +91,9 @@ const AgentTabNavigator = () => {
         component={AgentPropertiesScreen}
         options={{
           title: 'Listings',
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>📋</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>📋</Text>
+          ),
         }}
       />
       <Tab.Screen
@@ -89,7 +101,9 @@ const AgentTabNavigator = () => {
         component={AgentInquiriesScreen}
         options={{
           title: 'Inquiries',
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>💬</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
+          ),
         }}
       />
       <Tab.Screen
@@ -98,7 +112,9 @@ const AgentTabNavigator = () => {
         options={{
           title: 'Profile',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => <Text style={{color, fontSize: 20}}>👤</Text>,
+          tabBarIcon: ({color}) => (
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>👤</Text>
+          ),
         }}
       />
       <Tab.Screen
@@ -114,6 +130,14 @@ const AgentTabNavigator = () => {
         component={AddPropertyScreen}
         options={{
           title: 'Add Property',
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="EditProperty"
+        component={EditPropertyScreen}
+        options={{
+          title: 'Edit Property',
           tabBarButton: () => null, // Hide from tab bar
         }}
       />

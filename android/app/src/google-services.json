@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "387721645160",
+    "project_id": "my-chat-box-ec5b0",
+    "storage_bucket": "my-chat-box-ec5b0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:387721645160:android:77059b638b915c22a6bfdd",
+        "android_client_info": {
+          "package_name": "Indiapropertys.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDy24j-A9yxP99X2HyOM0O3iZt9c1AfcRg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

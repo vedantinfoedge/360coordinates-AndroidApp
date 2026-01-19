@@ -1,17 +1,46 @@
 import api from './api.service';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_ENDPOINTS} from '../config/api.config';
 import {fixImageUrl} from '../utils/imageHelper';
 
 export const userService = {
   // Get profile (exact backend structure: user + profile)
-  getProfile: async () => {
+  // Uses correct endpoint based on user type: /api/buyer/profile/get.php or /api/seller/profile/get.php
+  getProfile: async (userType?: string) => {
     try {
-      const response = await api.get(API_ENDPOINTS.USER_PROFILE);
+      // Determine user type from parameter or from stored user data
+      let finalUserType = userType;
+      if (!finalUserType) {
+        try {
+          const userData = await AsyncStorage.getItem('@propertyapp_user');
+          if (userData) {
+            const parsed = JSON.parse(userData);
+            finalUserType = parsed.user_type;
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+      
+      // Normalize user type
+      const normalizedUserType = finalUserType?.toLowerCase() || 'buyer';
+      
+      // Use correct endpoint based on user type
+      const endpoint = normalizedUserType === 'buyer' 
+        ? API_ENDPOINTS.BUYER_PROFILE_GET
+        : API_ENDPOINTS.SELLER_PROFILE_GET;
+      
+      console.log('[UserService] Fetching profile from:', endpoint, 'for userType:', normalizedUserType);
+      
+      const response = await api.get(endpoint);
       
       // Fix profile image URL
       if (response && response.success && response.data) {
-        if (response.data.profile?.profile_image) {
-          response.data.profile.profile_image = fixImageUrl(response.data.profile.profile_image);
+        // Handle different response structures
+        const profileData = response.data.profile || response.data;
+        
+        if (profileData?.profile_image) {
+          profileData.profile_image = fixImageUrl(profileData.profile_image);
         }
         if (response.data.user?.profile_image) {
           response.data.user.profile_image = fixImageUrl(response.data.user.profile_image);
