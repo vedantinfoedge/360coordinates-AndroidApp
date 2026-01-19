@@ -106,17 +106,20 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
     return items;
   }, [showProfile, showLogout, showSignIn, showSignUp, isLoggedIn, onProfilePress, onSupportPress, onSignInPress, onSignUpPress, onLogoutPress]);
 
-  // Debug logs
+  // Debug logs (MANDATORY DEBUG)
   useEffect(() => {
     console.log('[BuyerHeader] Props received:');
     console.log('  - showProfile:', showProfile);
     console.log('  - showLogout:', showLogout);
     console.log('  - showSignIn:', showSignIn);
     console.log('  - showSignUp:', showSignUp);
+    console.log('  - onSignInPress:', onSignInPress ? 'defined' : 'undefined');
+    console.log('  - onSignUpPress:', onSignUpPress ? 'defined' : 'undefined');
+    console.log('  - onLogoutPress:', onLogoutPress ? 'defined' : 'undefined');
     console.log('  - isLoggedIn (computed):', isLoggedIn);
     console.log('  - menuItems count:', menuItems.length);
     console.log('  - menuItems:', menuItems.map(item => item.label));
-  }, [showProfile, showLogout, showSignIn, showSignUp, isLoggedIn, menuItems]);
+  }, [showProfile, showLogout, showSignIn, showSignUp, isLoggedIn, menuItems, onSignInPress, onSignUpPress, onLogoutPress]);
 
   return (
     <View style={[styles.safeArea, styles.stickyHeader]}>
