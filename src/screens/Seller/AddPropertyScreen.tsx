@@ -8,13 +8,13 @@ import {
   ScrollView,
   Alert,
   Modal,
-  SafeAreaView,
   Image,
   Platform,
   PermissionsAndroid,
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';

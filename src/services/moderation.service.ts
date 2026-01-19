@@ -71,26 +71,30 @@ export const moderationService = {
       if (fileExtension === 'webp') mimeType = 'image/webp';
 
       const formData = new FormData();
+      
+      // FormData field name must be 'image' (not 'file' or 'images')
       formData.append('image', {
         uri: imageUri,
-        type: mimeType,
-        name: `image.${fileExtension}`,
+        type: mimeType, // 'image/jpeg', 'image/png', or 'image/webp'
+        name: `property_image.${fileExtension}`, // e.g., 'property_image.jpg'
       } as any);
 
-      // Add property_id (0 for validation-only mode)
+      // Add property_id (0 for validation-only mode for new properties)
       const propId = validateOnly ? 0 : (propertyId || 0);
       formData.append('property_id', String(propId));
 
+      // Add validate_only flag for new properties
       if (validateOnly) {
         formData.append('validate_only', 'true');
       }
 
-      console.log('[ModerationService] Uploading image:', {
+      console.log('[ModerationService] Uploading image with FormData:', {
         uri: imageUri,
         propertyId: propId,
         validateOnly,
         mimeType,
         fileExtension,
+        formDataFields: ['image', 'property_id', validateOnly ? 'validate_only' : null].filter(Boolean),
       });
 
       // Don't set Content-Type header - axios will set it automatically with boundary for FormData
@@ -169,17 +173,44 @@ export const moderationService = {
         };
       }
     } catch (error: any) {
-      console.error('[ModerationService] Image upload error:', {
-        message: error?.message,
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        data: error?.response?.data,
+      // Enhanced error logging with all possible error fields
+      const errorDetails = {
+        message: error?.message || 'Unknown error',
+        status: error?.status || error?.response?.status,
+        statusText: error?.statusText || error?.response?.statusText,
+        error_code: error?.error_code || error?.response?.data?.error_code,
+        details: error?.details || error?.response?.data?.details,
+        data: error?.response?.data || error?.data,
+        code: error?.code,
         config: {
           url: error?.config?.url,
           method: error?.config?.method,
           headers: error?.config?.headers,
         },
-      });
+        // Include full error serialization
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+      };
+      
+      // Log comprehensive error details
+      console.error('[ModerationService] Image upload error details:', JSON.stringify(errorDetails, null, 2));
+      
+      // Log raw error object for debugging
+      console.error('[ModerationService] Raw error object:', error);
+      
+      // Log response data separately if available
+      if (error?.response?.data) {
+        console.error('[ModerationService] Error response data:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      // Log request config for debugging
+      if (error?.config) {
+        console.error('[ModerationService] Request config:', {
+          url: error.config.url,
+          method: error.config.method,
+          headers: error.config.headers,
+          data: error.config.data instanceof FormData ? '[FormData]' : error.config.data,
+        });
+      }
       
       // Handle specific error cases
       if (error?.response?.status === 400) {
@@ -268,10 +299,9 @@ export const moderationService = {
         name: 'image.jpg',
       } as any);
 
+      // Don't set Content-Type header - axios will set it automatically with boundary for FormData
       const response = await api.post(API_ENDPOINTS.MODERATION_CHECK_IMAGE, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        // Let axios handle Content-Type automatically for FormData
       });
 
       return response;

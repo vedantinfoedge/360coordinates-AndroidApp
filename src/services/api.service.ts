@@ -63,11 +63,21 @@ api.interceptors.response.use(
     return data;
   },
   async error => {
-    // Log error
-    log.error('API', `Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+    // Log error with detailed information
+    const errorDetails = {
       status: error.response?.status,
+      statusText: error.response?.statusText,
       message: error.message,
-    });
+      data: error.response?.data,
+      url: error.config?.url,
+      method: error.config?.method,
+    };
+    
+    // Log full error details as JSON for better debugging
+    console.error(`[API] Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, JSON.stringify(errorDetails, null, 2));
+    
+    // Also use the log utility
+    log.error('API', `Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, errorDetails);
 
     if (error.response?.status === 401) {
       // Token expired - try to refresh token first

@@ -8,17 +8,14 @@ import {
   ScrollView,
   Alert,
   Modal,
-  SafeAreaView,
   Image,
   Platform,
   PermissionsAndroid,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
-<<<<<<< Updated upstream
 import {useRoute} from '@react-navigation/native';
-=======
->>>>>>> Stashed changes
 import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
@@ -48,6 +45,9 @@ type Props = {
 type PropertyStatus = 'sell' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
+  const route = useRoute();
+  const routeParams = route.params as {isUpcomingProject?: boolean} | undefined;
+  const isUpcomingProject = routeParams?.isUpcomingProject === true;
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sell');
@@ -1115,15 +1115,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             {/* Progress Steps */}
-<<<<<<< Updated upstream
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
               style={isUpcomingProject ? styles.progressContainerScroll : styles.progressContainerWrapper}
               contentContainerStyle={isUpcomingProject ? styles.progressContent : styles.progressContainer}>
-=======
-            <View style={styles.progressContainer}>
->>>>>>> Stashed changes
               {steps.map((step, index) => {
                 const status = getStepStatus(step.id);
                 return (
@@ -1160,7 +1156,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {/* Content */}
             <ScrollView
@@ -1893,7 +1889,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-<<<<<<< Updated upstream
   progressContainerScroll: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -1913,10 +1908,6 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
     borderWidth: 2,
     backgroundColor: colors.accent + '20',
-  },
-  typeButtonIcon: {
-    fontSize: 32,
-    marginBottom: spacing.xs,
   },
   typeButtonTextActive: {
     color: colors.accent,
@@ -2195,8 +2186,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.md,
   },
-=======
->>>>>>> Stashed changes
 });
 
 export default AddPropertyScreen;
