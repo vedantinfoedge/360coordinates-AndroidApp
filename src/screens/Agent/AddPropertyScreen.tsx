@@ -21,6 +21,8 @@ import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {moderationService} from '../../services/moderation.service';
 import LocationPicker from '../../components/map/LocationPicker';
+import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
+import StateAutoSuggest from '../../components/search/StateAutoSuggest';
 import {
   GuidePropertyType,
   getPropertyTypeConfig,
@@ -471,52 +473,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </Text>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Location <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter locality, area or landmark"
-                placeholderTextColor={colors.textSecondary}
-                value={location}
-                onChangeText={(text) => {
-                  setLocation(text);
-                  // Reset locationSelected when user starts typing/editing
-                  if (locationSelected) {
-                    setLocationSelected(false);
-                  }
-                }}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                State <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter state"
-                placeholderTextColor={colors.textSecondary}
-                value={state}
-                onChangeText={setState}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Additional Address</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Enter additional address details (building name, landmark, etc.)"
-                placeholderTextColor={colors.textSecondary}
-                value={additionalAddress}
-                onChangeText={setAdditionalAddress}
-                multiline
-                numberOfLines={2}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
               <Text style={styles.label}>Property Location on Map (Optional)</Text>
               <TouchableOpacity
                 style={styles.mapButton}
@@ -552,11 +508,104 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 setLongitude(locationData.longitude);
                 if (locationData.address) {
                   setLocation(locationData.address);
+                  setLocationSelected(true); // Mark location as selected
+                }
+                // Extract state from context if available
+                if (locationData.context) {
+                  const stateContext = locationData.context.find((ctx: any) => 
+                    ctx.id?.startsWith('region') || ctx.id?.startsWith('district')
+                  );
+                  if (stateContext) {
+                    setState(stateContext.text || stateContext.name);
+                  }
                 }
                 setLocationPickerVisible(false);
               }}
               onClose={() => setLocationPickerVisible(false)}
             />
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>
+                Location <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.locationInputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter locality, area or landmark"
+                  placeholderTextColor={colors.textSecondary}
+                  value={location}
+                  onChangeText={(text) => {
+                    setLocation(text);
+                    // Reset locationSelected when user starts typing/editing
+                    if (locationSelected) {
+                      setLocationSelected(false);
+                    }
+                  }}
+                  onFocus={() => {
+                    // Allow autosuggest when user focuses on the input
+                    // Only if they haven't selected a location or are editing
+                    if (locationSelected && location.length >= 2) {
+                      setLocationSelected(false);
+                    }
+                  }}
+                />
+                <LocationAutoSuggest
+                  query={location}
+                  onSelect={(locationData) => {
+                    setLocation(locationData.placeName || locationData.name);
+                    setLocationSelected(true); // Mark location as selected
+                    if (locationData.coordinates) {
+                      setLatitude(locationData.coordinates[1]);
+                      setLongitude(locationData.coordinates[0]);
+                    }
+                    // Extract state from context if available
+                    if (locationData.context) {
+                      const stateContext = locationData.context.find((ctx: any) => ctx.id?.startsWith('region'));
+                      if (stateContext) {
+                        setState(stateContext.text || stateContext.name);
+                      }
+                    }
+                  }}
+                  visible={location.length >= 2 && !locationSelected}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>
+                State <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.stateInputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter state"
+                  placeholderTextColor={colors.textSecondary}
+                  value={state}
+                  onChangeText={setState}
+                />
+                <StateAutoSuggest
+                  query={state}
+                  onSelect={(stateData) => {
+                    setState(stateData.name || stateData.placeName);
+                  }}
+                  visible={state.length >= 2}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Additional Address</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Enter additional address details (building name, landmark, etc.)"
+                placeholderTextColor={colors.textSecondary}
+                value={additionalAddress}
+                onChangeText={setAdditionalAddress}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+              />
+            </View>
 
             {fieldVisibility.showBedrooms && (
               <View style={styles.inputContainer}>
@@ -1283,6 +1332,14 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: spacing.lg,
+  },
+  locationInputContainer: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  stateInputContainer: {
+    position: 'relative',
+    zIndex: 1,
   },
   label: {
     ...typography.caption,

@@ -14,6 +14,8 @@ export interface GeocodeResult {
 export interface ReverseGeocodeResult {
   placeName: string;
   address: string;
+  context?: any[]; // Add context array for state extraction
+  coordinates?: [number, number]; // Add coordinates
 }
 
 /**
@@ -63,9 +65,12 @@ export const reverseGeocode = async (
     const data = await response.json();
 
     if (data.features && data.features.length > 0) {
+      const feature = data.features[0];
       return {
-        placeName: data.features[0].place_name,
-        address: data.features[0].place_name,
+        placeName: feature.place_name,
+        address: feature.place_name,
+        context: feature.context || [], // Include context for state extraction
+        coordinates: feature.center ? [feature.center[0], feature.center[1]] : undefined,
       };
     }
     return null;

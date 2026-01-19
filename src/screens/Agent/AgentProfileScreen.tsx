@@ -476,6 +476,35 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
             </View>
           </View>
         </View>
+
+        {/* Menu Items Section */}
+        <View style={styles.menuSection}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Inquiries')}>
+            <Text style={styles.menuIcon}>💬</Text>
+            <Text style={styles.menuText}>My Inquiries</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Support' as never)}>
+            <Text style={styles.menuIcon}>🆘</Text>
+            <Text style={styles.menuText}>Support</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+
+          <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+            <Text style={styles.menuIcon}>🚪</Text>
+            <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -669,6 +698,44 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '700',
     fontSize: 16,
+  },
+  menuSection: {
+    backgroundColor: colors.surface,
+    marginBottom: spacing.xl,
+    borderRadius: borderRadius.md,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  menuIcon: {
+    fontSize: 24,
+    marginRight: spacing.md,
+    width: 30,
+  },
+  menuText: {
+    ...typography.body,
+    color: colors.text,
+    flex: 1,
+  },
+  logoutText: {
+    color: colors.error,
+  },
+  menuArrow: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 18,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginLeft: spacing.xxl + spacing.md,
   },
 });
 

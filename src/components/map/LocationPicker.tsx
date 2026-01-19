@@ -31,7 +31,12 @@ try {
 interface LocationPickerProps {
   visible: boolean;
   initialLocation?: {latitude: number; longitude: number};
-  onLocationSelect: (location: {latitude: number; longitude: number; address?: string}) => void;
+  onLocationSelect: (location: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+    context?: any[]; // Add context for state extraction
+  }) => void;
   onClose: () => void;
 }
 
@@ -45,6 +50,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     initialLocation ? [initialLocation.longitude, initialLocation.latitude] : null,
   );
   const [address, setAddress] = useState<string>('');
+  const [locationContext, setLocationContext] = useState<any[]>([]); // Store context for state extraction
   const [loadingAddress, setLoadingAddress] = useState(false);
   const cameraRef = useRef<any>(null);
 
@@ -59,14 +65,17 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       
       if (result && result.placeName) {
         setAddress(result.placeName);
+        setLocationContext(result.context || []); // Store context
       } else {
         // Fallback to coordinates if geocoding fails
         setAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        setLocationContext([]);
       }
     } catch (error) {
       log.error('location', 'Error getting address', error);
       const [longitude, latitude] = coordinate;
       setAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      setLocationContext([]);
     } finally {
       setLoadingAddress(false);
     }
@@ -79,6 +88,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
         latitude,
         longitude,
         address: address || undefined,
+        context: locationContext, // Pass context for state extraction
       });
       onClose();
     } else {
