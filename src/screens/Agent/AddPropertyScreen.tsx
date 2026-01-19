@@ -15,7 +15,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
-import {BottomTabNavigationProp, useRoute} from '@react-navigation/bottom-tabs';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import {useRoute} from '@react-navigation/native';
 import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
@@ -2550,8 +2551,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
-              style={isUpcomingProject ? styles.progressContainerScroll : styles.progressContainer}
-              contentContainerStyle={isUpcomingProject ? styles.progressContent : undefined}>
+              style={isUpcomingProject ? styles.progressContainerScroll : styles.progressContainerWrapper}
+              contentContainerStyle={isUpcomingProject ? styles.progressContent : styles.progressContainer}>
               {steps.map((step, index) => {
                 const status = getStepStatus(step.id);
                 return (
@@ -2696,14 +2697,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
   },
+  progressContainerWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   progressContainerScroll: {
     borderBottomWidth: 1,
@@ -2722,7 +2724,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   stepCircleCompleted: {
     backgroundColor: '#43A047',
@@ -3351,7 +3353,7 @@ const styles = StyleSheet.create({
   },
   progressContent: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     gap: spacing.xs,
   },
   buttonGrid: {
