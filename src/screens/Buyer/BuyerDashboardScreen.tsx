@@ -526,17 +526,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               onPress={() => {
                 try {
                   // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
-                  navigation.navigate('SearchResults', {
+                  // Use the Search tab route to ensure correct navigator is focused
+                  navigation.navigate('Search' as never, {
                     query: '',
                     location: '',
-                    searchQuery: '',
-                    city: '',
-                    propertyType: '',
-                    budget: '',
-                    bedrooms: '',
-                    area: '',
-                    status: '',
-                    listingType: 'all', // Explicitly set to 'all' to show all properties
                   } as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
