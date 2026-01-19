@@ -17,6 +17,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
@@ -59,9 +60,41 @@ type ListingType = 'all' | 'sale' | 'rent' | 'pg';
 
 const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout, isAuthenticated} = useAuth();
-  // Explicitly check if user is guest (not logged in)
-  const isGuest = !user || !isAuthenticated;
+  const [token, setToken] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+
+  // Load token from AsyncStorage to verify auth state
+  useEffect(() => {
+    const loadToken = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem('@auth_token');
+        setToken(storedToken);
+      } catch (error) {
+        console.error('[BuyerDashboard] Error loading token:', error);
+      }
+    };
+    loadToken();
+  }, [user, isAuthenticated]); // Reload token when auth state changes
+
+  // Robust login check: user exists AND token exists AND isAuthenticated is true
+  const isLoggedIn = Boolean(user && token && isAuthenticated);
+  const isGuest = !isLoggedIn;
+
+  // Debug logs to verify auth state
+  useEffect(() => {
+    console.log('[BuyerDashboard] AUTH DEBUG:');
+    console.log('  - user:', user ? `exists (${user.email})` : 'null');
+    console.log('  - token:', token ? 'exists' : 'null');
+    console.log('  - isAuthenticated:', isAuthenticated);
+    console.log('  - isLoggedIn (computed):', isLoggedIn);
+    console.log('  - isGuest (computed):', isGuest);
+    console.log('  - Header will show:', {
+      showLogout: isLoggedIn,
+      showSignIn: isGuest,
+      showSignUp: isGuest,
+      showProfile: isLoggedIn,
+    });
+  }, [user, token, isAuthenticated, isLoggedIn, isGuest]);
   const [listingType, setListingType] = useState<ListingType>('all');
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -332,11 +365,17 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={isAuthenticated ? logout : undefined}
-          onSignInPress={() => navigation.navigate('Auth' as never, {screen: 'Login'} as never)}
-          onSignUpPress={() => navigation.navigate('Auth' as never, {screen: 'Register'} as never)}
-          showProfile={isAuthenticated}
-          showLogout={isAuthenticated}
+          onLogoutPress={isLoggedIn ? logout : undefined}
+          onSignInPress={() => {
+            console.log('[BuyerDashboard] Navigating to Login screen');
+            navigation.navigate('Auth' as never, {screen: 'Login'} as never);
+          }}
+          onSignUpPress={() => {
+            console.log('[BuyerDashboard] Navigating to Register screen');
+            navigation.navigate('Auth' as never, {screen: 'Register'} as never);
+          }}
+          showProfile={isLoggedIn}
+          showLogout={isLoggedIn}
           showSignIn={isGuest}
           showSignUp={isGuest}
         />
@@ -356,11 +395,17 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={isAuthenticated ? logout : undefined}
-        onSignInPress={() => navigation.navigate('Auth' as never, {screen: 'Login'} as never)}
-        onSignUpPress={() => navigation.navigate('Auth' as never, {screen: 'Register'} as never)}
-        showProfile={isAuthenticated}
-        showLogout={isAuthenticated}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={() => {
+          console.log('[BuyerDashboard] Navigating to Login screen');
+          navigation.navigate('Auth' as never, {screen: 'Login'} as never);
+        }}
+        onSignUpPress={() => {
+          console.log('[BuyerDashboard] Navigating to Register screen');
+          navigation.navigate('Auth' as never, {screen: 'Register'} as never);
+        }}
+        showProfile={isLoggedIn}
+        showLogout={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
       />

@@ -29,8 +29,8 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
   onLogoutPress,
   onSignInPress,
   onSignUpPress,
-  showProfile = true,
-  showLogout = true,
+  showProfile = false,
+  showLogout = false,
   showSignIn = false,
   showSignUp = false,
 }) => {
