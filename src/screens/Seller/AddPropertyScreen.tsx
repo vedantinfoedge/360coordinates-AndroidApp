@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useEffect} from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Platform,
   PermissionsAndroid,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
@@ -22,6 +23,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {moderationService} from '../../services/moderation.service';
+import {sellerService} from '../../services/seller.service';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
 import LocationPicker from '../../components/map/LocationPicker';
@@ -75,8 +77,45 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [priceNegotiable, setPriceNegotiable] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [maintenance, setMaintenance] = useState('');
+  const [checkingLimit, setCheckingLimit] = useState(true);
 
   const totalSteps = 5;
+
+  // Check property limit on screen load
+  // Sellers/owners can upload only 3 properties
+  useEffect(() => {
+    const checkLimit = async () => {
+      try {
+        setCheckingLimit(true);
+        const statsResponse: any = await sellerService.getDashboardStats();
+        if (statsResponse && statsResponse.success && statsResponse.data) {
+          const currentCount = statsResponse.data.total_properties || 0;
+          if (currentCount >= 3) {
+            Alert.alert(
+              'Property Limit Reached',
+              'You have reached the maximum limit of 3 properties. You cannot add more properties.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    navigation.goBack();
+                  },
+                },
+              ],
+              {cancelable: false}
+            );
+          }
+        }
+      } catch (error) {
+        console.error('[AddProperty] Error checking property limit:', error);
+        // Allow to continue if check fails
+      } finally {
+        setCheckingLimit(false);
+      }
+    };
+
+    checkLimit();
+  }, [navigation]);
   const steps = [
     {id: 1, name: 'Basic Info', icon: '📝'},
     {id: 2, name: 'Property Details', icon: '🏠'},
@@ -1244,6 +1283,28 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     return 'pending';
   };
 
+  // Show loading while checking property limit
+  if (checkingLimit) {
+    return (
+      <Modal
+        visible={true}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={handleClose}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <SafeAreaView style={styles.safeArea}>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>Checking property limit...</Text>
+              </View>
+            </SafeAreaView>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       visible={true}
@@ -2055,6 +2116,17 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
   },
   studioButtonText: {
     ...typography.body,

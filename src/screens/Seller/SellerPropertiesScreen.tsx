@@ -53,25 +53,31 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
 
   // Check property limit before adding
+  // Sellers/owners can upload only 3 properties (regardless of subscription plan)
   const checkPropertyLimit = async (): Promise<boolean> => {
     try {
       const statsResponse: any = await sellerService.getDashboardStats();
       if (statsResponse && statsResponse.success && statsResponse.data) {
         const stats = statsResponse.data;
         const currentCount = stats.total_properties || 0;
-        const planType = stats.subscription?.plan_type || 'free';
         
-        let limit = 3; // Default free plan
-        if (planType === 'basic' || planType === 'pro' || planType === 'premium') {
-          limit = 10;
-        } else if (user?.user_type === 'agent') {
-          limit = Infinity; // Unlimited for agents
-        }
+        // Sellers/owners have a fixed limit of 3 properties
+        const limit = 3;
         
         if (currentCount >= limit) {
           Alert.alert(
             'Property Limit Reached',
-            `You have reached your property limit (${limit} properties for ${planType} plan). Please upgrade your plan to add more properties.`,
+            `You have reached the maximum limit of ${limit} properties. You cannot add more properties.`,
+            [{text: 'OK'}]
+          );
+          return false;
+        }
+      } else {
+        // If API fails, check current properties count
+        if (allProperties.length >= 3) {
+          Alert.alert(
+            'Property Limit Reached',
+            `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
             [{text: 'OK'}]
           );
           return false;
@@ -80,7 +86,16 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       return true;
     } catch (error) {
       console.error('Error checking property limit:', error);
-      return true; // Allow if check fails
+      // If check fails, use local count as fallback
+      if (allProperties.length >= 3) {
+        Alert.alert(
+          'Property Limit Reached',
+          `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
+          [{text: 'OK'}]
+        );
+        return false;
+      }
+      return true; // Allow if check fails and count is below limit
     }
   };
 
