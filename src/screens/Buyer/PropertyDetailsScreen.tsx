@@ -23,6 +23,7 @@ import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {propertyService} from '../../services/property.service';
 import {favoriteService} from '../../services/favorite.service';
+import {buyerService} from '../../services/buyer.service';
 import {fixImageUrl, isValidImageUrl} from '../../utils/imageHelper';
 import BuyerHeader from '../../components/BuyerHeader';
 import {useAuth} from '../../context/AuthContext';
@@ -460,16 +461,16 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     
     try {
       setTogglingFavorite(true);
-      const response = await favoriteService.toggleFavorite(property.id);
-      const responseData = response as any; // API service returns parsed data
+      // Use buyerService for consistency with other buyer screens
+      const response = await buyerService.toggleFavorite(property.id) as any;
       
-      if (responseData && responseData.success) {
-        const newFavoriteStatus = responseData.data?.is_favorite ?? !isFavorite;
+      if (response && response.success) {
+        const newFavoriteStatus = response.data?.is_favorite ?? !isFavorite;
         setIsFavorite(newFavoriteStatus);
         // Update property object
         setProperty({...property, is_favorite: newFavoriteStatus});
       } else {
-        Alert.alert('Error', responseData?.message || 'Failed to update favorite');
+        Alert.alert('Error', response?.message || 'Failed to update favorite');
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
