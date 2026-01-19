@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo, useCallback} from 'react';
+import React, {useState, useEffect, useMemo, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -117,6 +117,9 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [area, setArea] = useState<string>(initialArea);
   const [status, setStatus] = useState<'sale' | 'rent' | ''>(initialStatus);
   const [bathrooms, setBathrooms] = useState<number | null>(null);
+  
+  // Ref to track if user is actively dragging budget slider (prevents search during drag)
+  const isDraggingBudget = useRef(false);
 
   // Property type classification
   const bedroomBasedTypes = [
@@ -162,8 +165,10 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
            selectedPropertyType.includes('Industrial Property');
   }, [selectedPropertyType]);
 
-  // Get appropriate max budget based on property type and listing type
-  const getMaxBudgetForType = useCallback((propType: string, listType: ListingType | 'all'): number => {
+  // Get appropriate max budget based on property type and listing type (memoized)
+  const maxBudgetForType = useMemo(() => {
+    const propType = selectedPropertyType;
+    const listType = listingType;
     if (propType === 'PG / Hostel') {
       return 50; // 50K/month max for PG/Hostel
     } else if (listType === 'buy' && isAreaBased && (propType.includes('Commercial') || propType.includes('Industrial') || propType.includes('Warehouse'))) {
@@ -179,16 +184,34 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     } else {
       return 500; // Default max
     }
+  }, [selectedPropertyType, listingType, isAreaBased]);
+
+  // Keep callback for backward compatibility with useEffect
+  const getMaxBudgetForType = useCallback((propType: string, listType: ListingType | 'all'): number => {
+    if (propType === 'PG / Hostel') {
+      return 50;
+    } else if (listType === 'buy' && isAreaBased && (propType.includes('Commercial') || propType.includes('Industrial') || propType.includes('Warehouse'))) {
+      return 5000;
+    } else if (listType === 'buy') {
+      return 2000;
+    } else if (listType === 'rent' && isAreaBased && (propType.includes('Co-working') || propType.includes('Warehouse'))) {
+      return 500;
+    } else if (listType === 'rent') {
+      return 200;
+    } else if (listType === 'pg-hostel') {
+      return 50;
+    } else {
+      return 500;
+    }
   }, [isAreaBased]);
 
   // Clear dependent fields when property type or listing type changes
   useEffect(() => {
     // Update max budget when property type or listing type changes
-    const newMaxBudget = getMaxBudgetForType(selectedPropertyType, listingType);
-    setMaxBudget(newMaxBudget);
+    setMaxBudget(maxBudgetForType);
     
     // Reset min budget if it exceeds new max
-    if (minBudget >= newMaxBudget) {
+    if (minBudget >= maxBudgetForType) {
       setMinBudget(0);
     }
     
@@ -211,7 +234,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         setBathrooms(null);
       }
     }
-  }, [selectedPropertyType, isBedroomBased, isAreaBased, isLandProperty, listingType, getMaxBudgetForType, minBudget]);
+  }, [selectedPropertyType, isBedroomBased, isAreaBased, isLandProperty, listingType, maxBudgetForType, minBudget]);
 
   // Get all property types for filter
   const allPropertyTypes = useMemo(() => {
@@ -458,12 +481,17 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       return;
     }
     
+    // Skip if we just updated from slider (will be handled when drag ends)
+    if (isDraggingBudget.current) {
+      return;
+    }
+    
     let isMounted = true;
     const budgetTimeout = setTimeout(() => {
-      if (isMounted) {
+      if (isMounted && !isDraggingBudget.current) {
         loadProperties();
       }
-    }, 800); // Longer delay for budget to avoid lag during slider drag
+    }, 1000); // Longer delay for budget to avoid lag during slider drag
 
     return () => {
       isMounted = false;
@@ -553,21 +581,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     setFilteredProperties(filtered);
   };
 
-  // Format budget value for display
-  const formatBudgetValue = (value: number, type: ListingType | 'all'): string => {
-    if (type === 'buy') {
-      if (value >= 100) {
-        return `₹${(value / 100).toFixed(1)} Cr`;
-      }
-      return `₹${value}L`;
-    } else {
-      // Rent or PG
-      if (value >= 100) {
-        return `₹${(value / 100).toFixed(1)} Lakh`;
-      }
-      return `₹${value}K`;
-    }
-  };
+  // Format budget value for display (keep for backward compatibility)
+  const formatBudgetValue = formatBudgetValueMemo;
 
   // Convert budget slider values to API format
   const getBudgetString = (min: number, max: number, type: ListingType | 'all', propType?: string): string => {
@@ -677,15 +692,38 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
-  // Optimized callbacks for RangeSlider
+  // Optimized callbacks for RangeSlider - using useCallback with stable dependencies
   const handleBudgetChange = useCallback((min: number, max: number) => {
+    // Mark that we're dragging to prevent search during drag
+    isDraggingBudget.current = true;
     setMinBudget(min);
     setMaxBudget(max);
+    // Reset dragging flag after a delay (when user stops dragging)
+    setTimeout(() => {
+      isDraggingBudget.current = false;
+    }, 1500);
   }, []);
 
+  // Memoize formatBudgetDisplay to prevent re-creation on every render
   const formatBudgetDisplay = useCallback((value: number) => {
     return formatBudgetValue(value, listingType);
   }, [listingType]);
+
+  // Memoize formatBudgetValue to ensure stable reference
+  const formatBudgetValueMemo = useCallback((value: number, type: ListingType | 'all'): string => {
+    if (type === 'buy') {
+      if (value >= 100) {
+        return `₹${(value / 100).toFixed(1)} Cr`;
+      }
+      return `₹${value}L`;
+    } else {
+      // Rent or PG
+      if (value >= 100) {
+        return `₹${(value / 100).toFixed(1)} Lakh`;
+      }
+      return `₹${value}K`;
+    }
+  }, []);
 
   const renderProperty = ({item}: {item: Property}) => {
     // Determine property type for PropertyCard
@@ -905,7 +943,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 <View style={styles.budgetSliderContainer}>
                   <RangeSlider
                     min={0}
-                    max={getMaxBudgetForType(selectedPropertyType, listingType)}
+                    max={maxBudgetForType}
                     minValue={minBudget}
                     maxValue={maxBudget}
                     onValueChange={handleBudgetChange}
@@ -920,13 +958,13 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                   />
                   <Text style={styles.priceLabel}>
                     {(() => {
-                      const max = getMaxBudgetForType(selectedPropertyType, listingType);
+                      const max = maxBudgetForType;
                       if (selectedPropertyType === 'PG / Hostel' || listingType === 'pg-hostel') {
-                        return `Range: 0 to ${formatBudgetValue(max, listingType)}/month (in thousands)`;
+                        return `Range: 0 to ${formatBudgetValueMemo(max, listingType)}/month (in thousands)`;
                       } else if (listingType === 'buy') {
-                        return `Range: 0 to ${formatBudgetValue(max, listingType)} (in Lakhs)`;
+                        return `Range: 0 to ${formatBudgetValueMemo(max, listingType)} (in Lakhs)`;
                       } else {
-                        return `Range: 0 to ${formatBudgetValue(max, listingType)}/month (in thousands)`;
+                        return `Range: 0 to ${formatBudgetValueMemo(max, listingType)}/month (in thousands)`;
                       }
                     })()}
                   </Text>

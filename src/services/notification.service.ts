@@ -4,11 +4,21 @@
  */
 
 import messaging from '@react-native-firebase/messaging';
-import {Alert, Platform} from 'react-native';
+import {Platform} from 'react-native';
+
+type NotificationType = 'info' | 'success' | 'error' | 'warning';
+
+type ShowNotificationCallback = (
+  title: string,
+  message: string,
+  type?: NotificationType,
+  duration?: number,
+) => void;
 
 class NotificationService {
   private fcmToken: string | null = null;
   private chatListRefreshCallback: (() => void) | null = null;
+  private showNotificationCallback: ShowNotificationCallback | null = null;
 
   /**
    * Request notification permissions and get FCM token
@@ -66,6 +76,14 @@ class NotificationService {
   }
 
   /**
+   * Register a callback to show custom notifications
+   */
+  setShowNotificationCallback(callback: ShowNotificationCallback | null) {
+    this.showNotificationCallback = callback;
+    console.log('[Notifications] Custom notification callback registered');
+  }
+
+  /**
    * Trigger chat list refresh if callback is registered
    */
   private triggerChatListRefresh() {
@@ -89,12 +107,18 @@ class NotificationService {
       }
       
       if (remoteMessage.notification) {
-        // Show local notification when app is in foreground
-        Alert.alert(
-          remoteMessage.notification.title || 'New Message',
-          remoteMessage.notification.body || 'You have a new message',
-          [{text: 'OK'}],
-        );
+        // Show custom notification when app is in foreground
+        const title = remoteMessage.notification.title || 'New Message';
+        const body = remoteMessage.notification.body || 'You have a new message';
+        const type: NotificationType = 
+          remoteMessage.data?.notificationType || 'info';
+        
+        if (this.showNotificationCallback) {
+          this.showNotificationCallback(title, body, type, 5000);
+        } else {
+          // Fallback: if callback not registered, use console (development only)
+          console.log('[Notifications] Notification:', title, body);
+        }
       }
     });
 

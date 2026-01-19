@@ -411,11 +411,6 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             <Text style={styles.optionArrow}>→</Text>
           </TouchableOpacity>
           <View style={styles.divider} />
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={styles.optionText}>Settings</Text>
-            <Text style={styles.optionArrow}>→</Text>
-          </TouchableOpacity>
-          <View style={styles.divider} />
           <TouchableOpacity style={styles.optionItem} onPress={handleLogout}>
             <Text style={[styles.optionText, styles.logoutText]}>Logout</Text>
             <Text style={styles.optionArrow}>→</Text>

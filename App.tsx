@@ -10,16 +10,21 @@ import {StatusBar, useColorScheme} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {AuthProvider} from './src/context/AuthContext';
+import {NotificationProvider, useNotification} from './src/contexts/NotificationContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import {initializeMapbox} from './src/config/mapbox.config';
 import {initializeFirebase} from './src/config/firebase.config';
 import {initializeMSG91} from './src/config/msg91.config';
 import {notificationService} from './src/services/notification.service';
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+// Inner component to access notification context
+const AppContent: React.FC = () => {
+  const {showNotification} = useNotification();
 
   useEffect(() => {
+    // Connect notification service to custom notification system
+    notificationService.setShowNotificationCallback(showNotification);
+
     // Initialize Mapbox on app start (will fail gracefully if not linked)
     try {
       initializeMapbox();
@@ -54,19 +59,31 @@ function App(): React.JSX.Element {
     } catch (error) {
       console.warn('Push notification initialization failed (app will continue without notifications):', error);
     }
-  }, []);
+  }, [showNotification]);
+
+  return (
+    <>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#FFFFFF"
+        translucent={true}
+      />
+      <AppNavigator />
+    </>
+  );
+};
+
+function App(): React.JSX.Element {
+  const isDarkMode = useColorScheme() === 'dark';
 
   return (
     <GestureHandlerRootView style={{flex: 1}}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <StatusBar
-            barStyle="dark-content"
-            backgroundColor="#FFFFFF"
-            translucent={true}
-          />
-          <AppNavigator />
-        </AuthProvider>
+        <NotificationProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </NotificationProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

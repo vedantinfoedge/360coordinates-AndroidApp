@@ -88,7 +88,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
     [min, max, sliderWidth, step],
   );
 
-  // Debounced onValueChange to reduce parent re-renders
+  // Debounced onValueChange to reduce parent re-renders (increased delay for smoother dragging)
   const debouncedOnValueChange = useCallback(
     (newMin: number, newMax: number) => {
       if (updateTimeoutRef.current) {
@@ -96,7 +96,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
       }
       updateTimeoutRef.current = setTimeout(() => {
         onValueChange(newMin, newMax);
-      }, 50); // Small delay to batch updates
+      }, 100); // Increased delay to reduce parent re-renders during drag
     },
     [onValueChange],
   );
@@ -108,16 +108,32 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
       const clampedValue = Math.max(min, Math.min(newValue, currentMaxValue.current - step));
       const newPosition = getPosition(clampedValue);
       
-      // Update display immediately for smooth UI
-      setMinPosition(newPosition);
-      setDisplayMinValue(clampedValue);
+      // Update refs immediately (no re-render)
       currentMinValue.current = clampedValue;
+      
+      // Always update animated value for smooth visual feedback (uses native driver, no re-render)
       minThumbAnimated.setValue(newPosition);
       
-      // Debounce the parent update
+      // Update position state (used for active track calculation) - throttle to reduce re-renders
+      // Only update if position changed significantly (at least 2px difference)
+      const positionChanged = Math.abs(minPosition - newPosition) >= 2;
+      if (positionChanged) {
+        setMinPosition(newPosition);
+      }
+      
+      // Update display value less frequently - only when value changes by meaningful amount
+      // For small ranges, update more frequently; for large ranges, use percentage threshold
+      const valueRange = max - min;
+      const threshold = Math.max(1, valueRange * 0.02); // 2% of range or at least 1 unit
+      const valueChanged = Math.abs(displayMinValue - clampedValue) >= threshold;
+      if (valueChanged) {
+        setDisplayMinValue(clampedValue);
+      }
+      
+      // Debounce the parent update to reduce parent re-renders
       debouncedOnValueChange(clampedValue, currentMaxValue.current);
     },
-    [min, step, positionToValue, getPosition, debouncedOnValueChange, minThumbAnimated],
+    [min, max, step, positionToValue, getPosition, debouncedOnValueChange, minThumbAnimated, minPosition, displayMinValue],
   );
 
   // Update max value (optimized for smooth dragging)
@@ -127,16 +143,32 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
       const clampedValue = Math.max(currentMinValue.current + step, Math.min(newValue, max));
       const newPosition = getPosition(clampedValue);
       
-      // Update display immediately for smooth UI
-      setMaxPosition(newPosition);
-      setDisplayMaxValue(clampedValue);
+      // Update refs immediately (no re-render)
       currentMaxValue.current = clampedValue;
+      
+      // Always update animated value for smooth visual feedback (uses native driver, no re-render)
       maxThumbAnimated.setValue(newPosition);
       
-      // Debounce the parent update
+      // Update position state (used for active track calculation) - throttle to reduce re-renders
+      // Only update if position changed significantly (at least 2px difference)
+      const positionChanged = Math.abs(maxPosition - newPosition) >= 2;
+      if (positionChanged) {
+        setMaxPosition(newPosition);
+      }
+      
+      // Update display value less frequently - only when value changes by meaningful amount
+      // For small ranges, update more frequently; for large ranges, use percentage threshold
+      const valueRange = max - min;
+      const threshold = Math.max(1, valueRange * 0.02); // 2% of range or at least 1 unit
+      const valueChanged = Math.abs(displayMaxValue - clampedValue) >= threshold;
+      if (valueChanged) {
+        setDisplayMaxValue(clampedValue);
+      }
+      
+      // Debounce the parent update to reduce parent re-renders
       debouncedOnValueChange(currentMinValue.current, clampedValue);
     },
-    [max, step, positionToValue, getPosition, debouncedOnValueChange, maxThumbAnimated],
+    [min, max, step, positionToValue, getPosition, debouncedOnValueChange, maxThumbAnimated, maxPosition, displayMaxValue],
   );
 
   // Min thumb pan responder
@@ -159,15 +191,25 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
         minThumbAnimated.flattenOffset();
         setActiveThumb(null);
         isDragging.current = false;
-        // Final update on release
+        
+        // Clear any pending debounced updates
         if (updateTimeoutRef.current) {
           clearTimeout(updateTimeoutRef.current);
+          updateTimeoutRef.current = null;
         }
+        
+        // Force final update on release with actual position
         updateMinValue(currentValue);
-        // Ensure final value is sent
-        setTimeout(() => {
-          onValueChange(currentMinValue.current, currentMaxValue.current);
-        }, 100);
+        
+        // Ensure state is synced and final value is sent immediately
+        const finalMinValue = currentMinValue.current;
+        const finalMaxValue = currentMaxValue.current;
+        const finalMinPos = getPosition(finalMinValue);
+        setMinPosition(finalMinPos);
+        setDisplayMinValue(finalMinValue);
+        
+        // Send final value immediately on release
+        onValueChange(finalMinValue, finalMaxValue);
       },
     }),
   ).current;
@@ -192,15 +234,25 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
         maxThumbAnimated.flattenOffset();
         setActiveThumb(null);
         isDragging.current = false;
-        // Final update on release
+        
+        // Clear any pending debounced updates
         if (updateTimeoutRef.current) {
           clearTimeout(updateTimeoutRef.current);
+          updateTimeoutRef.current = null;
         }
+        
+        // Force final update on release with actual position
         updateMaxValue(currentValue);
-        // Ensure final value is sent
-        setTimeout(() => {
-          onValueChange(currentMinValue.current, currentMaxValue.current);
-        }, 100);
+        
+        // Ensure state is synced and final value is sent immediately
+        const finalMinValue = currentMinValue.current;
+        const finalMaxValue = currentMaxValue.current;
+        const finalMaxPos = getPosition(finalMaxValue);
+        setMaxPosition(finalMaxPos);
+        setDisplayMaxValue(finalMaxValue);
+        
+        // Send final value immediately on release
+        onValueChange(finalMinValue, finalMaxValue);
       },
     }),
   ).current;
@@ -223,7 +275,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Value Display */}
+      {/* Value Display - memoized format calls */}
       <View style={styles.valueContainer}>
         <View style={styles.valueBox}>
           <Text style={styles.valueLabel}>Min</Text>
@@ -261,7 +313,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
 
         {/* Track Background */}
         <View style={styles.trackBackground}>
-          {/* Active Track with Gradient */}
+          {/* Active Track with Gradient - using static dimensions for better performance */}
           {activeTrackDimensions.width > 0 && (
             <View
               style={[
