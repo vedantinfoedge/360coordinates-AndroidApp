@@ -80,7 +80,16 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [furnishing, setFurnishing] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<Array<{uri: string; base64?: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
+  const [photos, setPhotos] = useState<
+    Array<{
+      uri: string;
+      // NOTE: base64 is no longer sent to backend; kept only to avoid crashes
+      base64?: string;
+      moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking';
+      moderationReason?: string;
+      imageUrl?: string; // final URL from moderation/upload API
+    }>
+  >([]);
   const [expectedPrice, setExpectedPrice] = useState('');
   const [priceNegotiable, setPriceNegotiable] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
@@ -206,7 +215,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       mediaType: 'photo' as MediaType,
       quality: 0.8 as const,
       selectionLimit: 10 - photos.length,
-      includeBase64: true, // Enable base64 for direct upload without moderation
+      // We no longer need base64 in the frontend; images are uploaded and referenced by URL
+      includeBase64: false,
     };
 
     launchImageLibrary(options, async (response: ImagePickerResponse) => {
@@ -230,10 +240,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         }
 
         // Add images with "checking" status and validate with Google Vision API
-        // Save base64 for fallback if imageUrl is not returned from validation-only mode
+        // We only care about the final URL returned from the moderation/upload API
         const newPhotos = assetsToAdd.map(asset => ({
           uri: asset.uri || '',
-          base64: asset.base64 || undefined, // Save base64 from picker for fallback
+          base64: undefined, // Not used for backend anymore
           moderationStatus: 'checking' as const,
           moderationReason: undefined,
           imageUrl: undefined,
@@ -449,11 +459,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Collect images - use imageUrl from moderation API if available, otherwise use base64
+      // Collect images - ONLY use URLs from moderation/upload API
       // Only include approved or pending images (rejected images are excluded)
-      const validImages = photos.filter(p => 
-        (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') &&
-        (p.imageUrl || p.base64) // Must have either URL from API or base64
+      const validImages = photos.filter(
+        p =>
+          (p.moderationStatus === 'APPROVED' ||
+            p.moderationStatus === 'PENDING') &&
+          !!p.imageUrl, // Must have a URL from the API
       );
       
       // Debug logging
@@ -461,19 +473,14 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         hasUri: !!p.uri,
         moderationStatus: p.moderationStatus,
         hasImageUrl: !!p.imageUrl,
-        hasBase64: !!p.base64,
+        hasBase64: !!p.base64, // kept only for debugging; not sent
         imageUrl: p.imageUrl?.substring(0, 50) + '...',
       })));
       
-      // Prefer imageUrl from moderation API, fallback to base64
+      // URLs from moderation/upload API
       const imageUrls = validImages
         .map(p => p.imageUrl)
         .filter((url): url is string => url !== undefined && url !== null && url !== '');
-      
-      const imageBase64Strings = validImages
-        .filter(p => (!p.imageUrl || p.imageUrl === '') && p.base64) // Use base64 if no URL or empty URL
-        .map(p => p.base64!)
-        .filter((base64): base64 is string => base64 !== undefined && base64 !== null && base64 !== '');
       
       // Check if we have any images
       if (validImages.length === 0) {
@@ -486,8 +493,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         return;
       }
       
-      // Check if we have any image data (URLs or base64)
-      if (imageUrls.length === 0 && imageBase64Strings.length === 0) {
+      // Check if we have any image URLs
+      if (imageUrls.length === 0) {
         console.error('[AddProperty] No image data available:', {
           validImagesCount: validImages.length,
           photosWithImageUrl: validImages.filter(p => p.imageUrl).length,
@@ -545,15 +552,15 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : null,
         maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
         amenities: selectedAmenities,
-        // Include images: prefer URLs from moderation API, fallback to base64
-        images: imageUrls.length > 0 ? imageUrls : (imageBase64Strings.length > 0 ? imageBase64Strings : undefined),
+        // Include images: ONLY URLs from moderation/upload API
+        images: imageUrls.length > 0 ? imageUrls : undefined,
       };
 
       console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
       console.log('[AddProperty] Images included:', {
         urls: imageUrls.length,
-        base64: imageBase64Strings.length,
-        total: imageUrls.length + imageBase64Strings.length
+        base64: 0,
+        total: imageUrls.length,
       });
       console.log('[AddProperty] Property data:', JSON.stringify({...propertyData, images: `[${imageUrls.length} URLs, ${imageBase64Strings.length} base64]`}, null, 2));
 
