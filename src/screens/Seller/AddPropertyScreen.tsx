@@ -223,9 +223,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         }
 
         // Add images with "checking" status and validate with Google Vision API
+        // Save base64 for fallback if imageUrl is not returned from validation-only mode
         const newPhotos = assetsToAdd.map(asset => ({
           uri: asset.uri || '',
-          base64: undefined, // Will be set after moderation
+          base64: asset.base64 || undefined, // Save base64 from picker for fallback
           moderationStatus: 'checking' as const,
           moderationReason: undefined,
           imageUrl: undefined,
@@ -257,8 +258,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       ...updated[imgIndex],
                       moderationStatus,
                       moderationReason: result.moderation_reason,
-                      imageUrl: result.image_url,
+                      imageUrl: result.image_url || undefined, // May be undefined in validation-only mode
                     };
+                    
+                    // Log moderation result for debugging
+                    console.log('[AddProperty] Image moderation result:', {
+                      index: imgIndex,
+                      status: moderationStatus,
+                      hasImageUrl: !!result.image_url,
+                      imageUrl: result.image_url?.substring(0, 50) + '...',
+                      hasBase64: !!updated[imgIndex].base64,
+                    });
                     
                     // Show alert for rejected images
                     if (moderationStatus === 'REJECTED') {
@@ -421,21 +431,46 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         (p.imageUrl || p.base64) // Must have either URL from API or base64
       );
       
+      // Debug logging
+      console.log('[AddProperty] All photos:', photos.map(p => ({
+        hasUri: !!p.uri,
+        moderationStatus: p.moderationStatus,
+        hasImageUrl: !!p.imageUrl,
+        hasBase64: !!p.base64,
+        imageUrl: p.imageUrl?.substring(0, 50) + '...',
+      })));
+      
       // Prefer imageUrl from moderation API, fallback to base64
       const imageUrls = validImages
         .map(p => p.imageUrl)
-        .filter((url): url is string => url !== undefined && url !== null);
+        .filter((url): url is string => url !== undefined && url !== null && url !== '');
       
       const imageBase64Strings = validImages
-        .filter(p => !p.imageUrl && p.base64) // Only use base64 if no URL available
+        .filter(p => (!p.imageUrl || p.imageUrl === '') && p.base64) // Use base64 if no URL or empty URL
         .map(p => p.base64!)
-        .filter((base64): base64 is string => base64 !== undefined && base64 !== null);
+        .filter((base64): base64 is string => base64 !== undefined && base64 !== null && base64 !== '');
       
       // Check if we have any images
       if (validImages.length === 0) {
         Alert.alert(
           'No Valid Images',
           'Please upload at least one image that has been approved or is pending review.',
+          [{text: 'OK'}]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Check if we have any image data (URLs or base64)
+      if (imageUrls.length === 0 && imageBase64Strings.length === 0) {
+        console.error('[AddProperty] No image data available:', {
+          validImagesCount: validImages.length,
+          photosWithImageUrl: validImages.filter(p => p.imageUrl).length,
+          photosWithBase64: validImages.filter(p => p.base64).length,
+        });
+        Alert.alert(
+          'Image Data Missing',
+          'Approved images are missing image data. Please try removing and re-uploading the images.',
           [{text: 'OK'}]
         );
         setIsSubmitting(false);

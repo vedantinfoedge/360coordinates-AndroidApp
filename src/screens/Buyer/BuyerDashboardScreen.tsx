@@ -529,6 +529,14 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                   navigation.navigate('SearchResults', {
                     query: '',
                     location: '',
+                    searchQuery: '',
+                    city: '',
+                    propertyType: '',
+                    budget: '',
+                    bedrooms: '',
+                    area: '',
+                    status: '',
+                    listingType: 'all', // Explicitly set to 'all' to show all properties
                   } as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
