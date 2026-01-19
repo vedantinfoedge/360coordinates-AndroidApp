@@ -253,10 +253,26 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
               if (propResponse?.success && propResponse.data?.property) {
                 property = propResponse.data.property;
                 setPropertyCache(prev => ({ ...prev, [propertyId]: property }));
+              } else {
+                // Property not found or invalid response - cache null to avoid repeated requests
+                setPropertyCache(prev => ({ ...prev, [propertyId]: null }));
               }
-            } catch (error) {
-              console.error('[ChatList] Error fetching property:', propertyId, error);
+            } catch (error: any) {
+              // Handle 404 (property deleted/not found) gracefully
+              if (error?.status === 404 || error?.response?.status === 404) {
+                // Property was deleted or doesn't exist - cache null to avoid repeated requests
+                console.log('[ChatList] Property not found (may be deleted):', propertyId);
+                setPropertyCache(prev => ({ ...prev, [propertyId]: null }));
+              } else {
+                // Other errors (network, server error, etc.) - log but don't cache
+                console.warn('[ChatList] Error fetching property:', propertyId, error?.message || error);
+              }
             }
+          }
+          
+          // If property is explicitly null (cached as not found), treat as missing
+          if (property === null) {
+            property = undefined;
           }
 
           // Determine display name and info based on user role

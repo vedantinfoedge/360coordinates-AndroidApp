@@ -372,7 +372,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         // Fallback: try without some filters if error occurs
         try {
           const fallbackParams: any = {limit: 100};
-          if (currentLocation) fallbackParams.location = currentLocation;
+          if (currentQuery) fallbackParams.location = currentQuery;
           if (status || listingType !== 'all') {
             fallbackParams.status = status || (listingType === 'buy' ? 'sale' : 'rent');
           }
