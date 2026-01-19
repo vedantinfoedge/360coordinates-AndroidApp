@@ -153,21 +153,31 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     try {
       setShowLocationSuggestions(false);
       
+      // PART A: Safely get location input with trim() - handle null/empty/spaces
+      // Empty location is VALID and should navigate to show ALL properties
       const searchLocationText = (searchLocation || searchQuery || '').trim();
       
-      if (!searchLocationText) {
-        Alert.alert('Search Required', 'Please enter a location to search for properties.');
-        return;
+      // PART A: Always allow Search click - NO validation blocking empty input
+      // Empty location is valid - will show ALL properties in SearchResults
+      // Navigate to Search tab which has the search functionality
+      const params: any = {
+        query: searchLocationText, // Always pass query param (even if empty string)
+        location: searchLocationText, // Always pass location param (even if empty string)
+      };
+      
+      // If location has value, add additional params for backward compatibility
+      if (searchLocationText) {
+        params.searchQuery = searchLocationText;
       }
       
-      // Navigate to Search tab which has the search functionality
+      // Add listing type filter
+      if (listingType !== 'all') {
+        params.listingType = listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType;
+      }
+      
       navigation.navigate('Search' as never, {
         screen: 'SearchResults',
-        params: {
-          location: searchLocationText,
-          searchQuery: searchLocationText,
-          listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
-        },
+        params: params,
       } as never);
     } catch (error: any) {
       console.error('Error navigating to search:', error);

@@ -71,20 +71,22 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
       // Close location suggestions
       setShowLocationSuggestions(false);
       
-      // Get the search location text (trimmed)
+      // PART A: Safely get location input with trim() - handle null/empty/spaces
+      // Empty location is VALID and should navigate to show ALL properties
       const searchLocationText = (searchLocation || searchQuery || '').trim();
       
-      // If no location is provided, show an alert
-      if (!searchLocationText) {
-        Alert.alert('Search Required', 'Please enter a location to search for properties.');
-        return;
-      }
-      
+      // PART A: Always allow Search click - NO validation blocking empty input
+      // Empty location is valid - will show ALL properties in SearchResults
       // Navigate to SearchResults with search params
       const params: any = {
-        location: searchLocationText,
-        searchQuery: searchLocationText,
+        query: searchLocationText, // Always pass query param (even if empty string)
+        location: searchLocationText, // Always pass location param (even if empty string)
       };
+      
+      // If location has value, add additional params for backward compatibility
+      if (searchLocationText) {
+        params.searchQuery = searchLocationText;
+      }
       
       // Add listing type filter
       if (listingType !== 'all') {
