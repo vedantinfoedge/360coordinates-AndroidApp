@@ -526,8 +526,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               onPress={() => {
                 try {
                   // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
-                  // Use the Search tab route to ensure correct navigator is focused
-                  navigation.navigate('Search' as never, {
+                  navigation.navigate('SearchResults' as never, {
                     query: '',
                     location: '',
                   } as never);
