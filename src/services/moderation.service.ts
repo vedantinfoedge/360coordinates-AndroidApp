@@ -85,11 +85,18 @@ export const moderationService = {
         formData.append('validate_only', 'true');
       }
 
+      console.log('[ModerationService] Uploading image:', {
+        uri: imageUri,
+        propertyId: propId,
+        validateOnly,
+        mimeType,
+        fileExtension,
+      });
+
+      // Don't set Content-Type header - axios will set it automatically with boundary for FormData
       const response = await api.post(API_ENDPOINTS.MODERATE_AND_UPLOAD, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
         timeout: 30000, // 30 seconds for moderation
+        // Let axios handle Content-Type automatically for FormData
       });
 
       // Handle response according to documentation format
@@ -162,13 +169,29 @@ export const moderationService = {
         };
       }
     } catch (error: any) {
-      console.error('Image upload with moderation error:', error);
+      console.error('[ModerationService] Image upload error:', {
+        message: error?.message,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        data: error?.response?.data,
+        config: {
+          url: error?.config?.url,
+          method: error?.config?.method,
+          headers: error?.config?.headers,
+        },
+      });
       
       // Handle specific error cases
       if (error?.response?.status === 400) {
         const errorData = error.response.data;
         const errorCode = errorData?.error_code;
         const errorMessage = getErrorMessage(errorCode, errorData?.details, errorData?.message);
+        
+        console.log('[ModerationService] 400 Error details:', {
+          errorCode,
+          errorData,
+          errorMessage,
+        });
         
         return {
           status: 'rejected',
@@ -178,9 +201,53 @@ export const moderationService = {
         };
       }
       
+      // Handle network errors
+      if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+        return {
+          status: 'failed',
+          message: 'Upload timeout. Please check your connection and try again.',
+        };
+      }
+      
+      // Handle other HTTP errors
+      if (error?.response) {
+        const status = error.response.status;
+        const errorData = error.response.data;
+        
+        if (status === 401) {
+          return {
+            status: 'failed',
+            message: 'Authentication failed. Please login again.',
+          };
+        }
+        
+        if (status === 413) {
+          return {
+            status: 'rejected',
+            message: 'Image file is too large. Maximum size is 5MB.',
+            moderation_status: 'REJECTED',
+            moderation_reason: 'File too large',
+          };
+        }
+        
+        if (status === 500) {
+          return {
+            status: 'failed',
+            message: 'Server error. Please try again later.',
+          };
+        }
+        
+        // Try to extract error message from response
+        const errorMessage = errorData?.message || errorData?.error || error.message;
+        return {
+          status: 'failed',
+          message: errorMessage || `Upload failed (${status}). Please try again.`,
+        };
+      }
+      
       return {
         status: 'failed',
-        message: error?.message || 'Failed to upload image. Please try again.',
+        message: error?.message || 'Failed to upload image. Please check your connection and try again.',
       };
     }
   },

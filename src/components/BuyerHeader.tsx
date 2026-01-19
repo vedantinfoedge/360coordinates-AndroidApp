@@ -1,12 +1,4 @@
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-import React, {useState, useEffect} from 'react';
-=======
 import React, {useState, useEffect, useMemo} from 'react';
->>>>>>> Stashed changes
-=======
-import React, {useState, useEffect, useMemo} from 'react';
->>>>>>> Stashed changes
 import {
   View,
   Text,
