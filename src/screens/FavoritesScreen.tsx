@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Image,
   Alert,
+  Share,
 } from 'react-native';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -16,10 +16,11 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {BuyerTabParamList} from '../components/navigation/BuyerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../theme';
-import {favoriteService} from '../services/favorite.service';
 import {buyerService} from '../services/buyer.service';
 import {fixImageUrl} from '../utils/imageHelper';
+import {formatters} from '../utils/formatters';
 import BuyerHeader from '../components/BuyerHeader';
+import PropertyCard from '../components/PropertyCard';
 import {useAuth} from '../context/AuthContext';
 
 type FavoritesScreenNavigationProp = CompositeNavigationProp<
@@ -37,8 +38,11 @@ interface Property {
   location?: string;
   city?: string;
   price: number | string;
+  status?: 'sale' | 'rent' | 'pg';
   cover_image?: string;
   images?: string[];
+  property_type?: string;
+  is_favorite?: boolean;
 }
 
 const FavoritesScreen: React.FC<Props> = ({navigation}) => {
@@ -77,13 +81,16 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
         // Handle buyer service response format
         const propertiesList = response.data.properties || response.data.favorites || [];
         const formattedProperties = propertiesList.map((prop: any) => ({
-          id: prop.id,
+          id: prop.id || prop.property_id,
           title: prop.title || prop.property_title || 'Untitled Property',
           location: prop.location || prop.city || 'Location not specified',
           city: prop.city,
           price: prop.price || 0,
+          status: prop.status || (prop.listing_type === 'rent' ? 'rent' : prop.listing_type === 'pg-hostel' ? 'pg' : 'sale'),
           cover_image: fixImageUrl(prop.cover_image || prop.images?.[0] || ''),
           images: prop.images || [],
+          property_type: prop.property_type,
+          is_favorite: true, // All items in favorites are favorited
         }));
 
         if (append) {
@@ -131,38 +138,58 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const renderProperty = ({item}: {item: Property}) => {
-    const priceText = typeof item.price === 'number' 
-      ? `₹${item.price.toLocaleString('en-IN')}` 
-      : item.price;
+  const handleToggleFavorite = async (propertyId: number | string) => {
+    try {
+      // Optimistically remove from list
+      setProperties(prev => prev.filter(prop => prop.id !== propertyId));
+      
+      // Call API to remove from favorites
+      await buyerService.toggleFavorite(propertyId);
+      
+      // Show success message
+      Alert.alert('Removed', 'Property removed from favorites');
+    } catch (error: any) {
+      console.error('Error removing favorite:', error);
+      // Reload favorites on error to restore state
+      loadFavorites(1, false);
+      Alert.alert('Error', 'Failed to remove from favorites. Please try again.');
+    }
+  };
 
+  const handleShareProperty = async (property: Property) => {
+    try {
+      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
+      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nView more: ${shareUrl}`;
+      
+      await Share.share({
+        message: shareMessage,
+        title: property.title,
+      });
+    } catch (error: any) {
+      if (error.message !== 'User did not share') {
+        console.error('Error sharing property:', error);
+        Alert.alert('Error', 'Failed to share property. Please try again.');
+      }
+    }
+  };
+
+  const renderProperty = ({item}: {item: Property}) => {
+    const propertyType = item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy';
+    
     return (
-      <TouchableOpacity
-        style={styles.propertyCard}
-        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}>
-        <View style={styles.imageContainer}>
-          {item.cover_image ? (
-            <Image
-              source={{uri: item.cover_image}}
-              style={styles.propertyImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.propertyImagePlaceholder}>
-              <Text style={styles.placeholderText}>No Image</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.propertyInfo}>
-          <Text style={styles.propertyTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text style={styles.propertyLocation} numberOfLines={1}>
-            {item.location || item.city || 'Location not specified'}
-          </Text>
-          <Text style={styles.propertyPrice}>{priceText}</Text>
-        </View>
-      </TouchableOpacity>
+      <PropertyCard
+        image={fixImageUrl(item.cover_image || item.images?.[0])}
+        name={item.title}
+        location={item.location || item.city || 'Location not specified'}
+        price={formatters.price(item.price, propertyType === 'rent')}
+        type={propertyType}
+        isFavorite={true}
+        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+        onFavoritePress={() => handleToggleFavorite(item.id)}
+        onSharePress={() => handleShareProperty(item)}
+        property={item}
+        style={styles.propertyCardStyle}
+      />
     );
   };
 
@@ -196,7 +223,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
     );
   }
 
-  if (properties.length === 0) {
+  if (properties.length === 0 && !loading) {
     return (
       <View style={styles.container}>
         <BuyerHeader
@@ -219,10 +246,16 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
           showSignUp={isGuest}
         />
         <View style={[styles.centerContainer, {flex: 1}]}>
+          <Text style={styles.emptyIcon}>❤️</Text>
           <Text style={styles.emptyText}>No favorites yet</Text>
           <Text style={styles.emptySubtext}>
             Start exploring properties and add them to your favorites
           </Text>
+          <TouchableOpacity
+            style={styles.exploreButton}
+            onPress={() => navigation.navigate('Home')}>
+            <Text style={styles.exploreButtonText}>Explore Properties</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -249,6 +282,15 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
         showSignIn={isGuest}
         showSignUp={isGuest}
       />
+      {/* Header with count */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>My Favorites</Text>
+        {properties.length > 0 && (
+          <Text style={styles.headerSubtitle}>
+            {properties.length} {properties.length === 1 ? 'property' : 'properties'}
+          </Text>
+        )}
+      </View>
       <FlatList
         data={properties}
         renderItem={renderProperty}
@@ -269,6 +311,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
             <ActivityIndicator size="small" color={colors.accent} style={styles.footerLoader} />
           ) : null
         }
+        ItemSeparatorComponent={() => <View style={styles.propertySeparator} />}
       />
     </View>
   );
@@ -284,65 +327,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
   },
+  header: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: {
+    ...typography.h2,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  headerSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
   listContent: {
     padding: spacing.md,
   },
-  propertyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+  propertyCardStyle: {
+    width: '100%',
+    marginRight: 0,
+  },
+  propertySeparator: {
+    height: spacing.md,
+  },
+  emptyIcon: {
+    fontSize: 64,
     marginBottom: spacing.md,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  imageContainer: {
-    width: '100%',
-    height: 200,
-  },
-  propertyImage: {
-    width: '100%',
-    height: '100%',
-  },
-  propertyImagePlaceholder: {
-    height: 200,
-    backgroundColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  propertyInfo: {
-    padding: spacing.md,
-  },
-  propertyTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  propertyLocation: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  propertyPrice: {
-    ...typography.body,
-    color: colors.accent,
-    fontWeight: '600',
   },
   emptyText: {
     ...typography.h2,
     color: colors.text,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   emptySubtext: {
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  exploreButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.md,
+  },
+  exploreButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
+    fontSize: 16,
   },
   loadingText: {
     ...typography.body,

@@ -24,7 +24,7 @@ import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<any, 'Profile'>,
+  BottomTabNavigationProp<BuyerTabParamList, 'Profile'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -118,7 +118,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
   const handleImagePicker = (source: 'camera' | 'gallery') => {
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.8,
+      quality: 0.8 as const,
       maxWidth: 800,
       maxHeight: 800,
     };
@@ -223,10 +223,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             <TouchableOpacity
               style={styles.loginButton}
               onPress={() => {
-                navigation.navigate('Auth' as never, {
+                (navigation as any).navigate('Auth', {
                   screen: 'Login',
                   params: {returnTo: 'Profile'},
-                } as never);
+                });
               }}
               activeOpacity={0.8}>
               <Text style={styles.loginButtonText}>Login / Register</Text>
@@ -401,7 +401,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.optionsSection}>
           <TouchableOpacity 
             style={styles.optionItem}
-            onPress={() => navigation.navigate('Favorites' as never)}>
+            onPress={() => navigation.navigate('Favorites')}>
             <Text style={styles.optionText}>My Favorites</Text>
             <Text style={styles.optionArrow}>→</Text>
           </TouchableOpacity>

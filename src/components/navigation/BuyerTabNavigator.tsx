@@ -97,6 +97,18 @@ const BuyerTabNavigator = () => {
       <Tab.Screen
         name="Search"
         component={SearchResultsScreen}
+        initialParams={{
+          query: '',
+          location: '',
+          searchQuery: '',
+          city: '',
+          propertyType: '',
+          budget: '',
+          bedrooms: '',
+          area: '',
+          status: '',
+          listingType: 'all', // Show all properties by default
+        }}
         options={{
           title: 'Search',
           headerShown: false,

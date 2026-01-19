@@ -6,12 +6,14 @@ import HomeScreen from '../../screens/Landing/HomeScreen';
 import SearchNavigator from '../../navigation/SearchNavigator';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
+import FavoritesScreen from '../../screens/FavoritesScreen';
 
 export type MainTabParamList = {
   Home: undefined;
   Search: undefined;
   Chat: undefined;
   Profile: undefined;
+  Favorites: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -98,6 +100,15 @@ const MainTabNavigator = () => {
           tabBarIcon: ({color}) => (
             <Text style={{color, fontSize: 20, textAlign: 'center'}}>👤</Text>
           ),
+        }}
+      />
+      <Tab.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{
+          title: 'Favorites',
+          tabBarButton: () => null, // hide from the bottom bar
+          headerShown: false,
         }}
       />
     </Tab.Navigator>
