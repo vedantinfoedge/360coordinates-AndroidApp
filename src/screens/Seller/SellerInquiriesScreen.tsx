@@ -254,6 +254,7 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
         <SellerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support')}
+          onSubscriptionPress={() => navigation.navigate('Subscription')}
           onLogoutPress={logout}
         />
         <View style={[styles.centerContainer, {flex: 1}]}>

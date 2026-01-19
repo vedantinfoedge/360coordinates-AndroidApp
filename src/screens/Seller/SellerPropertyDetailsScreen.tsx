@@ -17,6 +17,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation}) => {
       <SellerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
+        onSubscriptionPress={() => navigation.navigate('Subscription')}
         onLogoutPress={logout}
       />
       <View style={styles.content}>

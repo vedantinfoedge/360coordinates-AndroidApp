@@ -488,6 +488,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <SellerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -509,6 +510,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <SellerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -541,6 +543,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <SellerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
         onLogoutPress={async () => {
           await logout();
         }}
@@ -575,7 +578,27 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
               </View>
               <TouchableOpacity
                 style={styles.addPropertyButton}
-                onPress={() => navigation.navigate('AddProperty')}>
+                onPress={async () => {
+                  // Check property limit before navigating
+                  try {
+                    const statsResponse: any = await sellerService.getDashboardStats();
+                    if (statsResponse && statsResponse.success && statsResponse.data) {
+                      const currentCount = statsResponse.data.total_properties || 0;
+                      if (currentCount >= 3) {
+                        Alert.alert(
+                          'Property Limit Reached',
+                          'You have reached the maximum limit of 3 properties. You cannot add more properties.',
+                          [{text: 'OK'}]
+                        );
+                        return;
+                      }
+                    }
+                    navigation.navigate('AddProperty');
+                  } catch (error) {
+                    // If check fails, still allow navigation (will be checked again in AddPropertyScreen)
+                    navigation.navigate('AddProperty');
+                  }
+                }}>
                 <Text style={styles.addPropertyButtonText}>+ Add Property</Text>
               </TouchableOpacity>
             </View>
@@ -676,7 +699,27 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.quickActionsGrid}>
           <TouchableOpacity
             style={styles.quickActionCard}
-            onPress={() => navigation.navigate('AddProperty')}>
+            onPress={async () => {
+              // Check property limit before navigating
+              try {
+                const statsResponse: any = await sellerService.getDashboardStats();
+                if (statsResponse && statsResponse.success && statsResponse.data) {
+                  const currentCount = statsResponse.data.total_properties || 0;
+                  if (currentCount >= 3) {
+                    Alert.alert(
+                      'Property Limit Reached',
+                      'You have reached the maximum limit of 3 properties. You cannot add more properties.',
+                      [{text: 'OK'}]
+                    );
+                    return;
+                  }
+                }
+                navigation.navigate('AddProperty');
+              } catch (error) {
+                // If check fails, still allow navigation (will be checked again in AddPropertyScreen)
+                navigation.navigate('AddProperty');
+              }
+            }}>
             <Text style={styles.quickActionIcon}>➕</Text>
             <Text style={styles.quickActionTitle}>Add New Property</Text>
             <Text style={styles.quickActionDescription}>
