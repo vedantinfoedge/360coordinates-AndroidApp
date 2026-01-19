@@ -470,7 +470,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Search by city, locality, project"
                   placeholderTextColor={colors.textSecondary}
                   value={searchLocation || searchQuery}
-                  onChangeText={text => {
+                  onChangeText={(text: string) => {
                     setSearchLocation(text);
                     setSearchQuery(text);
                     setShowLocationSuggestions(text.length >= 2);
@@ -526,7 +526,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               onPress={() => {
                 try {
                   // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
-                  navigation.navigate('SearchResults' as never, {
+                  (navigation as any).navigate('SearchResults', {
                     query: '',
                     location: '',
                   } as never);
@@ -548,7 +548,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               data={properties}
               showsVerticalScrollIndicator={false}
               scrollEnabled={false}
-              keyExtractor={item => String(item.id)}
+              keyExtractor={(item: Property) => String(item.id)}
               contentContainerStyle={styles.propertiesList}
               renderItem={renderPropertyCard}
               ItemSeparatorComponent={() => <View style={styles.propertySeparator} />}
@@ -571,7 +571,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             data={TOP_CITIES}
             horizontal
             showsHorizontalScrollIndicator={false}
-            keyExtractor={item => item.id}
+            keyExtractor={(item: TopCity) => item.id}
             contentContainerStyle={styles.citiesList}
             renderItem={renderCityCard}
           />
