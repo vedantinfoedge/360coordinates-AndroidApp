@@ -15,6 +15,7 @@ interface SellerHeaderProps {
   onProfilePress?: () => void;
   onSupportPress?: () => void;
   onLogoutPress?: () => void;
+  onSubscriptionPress?: () => void;
   subscriptionDays?: number;
 }
 
@@ -22,6 +23,7 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
   onProfilePress,
   onSupportPress,
   onLogoutPress,
+  onSubscriptionPress,
   subscriptionDays,
 }) => {
   const [menuVisible, setMenuVisible] = useState(false);
@@ -94,6 +96,15 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
                   onSupportPress?.();
                 }}>
                 <Text style={styles.menuItemText}>Support</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  onSubscriptionPress?.();
+                }}>
+                <Text style={styles.menuItemText}>Subscription</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
               <TouchableOpacity

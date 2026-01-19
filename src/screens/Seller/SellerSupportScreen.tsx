@@ -137,6 +137,7 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
         onSupportPress={() => {
           // Already on support page
         }}
+        onSubscriptionPress={() => navigation.navigate('Subscription')}
         onLogoutPress={logout}
       />
 

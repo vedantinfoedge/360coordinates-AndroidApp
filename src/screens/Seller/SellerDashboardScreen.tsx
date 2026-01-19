@@ -488,6 +488,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <SellerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -509,6 +510,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <SellerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -541,6 +543,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <SellerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
         onLogoutPress={async () => {
           await logout();
         }}

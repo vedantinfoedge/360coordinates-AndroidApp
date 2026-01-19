@@ -9,6 +9,7 @@ import SellerPropertyDetailsScreen from '../../screens/Seller/SellerPropertyDeta
 import AddPropertyScreen from '../../screens/Seller/AddPropertyScreen';
 import SellerInquiriesScreen from '../../screens/Seller/SellerInquiriesScreen';
 import SellerSupportScreen from '../../screens/Seller/SellerSupportScreen';
+import SubscriptionScreen from '../../screens/Seller/SubscriptionScreen';
 import {colors, spacing} from '../../theme';
 import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
 
@@ -21,6 +22,7 @@ export type SellerTabParamList = {
   AddProperty: undefined;
   Inquiries: undefined;
   Support: undefined;
+  Subscription: undefined;
 };
 
 const Tab = createBottomTabNavigator<SellerTabParamList>();
@@ -178,6 +180,14 @@ const SellerTabNavigator = () => {
         component={SellerSupportScreen}
         options={{
           title: 'Support',
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="Subscription"
+        component={SubscriptionScreen}
+        options={{
+          title: 'Subscription',
           tabBarButton: () => null, // Hide from tab bar
         }}
       />

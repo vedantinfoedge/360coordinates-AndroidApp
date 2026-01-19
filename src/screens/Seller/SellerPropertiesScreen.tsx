@@ -571,15 +571,23 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       <SellerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
+        onSubscriptionPress={() => navigation.navigate('Subscription')}
         onLogoutPress={logout}
       />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Properties</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleAddProperty}>
-          <Text style={styles.addButtonText}>+ Add Property</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[styles.viewPlansButton, {marginRight: spacing.sm}]}
+            onPress={() => navigation.navigate('Subscription')}>
+            <Text style={styles.viewPlansButtonText}>View Plans</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAddProperty}>
+            <Text style={styles.addButtonText}>+ Add Property</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       {/* Search and Filter Bar */}
@@ -814,6 +822,25 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.text,
     flex: 1,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewPlansButton: {
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewPlansButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
   },
   addButton: {
     backgroundColor: colors.primary,

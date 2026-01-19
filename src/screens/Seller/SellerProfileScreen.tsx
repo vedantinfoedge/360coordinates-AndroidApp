@@ -379,6 +379,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         <SellerHeader
           onProfilePress={() => {}}
           onSupportPress={() => navigation.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
           onLogoutPress={handleLogout}
         />
         <View style={styles.loadingContainer}>
@@ -678,6 +679,16 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
             onPress={() => navigation.navigate('Support' as never)}>
             <Text style={styles.menuIcon}>🆘</Text>
             <Text style={styles.menuText}>Support</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Subscription' as never)}>
+            <Text style={styles.menuIcon}>💳</Text>
+            <Text style={styles.menuText}>Subscription</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
 
