@@ -9,6 +9,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -267,6 +268,7 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
       <SellerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
+        onSubscriptionPress={() => navigation.navigate('Subscription')}
         onLogoutPress={async () => {
           await logout();
         }}
@@ -276,37 +278,6 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Timer Section */}
-        <View style={styles.timerSection}>
-          <View style={styles.timerHeader}>
-            <Animated.View style={{transform: [{rotate: clockInterpolate}]}}>
-              <Text style={styles.clockIcon}>🕐</Text>
-            </Animated.View>
-            <Text style={styles.timerTitle}>Free Trial Remaining</Text>
-          </View>
-          <View style={styles.timerContainer}>
-            <View style={styles.timeBox}>
-              <Text style={styles.timeValue}>{formatTime(timerState.days)}</Text>
-              <Text style={styles.timeLabel}>Days</Text>
-            </View>
-            <Text style={styles.timeSeparator}>:</Text>
-            <View style={styles.timeBox}>
-              <Text style={styles.timeValue}>{formatTime(timerState.hours)}</Text>
-              <Text style={styles.timeLabel}>Hours</Text>
-            </View>
-            <Text style={styles.timeSeparator}>:</Text>
-            <View style={styles.timeBox}>
-              <Text style={styles.timeValue}>{formatTime(timerState.minutes)}</Text>
-              <Text style={styles.timeLabel}>Minutes</Text>
-            </View>
-            <Text style={styles.timeSeparator}>:</Text>
-            <View style={styles.timeBox}>
-              <Text style={styles.timeValue}>{formatTime(timerState.seconds)}</Text>
-              <Text style={styles.timeLabel}>Seconds</Text>
-            </View>
-          </View>
-        </View>
-
         {/* Plans Section */}
         <View style={styles.plansSection}>
           <Text style={styles.sectionTitle}>Choose Your Plan</Text>
@@ -314,24 +285,15 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
             Select the perfect plan for your property listing needs
           </Text>
 
-          {/* Lock Overlay */}
-          {isTrialActive && (
-            <View style={styles.lockOverlay}>
-              <Text style={styles.lockIcon}>🔒</Text>
-              <Text style={styles.lockTitle}>Plans Locked During Free Trial</Text>
-              <Text style={styles.lockSubtitle}>
-                Enjoy your premium access for free! Plans will be available when your trial period ends.
-              </Text>
-              <Text style={styles.lockDays}>
-                {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining
-              </Text>
-            </View>
-          )}
-
-          {/* Plan Cards */}
+          {/* Plan Cards - Always visible in background */}
           <View style={styles.plansGrid}>
             {subscriptionPlans.map((plan, index) => (
-              <View key={plan.planType} style={styles.planCard}>
+              <View 
+                key={plan.planType} 
+                style={[
+                  styles.planCard,
+                  isTrialActive && styles.planCardBlurred
+                ]}>
                 {plan.popular && (
                   <View style={styles.popularBadge}>
                     <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
@@ -372,6 +334,44 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
               </View>
             ))}
           </View>
+
+          {/* Blur Overlay - Shows during trial */}
+          {isTrialActive && (
+            <View style={styles.blurOverlay}>
+              <View style={styles.overlayContent}>
+                <Animated.View style={{transform: [{rotate: clockInterpolate}]}}>
+                  <Text style={styles.clockIcon}>🕐</Text>
+                </Animated.View>
+                <Text style={styles.lockTitle}>Plans Locked During Free Trial</Text>
+                <Text style={styles.lockSubtitle}>
+                  Enjoy your premium access for free! Plans will be available when your trial period ends.
+                </Text>
+                
+                {/* Compact Timer */}
+                <View style={styles.compactTimerContainer}>
+                  <View style={styles.compactTimeBox}>
+                    <Text style={styles.compactTimeValue}>{formatTime(timerState.days)}</Text>
+                    <Text style={styles.compactTimeLabel}>D</Text>
+                  </View>
+                  <Text style={styles.compactTimeSeparator}>:</Text>
+                  <View style={styles.compactTimeBox}>
+                    <Text style={styles.compactTimeValue}>{formatTime(timerState.hours)}</Text>
+                    <Text style={styles.compactTimeLabel}>H</Text>
+                  </View>
+                  <Text style={styles.compactTimeSeparator}>:</Text>
+                  <View style={styles.compactTimeBox}>
+                    <Text style={styles.compactTimeValue}>{formatTime(timerState.minutes)}</Text>
+                    <Text style={styles.compactTimeLabel}>M</Text>
+                  </View>
+                  <Text style={styles.compactTimeSeparator}>:</Text>
+                  <View style={styles.compactTimeBox}>
+                    <Text style={styles.compactTimeValue}>{formatTime(timerState.seconds)}</Text>
+                    <Text style={styles.compactTimeLabel}>S</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -400,65 +400,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: spacing.xl,
   },
-  timerSection: {
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    borderRadius: borderRadius.lg,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  timerHeader: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  clockIcon: {
-    fontSize: 32,
-    marginBottom: spacing.sm,
-  },
-  timerTitle: {
-    ...typography.h3,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  timerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  timeBox: {
-    backgroundColor: colors.secondary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  timeValue: {
-    ...typography.h2,
-    color: colors.surface,
-    fontWeight: 'bold',
-  },
-  timeLabel: {
-    ...typography.caption,
-    color: colors.surface,
-    marginTop: spacing.xs,
-    opacity: 0.9,
-  },
-  timeSeparator: {
-    ...typography.h2,
-    color: colors.text,
-    marginHorizontal: spacing.sm,
-    fontWeight: 'bold',
-  },
   plansSection: {
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
     paddingHorizontal: spacing.md,
     position: 'relative',
+    minHeight: 600,
   },
   sectionTitle: {
     ...typography.h2,
@@ -473,36 +419,87 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
-  lockOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: borderRadius.lg,
-    padding: spacing.xl,
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    ...Platform.select({
+      ios: {
+        backdropFilter: 'blur(10px)',
+      },
+      android: {
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      },
+    }),
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-    position: 'relative',
-    zIndex: 10,
+    zIndex: 100,
+    borderRadius: borderRadius.lg,
   },
-  lockIcon: {
-    fontSize: 48,
+  overlayContent: {
+    alignItems: 'center',
+    padding: spacing.xl,
+    width: '90%',
+    maxWidth: 400,
+  },
+  clockIcon: {
+    fontSize: 40,
     marginBottom: spacing.md,
   },
   lockTitle: {
-    ...typography.h3,
+    ...typography.h2,
     color: colors.surface,
     fontWeight: 'bold',
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   lockSubtitle: {
     ...typography.body,
     color: colors.surface,
     textAlign: 'center',
     opacity: 0.9,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
+    lineHeight: 22,
   },
-  lockDays: {
+  compactTimerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  compactTimeBox: {
+    backgroundColor: colors.secondary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  compactTimeValue: {
     ...typography.h3,
-    color: colors.accent,
+    color: colors.surface,
     fontWeight: 'bold',
+    fontSize: 20,
+  },
+  compactTimeLabel: {
+    ...typography.caption,
+    color: colors.surface,
+    marginTop: 2,
+    opacity: 0.9,
+    fontSize: 10,
+  },
+  compactTimeSeparator: {
+    ...typography.h3,
+    color: colors.surface,
+    marginHorizontal: spacing.xs,
+    fontWeight: 'bold',
+    fontSize: 20,
+  },
+  planCardBlurred: {
+    opacity: 0.3,
   },
   plansGrid: {
     flexDirection: 'row',
