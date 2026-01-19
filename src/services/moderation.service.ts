@@ -32,21 +32,57 @@ export interface ImageUploadResult {
 }
 
 export const moderationService = {
-  // Upload image with automatic moderation (as per guide)
+  /**
+   * Upload image with automatic moderation (as per Google Vision API documentation)
+   * 
+   * Image URL Format (from backend):
+   * - Full URL: "https://demo1.indiapropertys.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
+   * - Relative path: "properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
+   * 
+   * Filename pattern: img_{timestamp}_{uniqid}.{extension}
+   * Storage path: /backend/uploads/properties/{propertyId}/
+   * 
+   * @param imageUri Local image URI to upload
+   * @param propertyId Property ID (0 for validation-only mode)
+   * @param validateOnly If true, only validates without saving
+   * @returns ImageUploadResult with image_url following backend naming convention
+   */
   uploadWithModeration: async (
     imageUri: string,
     propertyId?: number | string,
+    validateOnly: boolean = false,
   ): Promise<ImageUploadResult> => {
     try {
+      // Validate file type before upload
+      const fileExtension = imageUri.split('.').pop()?.toLowerCase();
+      const allowedTypes = ['jpg', 'jpeg', 'png', 'webp'];
+      if (!fileExtension || !allowedTypes.includes(fileExtension)) {
+        return {
+          status: 'rejected',
+          message: 'Invalid image format. Please use JPEG, PNG, or WebP.',
+          moderation_status: 'REJECTED',
+          moderation_reason: 'Invalid file type',
+        };
+      }
+
+      // Determine MIME type
+      let mimeType = 'image/jpeg';
+      if (fileExtension === 'png') mimeType = 'image/png';
+      if (fileExtension === 'webp') mimeType = 'image/webp';
+
       const formData = new FormData();
-      formData.append('file', {
+      formData.append('image', {
         uri: imageUri,
-        type: 'image/jpeg',
-        name: 'image.jpg',
+        type: mimeType,
+        name: `image.${fileExtension}`,
       } as any);
 
-      if (propertyId) {
-        formData.append('property_id', String(propertyId));
+      // Add property_id (0 for validation-only mode)
+      const propId = validateOnly ? 0 : (propertyId || 0);
+      formData.append('property_id', String(propId));
+
+      if (validateOnly) {
+        formData.append('validate_only', 'true');
       }
 
       const response = await api.post(API_ENDPOINTS.MODERATE_AND_UPLOAD, formData, {
@@ -56,15 +92,20 @@ export const moderationService = {
         timeout: 30000, // 30 seconds for moderation
       });
 
-      // Handle different response statuses from moderation endpoint
-      // Backend returns: { status: "success"|"error", message: "...", data: { moderation_status, image_url, faces, objects, labels, ... } }
-      if (response.success && response.data) {
+      // Handle response according to documentation format
+      // Success Response: { status: "success", message: "...", data: { moderation_status, image_url, ... } }
+      // Error Response: { status: "error", message: "...", error_code: "...", details: {...} }
+      
+      // Check if response has success status (could be response.success or response.status)
+      const isSuccess = response.success === true || response.status === 'success';
+      
+      if (isSuccess && response.data) {
         const moderationData: ModerationData = response.data;
-        const moderationStatus = moderationData.moderation_status || (response as any).status;
+        const moderationStatus = moderationData.moderation_status || 'PENDING';
         
         // Map backend status to our format
         let status: 'success' | 'approved' | 'pending' | 'rejected' | 'failed' = 'success';
-        if (moderationStatus === 'APPROVED' || moderationStatus === 'SAFE') {
+        if (moderationStatus === 'SAFE' || moderationStatus === 'APPROVED') {
           status = 'approved';
         } else if (moderationStatus === 'REJECTED' || moderationStatus === 'UNSAFE') {
           status = 'rejected';
@@ -72,38 +113,81 @@ export const moderationService = {
           status = 'pending';
         }
 
-        // Analyze detection data (faces, objects, labels)
-        const detection = analyzeDetection(moderationData);
+        // Analyze detection data (faces, objects, labels) if available
+        const detection = moderationData ? analyzeDetection(moderationData) : undefined;
 
+        // Extract image URL - prefer image_url, then relative_path
+        // Backend returns full URL in image_url or relative path in relative_path
+        // Format: image_url = "https://demo1.indiapropertys.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
+        //         relative_path = "properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
+        let imageUrl = moderationData.image_url || 
+                      moderationData.relative_path || 
+                      (response.data as any).image_url ||
+                      (response.data as any).relative_path;
+        
+        // Fix image URL if it's a relative path
+        if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+          const {fixImageUrl} = require('../utils/imageHelper');
+          imageUrl = fixImageUrl(imageUrl) || imageUrl;
+        }
+        
         return {
           status,
           message: response.message || 'Image uploaded successfully',
-          image_url: moderationData.image_url || (response.data as any).url,
-          moderation_status: moderationStatus,
-          moderation_reason: moderationData.moderation_reason || (response.data as any).reason_code || (response as ModerationApiResponse).moderation_reason,
-          detection, // Include detection analysis
-          rawData: moderationData, // Include raw data for debugging
+          image_url: imageUrl,
+          moderation_status: moderationStatus as any,
+          moderation_reason: moderationData.moderation_reason || response.message,
+          detection,
+          rawData: moderationData,
         };
-      } else {
-        // Error response from backend
-        const errorData = response.data as ModerationData | undefined;
-        const detection = errorData ? analyzeDetection(errorData) : undefined;
+      } else if (response.status === 'error' || response.success === false) {
+        // Error response from backend (400 status)
+        const errorCode = (response as any).error_code;
+        const errorDetails = (response as any).details;
+        
+        // Get user-friendly error message based on error code
+        const errorMessage = getErrorMessage(errorCode, errorDetails, response.message);
         
         return {
           status: 'rejected',
-          message: response.message || 'Image rejected by moderation',
-          moderation_status: errorData?.moderation_status || 'REJECTED',
-          moderation_reason: errorData?.moderation_reason || (response.data as any)?.reason_code || (response as ModerationApiResponse).moderation_reason,
-          detection, // Include detection even for errors
+          message: errorMessage,
+          moderation_status: 'REJECTED',
+          moderation_reason: errorMessage,
+        };
+      } else {
+        // Unexpected response format
+        return {
+          status: 'failed',
+          message: response.message || 'Unexpected response from server',
         };
       }
     } catch (error: any) {
       console.error('Image upload with moderation error:', error);
+      
+      // Handle specific error cases
+      if (error?.response?.status === 400) {
+        const errorData = error.response.data;
+        const errorCode = errorData?.error_code;
+        const errorMessage = getErrorMessage(errorCode, errorData?.details, errorData?.message);
+        
+        return {
+          status: 'rejected',
+          message: errorMessage,
+          moderation_status: 'REJECTED',
+          moderation_reason: errorMessage,
+        };
+      }
+      
       return {
-        status: 'rejected',
-        message: error.message || 'Failed to upload image',
+        status: 'failed',
+        message: error?.message || 'Failed to upload image. Please try again.',
       };
     }
+  },
+
+  // Pre-validate image before upload (validation-only mode)
+  validateImage: async (imageUri: string): Promise<ImageUploadResult> => {
+    return moderationService.uploadWithModeration(imageUri, 0, true);
   },
 
   // Check image with Google Vision API
@@ -165,4 +249,52 @@ export const moderationService = {
     return response;
   },
 };
+
+// Helper function to get user-friendly error messages based on error codes
+function getErrorMessage(
+  errorCode?: string,
+  details?: any,
+  defaultMessage?: string,
+): string {
+  if (!errorCode) {
+    return defaultMessage || 'Image upload failed. Please try again.';
+  }
+
+  switch (errorCode) {
+    case 'human_detected':
+      const confidence = details?.confidence 
+        ? `${Math.round(details.confidence)}%` 
+        : '';
+      const method = details?.detection_method || 'detection';
+      return `Image contains people${confidence ? ` (${confidence} confidence)` : ''}. Please upload property images only.`;
+    
+    case 'animal_detected':
+      const animal = details?.detected || 'animal';
+      return `Image contains ${animal}. Please upload property images only.`;
+    
+    case 'adult_content':
+      return 'Image contains inappropriate content and cannot be uploaded.';
+    
+    case 'violence_content':
+      return 'Image contains violent content and cannot be uploaded.';
+    
+    case 'racy_content':
+      return 'Image contains suggestive content and cannot be uploaded.';
+    
+    case 'file_too_large':
+      return 'Image size exceeds 5MB. Please compress or use a smaller image.';
+    
+    case 'invalid_file_type':
+      return 'Invalid image format. Please use JPEG, PNG, or WebP.';
+    
+    case 'api_error':
+      return 'Image verification temporarily unavailable. Image will be reviewed manually.';
+    
+    case 'config_error':
+      return 'Server error. Please try again later.';
+    
+    default:
+      return defaultMessage || `Image upload failed: ${errorCode}`;
+  }
+}
 

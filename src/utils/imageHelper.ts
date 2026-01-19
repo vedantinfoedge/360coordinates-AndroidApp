@@ -47,9 +47,15 @@ export const compressImage = async (
  * Handles various URL formats from backend
  * 
  * Backend may return:
- * - Full URL: "https://demo1.indiapropertys.com/backend/uploads/properties/images/img_1.jpg"
+ * - Full URL: "https://demo1.indiapropertys.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
  * - Relative path: "uploads/properties/111/img_1767328756_69574bf41e6d4.jpeg"
- * - Relative path with slash: "/uploads/properties/img.jpg"
+ * - Relative path with slash: "/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
+ * - Properties path: "properties/74/img_1704067200_65a1b2c3d4e5f.jpg" (from moderation API)
+ * 
+ * Property Image Naming Convention:
+ * - Filename format: img_{timestamp}_{uniqid}.{extension}
+ * - Storage path: /backend/uploads/properties/{propertyId}/
+ * - Example: properties/74/img_1704067200_65a1b2c3d4e5f.jpg
  * 
  * @param imagePath Relative or absolute image path from API
  * @returns Full absolute image URL or null if invalid
@@ -106,11 +112,26 @@ export const fixImageUrl = (imagePath: string | null | undefined): string | null
     return `${API_CONFIG.BASE_URL}/${trimmed}`;
   }
   
+  // Handle properties/{propertyId}/ path format (from moderation API)
+  // Format: properties/74/img_1704067200_65a1b2c3d4e5f.jpg
+  if (trimmed.startsWith('properties/')) {
+    return `${API_CONFIG.UPLOAD_BASE_URL}/${trimmed}`;
+  }
+  
+  // Handle /properties/{propertyId}/ path format (with leading slash)
+  if (trimmed.startsWith('/properties/')) {
+    return `${API_CONFIG.UPLOAD_BASE_URL}${trimmed}`;
+  }
+  
   // Backend should normalize all URLs, so this shouldn't happen
   // But handle it gracefully - try to construct URL
   if (trimmed.includes('/') || trimmed.includes('\\')) {
     // Looks like a path, try to construct URL
     const cleanPath = trimmed.startsWith('/') ? trimmed.slice(1) : trimmed;
+    // Check if it's a properties path
+    if (cleanPath.startsWith('properties/')) {
+      return `${API_CONFIG.UPLOAD_BASE_URL}/${cleanPath}`;
+    }
     return `${API_CONFIG.BASE_URL}/${cleanPath}`;
   }
   

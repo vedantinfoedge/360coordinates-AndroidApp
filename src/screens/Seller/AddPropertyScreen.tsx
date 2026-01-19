@@ -182,28 +182,86 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           return;
         }
 
-        // Auto-approve all images and convert to base64 format
-        // Skip moderation for now as per user request
-        const newPhotos = assetsToAdd.map(asset => {
-          // Get base64 string (format: "data:image/jpeg;base64,/9j/4AAQSkZJRg...")
-          const imageType = asset.type || 'jpeg';
-          const base64String = asset.base64 
-            ? `data:image/${imageType};base64,${asset.base64}` 
-            : undefined;
-          
-          return {
-            uri: asset.uri || '',
-            base64: base64String,
-            moderationStatus: 'APPROVED' as const, // Auto-approve for now
-            moderationReason: undefined,
-            imageUrl: undefined, // We'll use base64 instead
-          };
-        });
+        // Add images with "checking" status and validate with Google Vision API
+        const newPhotos = assetsToAdd.map(asset => ({
+          uri: asset.uri || '',
+          base64: undefined, // Will be set after moderation
+          moderationStatus: 'checking' as const,
+          moderationReason: undefined,
+          imageUrl: undefined,
+        }));
         
         const updatedPhotos = [...photos, ...newPhotos];
         setPhotos(updatedPhotos);
         
-        console.log('[AddProperty] Added', newPhotos.length, 'images (auto-approved, base64 ready)');
+        // Process moderation for each image
+        newPhotos.forEach((img, index) => {
+          if (img.uri) {
+            moderationService.uploadWithModeration(img.uri, 0, false)
+              .then(result => {
+                setPhotos(prev => {
+                  const updated = [...prev];
+                  const imgIndex = prev.length - newPhotos.length + index;
+                  if (updated[imgIndex]) {
+                    let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
+                    
+                    if (result.status === 'approved' || result.moderation_status === 'SAFE') {
+                      moderationStatus = 'APPROVED';
+                    } else if (result.status === 'rejected' || result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE') {
+                      moderationStatus = 'REJECTED';
+                    } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || result.moderation_status === 'NEEDS_REVIEW') {
+                      moderationStatus = 'PENDING';
+                    }
+                    
+                    updated[imgIndex] = {
+                      ...updated[imgIndex],
+                      moderationStatus,
+                      moderationReason: result.moderation_reason,
+                      imageUrl: result.image_url,
+                    };
+                    
+                    // Show alert for rejected images
+                    if (moderationStatus === 'REJECTED') {
+                      Alert.alert(
+                        'Image Rejected',
+                        result.moderation_reason || 'Image does not meet our guidelines. Please upload property images only.',
+                        [{text: 'OK'}]
+                      );
+                    } else if (moderationStatus === 'PENDING') {
+                      Alert.alert(
+                        'Image Under Review',
+                        'Your image is being reviewed and will be visible after approval.',
+                        [{text: 'OK'}]
+                      );
+                    }
+                  }
+                  return updated;
+                });
+              })
+              .catch(error => {
+                console.error('[AddProperty] Moderation error:', error);
+                setPhotos(prev => {
+                  const updated = [...prev];
+                  const imgIndex = prev.length - newPhotos.length + index;
+                  if (updated[imgIndex]) {
+                    updated[imgIndex] = {
+                      ...updated[imgIndex],
+                      moderationStatus: 'REJECTED' as const,
+                      moderationReason: error.message || 'Failed to verify image',
+                    };
+                  }
+                  return updated;
+                });
+                Alert.alert(
+                  'Upload Failed',
+                  error.message || 'Failed to upload image. Please try again.',
+                  [{text: 'OK'}]
+                );
+              });
+          }
+        });
+        
+        console.log('[AddProperty] Added', newPhotos.length, 'images (validating with Google Vision API)');
       }
     });
   };
@@ -316,15 +374,50 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Collect images as base64 strings (auto-approved, skip moderation)
-      // According to guide: images can be sent as URLs or base64 strings in the request body
-      // For now, we're using base64 strings for all approved images
-      const imageBase64Strings = photos
-        .filter(p => p.moderationStatus === 'APPROVED' && p.base64) // Only include approved images with base64
+      // Collect images - use imageUrl from moderation API if available, otherwise use base64
+      // Only include approved or pending images (rejected images are excluded)
+      const validImages = photos.filter(p => 
+        (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') &&
+        (p.imageUrl || p.base64) // Must have either URL from API or base64
+      );
+      
+      // Prefer imageUrl from moderation API, fallback to base64
+      const imageUrls = validImages
+        .map(p => p.imageUrl)
+        .filter((url): url is string => url !== undefined && url !== null);
+      
+      const imageBase64Strings = validImages
+        .filter(p => !p.imageUrl && p.base64) // Only use base64 if no URL available
         .map(p => p.base64!)
         .filter((base64): base64 is string => base64 !== undefined && base64 !== null);
       
-      console.log('[AddProperty] Total photos:', photos.length, 'Approved photos with base64:', imageBase64Strings.length);
+      // Check if we have any images
+      if (validImages.length === 0) {
+        Alert.alert(
+          'No Valid Images',
+          'Please upload at least one image that has been approved or is pending review.',
+          [{text: 'OK'}]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Check if any images are still being validated
+      const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
+      if (checkingImages.length > 0) {
+        Alert.alert(
+          'Images Still Validating',
+          'Please wait for all images to be validated before submitting.',
+          [{text: 'OK'}]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      
+      console.log('[AddProperty] Total photos:', photos.length);
+      console.log('[AddProperty] Valid images (approved/pending):', validImages.length);
+      console.log('[AddProperty] Image URLs from API:', imageUrls.length);
+      console.log('[AddProperty] Base64 images (fallback):', imageBase64Strings.length);
 
       // Property type is already in the correct format from guide
       const propertyData = {
@@ -352,13 +445,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : null,
         maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
         amenities: selectedAmenities,
-        // Include images as base64 strings in the request (as per guide)
-        images: imageBase64Strings.length > 0 ? imageBase64Strings : undefined,
+        // Include images: prefer URLs from moderation API, fallback to base64
+        images: imageUrls.length > 0 ? imageUrls : (imageBase64Strings.length > 0 ? imageBase64Strings : undefined),
       };
 
       console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
-      console.log('[AddProperty] Images included as base64:', imageBase64Strings.length);
-      console.log('[AddProperty] Property data:', JSON.stringify({...propertyData, images: `[${imageBase64Strings.length} base64 images]`}, null, 2));
+      console.log('[AddProperty] Images included:', {
+        urls: imageUrls.length,
+        base64: imageBase64Strings.length,
+        total: imageUrls.length + imageBase64Strings.length
+      });
+      console.log('[AddProperty] Property data:', JSON.stringify({...propertyData, images: `[${imageUrls.length} URLs, ${imageBase64Strings.length} base64]`}, null, 2));
 
       // Create property with images included in request (as per guide)
       // Use 'seller' userType to use correct endpoint
