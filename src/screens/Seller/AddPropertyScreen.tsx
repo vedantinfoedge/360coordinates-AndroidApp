@@ -237,7 +237,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         // Process moderation for each image
         newPhotos.forEach((img, index) => {
           if (img.uri) {
-            moderationService.uploadWithModeration(img.uri, 0, false)
+            moderationService.uploadWithModeration(img.uri, 0, true)
               .then(result => {
                 setPhotos(prev => {
                   const updated = [...prev];

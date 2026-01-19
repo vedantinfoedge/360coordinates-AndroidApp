@@ -1,6 +1,7 @@
 import {Platform} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api.service';
-import {API_ENDPOINTS} from '../config/api.config';
+import {API_CONFIG, API_ENDPOINTS} from '../config/api.config';
 import {analyzeDetection} from './detection.service';
 import {
   ModerationApiResponse,
@@ -30,6 +31,48 @@ export interface ImageUploadResult {
   moderation_reason?: string;
   // Optional detection details (for new implementation)
   detection?: ReturnType<typeof analyzeDetection>;
+}
+
+const joinUrl = (baseUrl: string, path: string) => {
+  const base = baseUrl.replace(/\/+$/, '');
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${p}`;
+};
+
+/**
+ * React Native fetch timeout wrapper.
+ * Uses AbortController when available, otherwise Promise.race fallback.
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  // AbortController is supported in modern RN; keep fallback for safety.
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = setTimeout(() => {
+    controller?.abort();
+  }, timeoutMs);
+
+  try {
+    // If controller is null, signal will be undefined and fetch still works.
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    const response = await fetch(url, {
+      ...options,
+      signal: (controller?.signal as any) || undefined,
+    } as any);
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function getAuthToken(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem('@auth_token');
+  } catch {
+    return null;
+  }
 }
 
 export const moderationService = {
@@ -86,32 +129,85 @@ export const moderationService = {
         name: `property_image.${fileExtension}`, // e.g., 'property_image.jpg'
       } as any);
 
-      // Add property_id (0 for validation-only mode for new properties)
-      const propId = validateOnly ? 0 : (propertyId || 0);
-      formData.append('property_id', String(propId));
-
-      // Add validate_only flag for new properties
+      // For new properties (validateOnly=true), don't send property_id at all
+      // For existing properties, send the actual property_id
       if (validateOnly) {
+        // Validation-only mode: don't send property_id, only validate_only flag
         formData.append('validate_only', 'true');
+      } else if (propertyId && propertyId !== 0) {
+        // Existing property: send the actual property_id
+        formData.append('property_id', String(propertyId));
+      }
+      // If propertyId is 0 or undefined and validateOnly is false, don't send property_id
+
+      const formDataFields = ['image'];
+      if (validateOnly) {
+        formDataFields.push('validate_only');
+      } else if (propertyId && propertyId !== 0) {
+        formDataFields.push('property_id');
       }
 
       console.log('[ModerationService] Uploading image with FormData:', {
         uri: imageUri,
         normalizedUri,
         platform: Platform.OS,
-        propertyId: propId,
+        propertyId: propertyId || 'none (validation-only)',
         validateOnly,
         mimeType,
         fileExtension,
-        formDataFields: ['image', 'property_id', validateOnly ? 'validate_only' : null].filter(Boolean),
+        formDataFields,
       });
 
-      // Don't set Content-Type header - axios will set it automatically with boundary for FormData
-      // Increased timeout to 60 seconds for large images
-      const response = await api.post(API_ENDPOINTS.MODERATE_AND_UPLOAD, formData, {
-        timeout: 60000, // 60 seconds for large images
-        // Let axios handle Content-Type automatically for FormData
-      });
+      // Use fetch for React Native FormData uploads (more reliable than axios)
+      // Do NOT set Content-Type header manually; RN will set boundary automatically.
+      const url = joinUrl(API_CONFIG.API_BASE_URL, API_ENDPOINTS.MODERATE_AND_UPLOAD);
+      const token = await getAuthToken();
+
+      console.log('[ModerationService] Upload URL:', url);
+
+      const res = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            ...(token ? {Authorization: `Bearer ${token}`} : {}),
+            Accept: 'application/json',
+          },
+          body: formData,
+        },
+        60000, // 60 seconds for large images
+      );
+
+      const responseText = await res.text();
+      let response: any = null;
+      try {
+        response = responseText ? JSON.parse(responseText) : {};
+      } catch (parseErr) {
+        // Non-JSON responses are usually server errors / HTML, keep snippet for debugging.
+        console.error('[ModerationService] Non-JSON response:', {
+          status: res.status,
+          ok: res.ok,
+          snippet: responseText?.substring?.(0, 400),
+        });
+        response = {
+          success: false,
+          status: 'error',
+          message: `Invalid response from server (${res.status})`,
+          raw: responseText,
+        };
+      }
+
+      if (!res.ok) {
+        // Normalize into the same shape our code already expects.
+        response = {
+          ...(typeof response === 'object' ? response : {}),
+          success: false,
+          status: (response as any)?.status || 'error',
+          message:
+            (response as any)?.message ||
+            `Upload failed (${res.status}). Please try again.`,
+        };
+      }
 
       // Handle response according to documentation format
       // Success Response: { status: "success", message: "...", data: { moderation_status, image_url, ... } }
@@ -197,8 +293,14 @@ export const moderationService = {
           method: error?.config?.method,
           headers: error?.config?.headers,
         },
-        // Include full error serialization
-        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+        // Include full error serialization (best-effort)
+        fullError: (() => {
+          try {
+            return JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
+          } catch {
+            return String(error);
+          }
+        })(),
       };
       
       // Log comprehensive error details
