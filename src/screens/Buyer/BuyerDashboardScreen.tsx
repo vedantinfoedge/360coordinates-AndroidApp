@@ -364,7 +364,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.container}>
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onSupportPress={() => {
+            try {
+              console.log('[BuyerDashboard] Navigating to Support screen');
+              navigation.navigate('Support' as never);
+            } catch (error: any) {
+              console.error('[BuyerDashboard] Error navigating to Support:', error);
+              Alert.alert('Error', 'Failed to open Support screen. Please try again.');
+            }
+          }}
           onLogoutPress={isLoggedIn ? logout : undefined}
           onSignInPress={() => {
             console.log('[BuyerDashboard] Navigating to Login screen');
@@ -394,7 +402,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     <View style={styles.container}>
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onSupportPress={() => {
+          try {
+            console.log('[BuyerDashboard] Navigating to Support screen');
+            navigation.navigate('Support' as never);
+          } catch (error: any) {
+            console.error('[BuyerDashboard] Error navigating to Support:', error);
+            Alert.alert('Error', 'Failed to open Support screen. Please try again.');
+          }
+        }}
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={() => {
           console.log('[BuyerDashboard] Navigating to Login screen');

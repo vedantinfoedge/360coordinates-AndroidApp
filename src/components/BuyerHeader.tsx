@@ -54,7 +54,10 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
         label: 'View Profile',
         onPress: () => {
           setMenuVisible(false);
-          onProfilePress();
+          // Small delay to ensure modal closes before navigation
+          setTimeout(() => {
+            onProfilePress();
+          }, 100);
         },
       });
     }
@@ -65,7 +68,10 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
         label: 'Support',
         onPress: () => {
           setMenuVisible(false);
-          onSupportPress();
+          // Small delay to ensure modal closes before navigation
+          setTimeout(() => {
+            onSupportPress();
+          }, 100);
         },
       });
     }
@@ -78,7 +84,10 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
           onPress: () => {
             console.log('[BuyerHeader] Login pressed');
             setMenuVisible(false);
-            onSignInPress();
+            // Small delay to ensure modal closes before navigation
+            setTimeout(() => {
+              onSignInPress();
+            }, 100);
           },
         });
       }
@@ -88,7 +97,10 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
           onPress: () => {
             console.log('[BuyerHeader] Sign Up pressed');
             setMenuVisible(false);
-            onSignUpPress();
+            // Small delay to ensure modal closes before navigation
+            setTimeout(() => {
+              onSignUpPress();
+            }, 100);
           },
         });
       }
@@ -101,7 +113,10 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
         onPress: () => {
           console.log('[BuyerHeader] Logout pressed');
           setMenuVisible(false);
-          onLogoutPress();
+          // Small delay to ensure modal closes before logout action
+          setTimeout(() => {
+            onLogoutPress();
+          }, 100);
         },
         isLogout: true,
       });
