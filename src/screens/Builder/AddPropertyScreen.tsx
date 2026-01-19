@@ -23,6 +23,7 @@ import {propertyService} from '../../services/property.service';
 import {moderationService} from '../../services/moderation.service';
 import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
+import {extractStateFromContext} from '../../utils/geocoding';
 import {useAuth} from '../../context/AuthContext';
 import {formatters} from '../../utils/formatters';
 
@@ -197,14 +198,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     setShowLocationSuggestions(false);
     
     // Extract state from context
-    if (locationData.context) {
-      const stateContext = locationData.context.find((ctx: any) => 
-        ctx.id?.startsWith('region') || ctx.id?.startsWith('place')
-      );
-      if (stateContext) {
-        setState(stateContext.text || '');
-        setStateAutoFilled(true);
-      }
+    const extractedState = extractStateFromContext(locationData.context);
+    if (extractedState) {
+      setState(extractedState);
+      setStateAutoFilled(true);
     }
     
     // Set coordinates if available
@@ -712,6 +709,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 if (locationData.address) {
                   setLocation(locationData.address);
                   setLocationQuery(locationData.address);
+                }
+                // Extract state from context if available
+                const extractedState = extractStateFromContext(locationData.context);
+                if (extractedState) {
+                  setState(extractedState);
+                  setStateAutoFilled(true);
                 }
                 setLocationPickerVisible(false);
               }}

@@ -49,6 +49,63 @@ export const geocodeLocation = async (
 };
 
 /**
+ * Extract state name from Mapbox context array
+ * @param context - Array of context objects from Mapbox API
+ * @returns State name if found, null otherwise
+ */
+export const extractStateFromContext = (context?: any[]): string | null => {
+  if (!context || !Array.isArray(context) || context.length === 0) {
+    return null;
+  }
+
+  // Find all region contexts (state-level regions)
+  const regionContexts = context.filter(
+    (ctx: any) => ctx.id?.startsWith('region.')
+  );
+
+  if (regionContexts.length === 0) {
+    return null;
+  }
+
+  // If there's only one region context, use it
+  if (regionContexts.length === 1) {
+    return regionContexts[0].text || regionContexts[0].name || null;
+  }
+
+  // If there are multiple region contexts, prioritize:
+  // 1. The one with a short_code (state code like "MH", "KA", etc.)
+  // 2. The one that appears later in the context array (state is typically after district)
+  // 3. The first one as fallback
+
+  // Try to find one with short_code first
+  const stateWithCode = regionContexts.find(
+    (ctx: any) => ctx.short_code && ctx.short_code.length === 2
+  );
+  if (stateWithCode) {
+    return stateWithCode.text || stateWithCode.name || null;
+  }
+
+  // Find the region context that appears last in the original context array
+  // (state is typically after district in the hierarchy)
+  let lastRegionIndex = -1;
+  let lastRegionContext = null;
+  
+  context.forEach((ctx: any, index: number) => {
+    if (ctx.id?.startsWith('region.')) {
+      lastRegionIndex = index;
+      lastRegionContext = ctx;
+    }
+  });
+
+  if (lastRegionContext) {
+    return lastRegionContext.text || lastRegionContext.name || null;
+  }
+
+  // Fallback to first region context
+  return regionContexts[0].text || regionContexts[0].name || null;
+};
+
+/**
  * Reverse geocode coordinates (coordinates to address)
  * @param latitude - Latitude coordinate
  * @param longitude - Longitude coordinate

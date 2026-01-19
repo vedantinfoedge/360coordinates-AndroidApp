@@ -27,6 +27,7 @@ import {sellerService} from '../../services/seller.service';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
 import LocationPicker from '../../components/map/LocationPicker';
+import {extractStateFromContext} from '../../utils/geocoding';
 import {
   GuidePropertyType,
   getPropertyTypeConfig,
@@ -702,11 +703,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       setLongitude(locationData.coordinates[0]);
                     }
                     // Extract state from context if available
-                    if (locationData.context) {
-                      const stateContext = locationData.context.find((ctx: any) => ctx.id?.startsWith('region'));
-                      if (stateContext) {
-                        setState(stateContext.text || stateContext.name);
-                      }
+                    const extractedState = extractStateFromContext(locationData.context);
+                    if (extractedState) {
+                      setState(extractedState);
                     }
                   }}
                   visible={location.length >= 2 && !locationSelected}
@@ -783,6 +782,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 setLongitude(locationData.longitude);
                 if (locationData.address) {
                   setLocation(locationData.address);
+                  setLocationSelected(true);
+                }
+                // Extract state from context if available
+                const extractedState = extractStateFromContext(locationData.context);
+                if (extractedState) {
+                  setState(extractedState);
                 }
                 setLocationPickerVisible(false);
               }}

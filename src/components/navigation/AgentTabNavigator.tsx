@@ -17,7 +17,7 @@ export type AgentTabParamList = {
   Inquiries: undefined;
   Profile: undefined;
   PropertyDetails: {propertyId: string};
-  AddProperty: undefined;
+  AddProperty: {isUpcomingProject?: boolean} | undefined;
   EditProperty: {propertyId: string | number};
   Support: undefined;
 };
