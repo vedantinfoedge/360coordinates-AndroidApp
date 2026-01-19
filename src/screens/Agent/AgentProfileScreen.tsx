@@ -20,6 +20,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
 import {userService} from '../../services/user.service';
+import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
@@ -148,16 +149,26 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response: any = await userService.updateProfile({
-        full_name: formData.full_name,
-        address: formData.address,
-        whatsapp_number: formData.whatsapp_number,
-        alternate_mobile: formData.alternate_mobile,
-        company_name: formData.company_name,
-        license_number: formData.license_number,
-        gst_number: formData.gst_number,
-        website: formData.website,
-      });
+      // Build payload to match website seller profile update API
+      // Method: PUT /seller/profile/update.php
+      // Fields: full_name, address, company_name, license_number, website, gst_number (optional)
+      // Notes: 
+      // - Email and phone are not sent (cannot be changed)
+      // - Empty strings are sent to clear optional fields
+      // - All string fields are trimmed before sending
+      const updateData = {
+        full_name: formData.full_name?.trim() || '',
+        address: formData.address?.trim() || '',
+        company_name: formData.company_name?.trim() || '',
+        license_number: formData.license_number?.trim() || '',
+        website: formData.website?.trim() || '',
+        gst_number: formData.gst_number?.trim() || '',
+        // Extra optional fields supported by backend for mobile/app:
+        whatsapp_number: formData.whatsapp_number?.trim() || '',
+        alternate_mobile: formData.alternate_mobile?.trim() || '',
+      };
+
+      const response: any = await sellerService.updateProfile(updateData);
 
       if (response && response.success) {
         Alert.alert('Success', 'Profile updated successfully');
