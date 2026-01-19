@@ -525,7 +525,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             <TouchableOpacity
               onPress={() => {
                 try {
-                  // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
+                  // Explore Properties -> See All should open Search (SearchResults) with ALL properties (no filters)
                   const params: any = {
                     query: '',
                     location: '',
@@ -541,11 +541,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                   } else if (listingType === 'pg') {
                     params.status = 'rent'; // PG uses rent status in API
                     params.listingType = 'pg-hostel';
-                  } else {
-                    params.listingType = 'all';
                   }
 
-                  (navigation as any).navigate('SearchResults', params as never);
+                  // Navigate to the Search tab (which shows SearchResultsScreen)
+                  (navigation as any).navigate('Search', params as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   Alert.alert('Error', 'Failed to load all properties. Please try again.');
