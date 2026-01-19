@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  FlatList,
+  ScrollView,
 } from 'react-native';
 import {MAPBOX_ACCESS_TOKEN} from '../../config/mapbox.config';
 import {colors, spacing, typography} from '../../theme';
@@ -112,11 +112,14 @@ const StateAutoSuggest: React.FC<StateAutoSuggestProps> = ({
           <Text style={styles.loadingText}>Searching...</Text>
         </View>
       ) : (
-        <FlatList
-          data={suggestions}
-          keyExtractor={item => item.id}
-          renderItem={({item}) => (
+        <ScrollView
+          style={styles.list}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={true}>
+          {suggestions.map((item) => (
             <TouchableOpacity
+              key={item.id}
               style={styles.suggestion}
               onPress={() => handleSelect(item)}>
               <Text style={styles.suggestionText} numberOfLines={1}>
@@ -128,10 +131,8 @@ const StateAutoSuggest: React.FC<StateAutoSuggestProps> = ({
                 </Text>
               )}
             </TouchableOpacity>
-          )}
-          style={styles.list}
-          keyboardShouldPersistTaps="handled"
-        />
+          ))}
+        </ScrollView>
       )}
     </View>
   );

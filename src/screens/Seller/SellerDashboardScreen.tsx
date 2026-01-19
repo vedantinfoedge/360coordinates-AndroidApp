@@ -300,10 +300,10 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   useEffect(() => {
     // Only load data if user is a seller
     if (user && user.user_type === 'seller') {
-      // Auto-refresh every 10 seconds
+      // Auto-refresh every 30 seconds (as per documentation)
       refreshIntervalRef.current = setInterval(() => {
         loadDashboardData(false); // Silent refresh
-      }, 10000);
+      }, 30000);
 
       return () => {
         if (refreshIntervalRef.current) {

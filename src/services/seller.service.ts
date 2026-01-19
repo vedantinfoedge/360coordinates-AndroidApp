@@ -87,6 +87,26 @@ export const sellerService = {
     return response;
   },
 
+  // Update seller profile
+  updateProfile: async (profileData: {
+    full_name?: string;
+    address?: string;
+    whatsapp_number?: string;
+    alternate_mobile?: string;
+    company_name?: string;
+    license_number?: string;
+    gst_number?: string;
+    website?: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      linkedin?: string;
+    };
+  }) => {
+    const response = await api.put(API_ENDPOINTS.SELLER_PROFILE_UPDATE, profileData);
+    return response;
+  },
+
   // Update inquiry status
   updateInquiryStatus: async (
     inquiryId: number | string,

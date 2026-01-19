@@ -1,4 +1,4 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,15 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
+  TextInput,
+  Modal,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
-import {sellerService} from '../../services/seller.service';
+import {sellerService, DashboardStats} from '../../services/seller.service';
 import {propertyService} from '../../services/property.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 
@@ -32,18 +34,83 @@ interface Property {
   location: string;
   price: string;
   status: 'active' | 'pending' | 'sold';
+  created_at?: string;
 }
+
+type StatusFilter = 'all' | 'sale' | 'rent';
+type SortOption = 'newest' | 'oldest' | 'price-high' | 'price-low';
 
 const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
   const [properties, setProperties] = useState<any[]>([]);
+  const [allProperties, setAllProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+
+  // Check property limit before adding
+  const checkPropertyLimit = async (): Promise<boolean> => {
+    try {
+      const statsResponse: any = await sellerService.getDashboardStats();
+      if (statsResponse && statsResponse.success && statsResponse.data) {
+        const stats = statsResponse.data;
+        const currentCount = stats.total_properties || 0;
+        const planType = stats.subscription?.plan_type || 'free';
+        
+        let limit = 3; // Default free plan
+        if (planType === 'basic' || planType === 'pro' || planType === 'premium') {
+          limit = 10;
+        } else if (user?.user_type === 'agent') {
+          limit = Infinity; // Unlimited for agents
+        }
+        
+        if (currentCount >= limit) {
+          Alert.alert(
+            'Property Limit Reached',
+            `You have reached your property limit (${limit} properties for ${planType} plan). Please upgrade your plan to add more properties.`,
+            [{text: 'OK'}]
+          );
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking property limit:', error);
+      return true; // Allow if check fails
+    }
+  };
+
+  // Check if property can be edited (within 24 hours)
+  const canEditProperty = (property: any): boolean => {
+    const createdAt = property.created_at || property.created_date || property.date_created;
+    if (!createdAt) return true; // Allow if no date available
+    
+    const createdDate = new Date(createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - createdDate.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    return diffHours < 24;
+  };
 
   const loadMyProperties = useCallback(async (showLoading: boolean = true) => {
     try {
       if (showLoading) {
         setLoading(true);
+      }
+      
+      // Load dashboard stats for property limit check
+      try {
+        const statsResponse: any = await sellerService.getDashboardStats();
+        if (statsResponse && statsResponse.success && statsResponse.data) {
+          setDashboardStats(statsResponse.data);
+        }
+      } catch (error) {
+        console.warn('Error loading dashboard stats:', error);
       }
       
       // Use seller service endpoint (correct endpoint for sellers)
@@ -151,6 +218,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           });
           
           console.log('[SellerProperties] Loaded and fixed properties:', fixedProperties.length);
+          setAllProperties(fixedProperties);
           setProperties(fixedProperties);
         } else {
           // No properties found in response
@@ -258,10 +326,72 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const handleEdit = (propertyId: string) => {
+  // Filter and sort properties
+  const filteredAndSortedProperties = useMemo(() => {
+    let filtered = [...allProperties];
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(prop => 
+        (prop.title || '').toLowerCase().includes(query) ||
+        (prop.location || '').toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(prop => prop.status === statusFilter);
+    }
+    
+    // Apply sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          const aDate = new Date(a.created_at || a.created_date || 0).getTime();
+          const bDate = new Date(b.created_at || b.created_date || 0).getTime();
+          return bDate - aDate;
+        case 'oldest':
+          const aDateOld = new Date(a.created_at || a.created_date || 0).getTime();
+          const bDateOld = new Date(b.created_at || b.created_date || 0).getTime();
+          return aDateOld - bDateOld;
+        case 'price-high':
+          return parseFloat(b.price || '0') - parseFloat(a.price || '0');
+        case 'price-low':
+          return parseFloat(a.price || '0') - parseFloat(b.price || '0');
+        default:
+          return 0;
+      }
+    });
+    
+    return filtered;
+  }, [allProperties, searchQuery, statusFilter, sortBy]);
+
+  const handleEdit = async (propertyId: string | number) => {
+    const property = allProperties.find(p => String(p.id) === String(propertyId));
+    
+    if (!property) {
+      Alert.alert('Error', 'Property not found');
+      return;
+    }
+    
+    if (!canEditProperty(property)) {
+      Alert.alert(
+        'Edit Restricted',
+        'This property was created more than 24 hours ago. Only limited fields can be edited. Please contact support for major changes.',
+        [{text: 'OK'}]
+      );
+    }
+    
     // Navigate to edit property screen
-    navigation.navigate('AddProperty' as never);
-    // In real app, pass propertyId to edit screen
+    (navigation as any).navigate('AddProperty', {propertyId: String(propertyId)});
+  };
+
+  const handleAddProperty = async () => {
+    const canAdd = await checkPropertyLimit();
+    if (canAdd) {
+      navigation.navigate('AddProperty' as never);
+    }
   };
 
   const handleDelete = async (propertyId: string | number) => {
@@ -395,9 +525,16 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       </TouchableOpacity>
       <View style={styles.actionButtons}>
         <TouchableOpacity
-          style={[styles.actionButton, styles.editButton]}
-          onPress={() => handleEdit(item.id)}>
-          <Text style={styles.actionButtonText}>Edit</Text>
+          style={[
+            styles.actionButton,
+            styles.editButton,
+            !canEditProperty(item) && styles.actionButtonDisabled,
+          ]}
+          onPress={() => handleEdit(item.id)}
+          disabled={!canEditProperty(item)}>
+          <Text style={styles.actionButtonText}>
+            {canEditProperty(item) ? 'Edit' : 'Limited'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.viewButton]}
@@ -425,10 +562,101 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         <Text style={styles.headerTitle}>My Properties</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => navigation.navigate('AddProperty' as never)}>
+          onPress={handleAddProperty}>
           <Text style={styles.addButtonText}>+ Add Property</Text>
         </TouchableOpacity>
       </View>
+      
+      {/* Search and Filter Bar */}
+      <View style={styles.searchBar}>
+        <View style={styles.searchInputContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search properties..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={colors.textSecondary}
+          />
+        </View>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setShowFilterModal(true)}>
+          <Text style={styles.filterButtonText}>Filter</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilterModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter & Sort</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.filterSection}>
+              <Text style={styles.filterLabel}>Status</Text>
+              <View style={styles.filterOptions}>
+                {(['all', 'sale', 'rent'] as StatusFilter[]).map(status => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.filterOption,
+                      statusFilter === status && styles.filterOptionActive,
+                    ]}
+                    onPress={() => setStatusFilter(status)}>
+                    <Text
+                      style={[
+                        styles.filterOptionText,
+                        statusFilter === status && styles.filterOptionTextActive,
+                      ]}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            
+            <View style={styles.filterSection}>
+              <Text style={styles.filterLabel}>Sort By</Text>
+              {(['newest', 'oldest', 'price-high', 'price-low'] as SortOption[]).map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.sortOption,
+                    sortBy === option && styles.sortOptionActive,
+                  ]}
+                  onPress={() => setSortBy(option)}>
+                  <Text
+                    style={[
+                      styles.sortOptionText,
+                      sortBy === option && styles.sortOptionTextActive,
+                    ]}>
+                    {option === 'newest' && 'Newest First'}
+                    {option === 'oldest' && 'Oldest First'}
+                    {option === 'price-high' && 'Price: High to Low'}
+                    {option === 'price-low' && 'Price: Low to High'}
+                  </Text>
+                  {sortBy === option && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <TouchableOpacity
+              style={styles.applyButton}
+              onPress={() => setShowFilterModal(false)}>
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -441,23 +669,35 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           <Text style={styles.emptySubtext}>
             Add your first property to get started
           </Text>
-          <TouchableOpacity
-            style={styles.emptyAddButton}
-            onPress={() => navigation.navigate('AddProperty' as never)}>
-            <Text style={styles.emptyAddButtonText}>Add Property</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.emptyAddButton}
+          onPress={handleAddProperty}>
+          <Text style={styles.emptyAddButtonText}>Add Property</Text>
+        </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={properties}
-          renderItem={renderProperty}
-          keyExtractor={(item, index) => String(item.id || item.property_id || index)}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          {filteredAndSortedProperties.length === 0 && searchQuery ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🔍</Text>
+              <Text style={styles.emptyText}>No properties found</Text>
+              <Text style={styles.emptySubtext}>
+                Try adjusting your search or filters
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredAndSortedProperties}
+              renderItem={renderProperty}
+              keyExtractor={(item, index) => String(item.id || item.property_id || index)}
+              contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </>
       )}
     </View>
   );
@@ -661,6 +901,152 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     marginTop: spacing.md,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    paddingVertical: spacing.sm,
+  },
+  filterButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+  },
+  filterButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    ...typography.h2,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  modalClose: {
+    ...typography.h2,
+    color: colors.textSecondary,
+    fontSize: 24,
+  },
+  filterSection: {
+    marginBottom: spacing.xl,
+  },
+  filterLabel: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: spacing.md,
+  },
+  filterOptions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  filterOption: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  filterOptionActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterOptionText: {
+    ...typography.body,
+    color: colors.text,
+  },
+  filterOptionTextActive: {
+    color: colors.surface,
+    fontWeight: '600',
+  },
+  sortOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceSecondary,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sortOptionActive: {
+    backgroundColor: colors.primary + '20',
+    borderColor: colors.primary,
+  },
+  sortOptionText: {
+    ...typography.body,
+    color: colors.text,
+  },
+  sortOptionTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  checkmark: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  applyButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  applyButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: colors.textSecondary,
   },
 });
 
