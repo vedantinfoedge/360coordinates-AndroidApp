@@ -39,13 +39,17 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
 
   // Determine if user is logged in based on props
   const isLoggedIn = Boolean(showLogout && onLogoutPress);
+  const showProfileFinal = isLoggedIn && showProfile && Boolean(onProfilePress);
+  const showLogoutFinal = isLoggedIn && Boolean(showLogout && onLogoutPress);
+  const showSignInFinal = !isLoggedIn && (showSignIn || Boolean(onSignInPress));
+  const showSignUpFinal = !isLoggedIn && (showSignUp || Boolean(onSignUpPress));
   
   // Build menu items array dynamically using useMemo
   const menuItems = useMemo(() => {
     const items: Array<{label: string; onPress: () => void; isLogout?: boolean}> = [];
     
     // Add Profile for logged-in users (first)
-    if (showProfile && onProfilePress) {
+    if (showProfileFinal && onProfilePress) {
       items.push({
         label: 'View Profile',
         onPress: () => {
@@ -68,7 +72,7 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
     
     // Add Login and Sign Up for guest users
     if (!isLoggedIn) {
-      if (showSignIn && onSignInPress) {
+      if (showSignInFinal && onSignInPress) {
         items.push({
           label: 'Login',
           onPress: () => {
@@ -78,7 +82,7 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
           },
         });
       }
-      if (showSignUp && onSignUpPress) {
+      if (showSignUpFinal && onSignUpPress) {
         items.push({
           label: 'Sign Up',
           onPress: () => {
@@ -91,7 +95,7 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
     }
     
     // Add Logout for logged-in users (last)
-    if (isLoggedIn && onLogoutPress) {
+    if (showLogoutFinal && onLogoutPress) {
       items.push({
         label: 'Logout',
         onPress: () => {
@@ -104,7 +108,7 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
     }
     
     return items;
-  }, [showProfile, showLogout, showSignIn, showSignUp, isLoggedIn, onProfilePress, onSupportPress, onSignInPress, onSignUpPress, onLogoutPress]);
+  }, [showProfileFinal, showLogoutFinal, showSignInFinal, showSignUpFinal, isLoggedIn, onProfilePress, onSupportPress, onSignInPress, onSignUpPress, onLogoutPress]);
 
   // Debug logs (MANDATORY DEBUG)
   useEffect(() => {
@@ -113,13 +117,17 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
     console.log('  - showLogout:', showLogout);
     console.log('  - showSignIn:', showSignIn);
     console.log('  - showSignUp:', showSignUp);
+    console.log('  - showProfileFinal:', showProfileFinal);
+    console.log('  - showLogoutFinal:', showLogoutFinal);
+    console.log('  - showSignInFinal:', showSignInFinal);
+    console.log('  - showSignUpFinal:', showSignUpFinal);
     console.log('  - onSignInPress:', onSignInPress ? 'defined' : 'undefined');
     console.log('  - onSignUpPress:', onSignUpPress ? 'defined' : 'undefined');
     console.log('  - onLogoutPress:', onLogoutPress ? 'defined' : 'undefined');
     console.log('  - isLoggedIn (computed):', isLoggedIn);
     console.log('  - menuItems count:', menuItems.length);
     console.log('  - menuItems:', menuItems.map(item => item.label));
-  }, [showProfile, showLogout, showSignIn, showSignUp, isLoggedIn, menuItems, onSignInPress, onSignUpPress, onLogoutPress]);
+  }, [showProfile, showLogout, showSignIn, showSignUp, showProfileFinal, showLogoutFinal, showSignInFinal, showSignUpFinal, isLoggedIn, menuItems, onSignInPress, onSignUpPress, onLogoutPress]);
 
   return (
     <View style={[styles.safeArea, styles.stickyHeader]}>

@@ -1,3 +1,4 @@
+import {Platform} from 'react-native';
 import api from './api.service';
 import {API_ENDPOINTS} from '../config/api.config';
 import {analyzeDetection} from './detection.service';
@@ -72,9 +73,15 @@ export const moderationService = {
 
       const formData = new FormData();
       
+      // React Native FormData format - handle Platform-specific URI
+      // Android: Keep file:// prefix, iOS: Remove file:// prefix
+      const normalizedUri = Platform.OS === 'android' 
+        ? imageUri 
+        : imageUri.replace('file://', '');
+      
       // FormData field name must be 'image' (not 'file' or 'images')
       formData.append('image', {
-        uri: imageUri,
+        uri: normalizedUri, // Platform-normalized URI
         type: mimeType, // 'image/jpeg', 'image/png', or 'image/webp'
         name: `property_image.${fileExtension}`, // e.g., 'property_image.jpg'
       } as any);
@@ -90,6 +97,8 @@ export const moderationService = {
 
       console.log('[ModerationService] Uploading image with FormData:', {
         uri: imageUri,
+        normalizedUri,
+        platform: Platform.OS,
         propertyId: propId,
         validateOnly,
         mimeType,
@@ -98,8 +107,9 @@ export const moderationService = {
       });
 
       // Don't set Content-Type header - axios will set it automatically with boundary for FormData
+      // Increased timeout to 60 seconds for large images
       const response = await api.post(API_ENDPOINTS.MODERATE_AND_UPLOAD, formData, {
-        timeout: 30000, // 30 seconds for moderation
+        timeout: 60000, // 60 seconds for large images
         // Let axios handle Content-Type automatically for FormData
       });
 

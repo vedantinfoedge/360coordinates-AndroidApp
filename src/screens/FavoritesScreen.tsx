@@ -42,8 +42,12 @@ interface Property {
 }
 
 const FavoritesScreen: React.FC<Props> = ({navigation}) => {
-  const {logout} = useAuth();
+  const {logout, user, isAuthenticated} = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
+  
+  // Check if user is guest
+  const isLoggedIn = Boolean(user && isAuthenticated);
+  const isGuest = !isLoggedIn;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
@@ -168,7 +172,21 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={logout}
+          onLogoutPress={isLoggedIn ? logout : undefined}
+          onSignInPress={
+            isGuest
+              ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+              : undefined
+          }
+          onSignUpPress={
+            isGuest
+              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+              : undefined
+          }
+          showLogout={isLoggedIn}
+          showProfile={isLoggedIn}
+          showSignIn={isGuest}
+          showSignUp={isGuest}
         />
         <View style={[styles.centerContainer, {flex: 1}]}>
           <ActivityIndicator size="large" color={colors.accent} />
@@ -184,7 +202,21 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={logout}
+          onLogoutPress={isLoggedIn ? logout : undefined}
+          onSignInPress={
+            isGuest
+              ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+              : undefined
+          }
+          onSignUpPress={
+            isGuest
+              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+              : undefined
+          }
+          showLogout={isLoggedIn}
+          showProfile={isLoggedIn}
+          showSignIn={isGuest}
+          showSignUp={isGuest}
         />
         <View style={[styles.centerContainer, {flex: 1}]}>
           <Text style={styles.emptyText}>No favorites yet</Text>
@@ -201,7 +233,21 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={logout}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            : undefined
+        }
+        onSignUpPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            : undefined
+        }
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
       <FlatList
         data={properties}

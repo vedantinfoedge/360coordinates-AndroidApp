@@ -55,8 +55,12 @@ const TOP_CITIES: TopCity[] = [
 type ListingType = 'all' | 'sale' | 'rent' | 'pg';
 
 const HomeScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout} = useAuth();
+  const {user, logout, isAuthenticated} = useAuth();
   const insets = useSafeAreaInsets();
+  
+  // Check if user is guest
+  const isLoggedIn = Boolean(user && isAuthenticated);
+  const isGuest = !isLoggedIn;
   const [listingType, setListingType] = useState<ListingType>('all');
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -243,7 +247,21 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         onSupportPress={() => {
           // Navigate to support if needed
         }}
-        onLogoutPress={logout}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            : undefined
+        }
+        onSignUpPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            : undefined
+        }
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
       <Animated.View
         style={[

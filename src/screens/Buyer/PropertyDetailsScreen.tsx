@@ -52,8 +52,12 @@ interface PropertyImage {
 
 const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
-  const {logout, user} = useAuth();
+  const {logout, user, isAuthenticated} = useAuth();
   const [property, setProperty] = useState<any>(null);
+  
+  // Check if user is guest
+  const isLoggedIn = Boolean(user && isAuthenticated);
+  const isGuest = !isLoggedIn;
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showContactModal, setShowContactModal] = useState(false);
@@ -701,7 +705,21 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support' as never)}
-        onLogoutPress={logout}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            : undefined
+        }
+        onSignUpPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            : undefined
+        }
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
 
       {/* Favorite and Share Buttons - Positioned below header */}

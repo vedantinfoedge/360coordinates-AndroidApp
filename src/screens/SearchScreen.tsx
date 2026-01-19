@@ -34,11 +34,15 @@ interface Property {
 }
 
 const SearchScreen: React.FC<Props> = ({navigation}) => {
-  const {logout} = useAuth();
+  const {logout, user, isAuthenticated} = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Check if user is guest
+  const isLoggedIn = Boolean(user && isAuthenticated);
+  const isGuest = !isLoggedIn;
 
   useEffect(() => {
     // Load initial properties when component mounts
@@ -159,7 +163,21 @@ const SearchScreen: React.FC<Props> = ({navigation}) => {
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={logout}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            : undefined
+        }
+        onSignUpPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            : undefined
+        }
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
       <View style={styles.searchContainer}>
         <TextInput

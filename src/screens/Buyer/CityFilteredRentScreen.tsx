@@ -10,14 +10,32 @@ type Props = {
 };
 
 const CityFilteredRentScreen: React.FC<Props> = ({navigation}) => {
-  const {logout} = useAuth();
+  const {logout, user, isAuthenticated} = useAuth();
+  
+  // Check if user is guest
+  const isLoggedIn = Boolean(user && isAuthenticated);
+  const isGuest = !isLoggedIn;
   
   return (
     <SafeAreaView style={styles.container}>
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={logout}
+        onLogoutPress={isLoggedIn ? logout : undefined}
+        onSignInPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            : undefined
+        }
+        onSignUpPress={
+          isGuest
+            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            : undefined
+        }
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
       <View style={styles.content}>
         <Text style={styles.title}>City Filtered Rent</Text>
