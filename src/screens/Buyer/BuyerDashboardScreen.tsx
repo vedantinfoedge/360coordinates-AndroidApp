@@ -526,34 +526,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               onPress={() => {
                 try {
                   // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
-                  const params = {
+                  // Use the Search tab route to ensure correct navigator is focused
+                  navigation.navigate('Search' as never, {
                     query: '',
                     location: '',
-<<<<<<< HEAD
-                  };
-
-                  // Primary: direct screen navigation within Buyer tabs
-                  navigation.navigate('SearchResults' as never, params as never);
-
-                  // Fallback: switch to Search tab (if navigator setup differs)
-                  const parentNav: any = (navigation as any).getParent?.();
-                  if (parentNav?.navigate) {
-                    parentNav.navigate('Search', {
-                      screen: 'SearchResults',
-                      params,
-                    });
-                  }
-=======
-                    searchQuery: '',
-                    city: '',
-                    propertyType: '',
-                    budget: '',
-                    bedrooms: '',
-                    area: '',
-                    status: '',
-                    listingType: 'all', // Explicitly set to 'all' to show all properties
                   } as never);
->>>>>>> be9f5b9b6c6009f1463e83dfc59fa60236734322
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   Alert.alert('Error', 'Failed to load all properties. Please try again.');
