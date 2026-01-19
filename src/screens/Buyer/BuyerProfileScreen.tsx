@@ -399,7 +399,9 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
         {/* Additional Options */}
         <View style={styles.optionsSection}>
-          <TouchableOpacity style={styles.optionItem}>
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => navigation.navigate('Favorites' as never)}>
             <Text style={styles.optionText}>My Favorites</Text>
             <Text style={styles.optionArrow}>→</Text>
           </TouchableOpacity>
