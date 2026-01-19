@@ -390,16 +390,22 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
     
-    if (!canEditProperty(property)) {
+    const limitedEdit = !canEditProperty(property);
+    
+    if (limitedEdit) {
       Alert.alert(
-        'Edit Restricted',
-        'This property was created more than 24 hours ago. Only limited fields can be edited. Please contact support for major changes.',
-        [{text: 'OK'}]
+        'Limited Edit Mode',
+        'This property was created more than 24 hours ago.\n\nOnly the Title and Pricing fields (price, negotiable, deposit, maintenance) can be edited. Other details are locked.',
+        [{text: 'OK'}],
       );
     }
     
-    // Navigate to edit property screen
-    (navigation as any).navigate('AddProperty', {propertyId: String(propertyId)});
+    // Navigate to edit property screen with limitedEdit flag
+    (navigation as any).navigate('AddProperty', {
+      propertyId: String(propertyId),
+      isLimitedEdit: limitedEdit,
+      createdAt: property.created_at,
+    });
   };
 
   const handleAddProperty = async () => {
@@ -543,10 +549,9 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           style={[
             styles.actionButton,
             styles.editButton,
-            !canEditProperty(item) && styles.actionButtonDisabled,
           ]}
           onPress={() => handleEdit(item.id)}
-          disabled={!canEditProperty(item)}>
+          disabled={false}>
           <Text style={styles.actionButtonText}>
             {canEditProperty(item) ? 'Edit' : 'Limited'}
           </Text>

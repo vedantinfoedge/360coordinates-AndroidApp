@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useRoute, RouteProp} from '@react-navigation/native';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -35,6 +36,8 @@ import {
   PROPERTY_TYPES,
   AMENITIES_LIST,
 } from '../../utils/propertyTypeConfig';
+import {validation} from '../../utils/validation';
+import {formatters} from '../../utils/formatters';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -50,6 +53,10 @@ type Props = {
 type PropertyStatus = 'sale' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
+  const route = useRoute<RouteProp<RootStackParamList, 'AddProperty'>>();
+  const routeParams = (route.params as any) || {};
+  const isEditMode = !!routeParams.propertyId;
+  const isLimitedEdit = !!routeParams.isLimitedEdit;
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sale');
@@ -399,9 +406,27 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         return;
       }
       const priceValue = parseFloat(expectedPrice.replace(/[^0-9.]/g, ''));
-      if (isNaN(priceValue) || priceValue <= 0) {
-        Alert.alert('Error', 'Price must be a positive number');
+      const priceCheck = validation.validatePrice(priceValue, propertyStatus);
+      if (!priceCheck.valid) {
+        Alert.alert('Error', priceCheck.message || 'Invalid price');
         return;
+      }
+
+      if (propertyStatus === 'rent' && depositAmount.trim().length > 0) {
+        const depositValue = parseFloat(depositAmount.replace(/[^0-9.]/g, ''));
+        const depositCheck = validation.validateDeposit(depositValue, priceValue);
+        if (!depositCheck.valid) {
+          Alert.alert('Error', depositCheck.message || 'Invalid security deposit');
+          return;
+        }
+      }
+
+      if (maintenance.trim().length > 0) {
+        const maintenanceValue = parseFloat(maintenance.replace(/[^0-9.]/g, ''));
+        if (isNaN(maintenanceValue) || maintenanceValue <= 0) {
+          Alert.alert('Error', 'Maintenance must be a positive amount');
+          return;
+        }
       }
     }
 
@@ -610,7 +635,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               />
             </View>
 
-            <View style={styles.inputContainer}>
+            {/* Lock non-pricing fields in limited edit mode */}
+            <View
+              style={styles.inputContainer}
+              pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
               <Text style={styles.label}>I want to <Text style={styles.required}>*</Text></Text>
               <View style={styles.typeButtonsContainer}>
                 <TouchableOpacity
@@ -655,7 +683,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={styles.inputContainer}
+              pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
               <Text style={styles.label}>
                 Property Type <Text style={styles.required}>*</Text>
               </Text>
@@ -697,7 +727,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
       case 2:
         return (
-          <View style={styles.stepContent}>
+          <View style={styles.stepContent} pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
             <Text style={styles.stepTitle}>Property Details</Text>
             <Text style={styles.stepSubtitle}>
               Tell us more about your property specifications
@@ -1071,7 +1101,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
       case 3:
         return (
-          <View style={styles.stepContent}>
+          <View style={styles.stepContent} pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
             <Text style={styles.stepTitle}>Amenities & Description</Text>
             <Text style={styles.stepSubtitle}>
               Select the amenities available and describe your property.
@@ -1132,7 +1162,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
       case 4:
         return (
-          <View style={styles.stepContent}>
+          <View style={styles.stepContent} pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
             <Text style={styles.stepTitle}>Upload Photos</Text>
             <Text style={styles.stepSubtitle}>
               Add up to 10 high-quality photos of your property
@@ -1207,19 +1237,24 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                {propertyType === 'sell' ? 'Expected Price' : 'Monthly Rent'} <Text style={styles.required}>*</Text>
+                {propertyStatus === 'sale' ? 'Expected Price' : 'Monthly Rent'} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.priceInputContainer}>
                 <Text style={styles.currencySymbol}>₹</Text>
                 <TextInput
                   style={[styles.input, styles.priceInput]}
-                  placeholder={propertyType === 'sell' ? 'Enter expected price' : 'Enter monthly rent'}
+                  placeholder={propertyStatus === 'sale' ? 'Enter expected price' : 'Enter monthly rent'}
                   placeholderTextColor={colors.textSecondary}
                   value={expectedPrice}
                   onChangeText={setExpectedPrice}
                   keyboardType="numeric"
                 />
               </View>
+              {expectedPrice.trim().length > 0 && (
+                <Text style={styles.hintText}>
+                  {formatters.price(parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0, propertyStatus === 'rent')}
+                </Text>
+              )}
               <TouchableOpacity
                 style={styles.checkboxContainer}
                 onPress={() => setPriceNegotiable(!priceNegotiable)}>
@@ -1251,6 +1286,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.hintText}>
                   Typically 2-6 months of rent
                 </Text>
+                {depositAmount.trim().length > 0 && (
+                  <Text style={styles.hintText}>
+                    {formatters.price(parseFloat(depositAmount.replace(/[^0-9.]/g, '')) || 0, true)} deposit
+                  </Text>
+                )}
               </View>
             )}
 
@@ -1267,6 +1307,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   keyboardType="numeric"
                 />
               </View>
+              {maintenance.trim().length > 0 && (
+                <Text style={styles.hintText}>
+                  {formatters.price(parseFloat(maintenance.replace(/[^0-9.]/g, '')) || 0, true)} per month
+                </Text>
+              )}
             </View>
 
             <TouchableOpacity style={styles.summaryButton}>
@@ -1354,6 +1399,16 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <SafeAreaView style={styles.safeArea}>
+            {/* Restricted edit banner for older listings */}
+            {isEditMode && isLimitedEdit && (
+              <View style={styles.limitedBanner}>
+                <Text style={styles.limitedBannerTitle}>Limited Edit Mode</Text>
+                <Text style={styles.limitedBannerText}>
+                  This listing is more than 24 hours old. You can only edit the Title and Pricing fields (price, negotiable, security deposit, maintenance). Other details are locked.
+                </Text>
+              </View>
+            )}
+
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>List Your Property</Text>
