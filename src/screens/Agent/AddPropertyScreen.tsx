@@ -2527,15 +2527,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const getStepStatus = (stepId: number) => {
-    if (currentStep > stepId) {
-      return 'completed';
-    } else if (currentStep === stepId) {
-      return 'active';
-    }
-    return 'pending';
-  };
-
   return (
     <Modal
       visible={true}
