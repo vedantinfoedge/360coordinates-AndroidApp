@@ -15,7 +15,6 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
-import {useRoute} from '@react-navigation/native';
 import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
@@ -45,9 +44,6 @@ type Props = {
 type PropertyStatus = 'sell' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
-  const route = useRoute();
-  const routeParams = route.params as {isUpcomingProject?: boolean} | undefined;
-  const isUpcomingProject = routeParams?.isUpcomingProject === true;
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sell');
@@ -1118,8 +1114,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
-              style={isUpcomingProject ? styles.progressContainerScroll : styles.progressContainerWrapper}
-              contentContainerStyle={isUpcomingProject ? styles.progressContent : styles.progressContainer}>
+              style={styles.progressContainerWrapper}
+              contentContainerStyle={styles.progressContainer}>
               {steps.map((step, index) => {
                 const status = getStepStatus(step.id);
                 return (
