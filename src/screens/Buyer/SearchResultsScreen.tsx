@@ -75,12 +75,13 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const {logout} = useAuth();
   const routeParams = route?.params || {};
   
-  // Safely read query from route params with trimming
+  // PART B: Safely read location from route params with trimming
+  // Handle null/undefined/empty/spaces safely - empty location is valid
   // Priority: query > location > searchQuery
-  const query = (routeParams?.query || routeParams?.location || routeParams?.searchQuery || '').trim();
+  const routeLocation = (routeParams?.query || routeParams?.location || routeParams?.searchQuery || '').trim();
   
   // Initialize from route params (website-style search)
-  const initialLocation = query || '';
+  const initialLocation = routeLocation || '';
   const initialCity = routeParams.city || '';
   const initialPropertyType = routeParams.propertyType || '';
   const initialBudget = routeParams.budget || '';
@@ -239,22 +240,22 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         }
       }
       
-      // Location/Query (preferred over city according to website spec)
+      // PART B: Safely get location with trim() - handle null/empty/spaces
       // Priority: location state > searchText > initialLocation from route params
-      // Always trim input (initialLocation already contains trimmed query from route params)
-      const currentQuery = (location && location.trim()) || 
-                          (searchText && searchText.trim()) || 
-                          (initialLocation && initialLocation.trim()) || 
-                          '';
+      const currentLocation = (location && location.trim()) || 
+                              (searchText && searchText.trim()) || 
+                              (initialLocation && initialLocation.trim()) || 
+                              '';
       
-      if (currentQuery) {
-        // If query has text, filter by location
-        searchParams.location = currentQuery;
-        console.log('[SearchResultsScreen] Using location/query for filtered search:', currentQuery);
+      // PART B: Implement correct fetch logic
+      if (currentLocation) {
+        // CASE B: Location has value - fetch properties filtered by location
+        searchParams.location = currentLocation;
+        console.log('[SearchResultsScreen] Fetching properties filtered by location:', currentLocation);
       } else {
-        // If query is empty, load ALL properties (no location filter)
-        console.log('[SearchResultsScreen] Query is empty - loading ALL properties');
+        // CASE A: Location is empty - fetch ALL properties (unfiltered)
         // Don't add location param - API will return all properties
+        console.log('[SearchResultsScreen] Location is empty - fetching ALL properties (unfiltered)');
       }
       
       
@@ -372,7 +373,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         // Fallback: try without some filters if error occurs
         try {
           const fallbackParams: any = {limit: 100};
-          if (currentQuery) fallbackParams.location = currentQuery;
+          if (currentLocation) fallbackParams.location = currentLocation;
           if (status || listingType !== 'all') {
             fallbackParams.status = status || (listingType === 'buy' ? 'sale' : 'rent');
           }
@@ -468,16 +469,16 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
 
   // Load initial properties on mount
   useEffect(() => {
-    // Initialize search text and location from query (safely handles empty query)
-    if (query) {
-      setSearchText(query);
-      setLocation(query);
+    // PART B: Initialize search text and location from route params (safely handles empty location)
+    if (routeLocation) {
+      setSearchText(routeLocation);
+      setLocation(routeLocation);
     } else {
-      // Empty query - clear search fields, will load all properties
+      // PART B: Empty location - clear search fields, will load ALL properties
       setSearchText('');
       setLocation('');
     }
-    // Always load properties on mount - if query is empty, will load ALL properties
+    // PART B: Always load properties on mount - if location is empty, will load ALL properties
     const timer = setTimeout(() => {
       loadProperties();
     }, 300);

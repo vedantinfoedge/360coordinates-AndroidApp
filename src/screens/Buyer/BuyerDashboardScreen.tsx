@@ -183,29 +183,31 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       // Close location suggestions
       setShowLocationSuggestions(false);
       
-      // Get the search location text (trimmed) - always trim input
-      const query = (searchLocation || searchQuery || '').trim();
+      // PART A: Safely get location input with trim() - handle null/empty/spaces
+      // Empty location is VALID and should navigate to show ALL properties
+      const location = (searchLocation || searchQuery || '').trim();
       
-      // Navigate to SearchResults with search params (website-style API params)
-      // Always navigate even if query is empty - will show ALL properties
+      // PART A: Always allow Search click - NO validation blocking empty input
+      // Empty location is valid - will show ALL properties in SearchResults
       const params: any = {
-        query: query, // Always pass query param (even if empty)
+        query: location, // Always pass query param (even if empty string)
+        location: location, // Always pass location param (even if empty string)
       };
       
-      // Location (preferred over city according to website spec)
-      // If query has text, use it for filtering; if empty, SearchResults will show all properties
-      if (query) {
-        params.location = query;
+      // If location has value, add additional params for filtering
+      if (location) {
         // Also set searchQuery for backward compatibility
-        params.searchQuery = query;
+        params.searchQuery = location;
         
         // Extract city from location if it's a city name (optional, for better filtering)
-        const locationText = query.toLowerCase();
+        const locationText = location.toLowerCase();
         const matchedCity = TOP_CITIES.find(city => city.name.toLowerCase() === locationText);
         if (matchedCity) {
           params.city = matchedCity.name;
         }
       }
+      // If location is empty, params.location will be empty string
+      // SearchResults screen will detect empty location and load ALL properties
       
       // Add listing type filter
       if (listingType !== 'all') {
@@ -222,7 +224,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
       
       console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
-      // Always navigate to SearchResults - even without location input, it will show all properties
+      // PART A: Always navigate to SearchResults - empty location is valid
       navigation.navigate('SearchResults', params as never);
     } catch (error: any) {
       console.error('Error navigating to search:', error);
