@@ -59,6 +59,8 @@ type ListingType = 'all' | 'sale' | 'rent' | 'pg';
 
 const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout, isAuthenticated} = useAuth();
+  // Explicitly check if user is guest (not logged in)
+  const isGuest = !user || !isAuthenticated;
   const insets = useSafeAreaInsets();
   const [listingType, setListingType] = useState<ListingType>('all');
   const [properties, setProperties] = useState<Property[]>([]);
@@ -335,8 +337,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           onSignUpPress={() => navigation.navigate('Auth' as never, {screen: 'Register'} as never)}
           showProfile={isAuthenticated}
           showLogout={isAuthenticated}
-          showSignIn={!isAuthenticated}
-          showSignUp={!isAuthenticated}
+          showSignIn={isGuest}
+          showSignUp={isGuest}
         />
         <View style={styles.loadingContainer}>
           <Text style={styles.errorIcon}>🚫</Text>
@@ -359,8 +361,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         onSignUpPress={() => navigation.navigate('Auth' as never, {screen: 'Register'} as never)}
         showProfile={isAuthenticated}
         showLogout={isAuthenticated}
-        showSignIn={!isAuthenticated}
-        showSignUp={!isAuthenticated}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
       />
 
       <ScrollView
