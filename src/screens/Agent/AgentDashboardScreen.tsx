@@ -494,7 +494,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.addProjectButton}
-                  onPress={() => navigation.navigate('AddProperty', {isUpcomingProject: true} as never)}>
+                  onPress={() => navigation.navigate('AddProject')}>
                   <Text style={styles.addProjectButtonText}>+ Add Project</Text>
                 </TouchableOpacity>
               </View>

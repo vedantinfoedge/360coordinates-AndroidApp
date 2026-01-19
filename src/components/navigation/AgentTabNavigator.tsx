@@ -6,6 +6,7 @@ import AgentInquiriesScreen from '../../screens/Agent/AgentInquiriesScreen';
 import AgentProfileScreen from '../../screens/Agent/AgentProfileScreen';
 import AgentPropertyDetailsScreen from '../../screens/Agent/AgentPropertyDetailsScreen';
 import AddPropertyScreen from '../../screens/Agent/AddPropertyScreen';
+import AddProjectScreen from '../../screens/Agent/AddProjectScreen';
 import EditPropertyScreen from '../../screens/Agent/EditPropertyScreen';
 import AgentSupportScreen from '../../screens/Agent/AgentSupportScreen';
 import {colors} from '../../theme';
@@ -17,7 +18,7 @@ export type AgentTabParamList = {
   Inquiries: undefined;
   Profile: undefined;
   PropertyDetails: {propertyId: string};
-  AddProperty: {isUpcomingProject?: boolean} | undefined;
+  AddProperty: undefined;
   EditProperty: {propertyId: string | number};
   Support: undefined;
 };
@@ -130,6 +131,14 @@ const AgentTabNavigator = () => {
         component={AddPropertyScreen}
         options={{
           title: 'Add Property',
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="AddProject"
+        component={AddProjectScreen}
+        options={{
+          title: 'Add Project',
           tabBarButton: () => null, // Hide from tab bar
         }}
       />
