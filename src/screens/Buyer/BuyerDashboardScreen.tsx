@@ -183,22 +183,24 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       // Close location suggestions
       setShowLocationSuggestions(false);
       
-      // Get the search location text (trimmed) - allow empty search now
-      // If empty, user will be redirected to SearchResultsScreen showing all available properties
-      const searchLocationText = (searchLocation || searchQuery || '').trim();
+      // Get the search location text (trimmed) - always trim input
+      const query = (searchLocation || searchQuery || '').trim();
       
       // Navigate to SearchResults with search params (website-style API params)
-      const params: any = {};
+      // Always navigate even if query is empty - will show ALL properties
+      const params: any = {
+        query: query, // Always pass query param (even if empty)
+      };
       
-      // Location (preferred over city according to website spec) - optional now
-      // If no location provided, SearchResults will show all available properties
-      if (searchLocationText) {
-        params.location = searchLocationText;
+      // Location (preferred over city according to website spec)
+      // If query has text, use it for filtering; if empty, SearchResults will show all properties
+      if (query) {
+        params.location = query;
         // Also set searchQuery for backward compatibility
-        params.searchQuery = searchLocationText;
+        params.searchQuery = query;
         
         // Extract city from location if it's a city name (optional, for better filtering)
-        const locationText = searchLocationText.toLowerCase();
+        const locationText = query.toLowerCase();
         const matchedCity = TOP_CITIES.find(city => city.name.toLowerCase() === locationText);
         if (matchedCity) {
           params.city = matchedCity.name;

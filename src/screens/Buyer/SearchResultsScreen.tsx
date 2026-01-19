@@ -38,6 +38,7 @@ type Props = {
   navigation: SearchResultsScreenNavigationProp;
   route?: {
     params?: {
+      query?: string;
       searchQuery?: string;
       location?: string;
       city?: string;
@@ -74,8 +75,12 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const {logout} = useAuth();
   const routeParams = route?.params || {};
   
+  // Safely read query from route params with trimming
+  // Priority: query > location > searchQuery
+  const query = (routeParams?.query || routeParams?.location || routeParams?.searchQuery || '').trim();
+  
   // Initialize from route params (website-style search)
-  const initialLocation = routeParams.location || routeParams.searchQuery || '';
+  const initialLocation = query || '';
   const initialCity = routeParams.city || '';
   const initialPropertyType = routeParams.propertyType || '';
   const initialBudget = routeParams.budget || '';
@@ -234,14 +239,22 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         }
       }
       
-      // Location (preferred over city according to website spec)
+      // Location/Query (preferred over city according to website spec)
       // Priority: location state > searchText > initialLocation from route params
-      const currentLocation = (location && location.trim()) || (searchText && searchText.trim()) || (initialLocation && initialLocation.trim()) || '';
-      if (currentLocation) {
-        searchParams.location = currentLocation;
-        console.log('[SearchResultsScreen] Using location for search:', currentLocation);
+      // Always trim input (initialLocation already contains trimmed query from route params)
+      const currentQuery = (location && location.trim()) || 
+                          (searchText && searchText.trim()) || 
+                          (initialLocation && initialLocation.trim()) || 
+                          '';
+      
+      if (currentQuery) {
+        // If query has text, filter by location
+        searchParams.location = currentQuery;
+        console.log('[SearchResultsScreen] Using location/query for filtered search:', currentQuery);
       } else {
-        console.log('[SearchResultsScreen] No location provided - loading all properties');
+        // If query is empty, load ALL properties (no location filter)
+        console.log('[SearchResultsScreen] Query is empty - loading ALL properties');
+        // Don't add location param - API will return all properties
       }
       
       
@@ -455,11 +468,16 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
 
   // Load initial properties on mount
   useEffect(() => {
-    if (initialLocation) {
-      setSearchText(initialLocation);
-      setLocation(initialLocation);
+    // Initialize search text and location from query (safely handles empty query)
+    if (query) {
+      setSearchText(query);
+      setLocation(query);
+    } else {
+      // Empty query - clear search fields, will load all properties
+      setSearchText('');
+      setLocation('');
     }
-    // Always load properties on mount, even without location
+    // Always load properties on mount - if query is empty, will load ALL properties
     const timer = setTimeout(() => {
       loadProperties();
     }, 300);
