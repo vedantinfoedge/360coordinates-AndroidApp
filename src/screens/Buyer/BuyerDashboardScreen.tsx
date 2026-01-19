@@ -526,10 +526,26 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               onPress={() => {
                 try {
                   // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
-                  (navigation as any).navigate('SearchResults', {
+                  const params: any = {
                     query: '',
                     location: '',
-                  } as never);
+                  };
+
+                  // Preserve the currently selected listing type when navigating
+                  if (listingType === 'sale') {
+                    params.status = 'sale';
+                    params.listingType = 'buy';
+                  } else if (listingType === 'rent') {
+                    params.status = 'rent';
+                    params.listingType = 'rent';
+                  } else if (listingType === 'pg') {
+                    params.status = 'rent'; // PG uses rent status in API
+                    params.listingType = 'pg-hostel';
+                  } else {
+                    params.listingType = 'all';
+                  }
+
+                  (navigation as any).navigate('SearchResults', params as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   Alert.alert('Error', 'Failed to load all properties. Please try again.');
