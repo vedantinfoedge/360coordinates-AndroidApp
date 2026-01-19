@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import React, {useState, useEffect} from 'react';
+=======
+import React, {useState, useEffect, useMemo} from 'react';
+>>>>>>> Stashed changes
 import {
   View,
   Text,
@@ -37,17 +41,86 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
   const [menuVisible, setMenuVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
-  // Debug logs to verify props received
+  // Determine if user is logged in based on props
+  const isLoggedIn = Boolean(showLogout && onLogoutPress);
+  
+  // Build menu items array dynamically using useMemo
+  const menuItems = useMemo(() => {
+    const items: Array<{label: string; onPress: () => void; isLogout?: boolean}> = [];
+    
+    // Add Profile for logged-in users (first)
+    if (showProfile && onProfilePress) {
+      items.push({
+        label: 'View Profile',
+        onPress: () => {
+          setMenuVisible(false);
+          onProfilePress();
+        },
+      });
+    }
+    
+    // Always add Support
+    if (onSupportPress) {
+      items.push({
+        label: 'Support',
+        onPress: () => {
+          setMenuVisible(false);
+          onSupportPress();
+        },
+      });
+    }
+    
+    // Add Login and Sign Up for guest users
+    if (!isLoggedIn) {
+      if (showSignIn && onSignInPress) {
+        items.push({
+          label: 'Login',
+          onPress: () => {
+            console.log('[BuyerHeader] Login pressed');
+            setMenuVisible(false);
+            onSignInPress();
+          },
+        });
+      }
+      if (showSignUp && onSignUpPress) {
+        items.push({
+          label: 'Sign Up',
+          onPress: () => {
+            console.log('[BuyerHeader] Sign Up pressed');
+            setMenuVisible(false);
+            onSignUpPress();
+          },
+        });
+      }
+    }
+    
+    // Add Logout for logged-in users (last)
+    if (isLoggedIn && onLogoutPress) {
+      items.push({
+        label: 'Logout',
+        onPress: () => {
+          console.log('[BuyerHeader] Logout pressed');
+          setMenuVisible(false);
+          onLogoutPress();
+        },
+        isLogout: true,
+      });
+    }
+    
+    return items;
+  }, [showProfile, showLogout, showSignIn, showSignUp, isLoggedIn, onProfilePress, onSupportPress, onSignInPress, onSignUpPress, onLogoutPress]);
+
+  // Debug logs
   useEffect(() => {
     console.log('[BuyerHeader] Props received:');
     console.log('  - showProfile:', showProfile);
     console.log('  - showLogout:', showLogout);
     console.log('  - showSignIn:', showSignIn);
     console.log('  - showSignUp:', showSignUp);
-    console.log('  - onSignInPress exists:', !!onSignInPress);
-    console.log('  - onSignUpPress exists:', !!onSignUpPress);
-    console.log('  - onLogoutPress exists:', !!onLogoutPress);
-  }, [showProfile, showLogout, showSignIn, showSignUp, onSignInPress, onSignUpPress, onLogoutPress]);
+    console.log('  - isLoggedIn (computed):', isLoggedIn);
+    console.log('  - menuItems count:', menuItems.length);
+    console.log('  - menuItems:', menuItems.map(item => item.label));
+  }, [showProfile, showLogout, showSignIn, showSignUp, isLoggedIn, menuItems]);
 
   return (
     <View style={[styles.safeArea, styles.stickyHeader]}>
@@ -83,74 +156,18 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
             activeOpacity={1}
             onPress={() => setMenuVisible(false)}>
             <View style={styles.menuContainer} onStartShouldSetResponder={() => true}>
-              {showProfile && onProfilePress && (
-                <>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                      onProfilePress();
-                }}>
-                <Text style={styles.menuItemText}>View Profile</Text>
-              </TouchableOpacity>
-              <View style={styles.menuDivider} />
-                </>
-              )}
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  onSupportPress?.();
-                }}>
-                <Text style={styles.menuItemText}>Support</Text>
-              </TouchableOpacity>
-              {/* Login option - show for guest users */}
-              {Boolean(showSignIn) && onSignInPress ? (
-                <>
-                  <View style={styles.menuDivider} />
+              {menuItems.map((item, index) => (
+                <React.Fragment key={item.label}>
+                  {index > 0 && <View style={styles.menuDivider} />}
                   <TouchableOpacity
                     style={styles.menuItem}
-                    onPress={() => {
-                      console.log('[BuyerHeader] Login pressed');
-                      setMenuVisible(false);
-                      onSignInPress();
-                    }}>
-                    <Text style={styles.menuItemText}>Login</Text>
-                  </TouchableOpacity>
-                </>
-              ) : null}
-              {/* Sign Up option - show for guest users */}
-              {Boolean(showSignUp) && onSignUpPress ? (
-                <>
-                  <View style={styles.menuDivider} />
-                  <TouchableOpacity
-                    style={styles.menuItem}
-                    onPress={() => {
-                      console.log('[BuyerHeader] Sign Up pressed');
-                      setMenuVisible(false);
-                      onSignUpPress();
-                    }}>
-                    <Text style={styles.menuItemText}>Sign Up</Text>
-                  </TouchableOpacity>
-                </>
-              ) : null}
-              {/* Logout option - show for logged-in users only */}
-              {Boolean(showLogout) && onLogoutPress ? (
-                <>
-                  <View style={styles.menuDivider} />
-                  <TouchableOpacity
-                    style={styles.menuItem}
-                    onPress={() => {
-                      console.log('[BuyerHeader] Logout pressed');
-                      setMenuVisible(false);
-                      onLogoutPress();
-                    }}>
-                    <Text style={[styles.menuItemText, styles.logoutText]}>
-                      Logout
+                    onPress={item.onPress}>
+                    <Text style={item.isLogout ? [styles.menuItemText, styles.logoutText] : styles.menuItemText}>
+                      {item.label}
                     </Text>
                   </TouchableOpacity>
-                </>
-              ) : null}
+                </React.Fragment>
+              ))}
             </View>
           </TouchableOpacity>
         </Modal>
