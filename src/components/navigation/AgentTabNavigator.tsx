@@ -19,6 +19,7 @@ export type AgentTabParamList = {
   Profile: undefined;
   PropertyDetails: {propertyId: string};
   AddProperty: undefined;
+  AddProject: undefined;
   EditProperty: {propertyId: string | number};
   Support: undefined;
 };
