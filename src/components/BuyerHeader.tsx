@@ -37,6 +37,18 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
   const [menuVisible, setMenuVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
+  // Debug logs to verify props received
+  useEffect(() => {
+    console.log('[BuyerHeader] Props received:');
+    console.log('  - showProfile:', showProfile);
+    console.log('  - showLogout:', showLogout);
+    console.log('  - showSignIn:', showSignIn);
+    console.log('  - showSignUp:', showSignUp);
+    console.log('  - onSignInPress exists:', !!onSignInPress);
+    console.log('  - onSignUpPress exists:', !!onSignUpPress);
+    console.log('  - onLogoutPress exists:', !!onLogoutPress);
+  }, [showProfile, showLogout, showSignIn, showSignUp, onSignInPress, onSignUpPress, onLogoutPress]);
+
   return (
     <View style={[styles.safeArea, styles.stickyHeader]}>
       <View style={[styles.header, {paddingTop: insets.top}]}>
@@ -92,47 +104,53 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
                 }}>
                 <Text style={styles.menuItemText}>Support</Text>
               </TouchableOpacity>
-              {showSignIn && onSignInPress && (
+              {/* Login option - show for guest users */}
+              {Boolean(showSignIn) && onSignInPress ? (
                 <>
                   <View style={styles.menuDivider} />
                   <TouchableOpacity
                     style={styles.menuItem}
                     onPress={() => {
+                      console.log('[BuyerHeader] Login pressed');
                       setMenuVisible(false);
                       onSignInPress();
                     }}>
                     <Text style={styles.menuItemText}>Login</Text>
                   </TouchableOpacity>
                 </>
-              )}
-              {showSignUp && onSignUpPress && (
+              ) : null}
+              {/* Sign Up option - show for guest users */}
+              {Boolean(showSignUp) && onSignUpPress ? (
                 <>
                   <View style={styles.menuDivider} />
                   <TouchableOpacity
                     style={styles.menuItem}
                     onPress={() => {
+                      console.log('[BuyerHeader] Sign Up pressed');
                       setMenuVisible(false);
                       onSignUpPress();
                     }}>
                     <Text style={styles.menuItemText}>Sign Up</Text>
                   </TouchableOpacity>
                 </>
-              )}
-              {showLogout && onLogoutPress && (
+              ) : null}
+              {/* Logout option - show for logged-in users only */}
+              {Boolean(showLogout) && onLogoutPress ? (
                 <>
-              <View style={styles.menuDivider} />
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
+                  <View style={styles.menuDivider} />
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      console.log('[BuyerHeader] Logout pressed');
+                      setMenuVisible(false);
                       onLogoutPress();
-                }}>
-                <Text style={[styles.menuItemText, styles.logoutText]}>
-                  Logout
-                </Text>
-              </TouchableOpacity>
+                    }}>
+                    <Text style={[styles.menuItemText, styles.logoutText]}>
+                      Logout
+                    </Text>
+                  </TouchableOpacity>
                 </>
-              )}
+              ) : null}
             </View>
           </TouchableOpacity>
         </Modal>

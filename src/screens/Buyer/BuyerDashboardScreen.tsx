@@ -76,8 +76,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     loadToken();
   }, [user, isAuthenticated]); // Reload token when auth state changes
 
-  // Robust login check: user exists AND token exists AND isAuthenticated is true
-  const isLoggedIn = Boolean(user && token && isAuthenticated);
+  // Simplified login check: user exists OR isAuthenticated is true
+  // For guest users: user is null and isAuthenticated is false
+  const isLoggedIn = Boolean(user && isAuthenticated);
   const isGuest = !isLoggedIn;
 
   // Debug logs to verify auth state
@@ -88,7 +89,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     console.log('  - isAuthenticated:', isAuthenticated);
     console.log('  - isLoggedIn (computed):', isLoggedIn);
     console.log('  - isGuest (computed):', isGuest);
-    console.log('  - Header will show:', {
+    console.log('  - Header props will be:', {
       showLogout: isLoggedIn,
       showSignIn: isGuest,
       showSignUp: isGuest,
@@ -404,10 +405,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           console.log('[BuyerDashboard] Navigating to Register screen');
           navigation.navigate('Auth' as never, {screen: 'Register'} as never);
         }}
-        showProfile={isLoggedIn}
-        showLogout={isLoggedIn}
-        showSignIn={isGuest}
-        showSignUp={isGuest}
+        showProfile={Boolean(isLoggedIn)}
+        showLogout={Boolean(isLoggedIn)}
+        showSignIn={Boolean(isGuest)}
+        showSignUp={Boolean(isGuest)}
       />
 
       <ScrollView
