@@ -58,7 +58,7 @@ const TOP_CITIES: TopCity[] = [
 type ListingType = 'all' | 'sale' | 'rent' | 'pg';
 
 const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout} = useAuth();
+  const {user, logout, isAuthenticated} = useAuth();
   const insets = useSafeAreaInsets();
   const [listingType, setListingType] = useState<ListingType>('all');
   const [properties, setProperties] = useState<Property[]>([]);
@@ -330,7 +330,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={logout}
+          onLogoutPress={isAuthenticated ? logout : undefined}
+          showLogout={isAuthenticated}
+          showSignIn={false}
         />
         <View style={styles.loadingContainer}>
           <Text style={styles.errorIcon}>🚫</Text>
@@ -348,7 +350,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={logout}
+        onLogoutPress={isAuthenticated ? logout : undefined}
+        showLogout={isAuthenticated}
+        showSignIn={false}
       />
 
       <ScrollView
