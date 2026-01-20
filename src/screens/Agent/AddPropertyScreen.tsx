@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useEffect} from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,10 @@ import {
   Platform,
   PermissionsAndroid,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useRoute, RouteProp} from '@react-navigation/native';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -24,6 +26,7 @@ const {width: SCREEN_WIDTH} = Dimensions.get('window');
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {moderationService} from '../../services/moderation.service';
+import {sellerService} from '../../services/seller.service';
 import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
@@ -48,6 +51,14 @@ type Props = {
 type PropertyStatus = 'sell' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
+  const route = useRoute<RouteProp<AgentTabParamList, 'AddProperty'>>();
+  const routeParams = (route.params as any) || {};
+  const isEditMode = !!routeParams.propertyId;
+  const isLimitedEdit = !!routeParams.isLimitedEdit;
+  const propertyId = routeParams.propertyId;
+  const createdAt = routeParams.createdAt;
+  const [loadingProperty, setLoadingProperty] = useState(isEditMode);
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sell');
@@ -121,6 +132,90 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         : [...prev, amenityId],
     );
   };
+
+  // Check if property is older than 24 hours
+  const isPropertyOlderThan24Hours = (createdAtDate?: string | Date): boolean => {
+    if (!createdAtDate) return false;
+    const now = new Date();
+    const created = typeof createdAtDate === 'string' ? new Date(createdAtDate) : createdAtDate;
+    const hoursSinceCreation = (now.getTime() - created.getTime()) / (1000 * 60 * 60);
+    return hoursSinceCreation >= 24;
+  };
+
+  // Check if a field can be edited based on 24-hour restriction
+  const canEditField = (fieldName: string): boolean => {
+    if (!isEditMode || !isLimitedEdit) return true;
+    
+    // After 24 hours, only these fields can be edited
+    const editableFields = ['title', 'price', 'priceNegotiable', 'maintenanceCharges', 'depositAmount'];
+    return editableFields.includes(fieldName);
+  };
+
+  // Load property data when in edit mode
+  useEffect(() => {
+    const loadPropertyData = async () => {
+      if (!isEditMode || !propertyId) {
+        setLoadingProperty(false);
+        return;
+      }
+
+      try {
+        setLoadingProperty(true);
+        const response: any = await propertyService.getPropertyDetails(propertyId);
+        
+        if (response && response.success && response.data) {
+          const propData = response.data.property || response.data;
+          
+          // Populate form fields
+          setPropertyTitle(propData.title || propData.property_title || '');
+          setPropertyStatus(propData.status === 'rent' ? 'rent' : 'sell');
+          setPropertyType(propData.property_type || '');
+          setLocation(propData.location || '');
+          setState(propData.state || '');
+          setAdditionalAddress(propData.additional_address || '');
+          setLatitude(propData.latitude || null);
+          setLongitude(propData.longitude || null);
+          setBedrooms(propData.bedrooms ? parseInt(propData.bedrooms) : null);
+          setBathrooms(propData.bathrooms ? parseInt(propData.bathrooms) : null);
+          setBalconies(propData.balconies ? parseInt(propData.balconies) : null);
+          setBuiltUpArea(propData.area ? String(propData.area) : '');
+          setCarpetArea(propData.carpet_area ? String(propData.carpet_area) : '');
+          setFloor(propData.floor || '');
+          setTotalFloors(propData.total_floors ? String(propData.total_floors) : '');
+          setFacing(propData.facing || '');
+          setPropertyAge(propData.age || '');
+          setFurnishing(propData.furnishing || '');
+          setDescription(propData.description || '');
+          setExpectedPrice(propData.price ? String(propData.price) : '');
+          setPriceNegotiable(propData.price_negotiable || false);
+          setDepositAmount(propData.deposit_amount ? String(propData.deposit_amount) : '');
+          setMaintenance(propData.maintenance_charges ? String(propData.maintenance_charges) : '');
+          setSelectedAmenities(propData.amenities ? (Array.isArray(propData.amenities) ? propData.amenities : []) : []);
+          
+          // Load existing images
+          if (propData.images && Array.isArray(propData.images) && propData.images.length > 0) {
+            const existingImages = propData.images.map((imgUrl: string) => ({
+              uri: imgUrl,
+              imageUrl: imgUrl,
+              moderationStatus: 'APPROVED' as const,
+            }));
+            setPhotos(existingImages);
+          }
+        } else {
+          Alert.alert('Error', 'Failed to load property details');
+          navigation.goBack();
+        }
+      } catch (error: any) {
+        console.error('Error loading property:', error);
+        Alert.alert('Error', error.message || 'Failed to load property details');
+        navigation.goBack();
+      } finally {
+        setLoadingProperty(false);
+      }
+    };
+
+    loadPropertyData();
+  }, [isEditMode, propertyId, navigation]);
 
   const requestCameraPermission = async () => {
     if (Platform.OS === 'android') {
@@ -218,7 +313,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         // Process moderation for each image via Google Vision API
         newPhotos.forEach((img, index) => {
           if (img.uri) {
-            moderationService.uploadWithModeration(img.uri, 0, true) // true = validation-only (no property_id needed)
+            // In edit mode, upload with propertyId; in create mode, validate only
+            const uploadPropertyId = isEditMode && propertyId ? Number(propertyId) : 0;
+            const validateOnly = !isEditMode || !propertyId;
+            
+            moderationService.uploadWithModeration(img.uri, uploadPropertyId, validateOnly)
               .then(result => {
                 setPhotos(prev => {
                   const updated = [...prev];
@@ -238,7 +337,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       ...updated[imgIndex],
                       moderationStatus,
                       moderationReason: result.moderation_reason,
-                      imageUrl: result.image_url || undefined,
+                      imageUrl: result.image_url || updated[imgIndex].imageUrl || undefined,
                     };
                     
                     if (moderationStatus === 'REJECTED') {
@@ -385,108 +484,225 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Collect base64 for approved/pending images (Google Vision API moderated)
-      const validImages = photos.filter(
-        p =>
-          (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') &&
-          !!p.base64
-      );
-      
-      const imageBase64Strings = validImages
-        .map(p => {
-          if (!p.base64) return null;
-          let base64 = p.base64.trim();
-          if (base64.startsWith('data:image/')) {
-            if (!base64.includes(';base64,')) return null;
-            return base64;
-          }
-          return `data:image/jpeg;base64,${base64}`;
-        })
-        .filter((base64): base64 is string => base64 !== null && base64 !== '');
-      
-      if (validImages.length === 0) {
-        Alert.alert(
-          'No Valid Images',
-          'Please upload at least one image that has been approved or is pending review.',
-          [{text: 'OK'}]
+      if (isEditMode && propertyId) {
+        // EDIT MODE: Update existing property
+        console.log('[AddProperty] Editing property ID:', propertyId);
+        
+        // For edit mode, collect images differently:
+        // - Existing images: preserve URLs (filter out blob URLs)
+        // - New images: include base64 or imageUrl from moderation
+        const existingImageUrls = photos
+          .filter(p => p.imageUrl && !p.uri.startsWith('blob:') && !p.uri.startsWith('file:'))
+          .map(p => p.imageUrl!)
+          .filter((url): url is string => !!url && !url.startsWith('blob:'));
+        
+        // New images that were uploaded (have base64 or were uploaded via moderation)
+        const newImages = photos.filter(p => 
+          p.base64 || (p.imageUrl && (p.uri.startsWith('file:') || p.uri.startsWith('blob:')))
         );
-        setIsSubmitting(false);
-        return;
-      }
-      
-      const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
-      if (checkingImages.length > 0) {
-        Alert.alert(
-          'Images Still Validating',
-          'Please wait for all images to be validated before submitting.',
-          [{text: 'OK'}]
-        );
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (imageBase64Strings.length === 0) {
-        Alert.alert(
-          'Image Data Missing',
-          'Approved images are missing image data. Please try removing and re-uploading the images.',
-          [{text: 'OK'}]
-        );
-        setIsSubmitting(false);
-        return;
-      }
-      
-      console.log('[AddProperty] Total photos:', photos.length, 'Valid (approved/pending):', validImages.length, 'Base64 ready:', imageBase64Strings.length);
+        
+        const newImageBase64 = newImages
+          .map(p => {
+            if (p.base64) {
+              let base64 = p.base64.trim();
+              if (base64.startsWith('data:image/')) {
+                if (!base64.includes(';base64,')) return null;
+                return base64;
+              }
+              return `data:image/jpeg;base64,${base64}`;
+            }
+            return null;
+          })
+          .filter((base64): base64 is string => base64 !== null && base64 !== '');
+        
+        // Combine existing URLs and new base64 images
+        const allImages = [...existingImageUrls, ...newImageBase64];
+        
+        // Check if we have any images
+        if (allImages.length === 0 && photos.length > 0) {
+          Alert.alert(
+            'No Valid Images',
+            'Please wait for images to be processed or upload new images.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
+        if (checkingImages.length > 0) {
+          Alert.alert(
+            'Images Still Validating',
+            'Please wait for all images to be validated before submitting.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
 
-      // Property type is already in the correct format from guide
-      const propertyData = {
-        title: propertyTitle.trim(),
-        status: propertyStatus === 'sell' ? 'sale' : 'rent', // Map 'sell' to 'sale'
-        property_type: propertyType, // Already in guide format (e.g., 'Apartment', 'Villa / Banglow')
-        location: location.trim(),
-        state: state.trim() || null,
-        additional_address: additionalAddress.trim() || null,
-        latitude: latitude || null,
-        longitude: longitude || null,
-        bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
-        bathrooms: bathrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
-        balconies: balconies?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
-        area: parseFloat(builtUpArea) || 0,
-        carpet_area: carpetArea ? parseFloat(carpetArea) : null,
-        floor: floor.trim() || null,
-        total_floors: totalFloors ? parseInt(totalFloors) : null,
-        facing: facing || null,
-        age: propertyAge || null,
-        furnishing: furnishing || null,
-        description: description.trim(),
-        price: parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0,
-        price_negotiable: priceNegotiable,
-        maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
-        amenities: selectedAmenities,
-        // Include images as base64 strings in the request
-        images: imageBase64Strings.length > 0 ? imageBase64Strings : undefined,
-      };
+        // Build update data based on 24-hour restriction
+        const updateData: any = {};
+        
+        // Always allowed fields
+        updateData.title = propertyTitle.trim();
+        updateData.price = parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0;
+        updateData.price_negotiable = priceNegotiable;
+        updateData.maintenance_charges = maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null;
+        if (propertyStatus === 'rent' && depositAmount) {
+          updateData.deposit_amount = parseFloat(depositAmount.replace(/[^0-9.]/g, ''));
+        }
+        
+        // Only include other fields if not in limited edit mode
+        if (!isLimitedEdit) {
+          updateData.status = propertyStatus === 'sell' ? 'sale' : 'rent';
+          updateData.property_type = propertyType;
+          updateData.location = location.trim();
+          updateData.state = state.trim() || null;
+          updateData.additional_address = additionalAddress.trim() || null;
+          updateData.latitude = latitude || null;
+          updateData.longitude = longitude || null;
+          updateData.bedrooms = bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null);
+          updateData.bathrooms = bathrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null);
+          updateData.balconies = balconies?.toString() || (propertyType === 'Studio Apartment' ? '0' : null);
+          updateData.area = parseFloat(builtUpArea) || 0;
+          updateData.carpet_area = carpetArea ? parseFloat(carpetArea) : null;
+          updateData.floor = floor.trim() || null;
+          updateData.total_floors = totalFloors ? parseInt(totalFloors) : null;
+          updateData.facing = facing || null;
+          updateData.age = propertyAge || null;
+          updateData.furnishing = furnishing || null;
+          updateData.description = description.trim();
+          updateData.amenities = selectedAmenities;
+        }
+        
+        // Include images if any
+        if (allImages.length > 0) {
+          updateData.images = allImages;
+        }
+        
+        console.log('[AddProperty] Updating property with data:', {
+          ...updateData,
+          images: `[${allImages.length} images]`,
+        });
 
-      console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
-      console.log('[AddProperty] Images included as base64:', imageBase64Strings.length);
-
-      // Same endpoint as seller; backend skips property limit for agents
-      const response: any = await propertyService.createProperty(propertyData, 'agent');
-      
-      if (response && response.success) {
-        const imageCount = imageBase64Strings.length;
-        Alert.alert(
-          'Success', 
-          `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
-          [{text: 'OK', onPress: () => navigation.goBack()}]
-        );
+        const response: any = await sellerService.updateProperty(propertyId, updateData);
+        
+        if (response && response.success) {
+          Alert.alert(
+            'Success',
+            'Property updated successfully!',
+            [{text: 'OK', onPress: () => navigation.goBack()}]
+          );
+        } else {
+          const errorMessage = response?.message || response?.error?.message || 'Failed to update property';
+          console.error('[AddProperty] Property update failed:', errorMessage);
+          Alert.alert('Error', errorMessage);
+        }
       } else {
-        const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
-        console.error('[AddProperty] Property creation failed:', errorMessage);
-        Alert.alert('Error', errorMessage);
+        // CREATE MODE: Create new property
+        // Collect base64 for approved/pending images (Google Vision API moderated)
+        const validImages = photos.filter(
+          p =>
+            (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') &&
+            !!p.base64
+        );
+        
+        const imageBase64Strings = validImages
+          .map(p => {
+            if (!p.base64) return null;
+            let base64 = p.base64.trim();
+            if (base64.startsWith('data:image/')) {
+              if (!base64.includes(';base64,')) return null;
+              return base64;
+            }
+            return `data:image/jpeg;base64,${base64}`;
+          })
+          .filter((base64): base64 is string => base64 !== null && base64 !== '');
+        
+        if (validImages.length === 0) {
+          Alert.alert(
+            'No Valid Images',
+            'Please upload at least one image that has been approved or is pending review.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
+        if (checkingImages.length > 0) {
+          Alert.alert(
+            'Images Still Validating',
+            'Please wait for all images to be validated before submitting.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (imageBase64Strings.length === 0) {
+          Alert.alert(
+            'Image Data Missing',
+            'Approved images are missing image data. Please try removing and re-uploading the images.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+        
+        console.log('[AddProperty] Total photos:', photos.length, 'Valid (approved/pending):', validImages.length, 'Base64 ready:', imageBase64Strings.length);
+
+        // Property type is already in the correct format from guide
+        const propertyData = {
+          title: propertyTitle.trim(),
+          status: propertyStatus === 'sell' ? 'sale' : 'rent', // Map 'sell' to 'sale'
+          property_type: propertyType, // Already in guide format (e.g., 'Apartment', 'Villa / Banglow')
+          location: location.trim(),
+          state: state.trim() || null,
+          additional_address: additionalAddress.trim() || null,
+          latitude: latitude || null,
+          longitude: longitude || null,
+          bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+          bathrooms: bathrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+          balconies: balconies?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+          area: parseFloat(builtUpArea) || 0,
+          carpet_area: carpetArea ? parseFloat(carpetArea) : null,
+          floor: floor.trim() || null,
+          total_floors: totalFloors ? parseInt(totalFloors) : null,
+          facing: facing || null,
+          age: propertyAge || null,
+          furnishing: furnishing || null,
+          description: description.trim(),
+          price: parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0,
+          price_negotiable: priceNegotiable,
+          maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
+          amenities: selectedAmenities,
+          // Include images as base64 strings in the request
+          images: imageBase64Strings.length > 0 ? imageBase64Strings : undefined,
+        };
+
+        console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
+        console.log('[AddProperty] Images included as base64:', imageBase64Strings.length);
+
+        // Same endpoint as seller; backend skips property limit for agents
+        const response: any = await propertyService.createProperty(propertyData, 'agent');
+        
+        if (response && response.success) {
+          const imageCount = imageBase64Strings.length;
+          Alert.alert(
+            'Success', 
+            `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
+            [{text: 'OK', onPress: () => navigation.goBack()}]
+          );
+        } else {
+          const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
+          console.error('[AddProperty] Property creation failed:', errorMessage);
+          Alert.alert('Error', errorMessage);
+        }
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to create property. Please try again.');
+      Alert.alert('Error', error.response?.data?.message || (isEditMode ? 'Failed to update property. Please try again.' : 'Failed to create property. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -526,7 +742,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               />
             </View>
 
-            <View style={styles.inputContainer}>
+            {/* Lock non-pricing fields in limited edit mode */}
+            <View
+              style={styles.inputContainer}
+              pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
               <Text style={styles.label}>I want to <Text style={styles.required}>*</Text></Text>
               <View style={styles.typeButtonsContainer}>
                 <TouchableOpacity
@@ -571,7 +790,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={styles.inputContainer}
+              pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
               <Text style={styles.label}>
                 Property Type <Text style={styles.required}>*</Text>
               </Text>
@@ -613,7 +834,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
       case 2:
         return (
-          <View style={styles.stepContent}>
+          <View style={styles.stepContent} pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
             <Text style={styles.stepTitle}>Property Details</Text>
             <Text style={styles.stepSubtitle}>
               Tell us more about your property specifications
@@ -986,7 +1207,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
       case 3:
         return (
-          <View style={styles.stepContent}>
+          <View style={styles.stepContent} pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
             <Text style={styles.stepTitle}>Amenities & Description</Text>
             <Text style={styles.stepSubtitle}>
               Select the amenities available and describe your property.
@@ -1238,6 +1459,28 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     return 'pending';
   };
 
+  // Show loading while loading property data
+  if (loadingProperty) {
+    return (
+      <Modal
+        visible={true}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={handleClose}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <SafeAreaView style={styles.safeArea}>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>Loading property details...</Text>
+              </View>
+            </SafeAreaView>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       visible={true}
@@ -1247,9 +1490,21 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <SafeAreaView style={styles.safeArea}>
+            {/* Restricted edit banner for older listings */}
+            {isEditMode && isLimitedEdit && (
+              <View style={styles.limitedBanner}>
+                <Text style={styles.limitedBannerTitle}>Limited Edit Mode</Text>
+                <Text style={styles.limitedBannerText}>
+                  This listing is more than 24 hours old. You can only edit the Title and Pricing fields (price, negotiable, security deposit, maintenance). Other details are locked.
+                </Text>
+              </View>
+            )}
+
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>List Your Property</Text>
+              <Text style={styles.headerTitle}>
+                {isEditMode ? 'Edit Property' : 'List Your Property'}
+              </Text>
               <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -1365,6 +1620,38 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.text,
+    marginTop: spacing.md,
+    fontSize: 16,
+  },
+  limitedBanner: {
+    backgroundColor: '#FFF3CD',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFC107',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  limitedBannerTitle: {
+    ...typography.h3,
+    color: '#856404',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  limitedBannerText: {
+    ...typography.body,
+    color: '#856404',
+    fontSize: 13,
+    lineHeight: 18,
   },
   header: {
     flexDirection: 'row',

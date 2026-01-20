@@ -42,6 +42,9 @@ interface Property {
   inquiry_count?: number;
   inquiries?: number;
   project_type?: 'upcoming' | null;
+  created_at?: string;
+  created_date?: string;
+  date_created?: string;
 }
 
 const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
@@ -49,6 +52,45 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Check if property can be edited (within 24 hours)
+  const canEditProperty = (property: any): boolean => {
+    const createdAt = property.created_at || property.created_date || property.date_created;
+    if (!createdAt) return true; // Allow if no date available
+    
+    const createdDate = new Date(createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - createdDate.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    return diffHours < 24;
+  };
+
+  const handleEdit = async (propertyId: string | number) => {
+    const property = properties.find(p => String(p.id) === String(propertyId));
+    
+    if (!property) {
+      Alert.alert('Error', 'Property not found');
+      return;
+    }
+    
+    const limitedEdit = !canEditProperty(property);
+    
+    if (limitedEdit) {
+      Alert.alert(
+        'Limited Edit Mode',
+        'This property was created more than 24 hours ago.\n\nOnly the Title and Pricing fields (price, negotiable, deposit, maintenance) can be edited. Other details are locked.',
+        [{text: 'OK'}],
+      );
+    }
+    
+    // Navigate to AddProperty screen with edit params
+    (navigation as any).navigate('AddProperty', {
+      propertyId: String(propertyId),
+      isLimitedEdit: limitedEdit,
+      createdAt: property.created_at || property.created_date || property.date_created,
+    });
+  };
 
   const loadProperties = useCallback(async (showLoading: boolean = true) => {
     try {
@@ -138,6 +180,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
             cover_image: imageUrl || undefined, // Use undefined instead of null for better React Native handling
             views_count: prop.views_count || prop.views || prop.view_count || 0,
             inquiry_count: prop.inquiry_count || prop.inquiries || prop.inquiry_count || 0,
+            created_at: prop.created_at || prop.created_date || prop.date_created,
             project_type: prop.project_type || null,
           };
         });
@@ -346,7 +389,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
               style={styles.editButton}
               onPress={(e) => {
                 e.stopPropagation();
-                navigation.navigate('EditProperty', {propertyId: item.id} as never);
+                handleEdit(item.id);
               }}>
               <Text style={styles.editButtonText}>✏️ Edit</Text>
             </TouchableOpacity>
