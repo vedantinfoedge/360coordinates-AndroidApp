@@ -5,13 +5,13 @@ import {
   ActivityIndicator,
   Text,
   TouchableOpacity,
-  Alert,
   PermissionsAndroid,
   Platform,
 } from 'react-native';
 import {MAP_CONFIG, initializeMapbox, MAPBOX_ACCESS_TOKEN} from '../../config/mapbox.config';
 import {colors, spacing, typography} from '../../theme';
 import {log} from '../../utils/debug';
+import CustomAlert from '../../utils/alertHelper';
 
 // Conditionally import Mapbox to prevent crashes if not linked
 let Mapbox: any = null;
@@ -137,7 +137,7 @@ const MapViewComponent: React.FC<MapViewProps> = ({
     if (marker?.onPress) {
       marker.onPress();
     } else if (marker?.title) {
-      Alert.alert(marker.title, marker.description || '');
+      CustomAlert.alert(marker.title, marker.description || '');
     }
   };
 
@@ -180,7 +180,7 @@ const MapViewComponent: React.FC<MapViewProps> = ({
         onDidFailLoadingMap={(error: any) => {
           setLoading(false);
           log.error('location', 'Map failed to load', error);
-          Alert.alert('Error', 'Failed to load map. Please check your internet connection.');
+          CustomAlert.alert('Error', 'Failed to load map. Please check your internet connection.');
         }}>
         <Camera
           ref={cameraRef}

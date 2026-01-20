@@ -4,9 +4,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ScrollView,
 } from 'react-native';
+import CustomAlert from '../../utils/alertHelper';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AuthStackParamList} from '../../navigation/AuthNavigator';
@@ -62,7 +62,7 @@ const ResetPasswordScreen: React.FC = () => {
     }
 
     // TODO: Reset password with backend using OTP
-    Alert.alert('Success', 'Password reset successfully', [
+    CustomAlert.alert('Success', 'Password reset successfully', [
       {
         text: 'OK',
         onPress: () => navigation.navigate('Login' as never),

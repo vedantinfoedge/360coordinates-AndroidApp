@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {moderationService, ImageUploadResult} from '../../services/moderation.service';
 import {formatDetectionShort} from '../../services/detection.service';
+import CustomAlert from '../../utils/alertHelper';
 
 interface ImageWithModeration {
   uri: string;
@@ -97,7 +97,7 @@ const ImageUploadWithModeration: React.FC<ImageUploadWithModerationProps> = ({
           }
         }
         
-        Alert.alert('Image Rejected', alertMessage);
+        CustomAlert.alert('Image Rejected', alertMessage);
       } else if (result.status === 'pending' || result.moderation_status === 'PENDING') {
         let alertMessage = 'This image is pending admin review and will be approved shortly.';
         
@@ -113,7 +113,7 @@ const ImageUploadWithModeration: React.FC<ImageUploadWithModerationProps> = ({
           alertMessage += '\n\nDetected: ' + detectionParts.join(', ');
         }
         
-        Alert.alert('Image Pending Review', alertMessage);
+        CustomAlert.alert('Image Pending Review', alertMessage);
       }
 
       return result;
@@ -129,7 +129,7 @@ const ImageUploadWithModeration: React.FC<ImageUploadWithModerationProps> = ({
       };
       onImagesChange(errorImages);
 
-      Alert.alert('Validation Error', error.message || 'Failed to validate image');
+      CustomAlert.alert('Validation Error', error.message || 'Failed to validate image');
       
       return {
         status: 'rejected',

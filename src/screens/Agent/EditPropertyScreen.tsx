@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -18,6 +17,7 @@ import AgentHeader from '../../components/AgentHeader';
 import {propertyService} from '../../services/property.service';
 import {sellerService} from '../../services/seller.service';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type EditPropertyScreenNavigationProp = NativeStackNavigationProp<
   AgentTabParamList,
@@ -82,12 +82,12 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
         // Projects can always be fully edited, regular properties only within 24 hours
         setCanFullEdit(isUpcoming || within24Hours);
       } else {
-        Alert.alert('Error', 'Failed to load property details');
+        CustomAlert.alert('Error', 'Failed to load property details');
         navigation.goBack();
       }
     } catch (error: any) {
       console.error('Error loading property:', error);
-      Alert.alert('Error', error.message || 'Failed to load property details');
+      CustomAlert.alert('Error', error.message || 'Failed to load property details');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -96,15 +96,15 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('Error', 'Title is required');
+      CustomAlert.alert('Error', 'Title is required');
       return;
     }
     if (!price.trim() || isNaN(parseFloat(price))) {
-      Alert.alert('Error', 'Valid price is required');
+      CustomAlert.alert('Error', 'Valid price is required');
       return;
     }
     if (!location.trim()) {
-      Alert.alert('Error', 'Location is required');
+      CustomAlert.alert('Error', 'Location is required');
       return;
     }
 
@@ -128,18 +128,18 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
       const response = await sellerService.updateProperty(route.params.propertyId, updateData);
       
       if (response && response.success) {
-        Alert.alert('Success', 'Property updated successfully', [
+        CustomAlert.alert('Success', 'Property updated successfully', [
           {
             text: 'OK',
             onPress: () => navigation.goBack(),
           },
         ]);
       } else {
-        Alert.alert('Error', (response && response.message) || 'Failed to update property');
+        CustomAlert.alert('Error', (response && response.message) || 'Failed to update property');
       }
     } catch (error: any) {
       console.error('Error updating property:', error);
-      Alert.alert('Error', error.message || 'Failed to update property');
+      CustomAlert.alert('Error', error.message || 'Failed to update property');
     } finally {
       setSaving(false);
     }

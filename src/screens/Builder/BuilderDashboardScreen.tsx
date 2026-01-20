@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Image,
@@ -23,6 +22,7 @@ import BuilderHeader from '../../components/BuilderHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type BuilderDashboardScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BuilderTabParamList, 'Dashboard'>,
@@ -205,7 +205,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
       console.error('Error loading dashboard data:', error);
       // Only show alert for non-404 errors
       if (showLoading && error?.status !== 404 && error?.response?.status !== 404) {
-        Alert.alert('Error', error?.message || 'Failed to load dashboard data');
+        CustomAlert.alert('Error', error?.message || 'Failed to load dashboard data');
       }
     } finally {
       if (showLoading) {

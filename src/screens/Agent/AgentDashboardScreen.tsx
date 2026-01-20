@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Image,
@@ -24,6 +23,7 @@ import AgentHeader from '../../components/AgentHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type AgentDashboardScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<AgentTabParamList, 'Dashboard'>,
@@ -98,7 +98,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         user.user_type === 'seller' ? 'Seller/Owner' :
         user.user_type || 'User';
       
-      Alert.alert(
+      CustomAlert.alert(
         'Access Denied',
         `You are registered as ${userTypeLabel}. You cannot access this dashboard.`,
         [
@@ -245,7 +245,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
       console.error('Error loading dashboard data:', error);
       // Only show alert for non-404 errors
       if (showLoading && error?.status !== 404 && error?.response?.status !== 404) {
-        Alert.alert('Error', error?.message || 'Failed to load dashboard data');
+        CustomAlert.alert('Error', error?.message || 'Failed to load dashboard data');
       }
     } finally {
       if (showLoading) {

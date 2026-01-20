@@ -7,9 +7,9 @@ import {
   Text,
   ActivityIndicator,
   Dimensions,
-  Alert,
 } from 'react-native';
 import {MSG91_CONFIG} from '../../config/msg91.config';
+import CustomAlert from '../../utils/alertHelper';
 
 // Conditionally import WebView to handle cases where it's not linked
 let WebView: any = null;
@@ -359,7 +359,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
         console.warn('[MSG91 Widget] Error type:', message.error?.type);
         
         // Show detailed error to user
-        Alert.alert(
+        CustomAlert.alert(
           'Widget Error',
           `MSG91 Widget failed to load.\n\nError: ${errorMsg}\n\nCode: ${message.error?.code || 'N/A'}\n\nPlease check:\n1. Widget ID and Auth Token in MSG91 dashboard\n2. Widget is active/enabled\n3. Internet connection`,
           [

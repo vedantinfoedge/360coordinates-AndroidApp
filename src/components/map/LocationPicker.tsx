@@ -5,7 +5,6 @@ import {
   Text,
   TouchableOpacity,
   Modal,
-  Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
@@ -14,6 +13,7 @@ import MapViewComponent from './MapView';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {reverseGeocode} from '../../utils/geocoding';
 import {log} from '../../utils/debug';
+import CustomAlert from '../../utils/alertHelper';
 
 // Conditionally import Mapbox
 let Camera: any = null;
@@ -92,7 +92,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       });
       onClose();
     } else {
-      Alert.alert('Error', 'Please select a location on the map');
+      CustomAlert.alert('Error', 'Please select a location on the map');
     }
   };
 
@@ -125,7 +125,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
         },
         error => {
           log.error('location', 'Error getting current location', error);
-          Alert.alert(
+          CustomAlert.alert(
             'Location Error',
             'Unable to get your current location. Please select a location on the map.',
           );
@@ -139,7 +139,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       );
     } catch (error) {
       log.error('location', 'Error in handleUseCurrentLocation', error);
-      Alert.alert('Error', 'Failed to get current location');
+      CustomAlert.alert('Error', 'Failed to get current location');
       setLoadingAddress(false);
     }
   };

@@ -5,12 +5,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   Linking,
-  Alert,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
+import CustomAlert from '../../utils/alertHelper';
 
 type AdminDashboardScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -31,10 +31,10 @@ const AdminDashboardScreen: React.FC<Props> = ({navigation}) => {
       if (canOpen) {
         await Linking.openURL(ADMIN_WEB_URL);
       } else {
-        Alert.alert('Error', 'Cannot open admin dashboard. Please check the URL.');
+        CustomAlert.alert('Error', 'Cannot open admin dashboard. Please check the URL.');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to open admin dashboard');
+      CustomAlert.alert('Error', 'Failed to open admin dashboard');
     }
   };
 

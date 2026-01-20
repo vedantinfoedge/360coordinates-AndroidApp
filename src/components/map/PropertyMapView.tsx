@@ -16,8 +16,9 @@ import {getPropertyImageUrl, fixImageUrl} from '../../utils/imageHelper';
 import {log} from '../../utils/debug';
 import {formatters} from '../../utils/formatters';
 import {favoriteService} from '../../services/favorite.service';
-import {Share, Alert} from 'react-native';
+import {Share} from 'react-native';
 import {MAP_CONFIG} from '../../config/mapbox.config';
+import CustomAlert from '../../utils/alertHelper';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -311,7 +312,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
         setIsFavorite(response.data?.is_favorite ?? !isFavorite);
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update favorite');
+      CustomAlert.alert('Error', error.message || 'Failed to update favorite');
     }
   };
 
@@ -328,7 +329,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       });
     } catch (error: any) {
       if (error.message !== 'User did not share') {
-        Alert.alert('Error', 'Failed to share property');
+        CustomAlert.alert('Error', 'Failed to share property');
       }
     }
   };

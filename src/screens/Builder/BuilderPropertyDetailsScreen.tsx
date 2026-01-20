@@ -8,7 +8,6 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
-  Alert,
   Share,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -22,6 +21,7 @@ import BuilderHeader from '../../components/BuilderHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
   BuilderTabParamList,
@@ -155,12 +155,12 @@ const BuilderPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         setProperty(propData);
         setCurrentImageIndex(0);
       } else {
-        Alert.alert('Error', 'Failed to load project details');
+        CustomAlert.alert('Error', 'Failed to load project details');
         navigation.goBack();
       }
     } catch (error: any) {
       console.error('[BuilderPropertyDetails] Error loading project:', error);
-      Alert.alert('Error', error.message || 'Failed to load project details');
+      CustomAlert.alert('Error', error.message || 'Failed to load project details');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -184,7 +184,7 @@ const BuilderPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     } catch (error: any) {
       if (error.message !== 'User did not share') {
         console.error('Error sharing project:', error);
-        Alert.alert('Error', 'Failed to share project. Please try again.');
+        CustomAlert.alert('Error', 'Failed to share project. Please try again.');
       }
     }
   };

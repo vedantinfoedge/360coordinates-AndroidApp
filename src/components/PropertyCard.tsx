@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, Alert, Image} from 'react-native';
+import {View, Text, StyleSheet, TouchableOpacity, Image} from 'react-native';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import CustomAlert from '../utils/alertHelper';
 
 interface PropertyCardProps {
   image?: string;
@@ -48,7 +49,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       onFavoritePress();
     } else {
       // Default behavior
-      Alert.alert(
+      CustomAlert.alert(
         favorite ? 'Removed from Favorites' : 'Added to Favorites',
         `${name} has been ${favorite ? 'removed from' : 'added to'} your favorites.`,
       );
@@ -61,7 +62,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       onSharePress();
     } else {
       // Default behavior
-      Alert.alert('Share Property', `Share ${name} - ${location} - ${price}`);
+      CustomAlert.alert('Share Property', `Share ${name} - ${location} - ${price}`);
     }
   };
 

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   ImageBackground,
   Image,
   Animated,
@@ -15,6 +14,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import CustomAlert from '../../utils/alertHelper';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
@@ -110,7 +110,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
 
   const handlePhoneVerify = async () => {
     if (!phone) {
-      Alert.alert('Error', 'Please enter your phone number first');
+      CustomAlert.alert('Error', 'Please enter your phone number first');
       return;
     }
     
@@ -125,7 +125,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     } else if (digits.length === 12 && digits.startsWith('91')) {
       formattedPhone = digits; // Already formatted
     } else {
-      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      CustomAlert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
     
@@ -149,9 +149,9 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
           console.log('[Register] OTP Request ID:', response.reqId);
         }
         
-        Alert.alert('Success', 'Verification SMS sent! Please check your phone and enter the OTP when prompted.');
+        CustomAlert.alert('Success', 'Verification SMS sent! Please check your phone and enter the OTP when prompted.');
       } else {
-        Alert.alert('Error', response.message || 'Failed to send verification SMS');
+        CustomAlert.alert('Error', response.message || 'Failed to send verification SMS');
       }
     } catch (error: any) {
       // Log full error details for debugging
@@ -184,7 +184,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       }
       
       // Show detailed error for debugging, but user-friendly message
-      Alert.alert(
+      CustomAlert.alert(
         'Unable to Send OTP',
         errorMessage + '\n\n' + 
         'Troubleshooting:\n' +
@@ -215,37 +215,37 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
 
   const handleRegister = async () => {
     if (!name || !email || !phone || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill all fields');
+      CustomAlert.alert('Error', 'Please fill all fields');
       return;
     }
 
     if (!selectedRole) {
-      Alert.alert('Error', 'Please select a role');
+      CustomAlert.alert('Error', 'Please select a role');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      CustomAlert.alert('Error', 'Passwords do not match');
       return;
     }
 
     // Validate phone number (10 digits)
     const phoneRegex = /^[0-9]{10}$/;
     if (!phoneRegex.test(phone.replace(/[^0-9]/g, ''))) {
-      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      CustomAlert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      CustomAlert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     // Check if phone is verified (email is automatically accepted)
     if (!phoneVerified) {
-      Alert.alert('Error', 'Please verify your phone number before registering');
+      CustomAlert.alert('Error', 'Please verify your phone number before registering');
       return;
     }
 
@@ -297,7 +297,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
         // Check if auto-login happened (token and user in response)
         if (response.data?.token && response.data?.user) {
           // Auto-login successful - navigate to dashboard (AppNavigator will handle routing)
-          Alert.alert(
+          CustomAlert.alert(
             'Success',
             `Registration successful! Welcome, ${name}!`,
             [
@@ -322,7 +322,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
         }
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Registration failed');
+      CustomAlert.alert('Error', error.message || 'Registration failed');
     } finally {
       setIsLoading(false);
     }

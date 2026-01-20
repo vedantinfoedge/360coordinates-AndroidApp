@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   Modal,
   Image,
   Platform,
@@ -31,6 +30,7 @@ import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
 import {extractStateFromContext} from '../../utils/geocoding';
+import CustomAlert from '../../utils/alertHelper';
 import {
   GuidePropertyType,
   getPropertyTypeConfig,
@@ -202,12 +202,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             setPhotos(existingImages);
           }
         } else {
-          Alert.alert('Error', 'Failed to load property details');
+          CustomAlert.alert('Error', 'Failed to load property details');
           navigation.goBack();
         }
       } catch (error: any) {
         console.error('Error loading property:', error);
-        Alert.alert('Error', error.message || 'Failed to load property details');
+        CustomAlert.alert('Error', error.message || 'Failed to load property details');
         navigation.goBack();
       } finally {
         setLoadingProperty(false);
@@ -242,12 +242,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const handleImagePicker = async () => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Please grant photo access permission');
+      CustomAlert.alert('Permission Denied', 'Please grant photo access permission');
       return;
     }
 
     if (photos.length >= 10) {
-      Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
+      CustomAlert.alert('Limit Reached', 'You can upload maximum 10 photos');
       return;
     }
 
@@ -264,7 +264,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
 
       if (response.errorCode) {
-        Alert.alert('Error', response.errorMessage || 'Failed to pick image');
+        CustomAlert.alert('Error', response.errorMessage || 'Failed to pick image');
         return;
       }
 
@@ -274,7 +274,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         const assetsToAdd = response.assets.slice(0, remainingSlots);
         
         if (photos.length + assetsToAdd.length > maxPhotos) {
-          Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
+          CustomAlert.alert('Limit Reached', 'You can upload maximum 10 photos');
           return;
         }
 
@@ -341,13 +341,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     };
                     
                     if (moderationStatus === 'REJECTED') {
-                      Alert.alert(
+                      CustomAlert.alert(
                         'Image Rejected',
                         result.moderation_reason || 'Image does not meet our guidelines. Please upload property images only.',
                         [{text: 'OK'}]
                       );
                     } else if (moderationStatus === 'PENDING') {
-                      Alert.alert(
+                      CustomAlert.alert(
                         'Image Under Review',
                         'Your image is being reviewed and will be visible after approval.',
                         [{text: 'OK'}]
@@ -371,7 +371,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   }
                   return updated;
                 });
-                Alert.alert(
+                CustomAlert.alert(
                   'Upload Failed',
                   error.message || 'Failed to upload image. Please try again.',
                   [{text: 'OK'}]
@@ -389,78 +389,78 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     // Validation
     if (currentStep === 1) {
       if (!propertyTitle.trim()) {
-        Alert.alert('Error', 'Please enter property title');
+        CustomAlert.alert('Error', 'Please enter property title');
         return;
       }
       if (!propertyType) {
-        Alert.alert('Error', 'Please select property type');
+        CustomAlert.alert('Error', 'Please select property type');
         return;
       }
       if (propertyTitle.length > 255) {
-        Alert.alert('Error', 'Title must be less than 255 characters');
+        CustomAlert.alert('Error', 'Title must be less than 255 characters');
         return;
       }
     }
     if (currentStep === 2) {
       if (!location.trim()) {
-        Alert.alert('Error', 'Please enter location');
+        CustomAlert.alert('Error', 'Please enter location');
         return;
       }
       if (!state.trim()) {
-        Alert.alert('Error', 'Please enter state');
+        CustomAlert.alert('Error', 'Please enter state');
         return;
       }
       if (fieldVisibility.showFacing && !facing) {
-        Alert.alert('Error', 'Please select facing direction');
+        CustomAlert.alert('Error', 'Please select facing direction');
         return;
       }
       if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment') {
-        Alert.alert('Error', 'Please select number of bedrooms');
+        CustomAlert.alert('Error', 'Please select number of bedrooms');
         return;
       }
       if (fieldVisibility.bathroomsRequired && bathrooms === null) {
-        Alert.alert('Error', 'Please select number of bathrooms');
+        CustomAlert.alert('Error', 'Please select number of bathrooms');
         return;
       }
       if (!builtUpArea.trim()) {
-        Alert.alert('Error', `Please enter ${fieldVisibility.areaLabel}`);
+        CustomAlert.alert('Error', `Please enter ${fieldVisibility.areaLabel}`);
         return;
       }
     }
     if (currentStep === 3) {
       if (!description.trim()) {
-        Alert.alert('Error', 'Please enter property description');
+        CustomAlert.alert('Error', 'Please enter property description');
         return;
       }
       if (description.length < 100) {
-        Alert.alert('Error', 'Description must be at least 100 characters');
+        CustomAlert.alert('Error', 'Description must be at least 100 characters');
         return;
       }
       if (description.trim().length > 1000) {
-        Alert.alert('Error', 'Description cannot exceed 1000 characters');
+        CustomAlert.alert('Error', 'Description cannot exceed 1000 characters');
         return;
       }
       // Check for mobile numbers (Indian format: 10 digits, may have +91)
       const mobileRegex = /(\+91[\s-]?)?[6-9]\d{9}/g;
       if (mobileRegex.test(description)) {
-        Alert.alert('Error', 'Description cannot contain mobile numbers');
+        CustomAlert.alert('Error', 'Description cannot contain mobile numbers');
         return;
       }
       // Check for email addresses
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
       if (emailRegex.test(description)) {
-        Alert.alert('Error', 'Description cannot contain email addresses');
+        CustomAlert.alert('Error', 'Description cannot contain email addresses');
         return;
       }
     }
     if (currentStep === 5) {
       if (!expectedPrice.trim()) {
-        Alert.alert('Error', propertyStatus === 'sell' ? 'Please enter expected price' : 'Please enter monthly rent');
+        CustomAlert.alert('Error', propertyStatus === 'sell' ? 'Please enter expected price' : 'Please enter monthly rent');
         return;
       }
       const priceValue = parseFloat(expectedPrice.replace(/[^0-9.]/g, ''));
       if (isNaN(priceValue) || priceValue <= 0) {
-        Alert.alert('Error', 'Price must be a positive number');
+        CustomAlert.alert('Error', 'Price must be a positive number');
         return;
       }
     }
@@ -520,7 +520,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         
         // Check if we have any images
         if (allImages.length === 0 && photos.length > 0) {
-          Alert.alert(
+          CustomAlert.alert(
             'No Valid Images',
             'Please wait for images to be processed or upload new images.',
             [{text: 'OK'}]
@@ -531,7 +531,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         
         const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
         if (checkingImages.length > 0) {
-          Alert.alert(
+          CustomAlert.alert(
             'Images Still Validating',
             'Please wait for all images to be validated before submitting.',
             [{text: 'OK'}]
@@ -588,7 +588,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         const response: any = await sellerService.updateProperty(propertyId, updateData);
         
         if (response && response.success) {
-          Alert.alert(
+          CustomAlert.alert(
             'Success',
             'Property updated successfully!',
             [{text: 'OK', onPress: () => navigation.goBack()}]
@@ -596,7 +596,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         } else {
           const errorMessage = response?.message || response?.error?.message || 'Failed to update property';
           console.error('[AddProperty] Property update failed:', errorMessage);
-          Alert.alert('Error', errorMessage);
+          CustomAlert.alert('Error', errorMessage);
         }
       } else {
         // CREATE MODE: Create new property
@@ -620,7 +620,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           .filter((base64): base64 is string => base64 !== null && base64 !== '');
         
         if (validImages.length === 0) {
-          Alert.alert(
+          CustomAlert.alert(
             'No Valid Images',
             'Please upload at least one image that has been approved or is pending review.',
             [{text: 'OK'}]
@@ -631,7 +631,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         
         const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
         if (checkingImages.length > 0) {
-          Alert.alert(
+          CustomAlert.alert(
             'Images Still Validating',
             'Please wait for all images to be validated before submitting.',
             [{text: 'OK'}]
@@ -641,7 +641,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         }
         
         if (imageBase64Strings.length === 0) {
-          Alert.alert(
+          CustomAlert.alert(
             'Image Data Missing',
             'Approved images are missing image data. Please try removing and re-uploading the images.',
             [{text: 'OK'}]
@@ -689,7 +689,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         
         if (response && response.success) {
           const imageCount = imageBase64Strings.length;
-          Alert.alert(
+          CustomAlert.alert(
             'Success', 
             `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
             [{text: 'OK', onPress: () => navigation.goBack()}]
@@ -697,19 +697,19 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         } else {
           const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
           console.error('[AddProperty] Property creation failed:', errorMessage);
-          Alert.alert('Error', errorMessage);
+          CustomAlert.alert('Error', errorMessage);
         }
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      Alert.alert('Error', error.response?.data?.message || (isEditMode ? 'Failed to update property. Please try again.' : 'Failed to create property. Please try again.'));
+      CustomAlert.alert('Error', error.response?.data?.message || (isEditMode ? 'Failed to update property. Please try again.' : 'Failed to create property. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    Alert.alert(
+    CustomAlert.alert(
       'Cancel Listing',
       'Are you sure you want to cancel? Your progress will be lost.',
       [

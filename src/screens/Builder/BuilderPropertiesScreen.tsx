@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   Image,
   ActivityIndicator,
   RefreshControl,
@@ -18,6 +17,7 @@ import BuilderHeader from '../../components/BuilderHeader';
 import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -159,7 +159,7 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
       }
       
       if (showLoading) {
-        Alert.alert('Error Loading Properties', errorMessage);
+        CustomAlert.alert('Error Loading Properties', errorMessage);
       }
       setProperties([]);
     } finally {

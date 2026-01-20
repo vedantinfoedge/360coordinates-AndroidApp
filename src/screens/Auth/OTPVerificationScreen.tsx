@@ -4,8 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
+import CustomAlert from '../../utils/alertHelper';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AuthStackParamList} from '../../navigation/AuthNavigator';
@@ -65,13 +65,13 @@ const OTPVerificationScreen: React.FC = () => {
 
   const handleVerify = async () => {
     if (otp.length !== 6) {
-      Alert.alert('Error', 'Please enter the complete OTP');
+      CustomAlert.alert('Error', 'Please enter the complete OTP');
       return;
     }
 
     const userId = params.userId || params.user_id;
     if (!userId) {
-      Alert.alert('Error', 'User ID not found. Please try registering again.');
+      CustomAlert.alert('Error', 'User ID not found. Please try registering again.');
       return;
     }
 
@@ -89,7 +89,7 @@ const OTPVerificationScreen: React.FC = () => {
             if (params.type === 'forgotPassword') {
               navigation.navigate('ResetPassword', {otp} as never);
             } else {
-              Alert.alert(
+              CustomAlert.alert(
                 'Success',
                 'Email OTP verified successfully! You are now logged in.',
                 [
@@ -125,7 +125,7 @@ const OTPVerificationScreen: React.FC = () => {
             if (params.type === 'forgotPassword') {
               navigation.navigate('ResetPassword', {otp} as never);
             } else {
-              Alert.alert(
+              CustomAlert.alert(
                 'Success',
                 'SMS OTP verified successfully! You are now logged in.',
                 [
@@ -157,7 +157,7 @@ const OTPVerificationScreen: React.FC = () => {
       } else {
         // For registration, show success and navigation will be handled by AppNavigator
         // The user state change will trigger navigation in AppNavigator
-        Alert.alert(
+        CustomAlert.alert(
           'Success',
           'OTP verified successfully! You are now logged in.',
           [
@@ -172,7 +172,7 @@ const OTPVerificationScreen: React.FC = () => {
         );
       }
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Invalid OTP. Please try again.');
+      CustomAlert.alert('Error', error?.message || 'Invalid OTP. Please try again.');
       setOtp(''); // Clear OTP on error
     } finally {
       setIsLoading(false);
@@ -182,7 +182,7 @@ const OTPVerificationScreen: React.FC = () => {
   const handleResendOTP = async () => {
     const userId = params.userId || params.user_id;
     if (!userId) {
-      Alert.alert('Error', 'User ID not found. Please try registering again.');
+      CustomAlert.alert('Error', 'User ID not found. Please try registering again.');
       return;
     }
 
@@ -196,7 +196,7 @@ const OTPVerificationScreen: React.FC = () => {
             setTimer(60);
             setCanResend(false);
             setOtp('');
-            Alert.alert('Success', 'New email OTP sent successfully!');
+            CustomAlert.alert('Success', 'New email OTP sent successfully!');
             return;
           }
         } catch (emailError: any) {
@@ -216,7 +216,7 @@ const OTPVerificationScreen: React.FC = () => {
             setTimer(60);
             setCanResend(false);
             setOtp('');
-            Alert.alert('Success', 'New SMS OTP sent successfully!');
+            CustomAlert.alert('Success', 'New SMS OTP sent successfully!');
             return;
           }
         } catch (smsError: any) {
@@ -230,9 +230,9 @@ const OTPVerificationScreen: React.FC = () => {
       setTimer(60);
       setCanResend(false);
       setOtp('');
-      Alert.alert('Success', 'New OTP sent successfully!');
+      CustomAlert.alert('Success', 'New OTP sent successfully!');
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to resend OTP');
+      CustomAlert.alert('Error', error?.message || 'Failed to resend OTP');
     } finally {
       setIsLoading(false);
     }

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   Modal,
   Image,
   Platform,
@@ -26,6 +25,7 @@ import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import {extractStateFromContext} from '../../utils/geocoding';
 import {useAuth} from '../../context/AuthContext';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type AddProjectScreenNavigationProp = BottomTabNavigationProp<
   AgentTabParamList,
@@ -247,12 +247,12 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
   const handleProjectImagesUpload = async () => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Please grant photo access permission');
+      CustomAlert.alert('Permission Denied', 'Please grant photo access permission');
       return;
     }
 
     if (projectImages.length >= 20) {
-      Alert.alert('Limit Reached', 'You can upload maximum 20 images');
+      CustomAlert.alert('Limit Reached', 'You can upload maximum 20 images');
       return;
     }
 
@@ -266,7 +266,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
     launchImageLibrary(options, async (response: ImagePickerResponse) => {
       if (response.didCancel) return;
       if (response.errorCode) {
-        Alert.alert('Error', response.errorMessage || 'Failed to pick image');
+        CustomAlert.alert('Error', response.errorMessage || 'Failed to pick image');
         return;
       }
 
@@ -329,75 +329,75 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
     switch (step) {
       case 1:
         if (!projectName.trim()) {
-          Alert.alert('Error', 'Please enter project name');
+          CustomAlert.alert('Error', 'Please enter project name');
           return false;
         }
         if (!projectType) {
-          Alert.alert('Error', 'Please select project type');
+          CustomAlert.alert('Error', 'Please select project type');
           return false;
         }
         if (!description.trim()) {
-          Alert.alert('Error', 'Please enter project description');
+          CustomAlert.alert('Error', 'Please enter project description');
           return false;
         }
         if (description.length > 1000) {
-          Alert.alert('Error', 'Description cannot exceed 1000 characters');
+          CustomAlert.alert('Error', 'Description cannot exceed 1000 characters');
           return false;
         }
         return true;
       case 2:
         if (!location.trim()) {
-          Alert.alert('Error', 'Please enter location');
+          CustomAlert.alert('Error', 'Please enter location');
           return false;
         }
         if (!state.trim()) {
-          Alert.alert('Error', 'Please enter state');
+          CustomAlert.alert('Error', 'Please enter state');
           return false;
         }
         return true;
       case 3:
         if (selectedConfigurations.length === 0) {
-          Alert.alert('Error', 'Please select at least one configuration');
+          CustomAlert.alert('Error', 'Please select at least one configuration');
           return false;
         }
         if (!carpetAreaRange.trim()) {
-          Alert.alert('Error', 'Please enter carpet area range');
+          CustomAlert.alert('Error', 'Please enter carpet area range');
           return false;
         }
         return true;
       case 4:
         if (!startingPrice.trim()) {
-          Alert.alert('Error', 'Please enter starting price');
+          CustomAlert.alert('Error', 'Please enter starting price');
           return false;
         }
         return true;
       case 7:
         const approvedImages = projectImages.filter(img => img.moderationStatus === 'APPROVED');
         if (approvedImages.length < 2) {
-          Alert.alert('Error', 'Please upload at least 2 approved images');
+          CustomAlert.alert('Error', 'Please upload at least 2 approved images');
           return false;
         }
         if (projectImages.length > 20) {
-          Alert.alert('Error', 'Maximum 20 images allowed');
+          CustomAlert.alert('Error', 'Maximum 20 images allowed');
           return false;
         }
         const checkingImages = projectImages.filter(img => img.moderationStatus === 'checking');
         if (checkingImages.length > 0) {
-          Alert.alert('Error', 'Please wait for all images to be processed');
+          CustomAlert.alert('Error', 'Please wait for all images to be processed');
           return false;
         }
         return true;
       case 8:
         if (!salesName.trim()) {
-          Alert.alert('Error', 'Please enter sales person name');
+          CustomAlert.alert('Error', 'Please enter sales person name');
           return false;
         }
         if (!salesNumber.trim() || salesNumber.length !== 10) {
-          Alert.alert('Error', 'Please enter valid 10-digit sales number');
+          CustomAlert.alert('Error', 'Please enter valid 10-digit sales number');
           return false;
         }
         if (!emailId.trim() || !emailId.includes('@')) {
-          Alert.alert('Error', 'Please enter valid email address');
+          CustomAlert.alert('Error', 'Please enter valid email address');
           return false;
         }
         return true;
@@ -438,7 +438,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         .filter((url): url is string => url !== undefined);
 
       if (approvedImages.length < 2) {
-        Alert.alert('Error', 'Please upload at least 2 approved images');
+        CustomAlert.alert('Error', 'Please upload at least 2 approved images');
         setIsSubmitting(false);
         return;
       }
@@ -498,25 +498,25 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       const response: any = await propertyService.createProperty(propertyData, 'agent');
       
       if (response && response.success) {
-        Alert.alert(
+        CustomAlert.alert(
           'Success',
           'Upcoming project published successfully! It is now visible to buyers.',
           [{text: 'OK', onPress: () => navigation.goBack()}]
         );
       } else {
         const errorMessage = response?.message || response?.error?.message || 'Failed to create project';
-        Alert.alert('Error', errorMessage);
+        CustomAlert.alert('Error', errorMessage);
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to create project. Please try again.');
+      CustomAlert.alert('Error', error.response?.data?.message || 'Failed to create project. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    Alert.alert(
+    CustomAlert.alert(
       'Cancel Project',
       'Are you sure you want to cancel? Your progress will be lost.',
       [

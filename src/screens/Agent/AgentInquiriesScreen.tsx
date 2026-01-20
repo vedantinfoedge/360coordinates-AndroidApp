@@ -8,7 +8,6 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   TextInput,
   Modal,
 } from 'react-native';
@@ -24,6 +23,7 @@ import {sellerService} from '../../services/seller.service';
 import {inquiryService} from '../../services/inquiry.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type AgentInquiriesScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<AgentTabParamList>,
@@ -200,7 +200,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
       }
     } catch (error: any) {
       console.error('Error loading inquiries:', error);
-      Alert.alert('Error', 'Failed to load inquiries');
+      CustomAlert.alert('Error', 'Failed to load inquiries');
     } finally {
       setLoading(false);
       setRefreshing(false);

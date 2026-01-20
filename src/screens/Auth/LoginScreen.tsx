@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   ImageBackground,
   Image,
   Animated,
@@ -14,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import CustomAlert from '../../utils/alertHelper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -172,14 +172,14 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
 
   const handleLogin = async (retryUserType?: UserRole) => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+      CustomAlert.alert('Error', 'Please enter email and password');
       return;
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      CustomAlert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -252,7 +252,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
       // Handle validation errors (400)
       if (error.status === 400) {
         const errorMsg = error.message || error.error?.message || 'Validation failed. Please check your email, password, and selected role.';
-        Alert.alert('Validation Failed', errorMsg);
+        CustomAlert.alert('Validation Failed', errorMsg);
         return;
       }
       
@@ -267,7 +267,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
         if (suggestedUserType && !retryUserType && suggestedUserType !== userTypeToUse) {
           const suggestedRoleLabel = getRoleLabel(suggestedUserType as UserRole);
           
-          Alert.alert(
+          CustomAlert.alert(
             'Access Denied',
             `${errorMessage}\n\nYou are registered as ${suggestedRoleLabel}. Would you like to switch to ${suggestedRoleLabel} login?`,
             [
@@ -303,7 +303,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             setSelectedRole('seller');
           }
           
-          Alert.alert(
+          CustomAlert.alert(
             'Access Denied',
             errorMessage + roleHint,
             [
@@ -317,10 +317,10 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
           );
         }
       } else if (error.status === 401) {
-        Alert.alert('Login Failed', 'Invalid email or password. Please check your credentials and try again.');
+        CustomAlert.alert('Login Failed', 'Invalid email or password. Please check your credentials and try again.');
       } else {
         const errorMsg = error.message || error.error?.message || 'Login failed. Please try again.';
-        Alert.alert('Error', errorMsg);
+        CustomAlert.alert('Error', errorMsg);
       }
     } finally {
       setIsLoading(false);

@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   Image,
 } from 'react-native';
@@ -22,6 +21,7 @@ import AgentHeader from '../../components/AgentHeader';
 import {userService} from '../../services/user.service';
 import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<AgentTabParamList, 'Profile'>,
@@ -171,24 +171,24 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
       const response: any = await sellerService.updateProfile(updateData);
 
       if (response && response.success) {
-        Alert.alert('Success', 'Profile updated successfully');
+        CustomAlert.alert('Success', 'Profile updated successfully');
         setOriginalData({...formData});
         setIsEditing(false);
         // Reload profile to get updated data
         await loadProfile();
       } else {
-        Alert.alert('Error', (response && response.message) || 'Failed to update profile');
+        CustomAlert.alert('Error', (response && response.message) || 'Failed to update profile');
       }
     } catch (error: any) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', error?.message || 'Failed to update profile');
+      CustomAlert.alert('Error', error?.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
   };
 
   const showImagePicker = () => {
-    Alert.alert(
+    CustomAlert.alert(
       'Select Profile Image',
       'Choose an option',
       [
@@ -211,7 +211,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
     const callback = async (response: ImagePickerResponse) => {
       if (response.didCancel || response.errorCode) {
         if (response.errorMessage) {
-          Alert.alert('Error', response.errorMessage);
+          CustomAlert.alert('Error', response.errorMessage);
         }
         return;
       }
@@ -235,13 +235,13 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 });
               }
             }
-            Alert.alert('Success', 'Profile picture updated successfully');
+            CustomAlert.alert('Success', 'Profile picture updated successfully');
           } else {
-            Alert.alert('Error', (uploadResponse && uploadResponse.message) || 'Failed to upload image');
+            CustomAlert.alert('Error', (uploadResponse && uploadResponse.message) || 'Failed to upload image');
           }
         } catch (error: any) {
           console.error('Error uploading image:', error);
-          Alert.alert('Error', error?.message || 'Failed to upload image');
+          CustomAlert.alert('Error', error?.message || 'Failed to upload image');
         } finally {
           setSaving(false);
         }

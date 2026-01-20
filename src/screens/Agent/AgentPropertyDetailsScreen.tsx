@@ -8,7 +8,6 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
-  Alert,
   Share,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -22,6 +21,7 @@ import AgentHeader from '../../components/AgentHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
   AgentTabParamList,
@@ -157,12 +157,12 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         setProperty(propData);
         setCurrentImageIndex(0);
       } else {
-        Alert.alert('Error', 'Failed to load property details');
+        CustomAlert.alert('Error', 'Failed to load property details');
         navigation.goBack();
       }
     } catch (error: any) {
       console.error('[AgentPropertyDetails] Error loading property:', error);
-      Alert.alert('Error', error.message || 'Failed to load property details');
+      CustomAlert.alert('Error', error.message || 'Failed to load property details');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -186,7 +186,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     } catch (error: any) {
       if (error.message !== 'User did not share') {
         console.error('Error sharing property:', error);
-        Alert.alert('Error', 'Failed to share property. Please try again.');
+        CustomAlert.alert('Error', 'Failed to share property. Please try again.');
       }
     }
   };
