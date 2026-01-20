@@ -20,7 +20,11 @@ import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+<<<<<<< Updated upstream
 import {formatters, capitalize} from '../../utils/formatters';
+=======
+import {formatters} from '../../utils/formatters';
+>>>>>>> Stashed changes
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -104,12 +108,20 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
     } catch (error: any) {
       // If dashboard stats endpoint doesn't exist (404), use local count as fallback
       if (error?.status === 404 || error?.response?.status === 404) {
+<<<<<<< Updated upstream
         // Endpoint doesn't exist, use local properties count with default free plan limit
         const defaultLimit = 3;
         if (allProperties.length >= defaultLimit) {
           CustomAlert.alert(
             'Property Limit Reached',
             `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
+=======
+        // Endpoint doesn't exist, use local properties count
+        if (allProperties.length >= 3) {
+          Alert.alert(
+            'Property Limit Reached',
+            `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
+>>>>>>> Stashed changes
             [{text: 'OK'}]
           );
           return false;
@@ -117,10 +129,16 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         return true; // Allow if count is below limit
       }
       console.error('Error checking property limit:', error);
+<<<<<<< Updated upstream
       // If check fails for other reasons, use local count as fallback with default free plan limit
       const defaultLimit = 3;
       if (allProperties.length >= defaultLimit) {
         CustomAlert.alert(
+=======
+      // If check fails for other reasons, use local count as fallback
+      if (allProperties.length >= 3) {
+        Alert.alert(
+>>>>>>> Stashed changes
           'Property Limit Reached',
           `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
           [{text: 'OK'}]
@@ -451,8 +469,13 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
+<<<<<<< Updated upstream
   const handleDelete = async (propertyId: string | number) => {
     CustomAlert.alert(
+=======
+  const handleDelete = (propertyId: string | number) => {
+    Alert.alert(
+>>>>>>> Stashed changes
       'Delete Property',
       'Are you sure you want to delete this property? This action cannot be undone and the property will be removed from the database and website.',
       [
@@ -478,7 +501,11 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
               if (isSuccess || response?.data?.success) {
                 loadMyProperties(false);
                 setTimeout(() => {
+<<<<<<< Updated upstream
                   CustomAlert.alert('Success', 'Property has been deleted from the database and will no longer appear on the app or website.');
+=======
+                  Alert.alert('Success', 'Property has been deleted and will no longer appear on the app or website.');
+>>>>>>> Stashed changes
                 }, 100);
               } else {
                 loadMyProperties(true);
@@ -487,6 +514,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
               }
             } catch (error: any) {
               loadMyProperties(true);
+<<<<<<< Updated upstream
               
               // Show error message
               const errorMessage = error?.message || 
@@ -494,6 +522,14 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                                   error?.response?.message ||
                                   'Failed to delete property. Please check your connection and try again.';
               CustomAlert.alert('Delete Failed', errorMessage);
+=======
+              const errorMessage =
+                error?.message ||
+                error?.response?.data?.message ||
+                error?.response?.message ||
+                'Failed to delete property. Please check your connection and try again.';
+              Alert.alert('Delete Failed', errorMessage);
+>>>>>>> Stashed changes
             }
           },
         },
@@ -529,7 +565,11 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
             source={{uri: imageUrl}}
             style={styles.propertyImage}
             resizeMode="cover"
+<<<<<<< Updated upstream
             onError={(error: any) => {
+=======
+            onError={(error) => {
+>>>>>>> Stashed changes
               console.error(`[SellerProperties] Image load error for property ${item.id}:`, {
                 uri: imageUrl,
                 error: error.nativeEvent?.error || 'Unknown error',
@@ -550,7 +590,11 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.propertyInfo}>
         <View style={styles.propertyHeader}>
           <Text style={styles.propertyTitle} numberOfLines={2}>
+<<<<<<< Updated upstream
             {capitalize(item.title || 'Untitled Property')}
+=======
+            {item.title || 'Untitled Property'}
+>>>>>>> Stashed changes
           </Text>
           <View
             style={[

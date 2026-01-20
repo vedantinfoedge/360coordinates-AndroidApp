@@ -106,8 +106,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const totalSteps = 5;
 
   // Check property limit on screen load (only for new properties)
+<<<<<<< Updated upstream
   // According to backend: Sellers have limits based on subscription (free=3, basic=10, pro=10, premium=10)
   // Agents have unlimited properties
+=======
+  // Sellers/owners can upload only 3 properties
+>>>>>>> Stashed changes
   useEffect(() => {
     if (isEditMode) {
       // Skip limit check for edit mode
@@ -171,7 +175,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     };
 
     checkLimit();
+<<<<<<< Updated upstream
   }, [navigation, isEditMode, user]);
+=======
+  }, [navigation, isEditMode]);
+>>>>>>> Stashed changes
 
   // Load property data when in edit mode
   useEffect(() => {

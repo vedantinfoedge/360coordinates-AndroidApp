@@ -21,7 +21,11 @@ import {fixImageUrl, isValidImageUrl} from '../../utils/imageHelper';
 import SellerHeader from '../../components/SellerHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
+<<<<<<< Updated upstream
 import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
+=======
+import {formatters} from '../../utils/formatters';
+>>>>>>> Stashed changes
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
   SellerTabParamList,
@@ -445,7 +449,11 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         {/* Content Sections */}
         {/* Title and Price */}
         <View style={styles.headerSection}>
+<<<<<<< Updated upstream
           <Text style={styles.title}>{capitalize(property.title || property.property_title || 'Property Title')}</Text>
+=======
+          <Text style={styles.title}>{property.title || property.property_title || 'Property Title'}</Text>
+>>>>>>> Stashed changes
           <Text style={styles.location}>📍 {property.location || property.city || property.address || 'Location not specified'}</Text>
           <Text style={styles.price}>{formattedPrice}</Text>
         </View>
@@ -537,7 +545,11 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               {amenities.map((amenity: string, index: number) => (
                 <View key={index} style={styles.amenityItem}>
                   <Text style={styles.amenityIcon}>✓</Text>
+<<<<<<< Updated upstream
                   <Text style={styles.amenityText}>{capitalizeAmenity(amenity)}</Text>
+=======
+                  <Text style={styles.amenityText}>{amenity}</Text>
+>>>>>>> Stashed changes
                 </View>
               ))}
             </View>
