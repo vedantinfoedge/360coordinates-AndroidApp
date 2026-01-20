@@ -11,12 +11,16 @@ import {
   Image,
   Platform,
   PermissionsAndroid,
+  Dimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
+import LinearGradient from 'react-native-linear-gradient';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {moderationService} from '../../services/moderation.service';
@@ -523,24 +527,46 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>I want to</Text>
+              <Text style={styles.label}>I want to <Text style={styles.required}>*</Text></Text>
               <View style={styles.typeButtonsContainer}>
                 <TouchableOpacity
                   style={styles.typeButton}
                   onPress={() => setPropertyStatus('sell')}>
-                  <View style={propertyStatus === 'sell' ? styles.typeButtonSelected : styles.typeButtonUnselected}>
-                    <Text style={styles.typeButtonIcon}>🏷️</Text>
-                    <Text style={propertyStatus === 'sell' ? styles.typeButtonTextSelected : styles.typeButtonText}>Sell</Text>
-                  </View>
+                  {propertyStatus === 'sell' ? (
+                    <LinearGradient
+                      colors={['#8B5CF6', '#6D28D9']}
+                      start={{x: 0, y: 0}}
+                      end={{x: 1, y: 0}}
+                      style={styles.typeButtonGradient}>
+                      <Text style={styles.typeButtonIcon}>🏷️</Text>
+                      <Text style={styles.typeButtonTextSelected}>Sell</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.typeButtonUnselected}>
+                      <Text style={styles.typeButtonIcon}>🏷️</Text>
+                      <Text style={styles.typeButtonText}>Sell</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.typeButton}
                   onPress={() => setPropertyStatus('rent')}>
-                  <View style={propertyStatus === 'rent' ? styles.typeButtonSelected : styles.typeButtonUnselected}>
-                    <Text style={styles.typeButtonIcon}>🔑</Text>
-                    <Text style={propertyStatus === 'rent' ? styles.typeButtonTextSelected : styles.typeButtonText}>Rent / Lease</Text>
-                  </View>
+                  {propertyStatus === 'rent' ? (
+                    <LinearGradient
+                      colors={['#8B5CF6', '#6D28D9']}
+                      start={{x: 0, y: 0}}
+                      end={{x: 1, y: 0}}
+                      style={styles.typeButtonGradient}>
+                      <Text style={styles.typeButtonIcon}>🔑</Text>
+                      <Text style={styles.typeButtonTextSelected}>Rent</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.typeButtonUnselected}>
+                      <Text style={styles.typeButtonIcon}>🔑</Text>
+                      <Text style={styles.typeButtonText}>Rent</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -594,54 +620,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </Text>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Property Location on Map (Optional)</Text>
-              <TouchableOpacity
-                style={styles.mapButton}
-                onPress={() => setLocationPickerVisible(true)}>
-                <View style={styles.mapButtonInner}>
-                  <Text style={styles.mapButtonIcon}>
-                    {latitude && longitude ? '📍' : '🗺️'}
-                  </Text>
-                  <Text style={styles.mapButtonText}>
-                    {latitude && longitude
-                      ? 'Location Selected'
-                      : 'Select Location on Map'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              {latitude && longitude && (
-                <Text style={styles.mapButtonSubtext}>
-                  Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
-                </Text>
-              )}
-              {!latitude && !longitude && (
-                <Text style={styles.mapButtonSubtext}>
-                  Select exact location on map for better visibility
-                </Text>
-              )}
-            </View>
-
-            <LocationPicker
-              visible={locationPickerVisible}
-              initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
-              onLocationSelect={(locationData) => {
-                setLatitude(locationData.latitude);
-                setLongitude(locationData.longitude);
-                if (locationData.address) {
-                  setLocation(locationData.address);
-                  setLocationSelected(true); // Mark location as selected
-                }
-                // Extract state from context if available
-                const extractedState = extractStateFromContext(locationData.context);
-                if (extractedState) {
-                  setState(extractedState);
-                }
-                setLocationPickerVisible(false);
-              }}
-              onClose={() => setLocationPickerVisible(false)}
-            />
-
-            <View style={styles.inputContainer}>
               <Text style={styles.label}>
                 Location <Text style={styles.required}>*</Text>
               </Text>
@@ -651,7 +629,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter locality, area or landmark"
                   placeholderTextColor={colors.textSecondary}
                   value={location}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setLocation(text);
                     // Reset locationSelected when user starts typing/editing
                     if (locationSelected) {
@@ -684,7 +662,52 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   visible={location.length >= 2 && !locationSelected}
                 />
               </View>
+              
+              {/* Property Location on Map - Below Location Input */}
+              <View style={styles.mapContainer}>
+                <Text style={styles.mapLabel}>Property Location on Map (Optional)</Text>
+                <TouchableOpacity 
+                  style={styles.mapButton}
+                  onPress={() => setLocationPickerVisible(true)}>
+                  <LinearGradient
+                    colors={['#8B5CF6', '#6D28D9']}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 0}}
+                    style={styles.mapButtonGradient}>
+                    <Text style={styles.mapButtonIcon}>📍</Text>
+                    <Text style={styles.mapButtonText}>Add Location on Map</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <Text style={styles.mapButtonSubtext}>
+                  Select exact location on map for better visibility
+                </Text>
+                {latitude && longitude && (
+                  <Text style={styles.coordinateText}>
+                    Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                  </Text>
+                )}
+              </View>
             </View>
+
+            <LocationPicker
+              visible={locationPickerVisible}
+              initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
+              onLocationSelect={(locationData) => {
+                setLatitude(locationData.latitude);
+                setLongitude(locationData.longitude);
+                if (locationData.address) {
+                  setLocation(locationData.address);
+                  setLocationSelected(true);
+                }
+                // Extract state from context if available
+                const extractedState = extractStateFromContext(locationData.context);
+                if (extractedState) {
+                  setState(extractedState);
+                }
+                setLocationPickerVisible(false);
+              }}
+              onClose={() => setLocationPickerVisible(false)}
+            />
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
@@ -911,24 +934,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </View>
             )}
 
-            {fieldVisibility.showFacing && (
-              <Dropdown
-                label="Facing"
-                placeholder="Select facing direction"
-                options={[
-                  {label: 'North', value: 'North'},
-                  {label: 'South', value: 'South'},
-                  {label: 'East', value: 'East'},
-                  {label: 'West', value: 'West'},
-                  {label: 'North-East', value: 'North-East'},
-                  {label: 'North-West', value: 'North-West'},
-                  {label: 'South-East', value: 'South-East'},
-                  {label: 'South-West', value: 'South-West'},
-                ]}
-                value={facing}
-                onSelect={setFacing}
-              />
-            )}
+            <Dropdown
+              label="Facing"
+              placeholder="Select facing direction"
+              required={true}
+              options={[
+                {label: 'North', value: 'North'},
+                {label: 'South', value: 'South'},
+                {label: 'East', value: 'East'},
+                {label: 'West', value: 'West'},
+                {label: 'North-East', value: 'North-East'},
+                {label: 'North-West', value: 'North-West'},
+                {label: 'South-East', value: 'South-East'},
+                {label: 'South-West', value: 'South-West'},
+              ]}
+              value={facing}
+              onSelect={setFacing}
+            />
 
             {fieldVisibility.showAge && (
               <Dropdown
@@ -1129,7 +1151,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             {propertyStatus === 'rent' && (
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Deposit Amount</Text>
+                <Text style={styles.label}>Security Deposit</Text>
                 <View style={styles.priceInputContainer}>
                   <Text style={styles.currencySymbol}>₹</Text>
                   <TextInput
@@ -1141,6 +1163,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     keyboardType="numeric"
                   />
                 </View>
+                <Text style={styles.hintText}>
+                  Typically 2-6 months of rent
+                </Text>
               </View>
             )}
 
@@ -1231,11 +1256,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             {/* Progress Steps */}
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.progressContainerWrapper}
-              contentContainerStyle={styles.progressContainer}>
+            <View style={styles.progressContainer}>
               {steps.map((step, index) => {
                 const status = getStepStatus(step.id);
                 return (
@@ -1272,7 +1293,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 );
               })}
-            </ScrollView>
+            </View>
 
             {/* Content */}
             <ScrollView
@@ -1293,17 +1314,30 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+              <TouchableOpacity 
+                style={[styles.nextButton, isSubmitting && styles.disabledButton]} 
+                onPress={handleNext}
+                disabled={isSubmitting}>
                 {currentStep === totalSteps ? (
-                  <View style={styles.publishButtonInner}>
-                    <Text style={styles.publishButtonIcon}>✓</Text>
-                    <Text style={styles.publishButtonText}>Publish Listing</Text>
-                  </View>
+                  <LinearGradient
+                    colors={isSubmitting ? ['#CCCCCC', '#999999'] : ['#43A047', '#2E7D32']}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 0}}
+                    style={styles.publishButtonGradient}>
+                    <Text style={styles.publishButtonIcon}>{isSubmitting ? '⏳' : '✓'}</Text>
+                    <Text style={styles.publishButtonText}>
+                      {isSubmitting ? 'Submitting...' : 'Publish Listing'}
+                    </Text>
+                  </LinearGradient>
                 ) : (
-                  <View style={styles.nextButtonInner}>
+                  <LinearGradient
+                    colors={['#8B5CF6', '#6D28D9']}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 0}}
+                    style={styles.nextButtonGradient}>
                     <Text style={styles.nextButtonText}>Next</Text>
                     <Text style={styles.nextButtonArrow}>→</Text>
-                  </View>
+                  </LinearGradient>
                 )}
               </TouchableOpacity>
             </View>
@@ -1362,16 +1396,14 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
   },
-  progressContainerWrapper: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: 0,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   stepItem: {
     flex: 1,
@@ -1385,13 +1417,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: spacing.xs,
   },
   stepCircleCompleted: {
     backgroundColor: '#43A047',
   },
   stepCircleActive: {
-    backgroundColor: colors.text,
+    backgroundColor: '#8B5CF6',
   },
   stepIcon: {
     fontSize: 20,
@@ -1413,7 +1445,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   stepLabelActive: {
-    color: colors.text,
+    color: '#8B5CF6',
     fontWeight: '700',
   },
   stepLine: {
@@ -1429,15 +1461,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#43A047',
   },
   stepLineActive: {
-    backgroundColor: colors.text,
+    backgroundColor: '#8B5CF6',
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    padding: spacing.xl,
   },
   stepContent: {
     flex: 1,
@@ -1474,10 +1504,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   required: {
-    color: colors.text,
+    color: '#E53935',
   },
   input: {
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#F5F5F5',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     ...typography.body,
@@ -1519,15 +1549,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     gap: spacing.xs,
   },
-  typeButtonSelected: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    backgroundColor: colors.text,
-    borderRadius: borderRadius.md,
-    gap: spacing.xs,
-  },
   typeButtonUnselected: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1557,10 +1578,12 @@ const styles = StyleSheet.create({
   propertyTypeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    marginHorizontal: -spacing.xs / 2, // Negative margin for spacing
   },
   propertyTypeButton: {
-    width: '47%',
+    width: '48%', // Two columns with space between
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1569,11 +1592,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 100,
+    marginHorizontal: spacing.xs / 2, // Half margin on each side
+    marginBottom: spacing.md,
   },
   propertyTypeButtonActive: {
-    borderColor: colors.text,
+    borderColor: '#8B5CF6',
     borderWidth: 2,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#F3F0FF',
   },
   propertyTypeIcon: {
     fontSize: 32,
@@ -1587,23 +1612,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   propertyTypeTextActive: {
-    color: colors.text,
+    color: '#8B5CF6',
     fontWeight: '600',
+  },
+  mapContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  mapLabel: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: spacing.sm,
   },
   mapButton: {
     borderRadius: borderRadius.md,
-    backgroundColor: colors.text,
+    overflow: 'hidden',
     marginBottom: spacing.xs,
   },
-  mapButtonInner: {
+  mapButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
-    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
   },
   mapButtonIcon: {
     fontSize: 18,
+    marginRight: spacing.xs,
   },
   mapButtonText: {
     ...typography.body,
@@ -1615,6 +1654,14 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 12,
+    marginTop: spacing.xs,
+  },
+  coordinateText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    fontFamily: 'monospace',
+    fontSize: 11,
   },
   numberButtonsContainer: {
     flexDirection: 'row',
@@ -1646,8 +1693,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   numberButtonActive: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
   },
   numberButtonText: {
     ...typography.body,
@@ -1699,10 +1746,14 @@ const styles = StyleSheet.create({
   amenitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    justifyContent: 'flex-start',
+    marginTop: spacing.sm,
+    marginHorizontal: -spacing.xs, // Negative margin for spacing
   },
   amenityButton: {
-    width: '30%',
+    width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 4) / 3, // Responsive width for 3 columns
+    minWidth: 90, // Minimum width for small screens
+    maxWidth: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 4) / 3, // Max width same as width
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1711,11 +1762,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 90,
+    marginHorizontal: spacing.xs / 2, // Half margin on each side
+    marginBottom: spacing.md, // Bottom margin for wrapping
   },
   amenityButtonActive: {
-    borderColor: colors.text,
+    borderColor: '#8B5CF6',
     borderWidth: 2,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#F3F0FF',
   },
   amenityIcon: {
     fontSize: 24,
@@ -1740,7 +1793,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 200,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#FAFAFA',
   },
   photoUploadIcon: {
     fontSize: 48,
@@ -1829,7 +1882,7 @@ const styles = StyleSheet.create({
   priceInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#F5F5F5',
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1863,8 +1916,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
   },
   checkboxCheck: {
     color: colors.surface,
@@ -1877,17 +1930,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   summaryButton: {
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#F3F0FF',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   summaryButtonText: {
     ...typography.body,
-    color: colors.text,
+    color: '#8B5CF6',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1970,9 +2021,12 @@ const styles = StyleSheet.create({
   nextButton: {
     flex: 1,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.text,
+    overflow: 'hidden',
   },
-  nextButtonInner: {
+  disabledButton: {
+    opacity: 0.6,
+  },
+  nextButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1991,7 +2045,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  publishButtonInner: {
+  publishButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2306,6 +2360,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.md,
     marginTop: spacing.md,
+  },
+  hintText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: spacing.xs,
   },
 });
 
