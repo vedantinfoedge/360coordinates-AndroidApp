@@ -16,6 +16,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
 import {sellerService} from '../../services/seller.service';
+import {propertyService} from '../../services/property.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 
@@ -187,6 +188,55 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     loadProperties(false);
   };
 
+  const handleDelete = (propertyId: string | number) => {
+    Alert.alert(
+      'Delete Property',
+      'Are you sure you want to delete this property? This action cannot be undone and the property will be removed from the database and website.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const propertyIdStr = String(propertyId);
+              setProperties(prev => prev.filter(p => String(p.id) !== propertyIdStr));
+
+              const response: any = await propertyService.deleteProperty(propertyIdStr);
+
+              const isSuccess =
+                response?.success === true ||
+                response?.status === 'success' ||
+                (response?.message &&
+                  typeof response.message === 'string' &&
+                  (response.message.toLowerCase().includes('success') ||
+                    response.message.toLowerCase().includes('deleted')));
+
+              if (isSuccess || response?.data?.success) {
+                loadProperties(false);
+                setTimeout(() => {
+                  Alert.alert('Success', 'Property has been deleted and will no longer appear on the app or website.');
+                }, 100);
+              } else {
+                loadProperties(true);
+                const errorMsg = response?.message || response?.error?.message || 'Failed to delete property. Please try again.';
+                Alert.alert('Error', errorMsg);
+              }
+            } catch (error: any) {
+              loadProperties(true);
+              const errorMessage =
+                error?.message ||
+                error?.response?.data?.message ||
+                error?.response?.message ||
+                'Failed to delete property. Please check your connection and try again.';
+              Alert.alert('Delete Failed', errorMessage);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const getStatusColor = (status: string, isActive?: number | boolean) => {
     const active = isActive === 1 || isActive === true || status === 'active';
     if (active) {
@@ -292,14 +342,24 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
               item.status === 'rent'
             )}
           </Text>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              navigation.navigate('EditProperty', {propertyId: item.id} as never);
-            }}>
-            <Text style={styles.editButtonText}>✏️ Edit</Text>
-          </TouchableOpacity>
+          <View style={styles.propertyActions}>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                navigation.navigate('EditProperty', {propertyId: item.id} as never);
+              }}>
+              <Text style={styles.editButtonText}>✏️ Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleDelete(item.id);
+              }}>
+              <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       </TouchableOpacity>
@@ -485,14 +545,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flex: 1,
   },
+  propertyActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   editButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
-    marginLeft: spacing.sm,
   },
   editButtonText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  deleteButton: {
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+  },
+  deleteButtonText: {
     ...typography.caption,
     color: colors.surface,
     fontWeight: '600',
