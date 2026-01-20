@@ -143,16 +143,6 @@ const AgentTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Inquiries"
-        component={AgentInquiriesScreen}
-        options={{
-          title: 'Inquiries',
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>📨</Text>
-          ),
-        }}
-      />
-      <Tab.Screen
         name="Profile"
         component={AgentProfileScreen}
         options={{
@@ -161,6 +151,14 @@ const AgentTabNavigator = () => {
           tabBarIcon: ({color}) => (
             <Text style={{color, fontSize: 20, textAlign: 'center'}}>👤</Text>
           ),
+        }}
+      />
+      <Tab.Screen
+        name="Inquiries"
+        component={AgentInquiriesScreen}
+        options={{
+          title: 'Inquiries',
+          tabBarButton: () => null, // Hide from tab bar
         }}
       />
       <Tab.Screen
