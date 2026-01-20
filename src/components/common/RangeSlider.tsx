@@ -23,6 +23,8 @@ interface RangeSliderProps {
   step?: number;
   showMarkers?: boolean;
   gradientColors?: string[];
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 const RangeSlider: React.FC<RangeSliderProps> = ({
@@ -35,6 +37,8 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
   step = 1,
   showMarkers = true,
   gradientColors = [colors.accent, colors.primary, colors.secondary],
+  onDragStart,
+  onDragEnd,
 }) => {
   const sliderWidth = SLIDER_WIDTH;
   
@@ -96,10 +100,19 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
       }
       updateTimeoutRef.current = setTimeout(() => {
         onValueChange(newMin, newMax);
-      }, 100); // Increased delay to reduce parent re-renders during drag
+      }, 150); // Increased delay to reduce parent re-renders during drag
     },
     [onValueChange],
   );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Update min value (optimized for smooth dragging)
   const updateMinValue = useCallback(
@@ -181,6 +194,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
         setActiveThumb('min');
         minThumbAnimated.setOffset(minPosition);
         minThumbAnimated.setValue(0);
+        onDragStart?.();
       },
       onPanResponderMove: (_, gestureState) => {
         const newPosition = minPosition + gestureState.dx;
@@ -210,6 +224,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
         
         // Send final value immediately on release
         onValueChange(finalMinValue, finalMaxValue);
+        onDragEnd?.();
       },
     }),
   ).current;
@@ -224,6 +239,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
         setActiveThumb('max');
         maxThumbAnimated.setOffset(maxPosition);
         maxThumbAnimated.setValue(0);
+        onDragStart?.();
       },
       onPanResponderMove: (_, gestureState) => {
         const newPosition = maxPosition + gestureState.dx;
@@ -253,6 +269,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
         
         // Send final value immediately on release
         onValueChange(finalMinValue, finalMaxValue);
+        onDragEnd?.();
       },
     }),
   ).current;

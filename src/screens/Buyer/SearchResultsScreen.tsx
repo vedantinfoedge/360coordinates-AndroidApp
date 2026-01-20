@@ -122,6 +122,9 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   
   // Ref to track if user is actively dragging budget slider (prevents search during drag)
   const isDraggingBudget = useRef(false);
+  // Refs to track budget values during drag (without triggering state updates)
+  const pendingMinBudget = useRef<number>(0);
+  const pendingMaxBudget = useRef<number>(1000);
 
   // Property type classification
   const bedroomBasedTypes = [
@@ -496,7 +499,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       return;
     }
     
-    // Skip if we just updated from slider (will be handled when drag ends)
+    // Skip if we're currently dragging (will be handled when drag ends)
     if (isDraggingBudget.current) {
       return;
     }
@@ -506,13 +509,22 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       if (isMounted && !isDraggingBudget.current) {
         loadProperties();
       }
-    }, 1000); // Longer delay for budget to avoid lag during slider drag
+    }, 600); // Debounce delay for budget changes (reduced from 800ms for better responsiveness)
 
     return () => {
       isMounted = false;
       clearTimeout(budgetTimeout);
     };
   }, [minBudget, maxBudget, loadProperties]);
+
+  // Cleanup budget update timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (budgetUpdateTimeoutRef.current) {
+        clearTimeout(budgetUpdateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Load initial properties on mount
   useEffect(() => {
@@ -742,16 +754,59 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
+  // Throttle timeout ref for budget updates during drag
+  const budgetUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Optimized callbacks for RangeSlider - using useCallback with stable dependencies
   const handleBudgetChange = useCallback((min: number, max: number) => {
-    // Mark that we're dragging to prevent search during drag
+    // Store pending values in refs (no re-render)
+    pendingMinBudget.current = min;
+    pendingMaxBudget.current = max;
+    
+    // If not currently dragging, this is a final update (e.g., on release)
+    if (!isDraggingBudget.current) {
+      // Clear any pending throttled updates
+      if (budgetUpdateTimeoutRef.current) {
+        clearTimeout(budgetUpdateTimeoutRef.current);
+        budgetUpdateTimeoutRef.current = null;
+      }
+      // Update state immediately for final values
+      setMinBudget(min);
+      setMaxBudget(max);
+    } else {
+      // During drag, only update state periodically to reduce re-renders
+      // Use a throttled update (only update every 400ms during drag)
+      if (!budgetUpdateTimeoutRef.current) {
+        budgetUpdateTimeoutRef.current = setTimeout(() => {
+          setMinBudget(pendingMinBudget.current);
+          setMaxBudget(pendingMaxBudget.current);
+          budgetUpdateTimeoutRef.current = null;
+        }, 400);
+      }
+    }
+  }, []);
+
+  // Handle drag start - mark that we're dragging
+  const handleBudgetDragStart = useCallback(() => {
     isDraggingBudget.current = true;
-    setMinBudget(min);
-    setMaxBudget(max);
-    // Reset dragging flag after a delay (when user stops dragging)
-    setTimeout(() => {
-      isDraggingBudget.current = false;
-    }, 1500);
+    // Clear any pending updates
+    if (budgetUpdateTimeoutRef.current) {
+      clearTimeout(budgetUpdateTimeoutRef.current);
+      budgetUpdateTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Handle drag end - update final values and trigger search
+  const handleBudgetDragEnd = useCallback(() => {
+    isDraggingBudget.current = false;
+    // Clear any pending throttled updates
+    if (budgetUpdateTimeoutRef.current) {
+      clearTimeout(budgetUpdateTimeoutRef.current);
+      budgetUpdateTimeoutRef.current = null;
+    }
+    // Update state with final values
+    setMinBudget(pendingMinBudget.current);
+    setMaxBudget(pendingMaxBudget.current);
   }, []);
 
   // Memoize formatBudgetDisplay to prevent re-creation on every render
@@ -1006,6 +1061,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                     minValue={minBudget}
                     maxValue={maxBudget}
                     onValueChange={handleBudgetChange}
+                    onDragStart={handleBudgetDragStart}
+                    onDragEnd={handleBudgetDragEnd}
                     formatValue={formatBudgetDisplay}
                     step={listingType === 'buy' ? 5 : 1}
                     showMarkers={true}
