@@ -20,7 +20,7 @@ import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
-import {formatters} from '../../utils/formatters';
+import {formatters, capitalize} from '../../utils/formatters';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -53,31 +53,48 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
 
   // Check property limit before adding
-  // Sellers/owners can upload only 3 properties (regardless of subscription plan)
+  // According to backend: Sellers have limits based on subscription (free=3, basic=10, pro=10, premium=10)
+  // Agents have unlimited properties
   const checkPropertyLimit = async (): Promise<boolean> => {
     try {
+      // Agents have unlimited properties - skip check
+      if (user?.user_type === 'agent') {
+        return true;
+      }
+
       const statsResponse: any = await sellerService.getDashboardStats();
       if (statsResponse && statsResponse.success && statsResponse.data) {
         const stats = statsResponse.data;
         const currentCount = stats.total_properties || 0;
         
-        // Sellers/owners have a fixed limit of 3 properties
-        const limit = 3;
+        // Get subscription plan type (defaults to 'free' if no subscription)
+        const planType = stats.subscription?.plan_type || 'free';
         
-        if (currentCount >= limit) {
+        // Property limits based on subscription plan
+        const limits: {[key: string]: number} = {
+          'free': 3,
+          'basic': 10,
+          'pro': 10,
+          'premium': 10,
+        };
+        
+        const limit = limits[planType] || limits['free'];
+        
+        if (limit > 0 && currentCount >= limit) {
           CustomAlert.alert(
             'Property Limit Reached',
-            `You have reached the maximum limit of ${limit} properties. You cannot add more properties.`,
+            `Property limit reached. You can list up to ${limit} properties in your current plan.`,
             [{text: 'OK'}]
           );
           return false;
         }
       } else {
-        // If API fails, check current properties count
-        if (allProperties.length >= 3) {
+        // If API fails, check current properties count with default free plan limit
+        const defaultLimit = 3;
+        if (allProperties.length >= defaultLimit) {
           CustomAlert.alert(
             'Property Limit Reached',
-            `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
+            `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
             [{text: 'OK'}]
           );
           return false;
@@ -87,11 +104,12 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
     } catch (error: any) {
       // If dashboard stats endpoint doesn't exist (404), use local count as fallback
       if (error?.status === 404 || error?.response?.status === 404) {
-        // Endpoint doesn't exist, use local properties count
-        if (allProperties.length >= 3) {
+        // Endpoint doesn't exist, use local properties count with default free plan limit
+        const defaultLimit = 3;
+        if (allProperties.length >= defaultLimit) {
           CustomAlert.alert(
             'Property Limit Reached',
-            `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
+            `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
             [{text: 'OK'}]
           );
           return false;
@@ -99,11 +117,12 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         return true; // Allow if count is below limit
       }
       console.error('Error checking property limit:', error);
-      // If check fails for other reasons, use local count as fallback
-      if (allProperties.length >= 3) {
+      // If check fails for other reasons, use local count as fallback with default free plan limit
+      const defaultLimit = 3;
+      if (allProperties.length >= defaultLimit) {
         CustomAlert.alert(
           'Property Limit Reached',
-          `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
+          `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
           [{text: 'OK'}]
         );
         return false;
@@ -531,7 +550,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.propertyInfo}>
         <View style={styles.propertyHeader}>
           <Text style={styles.propertyTitle} numberOfLines={2}>
-            {item.title || 'Untitled Property'}
+            {capitalize(item.title || 'Untitled Property')}
           </Text>
           <View
             style={[

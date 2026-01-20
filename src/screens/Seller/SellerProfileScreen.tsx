@@ -165,20 +165,59 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       newErrors.last_name = 'Last name must be 2-50 letters only';
     }
     
-    // WhatsApp Number validation (optional, Indian phone validation)
-    if (formData.whatsapp_number && !validation.indianPhone(formData.whatsapp_number)) {
-      newErrors.whatsapp_number = 'Please enter a valid Indian phone number';
+    // Full name validation (2-50 chars total, letters and spaces only)
+    const fullName = `${formData.first_name.trim()} ${formData.last_name.trim()}`.trim();
+    if (fullName.length < 2 || fullName.length > 50) {
+      if (!newErrors.first_name && !newErrors.last_name) {
+        newErrors.first_name = 'Full name must be between 2 and 50 characters';
+      }
+    } else if (!/^[a-zA-Z\s]{2,50}$/.test(fullName)) {
+      if (!newErrors.first_name && !newErrors.last_name) {
+        newErrors.first_name = 'Full name must contain only letters and spaces';
+      }
     }
     
-    // Alternate Mobile validation (optional, Indian phone validation)
-    if (formData.alternate_mobile && !validation.indianPhone(formData.alternate_mobile)) {
-      newErrors.alternate_mobile = 'Please enter a valid Indian phone number';
+    // WhatsApp Number validation (optional, 10-15 digits as per backend spec)
+    if (formData.whatsapp_number && formData.whatsapp_number.trim()) {
+      const digits = formData.whatsapp_number.replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 15) {
+        newErrors.whatsapp_number = 'WhatsApp number must be 10-15 digits';
+      } else if (!validation.indianPhone(formData.whatsapp_number)) {
+        newErrors.whatsapp_number = 'Please enter a valid Indian phone number';
+      }
+    }
+    
+    // Alternate Mobile validation (optional, 10-15 digits as per backend spec)
+    if (formData.alternate_mobile && formData.alternate_mobile.trim()) {
+      const digits = formData.alternate_mobile.replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 15) {
+        newErrors.alternate_mobile = 'Alternate mobile must be 10-15 digits';
+      } else if (!validation.indianPhone(formData.alternate_mobile)) {
+        newErrors.alternate_mobile = 'Please enter a valid Indian phone number';
+      }
     }
     
     // Address validation (optional, max 500 chars)
     if (formData.address && formData.address.length > 500) {
       newErrors.address = 'Address must be less than 500 characters';
     }
+    
+    // Social links URL validation (optional)
+    const validateUrl = (url: string, fieldName: string): void => {
+      if (!url || !url.trim()) return;
+      const trimmed = url.trim();
+      // Add protocol if missing for validation
+      const urlToValidate = trimmed.match(/^https?:\/\//i) ? trimmed : `https://${trimmed}`;
+      try {
+        new URL(urlToValidate);
+      } catch {
+        newErrors[fieldName] = 'Please enter a valid URL';
+      }
+    };
+    
+    validateUrl(formData.facebook, 'facebook');
+    validateUrl(formData.instagram, 'instagram');
+    validateUrl(formData.linkedin, 'linkedin');
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -208,19 +247,65 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       // Combine first_name and last_name into full_name
       const fullName = `${formData.first_name.trim()} ${formData.last_name.trim()}`.trim();
       
+      // Normalize phone numbers - extract digits only (10-15 digits as per backend spec)
+      const normalizePhone = (phone: string): string | null => {
+        if (!phone || !phone.trim()) return null;
+        // Extract digits only
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length < 10 || digits.length > 15) {
+          return null; // Invalid, but validation already caught this
+        }
+        return digits; // Store as digits only
+      };
+      
+      // Validate and normalize social links (URLs)
+      const validateUrl = (url: string): string | null => {
+        if (!url || !url.trim()) return null;
+        const trimmed = url.trim();
+        // Add protocol if missing
+        if (!trimmed.match(/^https?:\/\//i)) {
+          // Try to validate as URL with protocol
+          try {
+            new URL(`https://${trimmed}`);
+            return `https://${trimmed}`;
+          } catch {
+            return null; // Invalid URL
+          }
+        }
+        // Validate URL format
+        try {
+          new URL(trimmed);
+          return trimmed;
+        } catch {
+          return null; // Invalid URL
+        }
+      };
+      
       const profileData: any = {
         full_name: fullName,
-        address: formData.address || null,
-        whatsapp_number: formData.whatsapp_number || null,
-        alternate_mobile: formData.alternate_mobile || null,
+        address: formData.address?.trim() || null,
+        whatsapp_number: normalizePhone(formData.whatsapp_number),
+        alternate_mobile: normalizePhone(formData.alternate_mobile),
         social_links: {
-          facebook: formData.facebook || null,
-          instagram: formData.instagram || null,
-          linkedin: formData.linkedin || null,
+          facebook: validateUrl(formData.facebook),
+          instagram: validateUrl(formData.instagram),
+          linkedin: validateUrl(formData.linkedin),
         },
       };
       
-      // Remove null values
+      // Remove null values from social_links
+      Object.keys(profileData.social_links).forEach(key => {
+        if (profileData.social_links[key] === null) {
+          delete profileData.social_links[key];
+        }
+      });
+      
+      // Remove social_links if empty
+      if (Object.keys(profileData.social_links).length === 0) {
+        delete profileData.social_links;
+      }
+      
+      // Remove null values from top level
       Object.keys(profileData).forEach(key => {
         if (profileData[key] === null) {
           delete profileData[key];
@@ -479,7 +564,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                     errors.first_name && styles.inputError,
                   ]}
                   value={formData.first_name}
-                  onChangeText={text => {
+                  onChangeText={(text: string) => {
                     setFormData({...formData, first_name: text});
                     if (errors.first_name) setErrors({...errors, first_name: ''});
                   }}
@@ -500,7 +585,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                     errors.last_name && styles.inputError,
                   ]}
                   value={formData.last_name}
-                  onChangeText={text => {
+                  onChangeText={(text: string) => {
                     setFormData({...formData, last_name: text});
                     if (errors.last_name) setErrors({...errors, last_name: ''});
                   }}
@@ -544,7 +629,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                   errors.whatsapp_number && styles.inputError,
                 ]}
                 value={formData.whatsapp_number}
-                onChangeText={text => {
+                onChangeText={(text: string) => {
                   setFormData({...formData, whatsapp_number: text});
                   if (errors.whatsapp_number) setErrors({...errors, whatsapp_number: ''});
                 }}
@@ -567,7 +652,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                   errors.alternate_mobile && styles.inputError,
                 ]}
                 value={formData.alternate_mobile}
-                onChangeText={text => {
+                onChangeText={(text: string) => {
                   setFormData({...formData, alternate_mobile: text});
                   if (errors.alternate_mobile) setErrors({...errors, alternate_mobile: ''});
                 }}
@@ -591,7 +676,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                   errors.address && styles.inputError,
                 ]}
                 value={formData.address}
-                onChangeText={text => {
+                onChangeText={(text: string) => {
                   setFormData({...formData, address: text});
                   if (errors.address) setErrors({...errors, address: ''});
                 }}
@@ -617,37 +702,67 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Facebook</Text>
               <TextInput
-                style={[styles.input, !isEditing && styles.inputDisabled]}
+                style={[
+                  styles.input,
+                  !isEditing && styles.inputDisabled,
+                  errors.facebook && styles.inputError,
+                ]}
                 value={formData.facebook}
-                onChangeText={text => setFormData({...formData, facebook: text})}
+                onChangeText={(text: string) => {
+                  setFormData({...formData, facebook: text});
+                  if (errors.facebook) setErrors({...errors, facebook: ''});
+                }}
                 editable={isEditing}
                 keyboardType="url"
                 placeholder="https://facebook.com/..."
               />
+              {errors.facebook && (
+                <Text style={styles.errorText}>{errors.facebook}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Instagram</Text>
               <TextInput
-                style={[styles.input, !isEditing && styles.inputDisabled]}
+                style={[
+                  styles.input,
+                  !isEditing && styles.inputDisabled,
+                  errors.instagram && styles.inputError,
+                ]}
                 value={formData.instagram}
-                onChangeText={text => setFormData({...formData, instagram: text})}
+                onChangeText={(text: string) => {
+                  setFormData({...formData, instagram: text});
+                  if (errors.instagram) setErrors({...errors, instagram: ''});
+                }}
                 editable={isEditing}
                 keyboardType="url"
                 placeholder="https://instagram.com/..."
               />
+              {errors.instagram && (
+                <Text style={styles.errorText}>{errors.instagram}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>LinkedIn</Text>
               <TextInput
-                style={[styles.input, !isEditing && styles.inputDisabled]}
+                style={[
+                  styles.input,
+                  !isEditing && styles.inputDisabled,
+                  errors.linkedin && styles.inputError,
+                ]}
                 value={formData.linkedin}
-                onChangeText={text => setFormData({...formData, linkedin: text})}
+                onChangeText={(text: string) => {
+                  setFormData({...formData, linkedin: text});
+                  if (errors.linkedin) setErrors({...errors, linkedin: ''});
+                }}
                 editable={isEditing}
                 keyboardType="url"
                 placeholder="https://linkedin.com/..."
               />
+              {errors.linkedin && (
+                <Text style={styles.errorText}>{errors.linkedin}</Text>
+              )}
             </View>
           </View>
         </View>

@@ -77,6 +77,14 @@ export const initializeMSG91 = async () => {
   try {
     const {OTPWidget} = require('@msg91comm/sendotp-react-native');
     
+    // Enhanced logging for 401 error debugging
+    console.log('[MSG91] Initializing widget:', {
+      widgetId: MSG91_CONFIG.SMS_WIDGET_ID,
+      authToken: MSG91_CONFIG.SMS_AUTH_TOKEN ? `${MSG91_CONFIG.SMS_AUTH_TOKEN.substring(0, 10)}...` : 'MISSING',
+      widgetIdLength: MSG91_CONFIG.SMS_WIDGET_ID?.length,
+      authTokenLength: MSG91_CONFIG.SMS_AUTH_TOKEN?.length,
+    });
+    
     // Initialize with SMS Widget (default, can be switched for email)
     // FIX: Pass tokenAuth as string, not object (per MSG91 SDK docs)
     OTPWidget.initializeWidget(
@@ -87,9 +95,15 @@ export const initializeMSG91 = async () => {
     currentWidgetId = MSG91_CONFIG.SMS_WIDGET_ID;
     currentAuthToken = MSG91_CONFIG.SMS_AUTH_TOKEN;
     
-    console.log('MSG91 OTP Widget initialized successfully (SMS widget)');
+    console.log('[MSG91] Widget initialized successfully (SMS widget)');
     return true;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[MSG91] Initialization failed:', {
+      error: error?.message || error,
+      widgetId: MSG91_CONFIG.SMS_WIDGET_ID,
+      authTokenLength: MSG91_CONFIG.SMS_AUTH_TOKEN?.length,
+      errorDetails: JSON.stringify(error, null, 2),
+    });
     console.warn('MSG91 OTP Widget not available (app will continue without MSG91):', error);
     return false;
   }

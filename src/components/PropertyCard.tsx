@@ -2,6 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Image} from 'react-native';
 import {colors, spacing, typography, borderRadius} from '../theme';
 import CustomAlert from '../utils/alertHelper';
+import {capitalize} from '../utils/formatters';
 
 interface PropertyCardProps {
   image?: string;
@@ -136,7 +137,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       {/* Property Info */}
       <View style={styles.infoContainer}>
         <Text style={styles.name} numberOfLines={1}>
-          {name}
+          {capitalize(name)}
         </Text>
         <Text style={styles.location} numberOfLines={1}>
           {location}

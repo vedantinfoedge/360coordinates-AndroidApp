@@ -14,7 +14,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {propertyService} from '../../services/property.service';
 import {getPropertyImageUrl, fixImageUrl} from '../../utils/imageHelper';
 import {log} from '../../utils/debug';
-import {formatters} from '../../utils/formatters';
+import {formatters, capitalize} from '../../utils/formatters';
 import {favoriteService} from '../../services/favorite.service';
 import {Share} from 'react-native';
 import {MAP_CONFIG} from '../../config/mapbox.config';
@@ -499,7 +499,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                 {/* Compact Content Section */}
                 <View style={styles.popupCardContent}>
                   <Text style={styles.popupCardTitle} numberOfLines={1}>
-                    {selectedProperty.title || 'Property'}
+                    {capitalize(selectedProperty.title || 'Property')}
                   </Text>
                   <Text style={styles.popupCardDescription} numberOfLines={1}>
                     {selectedProperty.location || 'Location not specified'}

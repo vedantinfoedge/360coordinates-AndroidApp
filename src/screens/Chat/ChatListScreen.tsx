@@ -25,6 +25,7 @@ import {markChatAsRead} from '../../services/firebase.service';
 import {notificationService} from '../../services/notification.service';
 import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import {capitalize} from '../../utils/formatters';
 import firestore from '@react-native-firebase/firestore';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import {Image} from 'react-native';
@@ -1194,7 +1195,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           {/* Only show property title for buyers, not for sellers/agents */}
           {user?.user_type === 'buyer' && item.propertyTitle && (
             <Text style={styles.propertyTitle} numberOfLines={1}>
-              {item.propertyTitle}
+              {capitalize(item.propertyTitle)}
             </Text>
           )}
           <View style={styles.messageRow}>

@@ -106,7 +106,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const totalSteps = 5;
 
   // Check property limit on screen load (only for new properties)
-  // Sellers/owners can upload only 3 properties
+  // According to backend: Sellers have limits based on subscription (free=3, basic=10, pro=10, premium=10)
+  // Agents have unlimited properties
   useEffect(() => {
     if (isEditMode) {
       // Skip limit check for edit mode
@@ -117,13 +118,34 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     const checkLimit = async () => {
       try {
         setCheckingLimit(true);
+        
+        // Agents have unlimited properties - skip check
+        if (user?.user_type === 'agent') {
+          setCheckingLimit(false);
+          return;
+        }
+
         const statsResponse: any = await sellerService.getDashboardStats();
         if (statsResponse && statsResponse.success && statsResponse.data) {
           const currentCount = statsResponse.data.total_properties || 0;
-          if (currentCount >= 3) {
+          
+          // Get subscription plan type (defaults to 'free' if no subscription)
+          const planType = statsResponse.data.subscription?.plan_type || 'free';
+          
+          // Property limits based on subscription plan
+          const limits: {[key: string]: number} = {
+            'free': 3,
+            'basic': 10,
+            'pro': 10,
+            'premium': 10,
+          };
+          
+          const limit = limits[planType] || limits['free'];
+          
+          if (limit > 0 && currentCount >= limit) {
             CustomAlert.alert(
               'Property Limit Reached',
-              'You have reached the maximum limit of 3 properties. You cannot add more properties.',
+              `Property limit reached. You can list up to ${limit} properties in your current plan.`,
               [
                 {
                   text: 'OK',
@@ -149,7 +171,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     };
 
     checkLimit();
-  }, [navigation, isEditMode]);
+  }, [navigation, isEditMode, user]);
 
   // Load property data when in edit mode
   useEffect(() => {
@@ -586,8 +608,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         CustomAlert.alert('Error', 'Please enter property title');
         return;
       }
-      if (propertyTitle.trim().length > 255) {
-        CustomAlert.alert('Error', 'Title must be less than 255 characters');
+      const titleLength = propertyTitle.trim().length;
+      if (titleLength < 1 || titleLength > 200) {
+        CustomAlert.alert('Error', 'Title must be between 1 and 200 characters');
         return;
       }
       if (!propertyType) {
@@ -600,6 +623,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         CustomAlert.alert('Error', 'Please enter location');
         return;
       }
+      if (location.trim().length < 3) {
+        CustomAlert.alert('Error', 'Location must be at least 3 characters');
+        return;
+      }
+      // State is optional according to backend spec, but we'll keep it required for app UX
+      // Backend allows null state, but app requires it for better data quality
       if (!state.trim()) {
         CustomAlert.alert('Error', 'Please enter state');
         return;
@@ -608,11 +637,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         CustomAlert.alert('Error', 'Please select facing direction');
         return;
       }
-      if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment') {
+      // Handle upcoming projects - bedrooms/bathrooms are optional
+      const isUpcomingProject = propertyType === 'Upcoming Projects';
+      if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment' && !isUpcomingProject) {
         CustomAlert.alert('Error', 'Please select number of bedrooms');
         return;
       }
-      if (fieldVisibility.bathroomsRequired && bathrooms === null) {
+      if (fieldVisibility.bathroomsRequired && bathrooms === null && !isUpcomingProject) {
         CustomAlert.alert('Error', 'Please select number of bathrooms');
         return;
       }
@@ -624,6 +655,27 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       if (isNaN(areaValue) || areaValue <= 0) {
         CustomAlert.alert('Error', `${fieldVisibility.areaLabel} must be a positive number`);
         return;
+      }
+      // Validate carpet area if provided - must be <= built-up area
+      if (carpetArea.trim()) {
+        const carpetValue = parseFloat(carpetArea);
+        if (isNaN(carpetValue) || carpetValue <= 0) {
+          CustomAlert.alert('Error', 'Carpet area must be a positive number');
+          return;
+        }
+        if (carpetValue > areaValue) {
+          CustomAlert.alert('Error', 'Carpet area cannot be greater than built-up area');
+          return;
+        }
+      }
+      // Validate floor if provided and total_floors exists
+      if (floor.trim() && totalFloors.trim()) {
+        const floorNum = parseInt(floor);
+        const totalFloorsNum = parseInt(totalFloors);
+        if (!isNaN(floorNum) && !isNaN(totalFloorsNum) && floorNum > totalFloorsNum) {
+          CustomAlert.alert('Error', 'Floor number cannot be greater than total floors');
+          return;
+        }
       }
       if (fieldVisibility.showFurnishing && !furnishing) {
         CustomAlert.alert('Error', 'Please select furnishing status');
@@ -863,8 +915,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         additional_address: additionalAddress.trim() || null,
         latitude: latitude || null,
         longitude: longitude || null,
-        bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
-        bathrooms: bathrooms?.toString() || null,
+        bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' || propertyType === 'Upcoming Projects' ? '0' : null),
+        bathrooms: bathrooms?.toString() || (propertyType === 'Upcoming Projects' ? '0' : null),
         balconies: balconies?.toString() || null,
         area: parseFloat(builtUpArea) || 0,
         carpet_area: carpetArea ? parseFloat(carpetArea) : null,

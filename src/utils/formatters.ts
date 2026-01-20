@@ -1,3 +1,52 @@
+/**
+ * Capitalize text - converts to uppercase
+ * Used for property titles and amenities
+ */
+export const capitalize = (text: string | null | undefined): string => {
+  if (!text) return '';
+  return String(text).toUpperCase();
+};
+
+/**
+ * Capitalize amenity name - converts amenity ID or name to proper capitalized format
+ * Maps common amenity IDs to their display names
+ */
+export const capitalizeAmenity = (amenity: string | null | undefined): string => {
+  if (!amenity) return '';
+  
+  const amenityStr = String(amenity).trim();
+  
+  // Map of amenity IDs to display names
+  const amenityMap: {[key: string]: string} = {
+    'parking': 'PARKING',
+    'lift': 'LIFT',
+    'security': '24X7 SECURITY',
+    'power_backup': 'POWER BACKUP',
+    'gym': 'GYM',
+    'swimming_pool': 'SWIMMING POOL',
+    'garden': 'GARDEN',
+    'clubhouse': 'CLUB HOUSE',
+    'playground': "CHILDREN'S PLAY AREA",
+    'cctv': 'CCTV',
+    'intercom': 'INTERCOM',
+    'fire_safety': 'FIRE SAFETY',
+    'water_supply': '24X7 WATER',
+    'gas_pipeline': 'GAS PIPELINE',
+    'wifi': 'WIFI',
+    'ac': 'AIR CONDITIONING',
+    'electricity': 'ELECTRICITY',
+  };
+  
+  // Check if it's a known amenity ID
+  const lowerKey = amenityStr.toLowerCase();
+  if (amenityMap[lowerKey]) {
+    return amenityMap[lowerKey];
+  }
+  
+  // If it's already a label, capitalize it
+  return amenityStr.toUpperCase();
+};
+
 export const formatters = {
   currency: (amount: number): string => {
     return `₹${amount.toLocaleString('en-IN')}`;

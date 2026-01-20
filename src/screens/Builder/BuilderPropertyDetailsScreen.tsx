@@ -20,7 +20,7 @@ import {fixImageUrl, isValidImageUrl} from '../../utils/imageHelper';
 import BuilderHeader from '../../components/BuilderHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
-import {formatters} from '../../utils/formatters';
+import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
@@ -393,7 +393,7 @@ const BuilderPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         {/* Title and Price */}
         <View style={styles.headerSection}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>{property.title || property.property_title || 'Project Title'}</Text>
+            <Text style={styles.title}>{capitalize(property.title || property.property_title || 'Project Title')}</Text>
             {isUpcoming && (
               <View style={styles.upcomingBadge}>
                 <Text style={styles.upcomingBadgeText}>Upcoming Project</Text>
@@ -497,7 +497,7 @@ const BuilderPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               {amenities.map((amenity: string, index: number) => (
                 <View key={index} style={styles.amenityItem}>
                   <Text style={styles.amenityIcon}>✓</Text>
-                  <Text style={styles.amenityText}>{amenity}</Text>
+                  <Text style={styles.amenityText}>{capitalizeAmenity(amenity)}</Text>
                 </View>
               ))}
             </View>

@@ -116,7 +116,16 @@ const OTPVerificationScreen: React.FC = () => {
           const phoneNumber = params.phone.startsWith('+') ? params.phone : `+91${params.phone}`;
           // Determine context: 'forgotPassword' or 'register' (default)
           const context = params.type === 'forgotPassword' ? 'forgotPassword' : 'register';
-          const smsVerifyResponse = await otpService.verifySMS(phoneNumber, otp, context);
+          // Use reqId and method from params if available (for widget verification)
+          const reqId = params.reqId;
+          const method = params.method || (reqId ? 'widget' : undefined);
+          console.log('[OTP] Verifying SMS OTP:', {
+            phone: phoneNumber,
+            context,
+            reqId: reqId ? `${reqId.substring(0, 10)}...` : 'not provided',
+            method: method || 'auto-detect',
+          });
+          const smsVerifyResponse = await otpService.verifySMS(phoneNumber, otp, reqId, context, method);
           if (smsVerifyResponse.success) {
             // SMS OTP verified via MSG91, now verify with backend
             await verifyOTP(userId, otp, params.phone);

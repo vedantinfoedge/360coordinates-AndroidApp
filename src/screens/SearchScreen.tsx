@@ -17,6 +17,7 @@ import BuyerHeader from '../components/BuyerHeader';
 import {propertySearchService} from '../services/propertySearch.service';
 import {fixImageUrl} from '../utils/imageHelper';
 import CustomAlert from '../utils/alertHelper';
+import {capitalize} from '../utils/formatters';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -143,7 +144,7 @@ const SearchScreen: React.FC<Props> = ({navigation}) => {
           </View>
         )}
         <View style={styles.propertyInfo}>
-          <Text style={styles.propertyTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.propertyTitle} numberOfLines={2}>{capitalize(item.title)}</Text>
           <Text style={styles.propertyLocation} numberOfLines={1}>{item.location}</Text>
           <Text style={styles.propertyPrice}>{priceText}</Text>
           {(item.bedrooms || item.bathrooms) && (

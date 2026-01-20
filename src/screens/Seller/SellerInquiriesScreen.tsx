@@ -23,7 +23,7 @@ import {sellerService} from '../../services/seller.service';
 import {inquiryService} from '../../services/inquiry.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import CustomAlert from '../../utils/alertHelper';
-import {formatters} from '../../utils/formatters';
+import {formatters, capitalize} from '../../utils/formatters';
 
 type SellerInquiriesScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<SellerTabParamList>,
@@ -215,7 +215,7 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.inquiryHeader}>
         <View style={styles.inquiryInfo}>
           <Text style={styles.buyerName}>{item.buyer_name}</Text>
-          <Text style={styles.propertyTitle}>{item.property_title}</Text>
+          <Text style={styles.propertyTitle}>{capitalize(item.property_title)}</Text>
           <Text style={styles.inquiryDate}>
             {formatters.timeAgo(item.created_at)}
           </Text>
