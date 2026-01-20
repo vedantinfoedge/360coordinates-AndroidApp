@@ -22,6 +22,23 @@ export interface FirebaseUploadResult {
  * @param onProgress - Progress callback (optional) - receives percentage 0-100
  * @returns Firebase download URL and path
  */
+/**
+ * Check if Firebase Storage is available
+ */
+export const isFirebaseStorageAvailable = (): boolean => {
+  try {
+    const storageInstance = storage();
+    return storageInstance !== null;
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
+    if (errorMessage.includes('not installed natively') || 
+        errorMessage.includes('native module')) {
+      console.warn('[FirebaseStorage] Firebase Storage native module not linked. Rebuild required.');
+    }
+    return false;
+  }
+};
+
 export const uploadPropertyImageToFirebase = async (
   imageUri: string,
   userId: number | string,
@@ -29,6 +46,13 @@ export const uploadPropertyImageToFirebase = async (
   onProgress?: (progress: number) => void,
 ): Promise<FirebaseUploadResult> => {
   try {
+    // Check if Firebase Storage is available
+    if (!isFirebaseStorageAvailable()) {
+      throw new Error(
+        'Firebase Storage is not available. Please rebuild the app: cd android && ./gradlew clean && cd .. && npm run android'
+      );
+    }
+
     // Generate unique filename
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 15);
@@ -43,7 +67,14 @@ export const uploadPropertyImageToFirebase = async (
     }
 
     // Create storage reference
-    const storageRef = storage().ref(storagePath);
+    let storageRef;
+    try {
+      const storageInstance = storage();
+      storageRef = storageInstance.ref(storagePath);
+    } catch (storageError: any) {
+      console.error('[FirebaseStorage] Error getting storage reference:', storageError);
+      throw new Error(`Firebase Storage not initialized: ${storageError.message}`);
+    }
 
     // Convert file:// URI to proper format for React Native
     let fileUri = imageUri;
@@ -87,7 +118,34 @@ export const uploadPropertyImageToFirebase = async (
     };
   } catch (error: any) {
     console.error('[FirebaseStorage] Upload error:', error);
-    throw new Error(`Failed to upload image: ${error.message}`);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to upload image';
+    if (error?.code) {
+      switch (error.code) {
+        case 'storage/unauthorized':
+          errorMessage = 'Permission denied. Please check Firebase Storage security rules.';
+          break;
+        case 'storage/canceled':
+          errorMessage = 'Upload was canceled';
+          break;
+        case 'storage/unknown':
+          errorMessage = 'Unknown error occurred. Please check your network connection.';
+          break;
+        case 'storage/invalid-argument':
+          errorMessage = 'Invalid file. Please try selecting a different image.';
+          break;
+        case 'storage/not-found':
+          errorMessage = 'Storage path not found';
+          break;
+        default:
+          errorMessage = error.message || `Upload failed: ${error.code}`;
+      }
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+    
+    throw new Error(errorMessage);
   }
 };
 

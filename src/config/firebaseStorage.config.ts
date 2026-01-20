@@ -5,7 +5,7 @@
 
 // Set to true to use Firebase Storage (upload to Firebase → backend moderation)
 // Set to false to use existing backend storage flow
-export const USE_FIREBASE_STORAGE = false; // Change to true to enable
+export const USE_FIREBASE_STORAGE = true; // Enabled - uploads to Firebase Storage
 
 // Firebase Storage settings
 export const FIREBASE_STORAGE_CONFIG = {

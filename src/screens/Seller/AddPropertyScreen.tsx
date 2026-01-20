@@ -25,6 +25,10 @@ import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {moderationService} from '../../services/moderation.service';
 import {sellerService} from '../../services/seller.service';
+import {uploadPropertyImageWithModeration} from '../../services/imageUpload.service';
+import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
+import {useAuth} from '../../context/AuthContext';
+import {isFirebaseStorageAvailable} from '../../services/firebaseStorageProperty.service';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
 import LocationPicker from '../../components/map/LocationPicker';
@@ -53,10 +57,12 @@ type Props = {
 type PropertyStatus = 'sale' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
+  const {user} = useAuth(); // Get user for userId
   const route = useRoute<RouteProp<RootStackParamList, 'AddProperty'>>();
   const routeParams = (route.params as any) || {};
   const isEditMode = !!routeParams.propertyId;
   const isLimitedEdit = !!routeParams.isLimitedEdit;
+  const propertyId = routeParams.propertyId;
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sale');
@@ -277,80 +283,187 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         setPhotos(updatedPhotos);
         
         // Process moderation for each image
-        // Option 2: Use validation-only mode (we're sending base64, not URLs)
-        // This validates images and shows status badges, but doesn't require property_id
+        // Upload images - use Firebase Storage if enabled, otherwise use backend storage
         newPhotos.forEach((img, index) => {
           if (img.uri) {
-            moderationService.uploadWithModeration(img.uri, 0, true) // true = validation-only (no property_id needed)
-              .then(result => {
-                setPhotos(prev => {
-                  const updated = [...prev];
-                  const imgIndex = prev.length - newPhotos.length + index;
-                  if (updated[imgIndex]) {
-                    let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
-                    
-                    if (result.status === 'approved' || result.moderation_status === 'SAFE') {
-                      moderationStatus = 'APPROVED';
-                    } else if (result.status === 'rejected' || result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE') {
-                      moderationStatus = 'REJECTED';
-                    } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || result.moderation_status === 'NEEDS_REVIEW') {
-                      moderationStatus = 'PENDING';
-                    }
-                    
-                    updated[imgIndex] = {
-                      ...updated[imgIndex],
-                      moderationStatus,
-                      moderationReason: result.moderation_reason,
-                      imageUrl: result.image_url || undefined, // May be undefined in validation-only mode
-                    };
-                    
-                    // Log moderation result for debugging
-                    console.log('[AddProperty] Image moderation result:', {
-                      index: imgIndex,
-                      status: moderationStatus,
-                      hasImageUrl: !!result.image_url,
-                      imageUrl: result.image_url?.substring(0, 50) + '...',
-                      hasBase64: !!updated[imgIndex].base64,
-                    });
-                    
-                    // Show alert for rejected images
-                    if (moderationStatus === 'REJECTED') {
-                      Alert.alert(
-                        'Image Rejected',
-                        result.moderation_reason || 'Image does not meet our guidelines. Please upload property images only.',
-                        [{text: 'OK'}]
-                      );
-                    } else if (moderationStatus === 'PENDING') {
-                      Alert.alert(
-                        'Image Under Review',
-                        'Your image is being reviewed and will be visible after approval.',
-                        [{text: 'OK'}]
-                      );
-                    }
-                  }
-                  return updated;
-                });
-              })
-              .catch(error => {
-                console.error('[AddProperty] Moderation error:', error);
-                setPhotos(prev => {
-                  const updated = [...prev];
-                  const imgIndex = prev.length - newPhotos.length + index;
-                  if (updated[imgIndex]) {
-                    updated[imgIndex] = {
-                      ...updated[imgIndex],
-                      moderationStatus: 'REJECTED' as const,
-                      moderationReason: error.message || 'Failed to verify image',
-                    };
-                  }
-                  return updated;
-                });
-                Alert.alert(
-                  'Upload Failed',
-                  error.message || 'Failed to upload image. Please try again.',
-                  [{text: 'OK'}]
-                );
+            // Check if Firebase Storage is enabled and available
+            const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
+            const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
+            
+            if (firebaseEnabled && firebaseAvailable) {
+              // Firebase Storage flow: Upload to Firebase → Backend moderation
+              console.log('[AddProperty] Using Firebase Storage for upload', {
+                imageIndex: index,
+                imageUri: img.uri.substring(0, 50),
+                userId: user.id,
+                propertyId: isEditMode ? propertyId : null,
               });
+              uploadPropertyImageWithModeration(
+                img.uri,
+                isEditMode ? propertyId : null, // propertyId or null for new properties
+                user.id,
+                (progress) => {
+                  console.log(`[AddProperty] Upload progress ${index + 1}: ${Math.round(progress)}%`);
+                }
+              )
+                .then(result => {
+                  setPhotos(prev => {
+                    const updated = [...prev];
+                    const imgIndex = prev.length - newPhotos.length + index;
+                    if (updated[imgIndex]) {
+                      let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
+                      
+                      if (result.moderationStatus === 'SAFE') {
+                        moderationStatus = 'APPROVED';
+                      } else if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
+                        moderationStatus = 'REJECTED';
+                      } else if (result.moderationStatus === 'PENDING' || (result.moderationStatus as string) === 'NEEDS_REVIEW') {
+                        moderationStatus = 'PENDING';
+                      }
+                      
+                      updated[imgIndex] = {
+                        ...updated[imgIndex],
+                        moderationStatus,
+                        moderationReason: result.moderationReason || undefined,
+                        imageUrl: result.firebaseUrl, // Firebase URL
+                      };
+                      
+                      console.log('[AddProperty] Firebase upload result:', {
+                        index: imgIndex,
+                        status: moderationStatus,
+                        firebaseUrl: result.firebaseUrl.substring(0, 50) + '...',
+                      });
+                    }
+                    return updated;
+                  });
+                  
+                  // Show alerts based on moderation status
+                  if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
+                    Alert.alert(
+                      'Image Rejected',
+                      result.moderationReason || 'Image does not meet our guidelines. Please upload property images only.',
+                      [{text: 'OK'}]
+                    );
+                  } else if (result.moderationStatus === 'PENDING' || result.moderationStatus === 'NEEDS_REVIEW') {
+                    Alert.alert(
+                      'Image Under Review',
+                      'Your image is being reviewed and will be visible after approval.',
+                      [{text: 'OK'}]
+                    );
+                  }
+                })
+                .catch(error => {
+                  console.error('[AddProperty] Firebase upload error:', error);
+                  setPhotos(prev => {
+                    const updated = [...prev];
+                    const imgIndex = prev.length - newPhotos.length + index;
+                    if (updated[imgIndex]) {
+                      updated[imgIndex] = {
+                        ...updated[imgIndex],
+                        moderationStatus: 'REJECTED' as const,
+                        moderationReason: error.message || 'Failed to upload image',
+                      };
+                    }
+                    return updated;
+                  });
+                  
+                  // Provide helpful error message
+                  let errorMessage = error.message || 'Failed to upload image to Firebase.';
+                  if (errorMessage.includes('not available') || errorMessage.includes('not installed')) {
+                    errorMessage = 'Firebase Storage is not available. Please rebuild the app.';
+                  }
+                  
+                  Alert.alert(
+                    'Upload Failed',
+                    errorMessage,
+                    [{text: 'OK'}]
+                  );
+                });
+            } else if (firebaseEnabled && !firebaseAvailable) {
+              // Firebase enabled but not available - fallback with warning
+              console.warn('[AddProperty] Firebase Storage enabled but not available, falling back to backend storage');
+              Alert.alert(
+                'Firebase Storage Unavailable',
+                'Firebase Storage is not available. Using backend storage instead. Please rebuild the app to enable Firebase Storage.',
+                [{text: 'OK'}]
+              );
+              // Fall through to backend storage
+            }
+            
+            if (!firebaseEnabled || !firebaseAvailable) {
+              // Fallback to backend storage flow
+              console.log('[AddProperty] Using backend storage (Firebase disabled or not available)');
+              moderationService.uploadWithModeration(img.uri, 0, true) // true = validation-only (no property_id needed)
+                .then(result => {
+                  setPhotos(prev => {
+                    const updated = [...prev];
+                    const imgIndex = prev.length - newPhotos.length + index;
+                    if (updated[imgIndex]) {
+                      let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
+                      
+                      if (result.status === 'approved' || result.moderation_status === 'SAFE') {
+                        moderationStatus = 'APPROVED';
+                      } else if (result.status === 'rejected' || result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE') {
+                        moderationStatus = 'REJECTED';
+                      } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || result.moderation_status === 'NEEDS_REVIEW') {
+                        moderationStatus = 'PENDING';
+                      }
+                      
+                      updated[imgIndex] = {
+                        ...updated[imgIndex],
+                        moderationStatus,
+                        moderationReason: result.moderation_reason,
+                        imageUrl: result.image_url || undefined, // May be undefined in validation-only mode
+                      };
+                      
+                      // Log moderation result for debugging
+                      console.log('[AddProperty] Image moderation result:', {
+                        index: imgIndex,
+                        status: moderationStatus,
+                        hasImageUrl: !!result.image_url,
+                        imageUrl: result.image_url?.substring(0, 50) + '...',
+                        hasBase64: !!updated[imgIndex].base64,
+                      });
+                      
+                      // Show alert for rejected images
+                      if (moderationStatus === 'REJECTED') {
+                        Alert.alert(
+                          'Image Rejected',
+                          result.moderation_reason || 'Image does not meet our guidelines. Please upload property images only.',
+                          [{text: 'OK'}]
+                        );
+                      } else if (moderationStatus === 'PENDING') {
+                        Alert.alert(
+                          'Image Under Review',
+                          'Your image is being reviewed and will be visible after approval.',
+                          [{text: 'OK'}]
+                        );
+                      }
+                    }
+                    return updated;
+                  });
+                })
+                .catch(error => {
+                  console.error('[AddProperty] Moderation error:', error);
+                  setPhotos(prev => {
+                    const updated = [...prev];
+                    const imgIndex = prev.length - newPhotos.length + index;
+                    if (updated[imgIndex]) {
+                      updated[imgIndex] = {
+                        ...updated[imgIndex],
+                        moderationStatus: 'REJECTED' as const,
+                        moderationReason: error.message || 'Failed to verify image',
+                      };
+                    }
+                    return updated;
+                  });
+                  Alert.alert(
+                    'Upload Failed',
+                    error.message || 'Failed to upload image. Please try again.',
+                    [{text: 'OK'}]
+                  );
+                });
+            }
           }
         });
         

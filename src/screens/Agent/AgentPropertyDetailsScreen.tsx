@@ -52,6 +52,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const imageScrollViewRef = useRef<ScrollView>(null);
+  const [failedImages, setFailedImages] = useState<Set<number>>(new Set()); // Track failed image IDs
 
   useEffect(() => {
     loadPropertyDetails();
@@ -61,6 +62,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   useEffect(() => {
     if (property && property.images && property.images.length > 0) {
       setCurrentImageIndex(0);
+      setFailedImages(new Set()); // Reset failed images when property changes
       setTimeout(() => {
         imageScrollViewRef.current?.scrollTo({
           x: 0,
@@ -294,15 +296,31 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       setShowImageGallery(true);
                     }}
                     activeOpacity={0.9}>
-                    <Image
-                      source={{uri: image.url}}
-                      style={styles.image}
-                      resizeMode="cover"
-                      defaultSource={require('../../assets/logo.jpeg')}
-                      onError={(error) => {
-                        console.error(`[AgentPropertyDetails] Image ${index} failed to load:`, image.url);
-                      }}
-                    />
+                    {failedImages.has(image.id) ? (
+                      <View style={[styles.image, styles.imagePlaceholder]}>
+                        <Text style={styles.imagePlaceholderText}>🏠</Text>
+                        <Text style={styles.imagePlaceholderSubtext}>Image unavailable</Text>
+                      </View>
+                    ) : (
+                      <Image
+                        source={{uri: image.url}}
+                        style={styles.image}
+                        resizeMode="cover"
+                        onError={(error) => {
+                          console.error(`[AgentPropertyDetails] Image ${index} failed to load:`, image.url, error);
+                          // Mark this image as failed
+                          setFailedImages(prev => new Set(prev).add(image.id));
+                        }}
+                        onLoadStart={() => {
+                          // Remove from failed set if it starts loading successfully
+                          setFailedImages(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(image.id);
+                            return newSet;
+                          });
+                        }}
+                      />
+                    )}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -587,6 +605,22 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    fontSize: 48,
+    marginBottom: spacing.xs,
+  },
+  imagePlaceholderSubtext: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   imageIndicators: {
     position: 'absolute',

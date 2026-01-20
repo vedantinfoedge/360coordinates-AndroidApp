@@ -324,8 +324,13 @@ export const moderationService = {
         fullError: (() => {
           try {
             return JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
-          } catch {
-            return String(error);
+          } catch (stringifyError) {
+            // If JSON.stringify fails, try to get error message safely
+            try {
+              return String(error?.message || error || stringifyError);
+            } catch {
+              return 'Error serialization failed';
+            }
           }
         })(),
       };
