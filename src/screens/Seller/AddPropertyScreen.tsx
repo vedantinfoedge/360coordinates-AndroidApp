@@ -20,7 +20,6 @@ import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-i
 import LinearGradient from 'react-native-linear-gradient';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
@@ -43,7 +42,7 @@ import {formatters} from '../../utils/formatters';
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
-  SellerTabParamList,
+  RootStackParamList,
   'AddProperty'
 >;
 
@@ -54,7 +53,7 @@ type Props = {
 type PropertyStatus = 'sale' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
-  const route = useRoute<RouteProp<SellerTabParamList, 'AddProperty'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'AddProperty'>>();
   const routeParams = (route.params as any) || {};
   const isEditMode = !!routeParams.propertyId;
   const isLimitedEdit = !!routeParams.isLimitedEdit;
@@ -290,11 +289,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   if (updated[imgIndex]) {
                     let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
                     
-                    if (result.status === 'approved' || result.moderation_status === 'SAFE' || result.moderation_status === 'APPROVED') {
+                    if (result.status === 'approved' || result.moderation_status === 'SAFE') {
                       moderationStatus = 'APPROVED';
                     } else if (result.status === 'rejected' || result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE') {
                       moderationStatus = 'REJECTED';
-                    } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || (result.moderation_status && result.moderation_status === 'NEEDS_REVIEW')) {
+                    } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || result.moderation_status === 'NEEDS_REVIEW') {
                       moderationStatus = 'PENDING';
                     }
                     
@@ -722,16 +721,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.typeButton}
                   onPress={() => setPropertyStatus('sale')}>
                   {propertyStatus === 'sale' ? (
-                    // @ts-expect-error - LinearGradient children type definition issue
                     <LinearGradient
                       colors={['#8B5CF6', '#6D28D9']}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 0}}
                       style={styles.typeButtonGradient}>
-                      <View>
-                        <Text style={styles.typeButtonIcon}>🏷️</Text>
-                        <Text style={styles.typeButtonTextSelected}>Sell</Text>
-                      </View>
+                      <Text style={styles.typeButtonIcon}>🏷️</Text>
+                      <Text style={styles.typeButtonTextSelected}>Sell</Text>
                     </LinearGradient>
                   ) : (
                     <View style={styles.typeButtonUnselected}>
@@ -745,16 +741,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.typeButton}
                   onPress={() => setPropertyStatus('rent')}>
                   {propertyStatus === 'rent' ? (
-                    // @ts-expect-error - LinearGradient children type definition issue
                     <LinearGradient
                       colors={['#8B5CF6', '#6D28D9']}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 0}}
                       style={styles.typeButtonGradient}>
-                      <View>
-                        <Text style={styles.typeButtonIcon}>🔑</Text>
-                        <Text style={styles.typeButtonTextSelected}>Rent</Text>
-                      </View>
+                      <Text style={styles.typeButtonIcon}>🔑</Text>
+                      <Text style={styles.typeButtonTextSelected}>Rent</Text>
                     </LinearGradient>
                   ) : (
                     <View style={styles.typeButtonUnselected}>
@@ -826,7 +819,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter locality, area or landmark"
                   placeholderTextColor={colors.textSecondary}
                   value={location}
-                  onChangeText={(text: string) => {
+                  onChangeText={(text) => {
                     setLocation(text);
                     // Reset locationSelected when user starts typing/editing
                     if (locationSelected) {
@@ -866,16 +859,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <TouchableOpacity 
                   style={styles.mapButton}
                   onPress={() => setLocationPickerVisible(true)}>
-                  {/* @ts-expect-error - LinearGradient children type definition issue */}
                   <LinearGradient
                     colors={['#8B5CF6', '#6D28D9']}
                     start={{x: 0, y: 0}}
                     end={{x: 1, y: 0}}
                     style={styles.mapButtonGradient}>
-                    <View>
-                      <Text style={styles.mapButtonIcon}>📍</Text>
-                      <Text style={styles.mapButtonText}>Add Location on Map</Text>
-                    </View>
+                    <Text style={styles.mapButtonIcon}>📍</Text>
+                    <Text style={styles.mapButtonText}>Add Location on Map</Text>
                   </LinearGradient>
                 </TouchableOpacity>
                 <Text style={styles.mapButtonSubtext}>
@@ -1172,7 +1162,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Dropdown
                 label="Furnishing"
                 placeholder="Select furnishing status"
-                required={fieldVisibility.showFurnishing}
+                required={fieldVisibility.furnishingRequired}
                 options={[
                   {label: 'Unfurnished', value: 'Unfurnished'},
                   {label: 'Semi-Furnished', value: 'Semi-Furnished'},
@@ -1464,7 +1454,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         onRequestClose={handleClose}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <SafeAreaView>
+            <SafeAreaView style={styles.safeArea}>
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Checking property limit...</Text>
@@ -1484,7 +1474,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <SafeAreaView>
+          <SafeAreaView style={styles.safeArea}>
             {/* Restricted edit banner for older listings */}
             {isEditMode && isLimitedEdit && (
               <View style={styles.limitedBanner}>
@@ -1567,30 +1557,24 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 onPress={handleNext}
                 disabled={isSubmitting}>
                 {currentStep === totalSteps ? (
-                  // @ts-expect-error - LinearGradient children type definition issue
                   <LinearGradient
                     colors={isSubmitting ? ['#CCCCCC', '#999999'] : ['#43A047', '#2E7D32']}
                     start={{x: 0, y: 0}}
                     end={{x: 1, y: 0}}
                     style={styles.publishButtonGradient}>
-                    <View>
-                      <Text style={styles.publishButtonIcon}>{isSubmitting ? '⏳' : '✓'}</Text>
-                      <Text style={styles.publishButtonText}>
-                        {isSubmitting ? 'Submitting...' : 'Publish Listing'}
-                      </Text>
-                    </View>
+                    <Text style={styles.publishButtonIcon}>{isSubmitting ? '⏳' : '✓'}</Text>
+                    <Text style={styles.publishButtonText}>
+                      {isSubmitting ? 'Submitting...' : 'Publish Listing'}
+                    </Text>
                   </LinearGradient>
                 ) : (
-                  // @ts-expect-error - LinearGradient children type definition issue
                   <LinearGradient
                     colors={['#8B5CF6', '#6D28D9']}
                     start={{x: 0, y: 0}}
                     end={{x: 1, y: 0}}
                     style={styles.nextButtonGradient}>
-                    <View>
-                      <Text style={styles.nextButtonText}>Next</Text>
-                      <Text style={styles.nextButtonArrow}>→</Text>
-                    </View>
+                    <Text style={styles.nextButtonText}>Next</Text>
+                    <Text style={styles.nextButtonArrow}>→</Text>
                   </LinearGradient>
                 )}
               </TouchableOpacity>
