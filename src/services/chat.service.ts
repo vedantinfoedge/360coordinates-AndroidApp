@@ -134,6 +134,8 @@ export const chatService = {
     receiverRole: 'agent' | 'seller',
     propertyId: number,
     backendChatRoomId?: string, // Optional: use backend's chatRoomId if provided
+    buyerName?: string, // Optional: buyer name to store in Firebase
+    buyerProfileImage?: string, // Optional: buyer profile image to store in Firebase
   ): Promise<string | null> => {
     try {
       // Try to ensure Firebase Auth is signed in (optional - Firestore might work without it)
@@ -227,7 +229,8 @@ export const chatService = {
           : [receiverIdStr, buyerIdStr];
         const participants = [minId, maxId];
         
-        await chatRef.set({
+        // Store buyer name and profile image if provided (from backend API response)
+        const chatRoomData: any = {
           chatRoomId: chatRoomId,
           buyerId: buyerId.toString(),
           receiverId: receiverId.toString(),
@@ -241,7 +244,19 @@ export const chatService = {
           },
           createdAt: firestore.FieldValue.serverTimestamp(),
           updatedAt: firestore.FieldValue.serverTimestamp(),
-        });
+        };
+        
+        // Store buyer name and profile image if provided (from backend API response)
+        if (buyerName && buyerName.trim() && buyerName !== 'Buyer' && !buyerName.startsWith('Buyer ')) {
+          chatRoomData.buyerName = buyerName.trim();
+          console.log('[Firebase Chat] Storing buyer name in chat room:', buyerName);
+        }
+        if (buyerProfileImage && buyerProfileImage.trim()) {
+          chatRoomData.buyerProfileImage = buyerProfileImage.trim();
+          console.log('[Firebase Chat] Storing buyer profile image in chat room');
+        }
+        
+        await chatRef.set(chatRoomData);
         
         // Verify document was created before returning
         const verifySnapshot = await chatRef.get();

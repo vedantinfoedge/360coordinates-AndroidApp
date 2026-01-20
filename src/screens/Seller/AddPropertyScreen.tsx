@@ -101,12 +101,19 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [depositAmount, setDepositAmount] = useState('');
   const [maintenance, setMaintenance] = useState('');
   const [checkingLimit, setCheckingLimit] = useState(true);
+  const [loadingProperty, setLoadingProperty] = useState(isEditMode);
 
   const totalSteps = 5;
 
-  // Check property limit on screen load
+  // Check property limit on screen load (only for new properties)
   // Sellers/owners can upload only 3 properties
   useEffect(() => {
+    if (isEditMode) {
+      // Skip limit check for edit mode
+      setCheckingLimit(false);
+      return;
+    }
+
     const checkLimit = async () => {
       try {
         setCheckingLimit(true);
@@ -129,16 +136,94 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             );
           }
         }
-      } catch (error) {
-        console.error('[AddProperty] Error checking property limit:', error);
-        // Allow to continue if check fails
+      } catch (error: any) {
+        // If dashboard stats endpoint doesn't exist (404), allow to continue
+        // The backend will enforce the limit when creating the property
+        if (error?.status !== 404 && error?.response?.status !== 404) {
+          console.warn('[AddProperty] Error checking property limit:', error);
+        }
+        // Allow to continue if check fails (including 404)
       } finally {
         setCheckingLimit(false);
       }
     };
 
     checkLimit();
-  }, [navigation]);
+  }, [navigation, isEditMode]);
+
+  // Load property data when in edit mode
+  useEffect(() => {
+    const loadPropertyData = async () => {
+      if (!isEditMode || !propertyId) {
+        setLoadingProperty(false);
+        return;
+      }
+
+      try {
+        setLoadingProperty(true);
+        const response: any = await propertyService.getPropertyDetails(propertyId);
+        
+        if (response && response.success && response.data) {
+          const propData = response.data.property || response.data;
+          
+          // Populate form fields
+          setPropertyTitle(propData.title || propData.property_title || '');
+          setPropertyStatus(propData.status === 'rent' ? 'rent' : 'sale');
+          setPropertyType(propData.property_type || '');
+          setLocation(propData.location || '');
+          setState(propData.state || '');
+          setAdditionalAddress(propData.additional_address || '');
+          setLatitude(propData.latitude || null);
+          setLongitude(propData.longitude || null);
+          setBedrooms(propData.bedrooms ? parseInt(String(propData.bedrooms)) : null);
+          setBathrooms(propData.bathrooms ? parseInt(String(propData.bathrooms)) : null);
+          setBalconies(propData.balconies ? parseInt(String(propData.balconies)) : null);
+          setBuiltUpArea(propData.area ? String(propData.area) : '');
+          setCarpetArea(propData.carpet_area ? String(propData.carpet_area) : '');
+          setFloor(propData.floor || '');
+          setTotalFloors(propData.total_floors ? String(propData.total_floors) : '');
+          setFacing(propData.facing || '');
+          setPropertyAge(propData.age || '');
+          setFurnishing(propData.furnishing || '');
+          setDescription(propData.description || '');
+          setExpectedPrice(propData.price ? String(propData.price) : '');
+          setPriceNegotiable(propData.price_negotiable || false);
+          setDepositAmount(propData.deposit_amount ? String(propData.deposit_amount) : '');
+          setMaintenance(propData.maintenance_charges ? String(propData.maintenance_charges) : '');
+          setSelectedAmenities(propData.amenities ? (Array.isArray(propData.amenities) ? propData.amenities : []) : []);
+          
+          // Load existing images
+          if (propData.images && Array.isArray(propData.images) && propData.images.length > 0) {
+            const existingImages = propData.images.map((imgUrl: string) => ({
+              uri: imgUrl,
+              imageUrl: imgUrl,
+              moderationStatus: 'APPROVED' as const,
+            }));
+            setPhotos(existingImages);
+          } else if (propData.cover_image) {
+            // Fallback to cover_image if images array is not available
+            const existingImages = [{
+              uri: propData.cover_image,
+              imageUrl: propData.cover_image,
+              moderationStatus: 'APPROVED' as const,
+            }];
+            setPhotos(existingImages);
+          }
+        } else {
+          Alert.alert('Error', 'Failed to load property details');
+          navigation.goBack();
+        }
+      } catch (error: any) {
+        console.error('Error loading property:', error);
+        Alert.alert('Error', error.message || 'Failed to load property details');
+        navigation.goBack();
+      } finally {
+        setLoadingProperty(false);
+      }
+    };
+
+    loadPropertyData();
+  }, [isEditMode, propertyId, navigation]);
   const steps = [
     {id: 1, name: 'Basic Info', icon: '📝'},
     {id: 2, name: 'Property Details', icon: '🏠'},
@@ -1650,8 +1735,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     return 'pending';
   };
 
-  // Show loading while checking property limit
-  if (checkingLimit) {
+  // Show loading while checking property limit or loading property data
+  if (checkingLimit || loadingProperty) {
     return (
       <Modal
         visible={true}
@@ -1663,7 +1748,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             <SafeAreaView style={styles.safeArea}>
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>Checking property limit...</Text>
+                <Text style={styles.loadingText}>
+                  {loadingProperty ? 'Loading property details...' : 'Checking property limit...'}
+                </Text>
               </View>
             </SafeAreaView>
           </View>

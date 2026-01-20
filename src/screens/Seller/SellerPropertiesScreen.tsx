@@ -20,6 +20,7 @@ import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import {formatters} from '../../utils/formatters';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -83,9 +84,22 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         }
       }
       return true;
-    } catch (error) {
+    } catch (error: any) {
+      // If dashboard stats endpoint doesn't exist (404), use local count as fallback
+      if (error?.status === 404 || error?.response?.status === 404) {
+        // Endpoint doesn't exist, use local properties count
+        if (allProperties.length >= 3) {
+          Alert.alert(
+            'Property Limit Reached',
+            `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
+            [{text: 'OK'}]
+          );
+          return false;
+        }
+        return true; // Allow if count is below limit
+      }
       console.error('Error checking property limit:', error);
-      // If check fails, use local count as fallback
+      // If check fails for other reasons, use local count as fallback
       if (allProperties.length >= 3) {
         CustomAlert.alert(
           'Property Limit Reached',
@@ -123,8 +137,12 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         if (statsResponse && statsResponse.success && statsResponse.data) {
           setDashboardStats(statsResponse.data);
         }
-      } catch (error) {
-        console.warn('Error loading dashboard stats:', error);
+      } catch (error: any) {
+        // If dashboard stats endpoint doesn't exist (404), silently continue
+        // We'll use local properties count as fallback
+        if (error?.status !== 404 && error?.response?.status !== 404) {
+          console.warn('Error loading dashboard stats:', error);
+        }
       }
       
       // Use seller service endpoint (correct endpoint for sellers)
@@ -399,11 +417,11 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       );
     }
     
-    // Navigate to edit property screen with limitedEdit flag
+    // Navigate to AddProperty screen with edit params
     (navigation as any).navigate('AddProperty', {
       propertyId: String(propertyId),
       isLimitedEdit: limitedEdit,
-      createdAt: property.created_at,
+      createdAt: property.created_at || property.created_date || property.date_created,
     });
   };
 
@@ -414,8 +432,13 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
+<<<<<<< Updated upstream
   const handleDelete = async (propertyId: string | number) => {
     CustomAlert.alert(
+=======
+  const handleDelete = (propertyId: string | number) => {
+    Alert.alert(
+>>>>>>> Stashed changes
       'Delete Property',
       'Are you sure you want to delete this property? This action cannot be undone and the property will be removed from the database and website.',
       [
@@ -425,45 +448,36 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('[SellerProperties] Attempting to delete property:', propertyId);
-              
-              // Optimistically remove from UI immediately for better UX
               const propertyIdStr = String(propertyId);
               setProperties(prev => prev.filter(p => String(p.id) !== propertyIdStr));
-              
-              // Call API to delete from database
+
               const response: any = await sellerService.deleteProperty(propertyIdStr);
-              
-              console.log('[SellerProperties] Delete API response:', response);
-              
-              // Check response format - backend might return success in different formats
-              const isSuccess = response?.success === true || 
-                               response?.status === 'success' ||
-                               (response?.message && typeof response.message === 'string' && 
-                                (response.message.toLowerCase().includes('success') ||
-                                 response.message.toLowerCase().includes('deleted')));
-              
+
+              const isSuccess =
+                response?.success === true ||
+                response?.status === 'success' ||
+                (response?.message &&
+                  typeof response.message === 'string' &&
+                  (response.message.toLowerCase().includes('success') ||
+                    response.message.toLowerCase().includes('deleted')));
+
               if (isSuccess || response?.data?.success) {
-                console.log('[SellerProperties] Property deleted successfully from database');
-                // Reload list to ensure sync with backend and refresh dashboard stats
-                loadMyProperties(true);
-                
-                // Show success message (but don't double-alert if already shown)
+                loadMyProperties(false);
                 setTimeout(() => {
+<<<<<<< Updated upstream
                   CustomAlert.alert('Success', 'Property has been deleted from the database and will no longer appear on the app or website.');
+=======
+                  Alert.alert('Success', 'Property has been deleted and will no longer appear on the app or website.');
+>>>>>>> Stashed changes
                 }, 100);
               } else {
-                // If API failed, reload to restore the property
-                console.warn('[SellerProperties] Delete may have failed, reloading properties');
                 loadMyProperties(true);
                 const errorMsg = response?.message || response?.error?.message || 'Failed to delete property. Please try again.';
                 CustomAlert.alert('Error', errorMsg);
               }
             } catch (error: any) {
-              console.error('[SellerProperties] Delete error:', error);
-              
-              // Reload list to restore the property if delete failed
               loadMyProperties(true);
+<<<<<<< Updated upstream
               
               // Show error message
               const errorMessage = error?.message || 
@@ -471,6 +485,14 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                                   error?.response?.message ||
                                   'Failed to delete property. Please check your connection and try again.';
               CustomAlert.alert('Delete Failed', errorMessage);
+=======
+              const errorMessage =
+                error?.message ||
+                error?.response?.data?.message ||
+                error?.response?.message ||
+                'Failed to delete property. Please check your connection and try again.';
+              Alert.alert('Delete Failed', errorMessage);
+>>>>>>> Stashed changes
             }
           },
         },
@@ -498,75 +520,93 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
     const statusColor = isActive ? getStatusColor('active') : getStatusColor('sold');
     
     return (
-      <View style={styles.propertyCard}>
-        <TouchableOpacity
-          style={styles.propertyContent}
-          onPress={() => handleViewDetails(item.id)}>
-          {imageUrl ? (
-            <Image 
-              source={{uri: imageUrl}} 
-              style={styles.propertyImage}
-              resizeMode="cover"
-              onError={(error) => {
-                console.warn('[SellerProperties] Failed to load image:', imageUrl, error.nativeEvent.error);
-              }}
-            />
-          ) : (
-            <View style={styles.propertyImagePlaceholder}>
-              <Text style={styles.placeholderText}>🏠</Text>
-              <Text style={styles.placeholderSubtext}>No Image</Text>
-            </View>
-          )}
-        <View style={styles.propertyInfo}>
-          <View style={styles.propertyHeader}>
-            <Text style={styles.propertyTitle} numberOfLines={2}>
-              {item.title || 'Untitled Property'}
-            </Text>
-            <View style={[styles.statusBadge, {backgroundColor: statusColor}]}>
-              <Text style={styles.statusText}>
-                {isActive ? 'ACTIVE' : 'INACTIVE'}
-              </Text>
-            </View>
+      <TouchableOpacity
+        style={styles.propertyCard}
+        onPress={() => navigation.navigate('PropertyDetails', {propertyId: item.id})}>
+        {imageUrl ? (
+          <Image
+            source={{uri: imageUrl}}
+            style={styles.propertyImage}
+            resizeMode="cover"
+            onError={(error) => {
+              console.error(`[SellerProperties] Image load error for property ${item.id}:`, {
+                uri: imageUrl,
+                error: error.nativeEvent?.error || 'Unknown error',
+              });
+            }}
+            onLoadStart={() => {
+              console.log(`[SellerProperties] Loading image for property ${item.id}:`, imageUrl);
+            }}
+            onLoadEnd={() => {
+              console.log(`[SellerProperties] Image loaded successfully for property ${item.id}`);
+            }}
+          />
+        ) : (
+          <View style={styles.propertyImagePlaceholder}>
+            <Text style={styles.placeholderText}>🏠</Text>
           </View>
+        )}
+      <View style={styles.propertyInfo}>
+        <View style={styles.propertyHeader}>
+          <Text style={styles.propertyTitle} numberOfLines={2}>
+            {item.title || 'Untitled Property'}
+          </Text>
+          <View
+            style={[
+              styles.statusBadge,
+              {backgroundColor: statusColor},
+            ]}>
+            <Text style={styles.statusText}>
+              {isActive ? 'ACTIVE' : 'INACTIVE'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.propertyLocationRow}>
+          <Text style={styles.locationIcon}>📍</Text>
           <Text style={styles.propertyLocation} numberOfLines={1}>
             {item.location || 'Location not specified'}
           </Text>
-          <Text style={styles.propertyPrice}>
-            {(item.status === 'rent' || item.status === 'Rent')
-              ? `₹${parseFloat(item.price || '0').toLocaleString('en-IN')}/month`
-              : `₹${parseFloat(item.price || '0').toLocaleString('en-IN')}`}
-          </Text>
-          <View style={styles.propertyStats}>
-            <Text style={styles.statText}>👁️ {item.views_count || item.views || 0}</Text>
-            <Text style={styles.statText}>💬 {item.inquiry_count || item.inquiries || 0}</Text>
-            <Text style={styles.statText}>❤️ {item.favorite_count || item.favorites || 0}</Text>
+        </View>
+        <View style={styles.propertyStatsRow}>
+          <View style={styles.propertyStatItem}>
+            <Text style={styles.propertyStatIcon}>👁️</Text>
+            <Text style={styles.propertyStatText}>{item.views_count || item.views || 0}</Text>
+          </View>
+          <View style={styles.propertyStatItem}>
+            <Text style={styles.propertyStatIcon}>💬</Text>
+            <Text style={styles.propertyStatText}>{item.inquiry_count || item.inquiries || 0}</Text>
           </View>
         </View>
-      </TouchableOpacity>
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            styles.editButton,
-          ]}
-          onPress={() => handleEdit(item.id)}
-          disabled={false}>
-          <Text style={styles.actionButtonText}>
-            {canEditProperty(item) ? 'Edit' : 'Limited'}
+        <View style={styles.propertyFooter}>
+          <Text style={styles.propertyPrice}>
+            {formatters.price(
+              typeof item.price === 'string' 
+                ? (parseFloat(item.price) || 0) 
+                : (typeof item.price === 'number' ? item.price : 0),
+              item.status === 'rent'
+            )}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.viewButton]}
-          onPress={() => handleViewDetails(item.id)}>
-          <Text style={styles.actionButtonText}>View</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDelete(item.id)}>
-          <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
-        </TouchableOpacity>
+          <View style={styles.propertyActions}>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={(e: any) => {
+                e.stopPropagation();
+                handleEdit(item.id);
+              }}>
+              <Text style={styles.editButtonText}>✏️ Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={(e: any) => {
+                e.stopPropagation();
+                handleDelete(item.id);
+              }}>
+              <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
-    </View>
+      </TouchableOpacity>
     );
   };
 
@@ -716,7 +756,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
             <FlatList
               data={filteredAndSortedProperties}
               renderItem={renderProperty}
-              keyExtractor={(item, index) => String(item.id || item.property_id || index)}
+              keyExtractor={(item: any, index: number) => String(item.id || item.property_id || index)}
               contentContainerStyle={styles.listContent}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -787,15 +827,54 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '600',
   },
+  propertyLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  locationIcon: {
+    fontSize: 14,
+    marginRight: spacing.xs,
+  },
   propertyLocation: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    flex: 1,
+  },
+  propertyStatsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  propertyStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  propertyStatIcon: {
+    fontSize: 16,
+  },
+  propertyStatText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  propertyFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.sm,
   },
   propertyPrice: {
-    ...typography.body,
+    ...typography.h3,
     color: colors.accent,
-    fontWeight: '600',
+    fontWeight: '700',
+    flex: 1,
+  },
+  propertyActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   emptyContainer: {
     flex: 1,
@@ -905,37 +984,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editButton: {
-    backgroundColor: colors.info,
-  },
-  viewButton: {
     backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
   },
-  deleteButton: {
-    backgroundColor: colors.error,
-  },
-  actionButtonText: {
+  editButtonText: {
     ...typography.caption,
     color: colors.surface,
     fontWeight: '600',
+    fontSize: 12,
+  },
+  deleteButton: {
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
   },
   deleteButtonText: {
+    ...typography.caption,
     color: colors.surface,
+    fontWeight: '600',
+    fontSize: 12,
   },
   propertyImage: {
     width: SCREEN_WIDTH > 600 ? 120 : '100%', // Full width on small screens, fixed on large
     height: SCREEN_WIDTH > 600 ? 200 : 180, // Responsive height
     resizeMode: 'cover',
-  },
-  propertyStats: {
-    flexDirection: 'row',
-    marginTop: spacing.xs,
-    flexWrap: 'wrap',
-  },
-  statText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginRight: spacing.md,
-    marginBottom: spacing.xs,
   },
   loadingContainer: {
     flex: 1,

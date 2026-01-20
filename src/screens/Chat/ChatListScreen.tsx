@@ -23,6 +23,8 @@ import {chatService} from '../../services/chat.service';
 import {propertyService} from '../../services/property.service';
 import {markChatAsRead} from '../../services/firebase.service';
 import {notificationService} from '../../services/notification.service';
+import {sellerService} from '../../services/seller.service';
+import {fixImageUrl} from '../../utils/imageHelper';
 import firestore from '@react-native-firebase/firestore';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import {Image} from 'react-native';
@@ -52,6 +54,8 @@ interface ChatRoom {
   updatedAt: any;
   receiverName?: string;
   propertyTitle?: string;
+  buyerName?: string;
+  buyer_name?: string;
 }
 
 interface ChatListItem {
@@ -81,7 +85,9 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [propertyCache, setPropertyCache] = useState<Record<string, any>>({});
+  const [buyerCache, setBuyerCache] = useState<Record<string, {name: string; profile_image?: string}>>({});
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const previousUserTypeRef = useRef<string | undefined>(undefined);
 
   // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
@@ -103,20 +109,172 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     ]).start();
   }, []);
 
+  // Pre-load buyer information from inquiries (for sellers/agents)
+  const loadBuyerInfoFromInquiries = async () => {
+    if (!user?.id || (user.user_type !== 'seller' && user.user_type !== 'agent')) {
+      return; // Only for sellers/agents
+    }
+
+    try {
+      console.log('[ChatList] Pre-loading buyer info from inquiries...');
+      const inquiriesResponse: any = await sellerService.getInquiries({
+        page: 1,
+        limit: 100,
+      });
+      
+      if (inquiriesResponse?.success) {
+        const inquiries = inquiriesResponse.data?.inquiries || inquiriesResponse.data || [];
+        console.log('[ChatList] Loaded', inquiries.length, 'inquiries for buyer info');
+        
+        // Log sample inquiry structure for debugging
+        if (inquiries.length > 0) {
+          console.log('[ChatList] Sample inquiry structure:', {
+            firstInquiry: {
+              buyer_id: inquiries[0].buyer_id,
+              buyerId: inquiries[0].buyerId,
+              buyer_name: inquiries[0].buyer_name,
+              hasBuyer: !!inquiries[0].buyer,
+              buyerKeys: inquiries[0].buyer ? Object.keys(inquiries[0].buyer) : [],
+              allKeys: Object.keys(inquiries[0]),
+            },
+            allBuyerIds: inquiries.map((inq: any) => inq.buyer_id || inq.buyerId).filter(Boolean),
+          });
+        }
+        
+        // Extract and cache buyer info from all inquiries
+        const newBuyerCache: Record<string, {name: string; profile_image?: string}> = {};
+        
+        inquiries.forEach((inquiry: any) => {
+          const buyerId = inquiry.buyer_id || inquiry.buyerId;
+          if (buyerId) {
+            const buyerIdStr = String(buyerId);
+            // Only add if not already in cache (avoid overwriting)
+            if (!newBuyerCache[buyerIdStr] && !buyerCache[buyerIdStr]) {
+              const buyerName = inquiry.buyer?.name || 
+                               inquiry.buyer?.full_name || 
+                               inquiry.buyer_name || 
+                               inquiry.name || 
+                               inquiry.buyer?.first_name || 
+                               (inquiry.buyer?.first_name && inquiry.buyer?.last_name 
+                                 ? `${inquiry.buyer.first_name} ${inquiry.buyer.last_name}` 
+                                 : null);
+              
+              if (buyerName && buyerName !== 'Buyer' && !buyerName.startsWith('Buyer ')) {
+                const buyerProfileImage = inquiry.buyer?.profile_image || 
+                                         inquiry.buyer_profile_image || 
+                                         inquiry.buyer?.profileImage ||
+                                         undefined;
+                
+                const fixedImageUrl = buyerProfileImage ? fixImageUrl(buyerProfileImage) : null;
+                newBuyerCache[buyerIdStr] = {
+                  name: buyerName,
+                  profile_image: fixedImageUrl || undefined,
+                };
+                console.log('[ChatList] Caching buyer from inquiry:', buyerIdStr, '->', buyerName);
+              }
+            }
+          }
+        });
+        
+        // Update cache with all buyer info
+        setBuyerCache(prev => {
+          const updated = { ...prev, ...newBuyerCache };
+          console.log('[ChatList] Updated buyer cache. Total buyers:', Object.keys(updated).length, 'New:', Object.keys(newBuyerCache).length);
+          console.log('[ChatList] Buyer cache keys:', Object.keys(updated));
+          
+          // Also update Firebase chat rooms with buyer names for future reference
+          // This ensures existing chat rooms have buyer names stored
+          if (Object.keys(newBuyerCache).length > 0) {
+            const db = firestore();
+            if (db) {
+              // Update all chat rooms for these buyers
+              Object.keys(newBuyerCache).forEach(async (buyerIdStr) => {
+                try {
+                  const buyerInfo = newBuyerCache[buyerIdStr];
+                  // Find all chat rooms for this buyer
+                  const chatRoomsSnapshot = await db
+                    .collection('chats')
+                    .where('buyerId', '==', buyerIdStr)
+                    .get();
+                  
+                  const updatePromises = chatRoomsSnapshot.docs.map(async (doc) => {
+                    const roomData = doc.data();
+                    // Only update if buyer name is not already stored
+                    if (!roomData.buyerName && !roomData.buyer_name) {
+                      await doc.ref.update({
+                        buyerName: buyerInfo.name,
+                        ...(buyerInfo.profile_image && { buyerProfileImage: buyerInfo.profile_image }),
+                      });
+                      console.log('[ChatList] Updated Firebase chat room', doc.id, 'with buyer name:', buyerInfo.name);
+                    }
+                  });
+                  
+                  await Promise.all(updatePromises);
+                } catch (updateError) {
+                  console.warn('[ChatList] Error updating Firebase chat rooms for buyer', buyerIdStr, ':', updateError);
+                }
+              });
+            }
+          }
+          
+          return updated;
+        });
+      } else {
+        console.warn('[ChatList] Inquiries response not successful or empty');
+      }
+    } catch (error) {
+      console.error('[ChatList] Error pre-loading buyer info:', error);
+    }
+  };
+
   // Set up listener when component mounts or user changes
   useEffect(() => {
+    // Check if user type has changed - if so, clear all caches and state
+    const currentUserType = user?.user_type;
+    const previousUserType = previousUserTypeRef.current;
+    
+    if (previousUserType !== undefined && previousUserType !== currentUserType) {
+      console.log('[ChatList] User type changed from', previousUserType, 'to', currentUserType, '- clearing all caches and state');
+      // Clear all caches when user type changes
+      setBuyerCache({});
+      setPropertyCache({});
+      setChatList([]);
+      setLoading(true);
+    }
+    
+    // Update previous user type ref
+    previousUserTypeRef.current = currentUserType;
+    
     // Clean up previous listener
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
       unsubscribeRef.current = null;
     }
 
-    // Set up real-time listener for chat rooms
-    const unsubscribe = setupChatRoomsListener();
-    unsubscribeRef.current = unsubscribe;
+    // Only initialize if we have a valid user
+    if (!user?.id || !user?.user_type) {
+      console.log('[ChatList] No user or user type, skipping initialization');
+      setLoading(false);
+      return;
+    }
+
+    // Pre-load buyer info for sellers/agents, then load chat rooms
+    const initializeChatList = async () => {
+      console.log('[ChatList] Initializing chat list for user type:', user.user_type);
+      
+      if (user.user_type === 'seller' || user.user_type === 'agent') {
+        await loadBuyerInfoFromInquiries();
+      }
+      
+      // Set up real-time listener for chat rooms
+      const unsubscribe = setupChatRoomsListener();
+      unsubscribeRef.current = unsubscribe;
+      
+      // Load chat rooms after buyer info is loaded
+      loadChatRooms();
+    };
     
-    // Also load chat rooms initially
-    loadChatRooms();
+    initializeChatList();
     
     // Register refresh callback with notification service
     notificationService.setChatListRefreshCallback(() => {
@@ -132,26 +290,60 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
       // Unregister callback when component unmounts
       notificationService.setChatListRefreshCallback(null);
     };
-  }, [user?.id]);
+  }, [user?.id, user?.user_type]);
 
   // Refresh chat list when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      console.log('[ChatList] Screen focused - refreshing chat list');
+      console.log('[ChatList] Screen focused - refreshing chat list for user type:', user?.user_type);
+      
+      // Verify user type matches expected type - if not, clear state
+      if (!user?.id || !user?.user_type) {
+        console.warn('[ChatList] No user or user type on focus, clearing state');
+        setChatList([]);
+        setBuyerCache({});
+        setPropertyCache({});
+        setLoading(false);
+        return;
+      }
+      
+      // Check if user type changed since last focus
+      const currentUserType = user.user_type;
+      const previousUserType = previousUserTypeRef.current;
+      
+      if (previousUserType !== undefined && previousUserType !== currentUserType) {
+        console.log('[ChatList] User type changed on focus - clearing caches');
+        setBuyerCache({});
+        setPropertyCache({});
+        setChatList([]);
+      }
+      
+      previousUserTypeRef.current = currentUserType;
+      
+      // Reload buyer info for sellers/agents only
+      if (user.user_type === 'seller' || user.user_type === 'agent') {
+        loadBuyerInfoFromInquiries();
+      } else if (user.user_type === 'buyer') {
+        // For buyers, clear buyer cache (not needed)
+        setBuyerCache({});
+      }
       
       // Reload chat rooms when screen comes into focus
       loadChatRooms();
       
       // Re-setup listener if it was cleaned up
-      if (!unsubscribeRef.current && user?.id) {
+      if (!unsubscribeRef.current && user.id) {
         const unsubscribe = setupChatRoomsListener();
         unsubscribeRef.current = unsubscribe;
       }
-    }, [user?.id])
+    }, [user?.id, user?.user_type])
   );
 
   const setupChatRoomsListener = () => {
-    if (!user?.id) return null;
+    if (!user?.id || !user?.user_type) {
+      console.warn('[ChatList] Cannot setup listener - missing user or user type');
+      return null;
+    }
 
     try {
       const db = firestore();
@@ -161,6 +353,9 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
       }
 
       const userIdStr = user.id.toString();
+      const currentUserType = user.user_type;
+      
+      console.log('[ChatList] Setting up Firebase listener for user type:', currentUserType, 'userId:', userIdStr);
 
       // Query without orderBy to avoid index requirement - we'll sort manually
       const query = db
@@ -170,6 +365,19 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
       const unsubscribe = query.onSnapshot(
         (snapshot) => {
           try {
+            // Validate user type before processing - prevent cross-dashboard data
+            if (!user?.id || !user?.user_type) {
+              console.warn('[ChatList] Firebase listener callback - user or user type missing, skipping');
+              return;
+            }
+            
+            // Double-check user type matches expected type
+            const listenerUserType = user.user_type;
+            if (listenerUserType !== currentUserType) {
+              console.warn('[ChatList] Firebase listener - user type mismatch:', listenerUserType, 'vs', currentUserType, '- skipping update');
+              return;
+            }
+            
             const chatRooms: ChatRoom[] = snapshot.docs.map((doc) => {
               const data = doc.data();
               let updatedAt = new Date();
@@ -178,6 +386,35 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
                 const firestoreTimestamp = data.updatedAt as FirebaseFirestoreTypes.Timestamp;
                 if (firestoreTimestamp && firestoreTimestamp.toDate) {
                   updatedAt = firestoreTimestamp.toDate();
+                }
+              }
+
+              // Log chat room data to see if buyer name is stored
+              if (data.buyerId && (listenerUserType === 'seller' || listenerUserType === 'agent')) {
+                const buyerIdStr = String(data.buyerId);
+                const hasBuyerName = !!(data.buyerName || data.buyer_name);
+                
+                console.log('[ChatList] Chat room data for buyerId:', data.buyerId, {
+                  hasBuyerName: hasBuyerName,
+                  buyerName: data.buyerName || data.buyer_name,
+                  hasReceiverName: !!data.receiverName,
+                  receiverName: data.receiverName,
+                  chatRoomId: doc.id,
+                });
+                
+                // If buyer name is in room data but not in cache, cache it
+                if (hasBuyerName && !buyerCache[buyerIdStr]) {
+                  const storedBuyerName = data.buyerName || data.buyer_name;
+                  if (storedBuyerName && storedBuyerName !== 'Buyer' && !storedBuyerName.startsWith('Buyer ')) {
+                    setBuyerCache(prev => ({
+                      ...prev,
+                      [buyerIdStr]: {
+                        name: storedBuyerName,
+                        profile_image: data.buyerProfileImage || data.buyer_profile_image || undefined,
+                      },
+                    }));
+                    console.log('[ChatList] Cached buyer name from chat room data:', storedBuyerName);
+                  }
                 }
               }
 
@@ -219,16 +456,18 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const loadChatRooms = async () => {
-    if (!user?.id) {
+    if (!user?.id || !user?.user_type) {
+      console.warn('[ChatList] Cannot load chat rooms - missing user or user type');
+      setChatList([]);
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      console.log('[ChatList] Loading chat rooms for user:', {
+      const currentUserType = user.user_type;
+      console.log('[ChatList] Loading chat rooms for user type:', currentUserType, {
         userId: user.id,
-        userType: user.user_type,
       });
       const response: any = await chatService.getConversations(user.id);
       
@@ -264,17 +503,21 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const processChatRooms = async (chatRooms: ChatRoom[]) => {
-    if (!user?.id) return;
+    if (!user?.id || !user?.user_type) {
+      console.warn('[ChatList] Cannot process chat rooms - missing user or user type');
+      setChatList([]);
+      return;
+    }
 
     const userIdStr = user.id.toString();
-    const isBuyer = user.user_type === 'buyer';
-    const isSellerOrAgent = user.user_type === 'seller' || user.user_type === 'agent';
+    const currentUserType = user.user_type;
+    const isBuyer = currentUserType === 'buyer';
+    const isSellerOrAgent = currentUserType === 'seller' || currentUserType === 'agent';
     
-    console.log('[ChatList] Processing chat rooms:', {
+    console.log('[ChatList] Processing chat rooms for user type:', currentUserType, {
       totalRooms: chatRooms.length,
       userId: user.id,
       userIdStr,
-      userType: user.user_type,
       isBuyer,
       isSellerOrAgent,
       sampleRoom: chatRooms.length > 0 ? {
@@ -413,10 +656,262 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             receiverRole = user.user_type === 'agent' ? 'agent' : 'seller';
             buyerId = room.buyerId;
             
-            // Try to get buyer name from inquiry or property data
-            // For now, use buyerId as fallback - could be enhanced with buyer profile fetch
-            displayName = room.receiverName || `Buyer ${buyerId}`;
-            displayImage = property?.cover_image; // Show property image for seller view
+            // Fetch buyer information from cache, chat room data, or inquiries
+            const buyerIdStr = buyerId ? String(buyerId) : '';
+            let buyerInfo = buyerCache[buyerIdStr];
+            
+            // First check if buyer name is in the chat room data itself
+            if (!buyerInfo && (room.buyerName || room.buyer_name)) {
+              const buyerName = room.buyerName || room.buyer_name;
+              if (buyerName && buyerName !== 'Buyer' && !buyerName.startsWith('Buyer ')) {
+                buyerInfo = {
+                  name: buyerName,
+                  profile_image: undefined,
+                };
+                // Cache it
+                setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
+                console.log('[ChatList] Found buyer name in chat room data:', buyerName);
+              }
+            }
+            
+            console.log('[ChatList] Looking for buyer info:', {
+              buyerId,
+              buyerIdStr,
+              buyerIdType: typeof buyerId,
+              inCache: !!buyerInfo,
+              cachedName: buyerInfo?.name,
+              fromRoomData: !!(room.buyerName || room.buyer_name),
+              cacheSize: Object.keys(buyerCache).length,
+              cacheKeys: Object.keys(buyerCache),
+              cacheMatch: Object.keys(buyerCache).includes(buyerIdStr),
+            });
+            
+            if (!buyerInfo && buyerId) {
+              console.log('[ChatList] Fetching buyer info for buyerId:', buyerId, 'propertyId:', propertyId);
+              // Try to fetch buyer info from inquiries
+              try {
+                const inquiriesResponse: any = await sellerService.getInquiries({
+                  page: 1,
+                  limit: 100,
+                });
+                
+                console.log('[ChatList] Inquiries response:', {
+                  success: inquiriesResponse?.success,
+                  hasData: !!inquiriesResponse?.data,
+                  dataType: Array.isArray(inquiriesResponse?.data) ? 'array' : typeof inquiriesResponse?.data,
+                  inquiriesCount: Array.isArray(inquiriesResponse?.data?.inquiries) ? inquiriesResponse.data.inquiries.length : 
+                                 Array.isArray(inquiriesResponse?.data) ? inquiriesResponse.data.length : 0,
+                });
+                
+                if (inquiriesResponse?.success) {
+                  const inquiries = inquiriesResponse.data?.inquiries || inquiriesResponse.data || [];
+                  
+                  // Log all buyer IDs in inquiries for debugging
+                  const allInquiryBuyerIds = inquiries.map((inq: any) => String(inq.buyer_id || inq.buyerId || '')).filter(Boolean);
+                  console.log('[ChatList] All buyer IDs in inquiries:', allInquiryBuyerIds);
+                  console.log('[ChatList] Looking for buyerId:', String(buyerId), 'in inquiries');
+                  
+                  // First try to find inquiry for this specific property and buyer
+                  let inquiry = inquiries.find((inq: any) => {
+                    const inqPropertyId = String(inq.property_id || inq.propertyId || '');
+                    const inqBuyerId = String(inq.buyer_id || inq.buyerId || '');
+                    const matches = inqPropertyId === String(propertyId) && inqBuyerId === String(buyerId);
+                    if (matches) {
+                      console.log('[ChatList] Found matching inquiry:', { inqPropertyId, inqBuyerId, propertyId, buyerId });
+                    }
+                    return matches;
+                  });
+                  
+                  console.log('[ChatList] Found inquiry for property+buyer:', !!inquiry);
+                  
+                  // If not found, try to find any inquiry for this buyer (buyer might have inquired about multiple properties)
+                  if (!inquiry) {
+                    inquiry = inquiries.find((inq: any) => {
+                      const inqBuyerId = String(inq.buyer_id || inq.buyerId || '');
+                      return inqBuyerId === String(buyerId);
+                    });
+                    console.log('[ChatList] Found inquiry for buyer (any property):', !!inquiry);
+                  }
+                  
+                  if (inquiry) {
+                    console.log('[ChatList] Inquiry data structure:', {
+                      hasBuyer: !!inquiry.buyer,
+                      buyerKeys: inquiry.buyer ? Object.keys(inquiry.buyer) : [],
+                      buyer_name: inquiry.buyer_name,
+                      name: inquiry.name,
+                      allKeys: Object.keys(inquiry),
+                    });
+                    
+                    // Extract buyer name from multiple possible locations
+                    const buyerName = inquiry.buyer?.name || 
+                                     inquiry.buyer?.full_name || 
+                                     inquiry.buyer_name || 
+                                     inquiry.name || 
+                                     inquiry.buyer?.first_name || 
+                                     (inquiry.buyer?.first_name && inquiry.buyer?.last_name 
+                                       ? `${inquiry.buyer.first_name} ${inquiry.buyer.last_name}` 
+                                       : null) ||
+                                     'Buyer';
+                    
+                    const buyerProfileImage = inquiry.buyer?.profile_image || 
+                                             inquiry.buyer_profile_image || 
+                                             inquiry.buyer?.profileImage ||
+                                             undefined;
+                    
+                    console.log('[ChatList] Extracted buyer info:', {
+                      name: buyerName,
+                      hasImage: !!buyerProfileImage,
+                    });
+                    
+                    const fixedImageUrl = buyerProfileImage ? fixImageUrl(buyerProfileImage) : null;
+                    buyerInfo = {
+                      name: buyerName,
+                      profile_image: fixedImageUrl || undefined,
+                    };
+                    
+                    // Cache buyer info
+                    if (buyerId) {
+                      const buyerIdStr = String(buyerId);
+                      setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
+                      console.log('[ChatList] Cached buyer info for buyerId:', buyerIdStr);
+                      
+                      // Also update Firebase chat room document with buyer name for future reference
+                      try {
+                        const db = firestore();
+                        if (db) {
+                          await db.collection('chats').doc(room.chatRoomId).update({
+                            buyerName: buyerInfo.name,
+                            ...(buyerInfo.profile_image && { buyerProfileImage: buyerInfo.profile_image }),
+                          });
+                          console.log('[ChatList] ✅ Updated Firebase chat room with buyer name:', buyerInfo.name);
+                        }
+                      } catch (updateError) {
+                        console.warn('[ChatList] Could not update Firebase chat room with buyer name:', updateError);
+                      }
+                    }
+                  } else {
+                    console.warn('[ChatList] No inquiry found for buyerId:', buyerId, 'propertyId:', propertyId);
+                    console.warn('[ChatList] This buyer may have chatted directly without making an inquiry');
+                    console.warn('[ChatList] Will try to find buyer name from Firebase chat room document or messages');
+                  }
+                } else {
+                  console.warn('[ChatList] Inquiries response not successful:', inquiriesResponse);
+                }
+              } catch (error) {
+                console.error('[ChatList] Error fetching buyer info from inquiries:', error);
+              }
+            } else if (buyerInfo) {
+              console.log('[ChatList] Using cached buyer info for buyerId:', buyerId);
+            }
+            
+            // If still no buyer info, try multiple fallbacks:
+            // 1. Check Firebase chat room document (in case it was stored there when chat was created)
+            // 2. Check first message in chat room (sender might have name stored)
+            if (!buyerInfo && buyerId) {
+              try {
+                const db = firestore();
+                if (db) {
+                  const chatRoomDoc = await db.collection('chats').doc(room.chatRoomId).get();
+                  if (chatRoomDoc.exists) {
+                    const roomData = chatRoomDoc.data();
+                    
+                    // Check if buyer name is stored in chat room document
+                    const storedBuyerName = roomData?.buyerName || roomData?.buyer_name;
+                    if (storedBuyerName && storedBuyerName !== 'Buyer' && !storedBuyerName.startsWith('Buyer ')) {
+                      buyerInfo = {
+                        name: storedBuyerName,
+                        profile_image: roomData?.buyerProfileImage || roomData?.buyer_profile_image || undefined,
+                      };
+                      const buyerIdStr = String(buyerId);
+                      setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
+                      console.log('[ChatList] ✅ Found buyer name in Firebase chat room document:', storedBuyerName);
+                    } else {
+                      // Try to get buyer name from messages (check all messages from buyer)
+                      try {
+                        const messagesSnapshot = await db
+                          .collection('chats')
+                          .doc(room.chatRoomId)
+                          .collection('messages')
+                          .orderBy('timestamp', 'asc')
+                          .get();
+                        
+                        if (!messagesSnapshot.empty) {
+                          // Look through all messages to find one from the buyer with name info
+                          for (const doc of messagesSnapshot.docs) {
+                            const messageData = doc.data();
+                            const senderId = String(messageData.senderId || '');
+                            
+                            // If message is from buyer, check if sender name is stored
+                            if (senderId === String(buyerId)) {
+                              const senderName = messageData.senderName || messageData.sender_name;
+                              if (senderName && senderName !== 'Buyer' && !senderName.startsWith('Buyer ')) {
+                                buyerInfo = {
+                                  name: senderName,
+                                  profile_image: messageData.senderProfileImage || messageData.sender_profile_image || undefined,
+                                };
+                                const buyerIdStr = String(buyerId);
+                                setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
+                                console.log('[ChatList] ✅ Found buyer name from message:', senderName);
+                                
+                                // Also update Firebase chat room document with buyer name
+                                try {
+                                  await db.collection('chats').doc(room.chatRoomId).update({
+                                    buyerName: buyerInfo.name,
+                                    ...(buyerInfo.profile_image && { buyerProfileImage: buyerInfo.profile_image }),
+                                  });
+                                  console.log('[ChatList] ✅ Updated Firebase chat room with buyer name from message');
+                                } catch (updateError) {
+                                  console.warn('[ChatList] Could not update Firebase with buyer name from message:', updateError);
+                                }
+                                break; // Found buyer name, no need to check more messages
+                              }
+                            }
+                          }
+                          
+                          // If still no buyer name found, log for debugging
+                          if (!buyerInfo) {
+                            console.warn('[ChatList] No buyer name found in any messages for buyerId:', buyerId);
+                          }
+                        }
+                      } catch (msgError) {
+                        console.warn('[ChatList] Error checking messages for buyer name:', msgError);
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.warn('[ChatList] Error fetching buyer name from Firebase chat room:', error);
+              }
+            }
+            
+            // Use buyer info if available, otherwise use fallback
+            if (buyerInfo && buyerInfo.name && buyerInfo.name !== 'Buyer' && !buyerInfo.name.startsWith('Buyer ')) {
+              displayName = buyerInfo.name;
+              displayImage = buyerInfo.profile_image;
+              console.log('[ChatList] ✅ Using buyer info:', buyerInfo.name, 'for buyerId:', buyerId);
+            } else {
+              // Fallback: Try to get from room data or use buyerId
+              if (room.receiverName && !room.receiverName.startsWith('Buyer ')) {
+                displayName = room.receiverName;
+                console.log('[ChatList] Using receiverName from room:', displayName);
+              } else {
+                // Last resort: show buyerId but log warning with full debug info
+                // For existing chats without buyer name, we'll show "Buyer {id}" until buyer name is found
+                displayName = `Buyer ${buyerId}`;
+                console.error('[ChatList] ❌ No buyer name found for buyerId:', buyerId, {
+                  buyerIdStr,
+                  hasBuyerInfo: !!buyerInfo,
+                  buyerInfoName: buyerInfo?.name,
+                  cacheSize: Object.keys(buyerCache).length,
+                  cacheKeys: Object.keys(buyerCache),
+                  roomReceiverName: room.receiverName,
+                  propertyId,
+                  chatRoomId: room.chatRoomId,
+                  note: 'Buyer name will be stored when: 1) They create a new chat, 2) Found in inquiries, 3) Found in Firebase chat room document, 4) Found in messages. For existing chats without buyer name, please update Firebase manually or wait for buyer to send a new message.',
+                });
+              }
+              displayImage = undefined; // No image, will show initials
+            }
           }
 
           // Format price
@@ -424,8 +919,42 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             ? `₹${parseFloat(String(property.price)).toLocaleString('en-IN')}${property.status === 'rent' ? '/Month' : ''}`
             : '';
 
-          // Format timestamp
-          const timestamp = formatTimestamp(room.updatedAt);
+          // Get actual last message timestamp from messages subcollection
+          let lastMessageTimestamp = room.updatedAt;
+          let lastMessageTimestampMs = room.updatedAt instanceof Date 
+            ? room.updatedAt.getTime() 
+            : (room.updatedAt?.toDate?.()?.getTime() || Date.now());
+          
+          try {
+            const db = firestore();
+            if (db) {
+              const messagesRef = db
+                .collection('chats')
+                .doc(room.chatRoomId)
+                .collection('messages')
+                .orderBy('timestamp', 'desc')
+                .limit(1);
+              
+              const lastMessageSnapshot = await messagesRef.get();
+              if (!lastMessageSnapshot.empty) {
+                const lastMessageDoc = lastMessageSnapshot.docs[0];
+                const lastMessageData = lastMessageDoc.data();
+                if (lastMessageData.timestamp) {
+                  const firestoreTimestamp = lastMessageData.timestamp as FirebaseFirestoreTypes.Timestamp;
+                  if (firestoreTimestamp && firestoreTimestamp.toDate) {
+                    lastMessageTimestamp = firestoreTimestamp.toDate();
+                    lastMessageTimestampMs = lastMessageTimestamp.getTime();
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('[ChatList] Error fetching last message timestamp:', error);
+            // Use room.updatedAt as fallback
+          }
+
+          // Format timestamp using actual last message time
+          const timestamp = formatTimestamp(lastMessageTimestamp);
           
           // Get unread count - check if status is 'new' (unread)
           const readStatus = room.readStatus || {};
@@ -439,7 +968,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             name: displayName,
             lastMessage: room.lastMessage || 'No messages yet',
             timestamp,
-            timestampMs: room.updatedAt instanceof Date ? room.updatedAt.getTime() : (room.updatedAt?.toDate?.()?.getTime() || Date.now()),
+            timestampMs: lastMessageTimestampMs,
             unreadCount,
             propertyId: room.propertyId,
             propertyTitle: property?.title || room.propertyTitle || 'Property',
@@ -458,13 +987,46 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             ? (room.receiverName || `Property Owner`)
             : (room.receiverName || `Buyer ${room.buyerId}`);
           
+          // Get last message timestamp for fallback case too
+          let fallbackTimestamp = room.updatedAt;
+          let fallbackTimestampMs = room.updatedAt instanceof Date 
+            ? room.updatedAt.getTime() 
+            : (room.updatedAt?.toDate?.()?.getTime() || Date.now());
+          
+          try {
+            const db = firestore();
+            if (db) {
+              const messagesRef = db
+                .collection('chats')
+                .doc(room.chatRoomId)
+                .collection('messages')
+                .orderBy('timestamp', 'desc')
+                .limit(1);
+              
+              const lastMessageSnapshot = await messagesRef.get();
+              if (!lastMessageSnapshot.empty) {
+                const lastMessageDoc = lastMessageSnapshot.docs[0];
+                const lastMessageData = lastMessageDoc.data();
+                if (lastMessageData.timestamp) {
+                  const firestoreTimestamp = lastMessageData.timestamp as FirebaseFirestoreTypes.Timestamp;
+                  if (firestoreTimestamp && firestoreTimestamp.toDate) {
+                    fallbackTimestamp = firestoreTimestamp.toDate();
+                    fallbackTimestampMs = fallbackTimestamp.getTime();
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            // Use room.updatedAt as fallback
+          }
+          
           return {
             id: room.chatRoomId,
             chatRoomId: room.chatRoomId,
             name: displayName,
             lastMessage: room.lastMessage || 'No messages yet',
-            timestamp: formatTimestamp(room.updatedAt),
-            timestampMs: room.updatedAt instanceof Date ? room.updatedAt.getTime() : (room.updatedAt?.toDate?.()?.getTime() || Date.now()),
+            timestamp: formatTimestamp(fallbackTimestamp),
+            timestampMs: fallbackTimestampMs,
             unreadCount: ((room.readStatus || {})[userIdStr] === 'new' || (room.readStatus || {})[userIdStr] === undefined) ? 1 : 0,
             propertyId: room.propertyId,
             propertyTitle: room.propertyTitle,
@@ -479,32 +1041,41 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     // Filter out null values
     let validChats = enrichedChats.filter(chat => chat !== null) as ChatListItem[];
     
-    // Deduplicate: Keep only the most recent conversation per property
-    // Group by propertyId and keep the one with the most recent timestamp
-    const uniqueByProperty = new Map<string, ChatListItem>();
+    // Deduplicate: Keep only one chat per user per property
+    // For sellers/agents: Group by buyerId + propertyId (one chat per buyer per property)
+    // For buyers: Group by receiverId + propertyId (one chat per seller per property)
+    const uniqueByUserAndProperty = new Map<string, ChatListItem>();
     
     validChats.forEach(chat => {
-      const key = chat.propertyId || chat.chatRoomId; // Use propertyId as key, fallback to chatRoomId
-      const existing = uniqueByProperty.get(key);
+      // Create unique key: buyerId_propertyId for sellers, receiverId_propertyId for buyers
+      let key: string;
+      if (isBuyer) {
+        // For buyers: receiverId_propertyId (one chat per seller per property)
+        key = `${chat.receiverId || 'unknown'}_${chat.propertyId || chat.chatRoomId}`;
+      } else {
+        // For sellers/agents: buyerId_propertyId (one chat per buyer per property)
+        key = `${chat.buyerId || 'unknown'}_${chat.propertyId || chat.chatRoomId}`;
+      }
+      
+      const existing = uniqueByUserAndProperty.get(key);
       
       if (!existing) {
-        // First occurrence of this property
-        uniqueByProperty.set(key, chat);
+        // First occurrence of this user+property combination
+        uniqueByUserAndProperty.set(key, chat);
       } else {
         // Compare timestamps - keep the more recent one
-        // Use timestampMs if available, otherwise fallback to comparing formatted timestamps
         const existingTime = existing.timestampMs || 0;
         const currentTime = chat.timestampMs || 0;
         
         if (currentTime > existingTime) {
           // Current chat has more recent activity
-          uniqueByProperty.set(key, chat);
+          uniqueByUserAndProperty.set(key, chat);
         }
       }
     });
     
     // Convert map back to array and sort by timestamp (most recent first)
-    const uniqueChats = Array.from(uniqueByProperty.values());
+    const uniqueChats = Array.from(uniqueByUserAndProperty.values());
     uniqueChats.sort((a, b) => {
       const timeA = a.timestampMs || 0;
       const timeB = b.timestampMs || 0;
@@ -548,7 +1119,13 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const renderChatItem = ({item}: {item: ChatListItem}) => {
-    const initials = item.name
+    // Generate initials from buyer name (remove "Buyer" prefix if present)
+    let nameForInitials = item.name;
+    if (nameForInitials.startsWith('Buyer ')) {
+      // If it's "Buyer 123", use "B" as initial
+      nameForInitials = 'Buyer';
+    }
+    const initials = nameForInitials
       .split(' ')
       .map((n) => n[0])
       .join('')
@@ -602,7 +1179,8 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             </Text>
             <Text style={styles.timestamp}>{item.timestamp}</Text>
           </View>
-          {item.propertyTitle && (
+          {/* Only show property title for buyers, not for sellers/agents */}
+          {user?.user_type === 'buyer' && item.propertyTitle && (
             <Text style={styles.propertyTitle} numberOfLines={1}>
               {item.propertyTitle}
             </Text>
@@ -714,7 +1292,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           showSignIn={isGuest}
           showSignUp={isGuest}
         />
-        <View style={styles.loadingContainer}>
+        <View style={[styles.loadingContainer, {paddingTop: insets.top + 60 + spacing.md * 2}]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading chats...</Text>
         </View>
@@ -790,6 +1368,7 @@ const styles = StyleSheet.create({
   chatItem: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E0E0',

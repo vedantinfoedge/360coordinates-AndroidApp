@@ -254,6 +254,10 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           
           console.log('[Chat] Backend chat room API response:', JSON.stringify(roomResponse, null, 2));
           
+          // Extract buyer name from backend response if available (for seller/agent view)
+          let buyerNameFromResponse: string | null = null;
+          let buyerProfileImageFromResponse: string | null = null;
+          
           // Extract chat room ID and receiverRole from API response - check multiple possible response structures
           if (roomResponse) {
             if (roomResponse.success && roomResponse.data) {
@@ -267,7 +271,21 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
               if (roomResponse.data.receiverRole && (roomResponse.data.receiverRole === 'agent' || roomResponse.data.receiverRole === 'seller')) {
                 backendReceiverRole = roomResponse.data.receiverRole;
               }
+              
+              // Extract buyer info from response (for seller/agent)
+              buyerNameFromResponse = roomResponse.data.buyer?.name || 
+                                     roomResponse.data.buyer?.full_name ||
+                                     roomResponse.data.buyer_name ||
+                                     roomResponse.data.buyerName ||
+                                     null;
+              buyerProfileImageFromResponse = roomResponse.data.buyer?.profile_image ||
+                                            roomResponse.data.buyer_profile_image ||
+                                            null;
+              
               console.log('[Chat] ✅ Backend chat room created successfully:', backendChatRoomId, 'receiverRole:', backendReceiverRole);
+              if (buyerNameFromResponse) {
+                console.log('[Chat] ✅ Buyer name from backend response:', buyerNameFromResponse);
+              }
             } else if (roomResponse.data) {
               // Some APIs return data directly without success flag
               backendChatRoomId = 
@@ -280,6 +298,19 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
               if (roomResponse.data.receiverRole && (roomResponse.data.receiverRole === 'agent' || roomResponse.data.receiverRole === 'seller')) {
                 backendReceiverRole = roomResponse.data.receiverRole;
               }
+              
+              // Extract buyer info from response (for seller/agent)
+              if (!buyerNameFromResponse) {
+                buyerNameFromResponse = roomResponse.data.buyer?.name || 
+                                       roomResponse.data.buyer?.full_name ||
+                                       roomResponse.data.buyer_name ||
+                                       roomResponse.data.buyerName ||
+                                       null;
+                buyerProfileImageFromResponse = roomResponse.data.buyer?.profile_image ||
+                                              roomResponse.data.buyer_profile_image ||
+                                              null;
+              }
+              
               console.log('[Chat] ✅ Backend chat room ID extracted:', backendChatRoomId, 'receiverRole:', backendReceiverRole);
             } else if (roomResponse.chatRoomId || roomResponse.inquiryId || roomResponse.id) {
               // Response might be flat
@@ -287,6 +318,19 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
               if (roomResponse.receiverRole && (roomResponse.receiverRole === 'agent' || roomResponse.receiverRole === 'seller')) {
                 backendReceiverRole = roomResponse.receiverRole;
               }
+              
+              // Extract buyer info from flat response (for seller/agent)
+              if (!buyerNameFromResponse) {
+                buyerNameFromResponse = roomResponse.buyer?.name || 
+                                       roomResponse.buyer?.full_name ||
+                                       roomResponse.buyer_name ||
+                                       roomResponse.buyerName ||
+                                       null;
+                buyerProfileImageFromResponse = roomResponse.buyer?.profile_image ||
+                                              roomResponse.buyer_profile_image ||
+                                              null;
+              }
+              
               console.log('[Chat] ✅ Backend chat room ID from flat response:', backendChatRoomId, 'receiverRole:', backendReceiverRole);
             } else {
               console.warn('[Chat] ⚠️ Unexpected API response structure:', roomResponse);
@@ -361,12 +405,15 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           console.log('[Chat] Using receiverRole:', role);
           
           // Pass backend's chatRoomId to ensure Firebase uses the same format
+          // Also pass buyer name and profile image if available from backend response
           firebaseRoomId = await chatService.createFirebaseChatRoom(
             Number(user.id),
             Number(userId),
             role,
             Number(propertyId),
             backendChatRoomId ? String(backendChatRoomId) : undefined, // Use backend's ID if available
+            buyerNameFromResponse || undefined, // Pass buyer name if available
+            buyerProfileImageFromResponse || undefined, // Pass buyer profile image if available
           );
           
           if (firebaseRoomId) {
