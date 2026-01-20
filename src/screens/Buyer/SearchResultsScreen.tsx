@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import RangeSlider from '../../components/common/RangeSlider';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CompositeNavigationProp} from '@react-navigation/native';
+import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
@@ -532,6 +532,25 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Refresh properties when screen is focused (e.g., when Search tab is clicked)
+  useFocusEffect(
+    useCallback(() => {
+      // When Search tab is clicked from bottom navigation, ensure it shows SearchResults with all properties
+      // Check if we're in the default state (no location, listingType is 'all')
+      const currentRouteLocation = (routeParams?.query || routeParams?.location || routeParams?.searchQuery || '').trim();
+      
+      // If opened from tab bar with no specific params, ensure we show all properties
+      if (!currentRouteLocation && listingType === 'all' && !status && properties.length === 0) {
+        // Reset search fields and load all properties
+        setSearchText('');
+        setLocation('');
+        setTimeout(() => {
+          loadProperties();
+        }, 100);
+      }
+    }, [routeParams, listingType, status, properties.length, loadProperties])
+  );
 
   const applyFilters = () => {
     let filtered = [...properties];

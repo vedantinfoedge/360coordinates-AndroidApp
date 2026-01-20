@@ -545,6 +545,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                   const params: any = {
                     query: '',
                     location: '',
+                    listingType: 'all', // Default to show all properties
                   };
 
                   // Preserve the currently selected listing type when navigating
@@ -557,6 +558,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                   } else if (listingType === 'pg') {
                     params.status = 'rent'; // PG uses rent status in API
                     params.listingType = 'pg-hostel';
+                  } else if (listingType === 'all') {
+                    // Explicitly set to 'all' to show all properties regardless of type
+                    params.listingType = 'all';
                   }
 
                   // Navigate directly to SearchResults screen
