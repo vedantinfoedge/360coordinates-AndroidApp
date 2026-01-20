@@ -37,6 +37,7 @@ type Props = {
 interface Inquiry {
   id: string | number;
   property_id: string | number;
+  buyer_id?: string | number;
   property_title?: string;
   buyer_name: string;
   buyer_email?: string;
@@ -78,6 +79,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
         const formattedInquiries = inquiriesData.map((inq: any) => ({
           id: inq.id || inq.inquiry_id,
           property_id: inq.property_id,
+          buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id || inq.buyer_id,
           property_title: inq.property_title || inq.property?.title || 'Property',
           buyer_name: inq.buyer_name || inq.name || inq.buyer?.full_name || 'Buyer',
           buyer_email: inq.buyer_email || inq.email || inq.buyer?.email,
@@ -99,6 +101,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
             const formattedInquiries = inquiriesData.map((inq: any) => ({
               id: inq.id || inq.inquiry_id,
               property_id: inq.property_id,
+              buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id || inq.buyer_id,
               property_title: inq.property_title || inq.property?.title || 'Property',
               buyer_name: inq.buyer_name || inq.buyer?.full_name || inq.name || 'Buyer',
               buyer_email: inq.buyer_email || inq.buyer?.email,
@@ -185,7 +188,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
 
   const handleReply = (inquiry: Inquiry) => {
     // Navigate to chat conversation with the buyer
-    const buyerId = inquiry.id || inquiry.property_id;
+    const buyerId = inquiry.buyer_id || inquiry.id || inquiry.property_id;
     const buyerName = inquiry.buyer_name || 'Buyer';
     const propertyId = inquiry.property_id;
     const propertyTitle = inquiry.property_title || 'Property';
@@ -197,6 +200,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
         userName: buyerName,
         propertyId: Number(propertyId),
         propertyTitle: propertyTitle,
+        receiverRole: 'agent', // Agent is the receiver role in this context
       },
     });
   };
