@@ -784,6 +784,9 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const renderSeparator = () => <View style={styles.propertySeparator} />;
 
+  // Calculate header height: insets.top + header minHeight (60) + padding (spacing.md * 2)
+  const headerHeight = insets.top + 60 + 32; // 60 is minHeight, 32 is approximate padding
+
   return (
     <View style={styles.container}>
       <BuyerHeader
@@ -812,7 +815,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       />
 
       {/* Search Bar */}
-      <View style={[styles.searchSection, {marginTop: insets.top + 70}]}>
+      <View style={[styles.searchSection, {marginTop: headerHeight, zIndex: 10}]}>
         <View style={styles.searchBarContainer}>
           <View style={styles.searchInputWrapper}>
             <Text style={styles.searchIcon}>📍</Text>
@@ -1144,6 +1147,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    width: '100%',
+    position: 'relative',
   },
   searchBarContainer: {
     flexDirection: 'row',

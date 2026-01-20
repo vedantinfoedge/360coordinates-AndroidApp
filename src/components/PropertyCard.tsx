@@ -56,6 +56,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   };
 
   const handleSharePress = () => {
+    console.log('[PropertyCard] Share button pressed');
     if (onSharePress) {
       onSharePress();
     } else {
@@ -215,6 +216,7 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     marginLeft: 'auto',
+    zIndex: 15,
   },
   actionButtonContainer: {
     width: '100%',
@@ -233,6 +235,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
     zIndex: 5,
+    pointerEvents: 'none',
   },
   buyBadge: {
     backgroundColor: colors.text,
