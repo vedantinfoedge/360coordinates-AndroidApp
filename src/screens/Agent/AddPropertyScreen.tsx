@@ -156,7 +156,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       mediaType: 'photo' as MediaType,
       quality: 0.8 as const,
       selectionLimit: 10 - photos.length,
-      includeBase64: true, // Enable base64 for direct upload without moderation
+      includeBase64: true,
     };
 
     launchImageLibrary(options, async (response: ImagePickerResponse) => {
@@ -179,28 +179,105 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           return;
         }
 
-        // Auto-approve all images and convert to base64 format
-        // Skip moderation for now as per user request
+        // Add images with "checking" status and validate with Google Vision API
         const newPhotos = assetsToAdd.map(asset => {
-          // Get base64 string (format: "data:image/jpeg;base64,/9j/4AAQSkZJRg...")
-          const imageType = asset.type || 'jpeg';
-          const base64String = asset.base64 
-            ? `data:image/${imageType};base64,${asset.base64}` 
+          let imageType = asset.type || 'jpeg';
+          if (!asset.type && asset.uri) {
+            const uriLower = asset.uri.toLowerCase();
+            if (uriLower.includes('.png')) imageType = 'png';
+            else if (uriLower.includes('.jpg') || uriLower.includes('.jpeg')) imageType = 'jpeg';
+            else if (uriLower.includes('.webp')) imageType = 'webp';
+          }
+          
+          let base64Data = asset.base64;
+          if (base64Data && base64Data.includes('data:image/')) {
+            const parts = base64Data.split(',');
+            base64Data = parts.length > 1 ? parts[1] : base64Data;
+          }
+          
+          const base64String = base64Data 
+            ? `data:image/${imageType};base64,${base64Data}`
             : undefined;
           
           return {
             uri: asset.uri || '',
             base64: base64String,
-            moderationStatus: 'APPROVED' as const, // Auto-approve for now
+            moderationStatus: 'checking' as const,
             moderationReason: undefined,
-            imageUrl: undefined, // We'll use base64 instead
+            imageUrl: undefined,
           };
         });
         
         const updatedPhotos = [...photos, ...newPhotos];
         setPhotos(updatedPhotos);
         
-        console.log('[AddProperty] Added', newPhotos.length, 'images (auto-approved, base64 ready)');
+        // Process moderation for each image via Google Vision API
+        newPhotos.forEach((img, index) => {
+          if (img.uri) {
+            moderationService.uploadWithModeration(img.uri, 0, true) // true = validation-only (no property_id needed)
+              .then(result => {
+                setPhotos(prev => {
+                  const updated = [...prev];
+                  const imgIndex = prev.length - newPhotos.length + index;
+                  if (updated[imgIndex]) {
+                    let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
+                    
+                    if (result.status === 'approved' || result.moderation_status === 'SAFE') {
+                      moderationStatus = 'APPROVED';
+                    } else if (result.status === 'rejected' || result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE') {
+                      moderationStatus = 'REJECTED';
+                    } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || (result.moderation_status as string) === 'NEEDS_REVIEW') {
+                      moderationStatus = 'PENDING';
+                    }
+                    
+                    updated[imgIndex] = {
+                      ...updated[imgIndex],
+                      moderationStatus,
+                      moderationReason: result.moderation_reason,
+                      imageUrl: result.image_url || undefined,
+                    };
+                    
+                    if (moderationStatus === 'REJECTED') {
+                      Alert.alert(
+                        'Image Rejected',
+                        result.moderation_reason || 'Image does not meet our guidelines. Please upload property images only.',
+                        [{text: 'OK'}]
+                      );
+                    } else if (moderationStatus === 'PENDING') {
+                      Alert.alert(
+                        'Image Under Review',
+                        'Your image is being reviewed and will be visible after approval.',
+                        [{text: 'OK'}]
+                      );
+                    }
+                  }
+                  return updated;
+                });
+              })
+              .catch(error => {
+                console.error('[AddProperty] Moderation error:', error);
+                setPhotos(prev => {
+                  const updated = [...prev];
+                  const imgIndex = prev.length - newPhotos.length + index;
+                  if (updated[imgIndex]) {
+                    updated[imgIndex] = {
+                      ...updated[imgIndex],
+                      moderationStatus: 'REJECTED' as const,
+                      moderationReason: error.message || 'Failed to verify image',
+                    };
+                  }
+                  return updated;
+                });
+                Alert.alert(
+                  'Upload Failed',
+                  error.message || 'Failed to upload image. Please try again.',
+                  [{text: 'OK'}]
+                );
+              });
+          }
+        });
+        
+        console.log('[AddProperty] Added', newPhotos.length, 'images (validating with Google Vision API)');
       }
     });
   };
@@ -304,13 +381,57 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Collect images as base64 strings (auto-approved, skip moderation)
-      const imageBase64Strings = photos
-        .filter(p => p.moderationStatus === 'APPROVED' && p.base64)
-        .map(p => p.base64!)
-        .filter((base64): base64 is string => base64 !== undefined && base64 !== null);
+      // Collect base64 for approved/pending images (Google Vision API moderated)
+      const validImages = photos.filter(
+        p =>
+          (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') &&
+          !!p.base64
+      );
       
-      console.log('[AddProperty] Total photos:', photos.length, 'Approved photos with base64:', imageBase64Strings.length);
+      const imageBase64Strings = validImages
+        .map(p => {
+          if (!p.base64) return null;
+          let base64 = p.base64.trim();
+          if (base64.startsWith('data:image/')) {
+            if (!base64.includes(';base64,')) return null;
+            return base64;
+          }
+          return `data:image/jpeg;base64,${base64}`;
+        })
+        .filter((base64): base64 is string => base64 !== null && base64 !== '');
+      
+      if (validImages.length === 0) {
+        Alert.alert(
+          'No Valid Images',
+          'Please upload at least one image that has been approved or is pending review.',
+          [{text: 'OK'}]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
+      if (checkingImages.length > 0) {
+        Alert.alert(
+          'Images Still Validating',
+          'Please wait for all images to be validated before submitting.',
+          [{text: 'OK'}]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (imageBase64Strings.length === 0) {
+        Alert.alert(
+          'Image Data Missing',
+          'Approved images are missing image data. Please try removing and re-uploading the images.',
+          [{text: 'OK'}]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      
+      console.log('[AddProperty] Total photos:', photos.length, 'Valid (approved/pending):', validImages.length, 'Base64 ready:', imageBase64Strings.length);
 
       // Property type is already in the correct format from guide
       const propertyData = {
@@ -1217,7 +1338,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
     minHeight: 70,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -1250,6 +1372,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: 0,
   },
   stepItem: {
     flex: 1,
@@ -1282,6 +1405,7 @@ const styles = StyleSheet.create({
   stepLabel: {
     ...typography.caption,
     fontSize: 10,
+    lineHeight: 12,
     color: colors.textSecondary,
     textAlign: 'center',
   },
@@ -1312,7 +1436,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
   },
   stepContent: {
     flex: 1,
