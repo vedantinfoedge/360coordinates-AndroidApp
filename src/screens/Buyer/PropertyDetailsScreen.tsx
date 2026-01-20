@@ -30,6 +30,14 @@ import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {Linking} from 'react-native';
 
+// Import WebView with error handling
+let WebView: any = null;
+try {
+  WebView = require('react-native-webview').WebView;
+} catch (error) {
+  console.warn('[PropertyDetails] WebView not available:', error);
+}
+
 type PropertyDetailsScreenNavigationProp = BottomTabNavigationProp<BuyerTabParamList, 'PropertyDetails'>;
 
 type Props = {
@@ -70,6 +78,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [togglingFavorite, setTogglingFavorite] = useState(false);
   const [showImageGallery, setShowImageGallery] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const imageScrollViewRef = useRef<ScrollView>(null);
 
   const [interactionState, setInteractionState] = useState({
@@ -701,6 +710,49 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
+  // Check if video URL is valid
+  const isValidVideoUrl = (url: string | null | undefined): boolean => {
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      return false;
+    }
+    const trimmedUrl = url.trim();
+    // Check for YouTube, Vimeo, or direct video URLs
+    return (
+      trimmedUrl.includes('youtube.com') ||
+      trimmedUrl.includes('youtu.be') ||
+      trimmedUrl.includes('vimeo.com') ||
+      trimmedUrl.endsWith('.mp4') ||
+      trimmedUrl.endsWith('.mov') ||
+      trimmedUrl.endsWith('.webm') ||
+      trimmedUrl.startsWith('http://') ||
+      trimmedUrl.startsWith('https://')
+    );
+  };
+
+  // Convert video URL to embed format
+  const getVideoEmbedUrl = (url: string): string => {
+    const trimmedUrl = url.trim();
+    
+    // YouTube URL conversion
+    if (trimmedUrl.includes('youtube.com/watch?v=')) {
+      const videoId = trimmedUrl.split('v=')[1]?.split('&')[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (trimmedUrl.includes('youtu.be/')) {
+      const videoId = trimmedUrl.split('youtu.be/')[1]?.split('?')[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    // Vimeo URL conversion
+    if (trimmedUrl.includes('vimeo.com/')) {
+      const videoId = trimmedUrl.split('vimeo.com/')[1]?.split('?')[0];
+      return `https://player.vimeo.com/video/${videoId}`;
+    }
+    
+    // Direct video URL - return as is
+    return trimmedUrl;
+  };
+
   if (loading || !property) {
     return (
       <View style={styles.loadingContainer}>
@@ -944,6 +996,35 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             </View>
           )}
         </View>
+
+        {/* Video Section - Display if video is available */}
+        {property.video_url && isValidVideoUrl(property.video_url) && (
+          <View style={styles.videoSection}>
+            <Text style={styles.sectionTitle}>Property Video</Text>
+            <TouchableOpacity
+              style={styles.videoContainer}
+              onPress={() => setShowVideoModal(true)}
+              activeOpacity={0.9}>
+              <View style={styles.videoThumbnail}>
+                <Image
+                  source={
+                    property.cover_image
+                      ? {uri: fixImageUrl(property.cover_image)}
+                      : propertyImages.length > 0
+                      ? {uri: propertyImages[0].url}
+                      : require('../../assets/logo.jpeg')
+                  }
+                  style={styles.videoThumbnailImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.videoPlayButton}>
+                  <Text style={styles.videoPlayIcon}>▶</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.videoHint}>Tap to play video</Text>
+          </View>
+        )}
 
         {/* Content Sections */}
         {/* Title and Price */}
@@ -1198,6 +1279,68 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         initialIndex={currentImageIndex}
         onClose={() => setShowImageGallery(false)}
       />
+
+      {/* Video Modal */}
+      {property.video_url && isValidVideoUrl(property.video_url) && (
+        <Modal
+          visible={showVideoModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowVideoModal(false)}>
+          <View style={styles.videoModalOverlay}>
+            <View style={styles.videoModalContent}>
+              <View style={styles.videoModalHeader}>
+                <Text style={styles.videoModalTitle}>Property Video</Text>
+                <TouchableOpacity
+                  onPress={() => setShowVideoModal(false)}
+                  style={styles.videoModalCloseButton}>
+                  <Text style={styles.videoModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.videoPlayerContainer}>
+                {WebView ? (
+                  <WebView
+                    source={{uri: getVideoEmbedUrl(property.video_url)}}
+                    style={styles.videoPlayer}
+                    allowsFullscreenVideo={true}
+                    mediaPlaybackRequiresUserAction={false}
+                    javaScriptEnabled={true}
+                    domStorageEnabled={true}
+                    startInLoadingState={true}
+                    scalesPageToFit={true}
+                    onError={(syntheticEvent) => {
+                      const {nativeEvent} = syntheticEvent;
+                      console.error('[PropertyDetails] Video error:', nativeEvent);
+                      CustomAlert.alert(
+                        'Video Error',
+                        'Unable to load video. Please check your internet connection.',
+                        [{text: 'OK', onPress: () => setShowVideoModal(false)}]
+                      );
+                    }}
+                  />
+                ) : (
+                  <View style={styles.videoErrorContainer}>
+                    <Text style={styles.videoErrorText}>
+                      Video player not available. Please update the app.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.videoErrorButton}
+                      onPress={() => {
+                        if (property.video_url) {
+                          Linking.openURL(property.video_url).catch(err => {
+                            console.error('Error opening video URL:', err);
+                          });
+                        }
+                      }}>
+                      <Text style={styles.videoErrorButtonText}>Open in Browser</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -1711,6 +1854,128 @@ const styles = StyleSheet.create({
   },
   modalLimitTextError: {
     color: '#DC2626',
+  },
+  videoSection: {
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+  },
+  videoContainer: {
+    width: '100%',
+    marginTop: spacing.sm,
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: 200,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: colors.surfaceSecondary,
+  },
+  videoThumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  videoPlayButton: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -30,
+    marginLeft: -30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.surface,
+  },
+  videoPlayIcon: {
+    fontSize: 24,
+    color: colors.surface,
+    marginLeft: 4, // Slight offset for play icon
+  },
+  videoHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    fontSize: 12,
+  },
+  videoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoModalContent: {
+    width: SCREEN_WIDTH,
+    height: '100%',
+    backgroundColor: colors.background,
+  },
+  videoModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingTop: Platform.OS === 'ios' ? spacing.xl : spacing.lg,
+  },
+  videoModalTitle: {
+    ...typography.h2,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  videoModalCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surfaceSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoModalCloseText: {
+    fontSize: 24,
+    color: colors.text,
+    fontWeight: 'bold',
+  },
+  videoPlayerContainer: {
+    flex: 1,
+    width: '100%',
+  },
+  videoPlayer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  videoErrorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.background,
+  },
+  videoErrorText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  videoErrorButton: {
+    backgroundColor: colors.text,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  videoErrorButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
   },
 });
 
