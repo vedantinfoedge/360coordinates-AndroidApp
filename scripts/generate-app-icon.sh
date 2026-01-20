@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Script to generate app icons from App-icon.jpg
+# Script to generate app icons from App-icon.png
 # Uses macOS built-in sips tool for image conversion
 
 set -e
 
-SOURCE_IMAGE="src/assets/App-icon.jpg"
+SOURCE_IMAGE="src/assets/App-icon.png"
 IOS_ICON_DIR="ios/PropertyApp/Images.xcassets/AppIcon.appiconset"
 ANDROID_RES_DIR="android/app/src/main/res"
 
@@ -15,7 +15,7 @@ if [ ! -f "$SOURCE_IMAGE" ]; then
     exit 1
 fi
 
-echo "Generating app icons from App-icon.jpg..."
+echo "Generating app icons from App-icon.png..."
 echo ""
 
 # Create iOS icon directory if it doesn't exist
