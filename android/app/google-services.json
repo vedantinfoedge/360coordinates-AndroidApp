@@ -12,7 +12,12 @@
           "package_name": "Indiapropertys.com"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "387721645160-f7ullrpcfklvai4tcpu3eufef7af74uc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDy24j-A9yxP99X2HyOM0O3iZt9c1AfcRg"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "387721645160-f7ullrpcfklvai4tcpu3eufef7af74uc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
