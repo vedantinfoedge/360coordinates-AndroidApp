@@ -19,7 +19,10 @@ import {useRoute, RouteProp} from '@react-navigation/native';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {CompositeNavigationProp} from '@react-navigation/native';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {RootStackParamList} from '../../navigation/AppNavigator';
+import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
@@ -45,9 +48,9 @@ import {formatters} from '../../utils/formatters';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
-type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'AddProperty'
+type AddPropertyScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<SellerTabParamList, 'AddProperty'>,
+  NativeStackNavigationProp<RootStackParamList>
 >;
 
 type Props = {
@@ -58,7 +61,7 @@ type PropertyStatus = 'sale' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const {user} = useAuth(); // Get user for userId
-  const route = useRoute<RouteProp<RootStackParamList, 'AddProperty'>>();
+  const route = useRoute<RouteProp<SellerTabParamList, 'AddProperty'>>();
   const routeParams = (route.params as any) || {};
   const isEditMode = !!routeParams.propertyId;
   const isLimitedEdit = !!routeParams.isLimitedEdit;
@@ -106,12 +109,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const totalSteps = 5;
 
   // Check property limit on screen load (only for new properties)
-<<<<<<< Updated upstream
   // According to backend: Sellers have limits based on subscription (free=3, basic=10, pro=10, premium=10)
   // Agents have unlimited properties
-=======
-  // Sellers/owners can upload only 3 properties
->>>>>>> Stashed changes
   useEffect(() => {
     if (isEditMode) {
       // Skip limit check for edit mode
@@ -175,11 +174,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     };
 
     checkLimit();
-<<<<<<< Updated upstream
   }, [navigation, isEditMode, user]);
-=======
-  }, [navigation, isEditMode]);
->>>>>>> Stashed changes
 
   // Load property data when in edit mode
   useEffect(() => {
@@ -240,12 +235,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             setPhotos(existingImages);
           }
         } else {
-          Alert.alert('Error', 'Failed to load property details');
+          CustomAlert.alert('Error', 'Failed to load property details');
           navigation.goBack();
         }
       } catch (error: any) {
         console.error('Error loading property:', error);
-        Alert.alert('Error', error.message || 'Failed to load property details');
+        CustomAlert.alert('Error', error.message || 'Failed to load property details');
         navigation.goBack();
       } finally {
         setLoadingProperty(false);
@@ -542,7 +537,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                         moderationStatus = 'APPROVED';
                       } else if (result.status === 'rejected' || result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE') {
                         moderationStatus = 'REJECTED';
-                      } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || result.moderation_status === 'NEEDS_REVIEW') {
+                      } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || String(result.moderation_status) === 'NEEDS_REVIEW') {
                         moderationStatus = 'PENDING';
                       }
                       
@@ -645,13 +640,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         CustomAlert.alert('Error', 'Please select facing direction');
         return;
       }
-      // Handle upcoming projects - bedrooms/bathrooms are optional
-      const isUpcomingProject = propertyType === 'Upcoming Projects';
-      if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment' && !isUpcomingProject) {
+      // Handle upcoming projects - bedrooms/bathrooms are optional (handled via project_type field, not property_type)
+      if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment') {
         CustomAlert.alert('Error', 'Please select number of bedrooms');
         return;
       }
-      if (fieldVisibility.bathroomsRequired && bathrooms === null && !isUpcomingProject) {
+      if (fieldVisibility.bathroomsRequired && bathrooms === null) {
         CustomAlert.alert('Error', 'Please select number of bathrooms');
         return;
       }
@@ -923,8 +917,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         additional_address: additionalAddress.trim() || null,
         latitude: latitude || null,
         longitude: longitude || null,
-        bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' || propertyType === 'Upcoming Projects' ? '0' : null),
-        bathrooms: bathrooms?.toString() || (propertyType === 'Upcoming Projects' ? '0' : null),
+        bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+        bathrooms: bathrooms?.toString() || null,
         balconies: balconies?.toString() || null,
         area: parseFloat(builtUpArea) || 0,
         carpet_area: carpetArea ? parseFloat(carpetArea) : null,
@@ -1170,7 +1164,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter locality, area or landmark"
                   placeholderTextColor={colors.textSecondary}
                   value={location}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setLocation(text);
                     // Reset locationSelected when user starts typing/editing
                     if (locationSelected) {
@@ -1240,7 +1234,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter state"
                   placeholderTextColor={colors.textSecondary}
                   value={state}
-                  onChangeText={setState}
+                  onChangeText={(text: string) => setState(text)}
                 />
                 <StateAutoSuggest
                   query={state}
@@ -1513,7 +1507,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Dropdown
                 label="Furnishing"
                 placeholder="Select furnishing status"
-                required={fieldVisibility.furnishingRequired}
+                required={false}
                 options={[
                   {label: 'Unfurnished', value: 'Unfurnished'},
                   {label: 'Semi-Furnished', value: 'Semi-Furnished'},

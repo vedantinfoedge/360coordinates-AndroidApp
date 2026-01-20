@@ -25,10 +25,7 @@ import {markChatAsRead} from '../../services/firebase.service';
 import {notificationService} from '../../services/notification.service';
 import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
-<<<<<<< Updated upstream
 import {capitalize} from '../../utils/formatters';
-=======
->>>>>>> Stashed changes
 import firestore from '@react-native-firebase/firestore';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import {Image} from 'react-native';
@@ -60,11 +57,8 @@ interface ChatRoom {
   propertyTitle?: string;
   buyerName?: string;
   buyer_name?: string;
-<<<<<<< Updated upstream
   buyerProfileImage?: string;
   buyer_profile_image?: string;
-=======
->>>>>>> Stashed changes
 }
 
 interface ChatListItem {
@@ -665,7 +659,6 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             receiverRole = user.user_type === 'agent' ? 'agent' : 'seller';
             buyerId = room.buyerId;
             
-<<<<<<< Updated upstream
             // Fetch buyer information - check in order: cache, room data, Firebase document, inquiries, messages
             const buyerIdStr = buyerId ? String(buyerId) : '';
             let buyerInfo = buyerCache[buyerIdStr];
@@ -680,19 +673,11 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             });
             
             // Step 1: Check if buyer name is in the chat room data itself (from Firebase - already fetched)
-=======
-            // Fetch buyer information from cache, chat room data, or inquiries
-            const buyerIdStr = buyerId ? String(buyerId) : '';
-            let buyerInfo = buyerCache[buyerIdStr];
-            
-            // First check if buyer name is in the chat room data itself
->>>>>>> Stashed changes
             if (!buyerInfo && (room.buyerName || room.buyer_name)) {
               const buyerName = room.buyerName || room.buyer_name;
               if (buyerName && buyerName !== 'Buyer' && !buyerName.startsWith('Buyer ')) {
                 buyerInfo = {
                   name: buyerName,
-<<<<<<< Updated upstream
                   profile_image: room.buyerProfileImage || room.buyer_profile_image || undefined,
                 };
                 // Cache it
@@ -722,13 +707,6 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
                 }
               } catch (error) {
                 console.warn('[ChatList] Error checking Firebase document directly:', error);
-=======
-                  profile_image: undefined,
-                };
-                // Cache it
-                setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
-                console.log('[ChatList] Found buyer name in chat room data:', buyerName);
->>>>>>> Stashed changes
               }
             }
             
@@ -744,10 +722,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
               cacheMatch: Object.keys(buyerCache).includes(buyerIdStr),
             });
             
-<<<<<<< Updated upstream
             // Step 3: If still not found, try to fetch buyer info from inquiries
-=======
->>>>>>> Stashed changes
             if (!buyerInfo && buyerId) {
               console.log('[ChatList] Fetching buyer info for buyerId:', buyerId, 'propertyId:', propertyId);
               // Try to fetch buyer info from inquiries
@@ -866,18 +841,11 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
               console.log('[ChatList] Using cached buyer info for buyerId:', buyerId);
             }
             
-<<<<<<< Updated upstream
             // Step 4: If still no buyer info, check messages (buyer name might be in message sender info)
-=======
-            // If still no buyer info, try multiple fallbacks:
-            // 1. Check Firebase chat room document (in case it was stored there when chat was created)
-            // 2. Check first message in chat room (sender might have name stored)
->>>>>>> Stashed changes
             if (!buyerInfo && buyerId) {
               try {
                 const db = firestore();
                 if (db) {
-<<<<<<< Updated upstream
                   // Try to get buyer name from messages (check all messages from buyer)
                   const messagesSnapshot = await db
                     .collection('chats')
@@ -926,78 +894,6 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
                 }
               } catch (msgError) {
                 console.warn('[ChatList] Error checking messages for buyer name:', msgError);
-=======
-                  const chatRoomDoc = await db.collection('chats').doc(room.chatRoomId).get();
-                  if (chatRoomDoc.exists) {
-                    const roomData = chatRoomDoc.data();
-                    
-                    // Check if buyer name is stored in chat room document
-                    const storedBuyerName = roomData?.buyerName || roomData?.buyer_name;
-                    if (storedBuyerName && storedBuyerName !== 'Buyer' && !storedBuyerName.startsWith('Buyer ')) {
-                      buyerInfo = {
-                        name: storedBuyerName,
-                        profile_image: roomData?.buyerProfileImage || roomData?.buyer_profile_image || undefined,
-                      };
-                      const buyerIdStr = String(buyerId);
-                      setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
-                      console.log('[ChatList] ✅ Found buyer name in Firebase chat room document:', storedBuyerName);
-                    } else {
-                      // Try to get buyer name from messages (check all messages from buyer)
-                      try {
-                        const messagesSnapshot = await db
-                          .collection('chats')
-                          .doc(room.chatRoomId)
-                          .collection('messages')
-                          .orderBy('timestamp', 'asc')
-                          .get();
-                        
-                        if (!messagesSnapshot.empty) {
-                          // Look through all messages to find one from the buyer with name info
-                          for (const doc of messagesSnapshot.docs) {
-                            const messageData = doc.data();
-                            const senderId = String(messageData.senderId || '');
-                            
-                            // If message is from buyer, check if sender name is stored
-                            if (senderId === String(buyerId)) {
-                              const senderName = messageData.senderName || messageData.sender_name;
-                              if (senderName && senderName !== 'Buyer' && !senderName.startsWith('Buyer ')) {
-                                buyerInfo = {
-                                  name: senderName,
-                                  profile_image: messageData.senderProfileImage || messageData.sender_profile_image || undefined,
-                                };
-                                const buyerIdStr = String(buyerId);
-                                setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
-                                console.log('[ChatList] ✅ Found buyer name from message:', senderName);
-                                
-                                // Also update Firebase chat room document with buyer name
-                                try {
-                                  await db.collection('chats').doc(room.chatRoomId).update({
-                                    buyerName: buyerInfo.name,
-                                    ...(buyerInfo.profile_image && { buyerProfileImage: buyerInfo.profile_image }),
-                                  });
-                                  console.log('[ChatList] ✅ Updated Firebase chat room with buyer name from message');
-                                } catch (updateError) {
-                                  console.warn('[ChatList] Could not update Firebase with buyer name from message:', updateError);
-                                }
-                                break; // Found buyer name, no need to check more messages
-                              }
-                            }
-                          }
-                          
-                          // If still no buyer name found, log for debugging
-                          if (!buyerInfo) {
-                            console.warn('[ChatList] No buyer name found in any messages for buyerId:', buyerId);
-                          }
-                        }
-                      } catch (msgError) {
-                        console.warn('[ChatList] Error checking messages for buyer name:', msgError);
-                      }
-                    }
-                  }
-                }
-              } catch (error) {
-                console.warn('[ChatList] Error fetching buyer name from Firebase chat room:', error);
->>>>>>> Stashed changes
               }
             }
             
