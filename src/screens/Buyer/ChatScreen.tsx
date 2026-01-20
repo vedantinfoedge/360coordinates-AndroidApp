@@ -1,30 +1,676 @@
-import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import React, {useState, useEffect, useRef} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Animated,
+  Image,
+} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useAuth} from '../../context/AuthContext';
+import {RootStackParamList} from '../../navigation/AppNavigator';
+import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {ChatStackParamList} from '../../navigation/ChatNavigator';
+import {colors, spacing, typography, borderRadius} from '../../theme';
 import BuyerHeader from '../../components/BuyerHeader';
+import {useAuth} from '../../context/AuthContext';
+import {chatService} from '../../services/chat.service';
+import {propertyService} from '../../services/property.service';
+import {markChatAsRead} from '../../services/firebase.service';
+import {notificationService} from '../../services/notification.service';
+import firestore from '@react-native-firebase/firestore';
+import {FirebaseFirestoreTypes} from '@react-native-firebase/firestore';
+
+type ChatScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<any>,
+  CompositeNavigationProp<
+    BottomTabNavigationProp<BuyerTabParamList>,
+    NativeStackNavigationProp<RootStackParamList>
+  >
+>;
 
 type Props = {
-  navigation: NativeStackNavigationProp<any>;
+  navigation: ChatScreenNavigationProp;
 };
+
+interface ChatRoom {
+  id: string;
+  chatRoomId: string;
+  buyerId: string;
+  receiverId: string;
+  receiverRole: 'agent' | 'seller';
+  propertyId: string;
+  participants: string[];
+  lastMessage: string;
+  readStatus: {[userId: string]: 'new' | 'read'};
+  updatedAt: any;
+  receiverName?: string;
+  propertyTitle?: string;
+}
+
+interface ChatListItem {
+  id: string;
+  chatRoomId: string;
+  name: string;
+  lastMessage: string;
+  timestamp: string;
+  timestampMs?: number;
+  unreadCount: number;
+  propertyId?: string;
+  propertyTitle?: string;
+  receiverId?: string;
+  receiverRole?: 'agent' | 'seller';
+  buyerId?: string;
+  image?: string;
+  location?: string;
+  price?: string;
+}
 
 const ChatScreen: React.FC<Props> = ({navigation}) => {
   const {logout, user, isAuthenticated} = useAuth();
-  
+  const insets = useSafeAreaInsets();
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(30)).current;
+  const [chatList, setChatList] = useState<ChatListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [propertyCache, setPropertyCache] = useState<Record<string, any>>({});
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+
   // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
   const isGuest = !isLoggedIn;
-  
+
+  // Animate popup when component mounts
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  // Set up listener when component mounts or user changes
+  useEffect(() => {
+    // Clean up previous listener
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+
+    // Set up real-time listener for chat rooms
+    const unsubscribe = setupChatRoomsListener();
+    unsubscribeRef.current = unsubscribe;
+
+    // Also load chat rooms initially
+    loadChatRooms();
+
+    // Register refresh callback with notification service
+    notificationService.setChatListRefreshCallback(() => {
+      console.log('[BuyerChat] Refresh triggered by notification service');
+      loadChatRooms();
+    });
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+      // Unregister callback when component unmounts
+      notificationService.setChatListRefreshCallback(null);
+    };
+  }, [user?.id]);
+
+  // Refresh chat list when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('[BuyerChat] Screen focused - refreshing chat list');
+
+      // Reload chat rooms when screen comes into focus
+      loadChatRooms();
+
+      // Re-setup listener if it was cleaned up
+      if (!unsubscribeRef.current && user?.id) {
+        const unsubscribe = setupChatRoomsListener();
+        unsubscribeRef.current = unsubscribe;
+      }
+    }, [user?.id]),
+  );
+
+  const setupChatRoomsListener = () => {
+    if (!user?.id) return null;
+
+    try {
+      const db = firestore();
+      if (!db) {
+        console.warn('[BuyerChat] Firestore not available, using manual refresh');
+        return null;
+      }
+
+      const userIdStr = user.id.toString();
+
+      // Query without orderBy to avoid index requirement - we'll sort manually
+      const query = db
+        .collection('chats')
+        .where('participants', 'array-contains', userIdStr);
+
+      const unsubscribe = query.onSnapshot(
+        snapshot => {
+          try {
+            const chatRooms: ChatRoom[] = snapshot.docs.map(doc => {
+              const data = doc.data();
+              let updatedAt = new Date();
+
+              if (data.updatedAt) {
+                const firestoreTimestamp =
+                  data.updatedAt as FirebaseFirestoreTypes.Timestamp;
+                if (firestoreTimestamp && firestoreTimestamp.toDate) {
+                  updatedAt = firestoreTimestamp.toDate();
+                }
+              }
+
+              return {
+                id: doc.id,
+                chatRoomId: doc.id,
+                ...data,
+                updatedAt,
+              } as ChatRoom;
+            });
+
+            // Sort manually if orderBy didn't work
+            chatRooms.sort(
+              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+            );
+
+            processChatRooms(chatRooms).catch(error => {
+              console.error('[BuyerChat] Error processing chat rooms:', error);
+            });
+          } catch (error) {
+            console.error('[BuyerChat] Error processing snapshot:', error);
+          }
+        },
+        (error: any) => {
+          console.error('[BuyerChat] Listener error:', error);
+          // If error is due to missing index, fall back to manual load
+          if (error?.code === 'failed-precondition') {
+            console.warn(
+              '[BuyerChat] Firestore index required. Using manual refresh.',
+            );
+            loadChatRooms();
+          }
+        },
+      );
+
+      return unsubscribe;
+    } catch (error) {
+      console.error('[BuyerChat] Error setting up listener:', error);
+      // Fallback to manual refresh
+      loadChatRooms();
+      return null;
+    }
+  };
+
+  const loadChatRooms = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response: any = await chatService.getConversations(user.id);
+
+      if (response && (response.success || response.data) && response.data) {
+        const chatRooms = Array.isArray(response.data) ? response.data : [];
+        await processChatRooms(chatRooms as ChatRoom[]);
+      } else {
+        setChatList([]);
+      }
+    } catch (error: any) {
+      console.error('[BuyerChat] Error loading chat rooms:', error);
+      setChatList([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const processChatRooms = async (chatRooms: ChatRoom[]) => {
+    if (!user?.id) return;
+
+    const userIdStr = user.id.toString();
+    const isBuyer = user.user_type === 'buyer';
+
+    // Filter chat rooms for buyers: Show rooms where buyerId === user.id
+    let filteredRooms = chatRooms;
+    if (isBuyer) {
+      filteredRooms = chatRooms.filter(room => room.buyerId === userIdStr);
+    }
+
+    // Enrich each chat room with property and participant data
+    const enrichedChats = await Promise.all(
+      filteredRooms.map(async room => {
+        try {
+          const propertyId = room.propertyId;
+          if (!propertyId) {
+            console.warn('[BuyerChat] No propertyId for room:', room.chatRoomId);
+            return null;
+          }
+
+          // Get property details (with caching)
+          let property = propertyCache[propertyId];
+          if (!property) {
+            try {
+              const propResponse: any =
+                await propertyService.getPropertyDetails(propertyId);
+              if (propResponse?.success && propResponse.data?.property) {
+                property = propResponse.data.property;
+                setPropertyCache(prev => ({...prev, [propertyId]: property}));
+              } else {
+                setPropertyCache(prev => ({...prev, [propertyId]: null}));
+              }
+            } catch (error: any) {
+              if (error?.status === 404 || error?.response?.status === 404) {
+                console.log(
+                  '[BuyerChat] Property not found (may be deleted):',
+                  propertyId,
+                );
+                setPropertyCache(prev => ({...prev, [propertyId]: null}));
+              } else {
+                console.warn(
+                  '[BuyerChat] Error fetching property:',
+                  propertyId,
+                  error?.message || error,
+                );
+              }
+            }
+          }
+
+          if (property === null) {
+            property = undefined;
+          }
+
+          // Determine display name and info for buyer view
+          const ownerUserType =
+            property?.user_type ||
+            property?.seller?.user_type ||
+            property?.owner?.user_type;
+
+          const receiverId = String(
+            property?.user_id ||
+              property?.seller?.id ||
+              property?.owner?.id ||
+              room.receiverId,
+          );
+          const receiverRole =
+            ownerUserType === 'agent' ? 'agent' : 'seller';
+
+          const displayName =
+            property?.seller?.name ||
+            property?.seller?.full_name ||
+            property?.owner?.name ||
+            property?.owner?.full_name ||
+            room.receiverName ||
+            `Property Owner`;
+          const displayImage =
+            property?.seller?.profile_image ||
+            property?.owner?.profile_image ||
+            property?.cover_image;
+
+          // Format price
+          const price = property?.price
+            ? `₹${parseFloat(String(property.price)).toLocaleString('en-IN')}${
+                property.status === 'rent' ? '/Month' : ''
+              }`
+            : '';
+
+          // Format timestamp
+          const timestamp = formatTimestamp(room.updatedAt);
+
+          // Get unread count
+          const readStatus = room.readStatus || {};
+          const myReadStatus = readStatus[userIdStr];
+          const unreadCount =
+            myReadStatus === 'new' || myReadStatus === undefined ? 1 : 0;
+
+          return {
+            id: room.chatRoomId,
+            chatRoomId: room.chatRoomId,
+            name: displayName,
+            lastMessage: room.lastMessage || 'No messages yet',
+            timestamp,
+            timestampMs:
+              room.updatedAt instanceof Date
+                ? room.updatedAt.getTime()
+                : room.updatedAt?.toDate?.()?.getTime() || Date.now(),
+            unreadCount,
+            propertyId: room.propertyId,
+            propertyTitle: property?.title || room.propertyTitle || 'Property',
+            receiverId: receiverId,
+            receiverRole: receiverRole,
+            buyerId: room.buyerId,
+            image: displayImage,
+            location: property?.location || '',
+            price: price,
+          };
+        } catch (error) {
+          console.error(
+            '[BuyerChat] Error processing room:',
+            room.chatRoomId,
+            error,
+          );
+          return {
+            id: room.chatRoomId,
+            chatRoomId: room.chatRoomId,
+            name: room.receiverName || `Property Owner`,
+            lastMessage: room.lastMessage || 'No messages yet',
+            timestamp: formatTimestamp(room.updatedAt),
+            timestampMs:
+              room.updatedAt instanceof Date
+                ? room.updatedAt.getTime()
+                : room.updatedAt?.toDate?.()?.getTime() || Date.now(),
+            unreadCount:
+              ((room.readStatus || {})[userIdStr] === 'new' ||
+                (room.readStatus || {})[userIdStr] === undefined)
+                ? 1
+                : 0,
+            propertyId: room.propertyId,
+            propertyTitle: room.propertyTitle,
+            receiverId: room.receiverId,
+            receiverRole: room.receiverRole || 'seller',
+            buyerId: room.buyerId,
+          };
+        }
+      }),
+    );
+
+    // Filter out null values
+    let validChats = enrichedChats.filter(chat => chat !== null) as ChatListItem[];
+
+    // Deduplicate: Keep only the most recent conversation per property
+    const uniqueByProperty = new Map<string, ChatListItem>();
+
+    validChats.forEach(chat => {
+      const key = chat.propertyId || chat.chatRoomId;
+      const existing = uniqueByProperty.get(key);
+
+      if (!existing) {
+        uniqueByProperty.set(key, chat);
+      } else {
+        const existingTime = existing.timestampMs || 0;
+        const currentTime = chat.timestampMs || 0;
+
+        if (currentTime > existingTime) {
+          uniqueByProperty.set(key, chat);
+        }
+      }
+    });
+
+    // Convert map back to array and sort by timestamp (most recent first)
+    const uniqueChats = Array.from(uniqueByProperty.values());
+    uniqueChats.sort((a, b) => {
+      const timeA = a.timestampMs || 0;
+      const timeB = b.timestampMs || 0;
+      return timeB - timeA;
+    });
+
+    setChatList(uniqueChats);
+  };
+
+  const formatTimestamp = (date: Date | any): string => {
+    if (!date) return 'Just now';
+
+    let dateObj: Date;
+    if (date instanceof Date) {
+      dateObj = date;
+    } else if (date?.toDate && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else {
+      return 'Just now';
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - dateObj.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d`;
+
+    return dateObj.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadChatRooms();
+  };
+
+  const renderChatItem = ({item}: {item: ChatListItem}) => {
+    const initials = item.name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+
+    return (
+      <TouchableOpacity
+        style={styles.chatItem}
+        onPress={async () => {
+          // Mark chat as read when opening conversation
+          if (item.unreadCount > 0 && user?.id) {
+            try {
+              await markChatAsRead(item.chatRoomId, user.id);
+              console.log('[BuyerChat] Marked chat as read:', item.chatRoomId);
+            } catch (error) {
+              console.error('[BuyerChat] Error marking chat as read:', error);
+            }
+          }
+
+          // Navigate to chat conversation
+          navigation.navigate('Chats', {
+            screen: 'ChatConversation',
+            params: {
+              conversationId: item.chatRoomId,
+              userId: item.receiverId ? Number(item.receiverId) : undefined,
+              userName: item.name,
+              propertyId: item.propertyId
+                ? Number(item.propertyId)
+                : undefined,
+              propertyTitle: item.propertyTitle,
+              receiverRole: item.receiverRole,
+            },
+          });
+        }}
+        activeOpacity={0.7}>
+        {/* Avatar */}
+        <View style={styles.avatarContainer}>
+          {item.image ? (
+            <Image
+              source={{uri: item.image}}
+              style={[
+                styles.avatar,
+                styles.avatarImage,
+                item.unreadCount > 0 && styles.avatarUnread,
+              ]}
+            />
+          ) : (
+            <View
+              style={[
+                styles.avatar,
+                item.unreadCount > 0 && styles.avatarUnread,
+              ]}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Chat Info */}
+        <View style={styles.chatInfo}>
+          <View style={styles.chatHeader}>
+            <Text
+              style={[
+                styles.chatName,
+                item.unreadCount > 0 && styles.chatNameUnread,
+              ]}
+              numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={styles.timestamp}>{item.timestamp}</Text>
+          </View>
+          {item.propertyTitle && (
+            <Text style={styles.propertyTitle} numberOfLines={1}>
+              {item.propertyTitle}
+            </Text>
+          )}
+          <View style={styles.messageRow}>
+            <Text
+              style={[
+                styles.lastMessage,
+                item.unreadCount > 0 && styles.lastMessageUnread,
+              ]}
+              numberOfLines={1}>
+              {item.lastMessage}
+            </Text>
+            {item.unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>
+                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Show login prompt if user is not authenticated (guest)
+  if (!isAuthenticated || !user) {
+    return (
+      <View style={styles.container}>
+        <BuyerHeader
+          onProfilePress={() => {}}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={() => {}}
+          onSignInPress={() => {
+            (navigation as any).navigate('Auth', {
+              screen: 'Login',
+              params: {returnTo: 'Chats'},
+            });
+          }}
+          onSignUpPress={() => {
+            (navigation as any).navigate('Auth', {screen: 'Register'});
+          }}
+          showLogout={false}
+          showProfile={false}
+          showSignIn={true}
+          showSignUp={true}
+        />
+        <Animated.View
+          style={[
+            styles.loginContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{translateY: slideAnim}],
+              paddingTop: insets.top + 70,
+            },
+          ]}>
+          <View style={styles.loginContent}>
+            <View style={styles.loginIconContainer}>
+              <Text style={styles.loginIcon}>💬</Text>
+            </View>
+            <Text style={styles.loginTitle}>Login Required</Text>
+            <Text style={styles.loginSubtitle}>
+              Please login to view and manage your chats with property owners
+            </Text>
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={() => {
+                (navigation as any).navigate('Auth', {
+                  screen: 'Login',
+                  params: {returnTo: 'Chats'},
+                });
+              }}
+              activeOpacity={0.8}>
+              <Text style={styles.loginButtonText}>Login / Register</Text>
+            </TouchableOpacity>
+            <Text style={styles.loginNote}>
+              Login to access your conversations with property owners and agents
+            </Text>
+          </View>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  if (loading && chatList.length === 0) {
+    return (
+      <View style={styles.container}>
+        <BuyerHeader
+          onProfilePress={() => navigation.navigate('Profile')}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={isLoggedIn ? logout : undefined}
+          onSignInPress={
+            isGuest
+              ? () =>
+                  (navigation as any).navigate('Auth', {
+                    screen: 'Login',
+                    params: {returnTo: 'Chats'},
+                  })
+              : undefined
+          }
+          onSignUpPress={
+            isGuest
+              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+              : undefined
+          }
+          showLogout={isLoggedIn}
+          showProfile={isLoggedIn}
+          showSignIn={isGuest}
+          showSignUp={isGuest}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading chats...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={
           isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            ? () =>
+                (navigation as any).navigate('Auth', {
+                  screen: 'Login',
+                  params: {returnTo: 'Chats'},
+                })
             : undefined
         }
         onSignUpPress={
@@ -37,10 +683,32 @@ const ChatScreen: React.FC<Props> = ({navigation}) => {
         showSignIn={isGuest}
         showSignUp={isGuest}
       />
-      <View style={styles.content}>
-        <Text style={styles.title}>Chat</Text>
-      </View>
-    </SafeAreaView>
+      {chatList.length > 0 ? (
+        <FlatList
+          data={chatList}
+          renderItem={renderChatItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>💬</Text>
+          <Text style={styles.emptyText}>No chats yet</Text>
+          <Text style={styles.emptySubtext}>
+            Start a conversation by chatting with a property owner
+          </Text>
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -49,14 +717,210 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  content: {
+  listContent: {
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  chatItem: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E0E0E0',
+    alignItems: 'center',
+    minHeight: 72,
+  },
+  avatarContainer: {
+    marginRight: spacing.md,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 0,
+  },
+  avatarImage: {
+    backgroundColor: 'transparent',
+  },
+  avatarUnread: {
+    backgroundColor: colors.secondary,
+  },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  chatInfo: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingRight: spacing.xs,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  chatName: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: '#000000',
+    flex: 1,
+  },
+  chatNameUnread: {
+    fontWeight: '600',
+  },
+  propertyTitle: {
+    fontSize: 13,
+    color: '#667781',
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  timestamp: {
+    fontSize: 13,
+    color: '#667781',
+    marginLeft: spacing.sm,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: '#667781',
+    flex: 1,
+    marginRight: spacing.xs,
+  },
+  lastMessageUnread: {
+    color: '#000000',
+    fontWeight: '500',
+  },
+  unreadBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    marginLeft: spacing.xs,
+  },
+  unreadText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.xl,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  emptyText: {
+    ...typography.h3,
+    color: colors.text,
+    marginBottom: spacing.sm,
+    fontWeight: '600',
+  },
+  emptySubtext: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  loginContent: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    borderWidth: 2,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loginIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  loginIcon: {
+    fontSize: 50,
+  },
+  loginTitle: {
+    ...typography.h1,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  loginSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 22,
+  },
+  loginButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  loginButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  loginNote: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 18,
   },
 });
 
