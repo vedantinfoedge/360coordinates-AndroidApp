@@ -226,12 +226,32 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
 
     try {
       setLoading(true);
+      console.log('[ChatList] Loading chat rooms for user:', {
+        userId: user.id,
+        userType: user.user_type,
+      });
       const response: any = await chatService.getConversations(user.id);
+      
+      console.log('[ChatList] Chat service response:', {
+        success: response?.success,
+        hasData: !!response?.data,
+        dataLength: Array.isArray(response?.data) ? response.data.length : 0,
+        sampleRoom: Array.isArray(response?.data) && response.data.length > 0 ? {
+          id: response.data[0].id,
+          chatRoomId: response.data[0].chatRoomId,
+          buyerId: response.data[0].buyerId,
+          receiverId: response.data[0].receiverId,
+          participants: response.data[0].participants,
+          allKeys: Object.keys(response.data[0] || {}),
+        } : null,
+      });
       
       if (response && (response.success || response.data) && response.data) {
         const chatRooms = Array.isArray(response.data) ? response.data : [];
+        console.log('[ChatList] Processing', chatRooms.length, 'chat rooms');
         await processChatRooms(chatRooms as ChatRoom[]);
       } else {
+        console.warn('[ChatList] No chat rooms in response, setting empty list');
         setChatList([]);
       }
     } catch (error: any) {
@@ -250,14 +270,74 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     const isBuyer = user.user_type === 'buyer';
     const isSellerOrAgent = user.user_type === 'seller' || user.user_type === 'agent';
     
+    console.log('[ChatList] Processing chat rooms:', {
+      totalRooms: chatRooms.length,
+      userId: user.id,
+      userIdStr,
+      userType: user.user_type,
+      isBuyer,
+      isSellerOrAgent,
+      sampleRoom: chatRooms.length > 0 ? {
+        id: chatRooms[0].id,
+        buyerId: chatRooms[0].buyerId,
+        receiverId: chatRooms[0].receiverId,
+        receiverIdType: typeof chatRooms[0].receiverId,
+        buyerIdType: typeof chatRooms[0].buyerId,
+      } : null,
+    });
+    
     // Filter chat rooms based on user role (like website)
     // Buyers: Show rooms where buyerId === user.id (user is the buyer)
     // Sellers/Agents: Show rooms where receiverId === user.id (user is the receiver/seller)
     let filteredRooms = chatRooms;
     if (isBuyer) {
-      filteredRooms = chatRooms.filter(room => room.buyerId === userIdStr);
+      filteredRooms = chatRooms.filter(room => {
+        const matches = String(room.buyerId) === userIdStr;
+        return matches;
+      });
+      console.log('[ChatList] Buyer filter - filtered rooms:', filteredRooms.length, 'from', chatRooms.length);
     } else if (isSellerOrAgent) {
-      filteredRooms = chatRooms.filter(room => room.receiverId === userIdStr);
+      filteredRooms = chatRooms.filter(room => {
+        // Convert both to strings for comparison to handle type mismatches
+        const roomReceiverId = String(room.receiverId || '');
+        const matches = roomReceiverId === userIdStr;
+        
+        // Fallback: If receiverId doesn't match but user is in participants and is NOT the buyer, include it
+        if (!matches && room.participants && Array.isArray(room.participants)) {
+          const isParticipant = room.participants.some(p => String(p) === userIdStr);
+          const isNotBuyer = String(room.buyerId || '') !== userIdStr;
+          if (isParticipant && isNotBuyer) {
+            console.log('[ChatList] Including room via fallback (participant check):', {
+              roomId: room.chatRoomId,
+              receiverId: room.receiverId,
+              buyerId: room.buyerId,
+              participants: room.participants,
+            });
+            return true;
+          }
+        }
+        
+        if (!matches && room.receiverId) {
+          console.log('[ChatList] Room filtered out:', {
+            roomId: room.chatRoomId,
+            roomReceiverId: room.receiverId,
+            roomReceiverIdType: typeof room.receiverId,
+            userIdStr,
+            userIdStrType: typeof userIdStr,
+            participants: room.participants,
+          });
+        }
+        return matches;
+      });
+      console.log('[ChatList] Seller/Agent filter - filtered rooms:', filteredRooms.length, 'from', chatRooms.length);
+      if (filteredRooms.length === 0 && chatRooms.length > 0) {
+        console.warn('[ChatList] No rooms matched filter! Sample rooms:', chatRooms.slice(0, 3).map(r => ({
+          id: r.id,
+          buyerId: r.buyerId,
+          receiverId: r.receiverId,
+          participants: r.participants,
+        })));
+      }
     }
     
     // Enrich each chat room with property and participant data
@@ -671,8 +751,11 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
         <FlatList
           data={chatList}
           renderItem={renderChatItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          keyExtractor={(item: ChatListItem) => item.id}
+          contentContainerStyle={[
+            styles.listContent,
+            {paddingTop: insets.top + 60 + spacing.md * 2},
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -684,7 +767,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           }
         />
       ) : (
-        <View style={styles.emptyContainer}>
+        <View style={[styles.emptyContainer, {paddingTop: insets.top + 60 + spacing.md * 2}]}>
           <Text style={styles.emptyIcon}>💬</Text>
           <Text style={styles.emptyText}>No chats yet</Text>
           <Text style={styles.emptySubtext}>Start a conversation by chatting with a property owner</Text>
@@ -700,14 +783,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   listContent: {
-    paddingTop: spacing.md,
     paddingBottom: spacing.xs,
+    flexGrow: 1,
   },
   // WhatsApp-style chat item
   chatItem: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E0E0',
