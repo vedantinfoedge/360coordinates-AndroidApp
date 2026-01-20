@@ -71,8 +71,8 @@ The form supports the following property types, grouped by category:
 | Bedrooms | ❌ No | ❌ No |
 | Bathrooms | ✅ Yes | ✅ Yes |
 | Balconies | ✅ Yes | - |
-| Floor | ✅ Yes | - |
-| Total Floors | ✅ Yes | - |
+| Floor     | ✅ Yes | - |
+| Total Flo | ✅ Yes | - |
 | Facing | ✅ Yes | - |
 | Furnishing | ✅ Yes | - |
 | Age | ✅ Yes | - |

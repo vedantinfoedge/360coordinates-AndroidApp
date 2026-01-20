@@ -118,5 +118,17 @@ export const sellerService = {
     });
     return response;
   },
+
+  /**
+   * Delete property (seller/agent).
+   * Matches website: DELETE /seller/properties/delete.php?id={id}
+   * Backend: requireUserType(['seller', 'agent']), checks ownership.
+   */
+  deleteProperty: async (propertyId: string | number) => {
+    const response = await api.delete(
+      `${API_ENDPOINTS.SELLER_PROPERTIES_DELETE}?id=${propertyId}`,
+    );
+    return response;
+  },
 };
 

@@ -16,7 +16,6 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
 import {sellerService} from '../../services/seller.service';
-import {propertyService} from '../../services/property.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 
@@ -202,7 +201,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
               const propertyIdStr = String(propertyId);
               setProperties(prev => prev.filter(p => String(p.id) !== propertyIdStr));
 
-              const response: any = await propertyService.deleteProperty(propertyIdStr);
+              const response: any = await sellerService.deleteProperty(propertyIdStr);
 
               const isSuccess =
                 response?.success === true ||

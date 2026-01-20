@@ -19,7 +19,6 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
-import {propertyService} from '../../services/property.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
@@ -433,7 +432,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
               setProperties(prev => prev.filter(p => String(p.id) !== propertyIdStr));
               
               // Call API to delete from database
-              const response: any = await propertyService.deleteProperty(propertyIdStr);
+              const response: any = await sellerService.deleteProperty(propertyIdStr);
               
               console.log('[SellerProperties] Delete API response:', response);
               
