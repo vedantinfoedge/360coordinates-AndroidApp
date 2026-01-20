@@ -8,6 +8,7 @@ import {
   ModerationData,
   EnhancedImageUploadResult,
 } from './moderation.types';
+import {uploadImageToFirebase, UploadResult} from './firebaseStorage.service';
 
 export type ModerationStatus = 'SAFE' | 'UNSAFE' | 'PENDING';
 
@@ -482,6 +483,74 @@ export const moderationService = {
       reason: reason || 'Image does not meet quality standards',
     });
     return response;
+  },
+
+  /**
+   * Upload image with moderation, then optionally upload to Firebase Storage
+   * This provides a hybrid approach: moderation via backend, storage via Firebase
+   * 
+   * @param imageUri Local image URI
+   * @param propertyId Property ID (0 for validation-only)
+   * @param validateOnly If true, only validates without saving
+   * @param useFirebaseStorage If true, upload to Firebase Storage after moderation approval
+   * @returns ImageUploadResult with image_url (from backend or Firebase)
+   */
+  uploadWithModerationAndFirebase: async (
+    imageUri: string,
+    propertyId?: number | string,
+    validateOnly: boolean = false,
+    useFirebaseStorage: boolean = false,
+  ): Promise<ImageUploadResult> => {
+    // Step 1: Upload with moderation (existing flow)
+    const moderationResult = await moderationService.uploadWithModeration(
+      imageUri,
+      propertyId,
+      validateOnly,
+    );
+
+    // Step 2: If moderation approved and Firebase Storage is enabled, upload to Firebase
+    if (
+      useFirebaseStorage &&
+      moderationResult.status === 'approved' &&
+      moderationResult.image_url
+    ) {
+      try {
+        const firebaseResult = await uploadImageToFirebase(imageUri, {
+          propertyId: propertyId || undefined,
+          compress: true,
+          quality: 0.8,
+        });
+
+        if (firebaseResult.success && firebaseResult.downloadUrl) {
+          // Return Firebase URL instead of backend URL
+          return {
+            ...moderationResult,
+            image_url: firebaseResult.downloadUrl,
+            // Add metadata to indicate it's from Firebase
+            rawData: {
+              ...(moderationResult.rawData || {}),
+              storage_type: 'firebase',
+              firebase_path: firebaseResult.path,
+            },
+          };
+        } else {
+          // Firebase upload failed, but moderation succeeded
+          // Return backend URL as fallback
+          console.warn(
+            '[ModerationService] Firebase upload failed, using backend URL:',
+            firebaseResult.error,
+          );
+          return moderationResult;
+        }
+      } catch (firebaseError) {
+        console.error('[ModerationService] Firebase upload error:', firebaseError);
+        // Return backend URL as fallback
+        return moderationResult;
+      }
+    }
+
+    // Return moderation result (backend URL)
+    return moderationResult;
   },
 };
 

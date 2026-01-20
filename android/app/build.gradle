@@ -135,6 +135,8 @@ dependencies {
     // Add other Firebase products as needed:
     // https://firebase.google.com/docs/android/setup#available-libraries
     // implementation 'com.google.firebase:firebase-auth'
+    // Note: Firebase Storage is handled by @react-native-firebase/storage package
+    // No need to add it here as React Native Firebase manages native dependencies
     // implementation 'com.google.firebase:firebase-storage'
 }
 
