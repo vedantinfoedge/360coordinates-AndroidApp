@@ -1,6 +1,5 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {View, Text} from 'react-native';
 import AgentDashboardScreen from '../../screens/Agent/AgentDashboardScreen';
 import AgentPropertiesScreen from '../../screens/Agent/AgentPropertiesScreen';
 import AgentInquiriesScreen from '../../screens/Agent/AgentInquiriesScreen';
@@ -10,14 +9,12 @@ import AddPropertyScreen from '../../screens/Agent/AddPropertyScreen';
 import AddProjectScreen from '../../screens/Agent/AddProjectScreen';
 import EditPropertyScreen from '../../screens/Agent/EditPropertyScreen';
 import AgentSupportScreen from '../../screens/Agent/AgentSupportScreen';
-import ChatNavigator from '../../navigation/ChatNavigator';
 import {colors} from '../../theme';
-import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
+import {Text} from 'react-native';
 
 export type AgentTabParamList = {
   Dashboard: undefined;
   Listings: undefined;
-  Chat: undefined;
   Inquiries: undefined;
   Profile: undefined;
   PropertyDetails: {propertyId: string};
@@ -30,8 +27,6 @@ export type AgentTabParamList = {
 const Tab = createBottomTabNavigator<AgentTabParamList>();
 
 const AgentTabNavigator = () => {
-  const unreadCount = useUnreadChatCount();
-
   return (
     <Tab.Navigator
       screenOptions={{
@@ -104,51 +99,12 @@ const AgentTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Chat"
-        component={ChatNavigator}
-        options={{
-          title: 'Chat',
-          headerShown: false,
-          tabBarIcon: ({color}) => (
-            <View style={{position: 'relative', alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
-              {unreadCount > 0 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -8,
-                    backgroundColor: '#FF3B30',
-                    borderRadius: 10,
-                    minWidth: 18,
-                    height: 18,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingHorizontal: 4,
-                    borderWidth: 2,
-                    borderColor: colors.surface,
-                  }}>
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 10,
-                      fontWeight: 'bold',
-                    }}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
         name="Inquiries"
         component={AgentInquiriesScreen}
         options={{
           title: 'Inquiries',
           tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>📨</Text>
+            <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
           ),
         }}
       />
