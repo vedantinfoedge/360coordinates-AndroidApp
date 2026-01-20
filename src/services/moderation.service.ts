@@ -197,6 +197,17 @@ export const moderationService = {
         };
       }
 
+      // Log full response for debugging
+      console.log('[ModerationService] Full API response:', {
+        status: res.status,
+        ok: res.ok,
+        responseKeys: Object.keys(response || {}),
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        responsePreview: JSON.stringify(response).substring(0, 500),
+        fullResponse: JSON.stringify(response, null, 2), // Full response for debugging
+      });
+
       if (!res.ok) {
         // Normalize into the same shape our code already expects.
         response = {
@@ -233,19 +244,34 @@ export const moderationService = {
         // Analyze detection data (faces, objects, labels) if available
         const detection = moderationData ? analyzeDetection(moderationData) : undefined;
 
-        // Extract image URL - prefer image_url, then relative_path
-        // Backend returns full URL in image_url or relative path in relative_path
+        // Extract image URL - check multiple possible locations
+        // Backend might return URL in different places depending on validate_only flag
         // Format: image_url = "https://demo1.indiapropertys.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
         //         relative_path = "properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
         let imageUrl = moderationData.image_url || 
                       moderationData.relative_path || 
                       (response.data as any).image_url ||
-                      (response.data as any).relative_path;
+                      (response.data as any).relative_path ||
+                      response.image_url || // Check top-level response
+                      response.relative_path; // Check top-level response
+        
+        console.log('[ModerationService] URL extraction:', {
+          fromModerationData: !!moderationData.image_url || !!moderationData.relative_path,
+          fromResponseData: !!(response.data as any)?.image_url || !!(response.data as any)?.relative_path,
+          fromTopLevel: !!response.image_url || !!response.relative_path,
+          foundUrl: !!imageUrl,
+          urlPreview: imageUrl?.substring(0, 80),
+        });
         
         // Fix image URL if it's a relative path
         if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
           const {fixImageUrl} = require('../utils/imageHelper');
-          imageUrl = fixImageUrl(imageUrl) || imageUrl;
+          const fixedUrl = fixImageUrl(imageUrl);
+          console.log('[ModerationService] Fixed relative URL:', {
+            original: imageUrl.substring(0, 50),
+            fixed: fixedUrl?.substring(0, 80),
+          });
+          imageUrl = fixedUrl || imageUrl;
         }
         
         return {

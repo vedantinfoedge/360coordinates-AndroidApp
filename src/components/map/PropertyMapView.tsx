@@ -142,8 +142,8 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           setSelectedPropertyId(String(currentProperty.id));
           checkFavoriteStatus(String(currentProperty.id));
           
-          // Load related properties (same area, similar type)
-          await loadRelatedProperties(lat, lng, currentProperty.status || currentProperty.property_status);
+          // Load related properties (same area, similar type) and pass current property
+          await loadRelatedProperties(lat, lng, currentProperty.status || currentProperty.property_status, formattedProperty);
         }
       }
     } catch (error) {
@@ -155,7 +155,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     }
   };
 
-  const loadRelatedProperties = async (centerLat: number, centerLng: number, propertyStatus?: string) => {
+  const loadRelatedProperties = async (centerLat: number, centerLng: number, propertyStatus?: string, currentProperty?: Property) => {
     try {
       // Build status filter based on listing type or property status
       let statusFilter: 'sale' | 'rent' | 'pg' | undefined = undefined;
@@ -201,16 +201,27 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
             cover_image: prop.cover_image || prop.image,
           }));
         
-        // Add current property to the list if it exists
-        if (selectedProperty) {
-          formattedProperties = [selectedProperty, ...formattedProperties];
+        // Always add current property to the list if provided (for pinning on map)
+        if (currentProperty) {
+          formattedProperties = [currentProperty, ...formattedProperties];
         }
         
         setProperties(formattedProperties);
-        log.property(`Loaded ${formattedProperties.length} related properties for map`);
+        log.property(`Loaded ${formattedProperties.length} related properties for map (including current property)`);
+      } else {
+        // If no related properties found, still add current property to show it on map
+        if (currentProperty) {
+          setProperties([currentProperty]);
+          log.property(`No related properties found, showing only current property on map`);
+        }
       }
     } catch (error) {
       log.error('property', 'Error loading related properties', error);
+      // Even if error occurs, show current property on map
+      if (currentProperty) {
+        setProperties([currentProperty]);
+        log.property(`Error loading related properties, showing only current property on map`);
+      }
     }
   };
 
