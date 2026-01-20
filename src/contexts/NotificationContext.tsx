@@ -1,5 +1,5 @@
 import React, {createContext, useContext, useState, useCallback} from 'react';
-import {View, StyleSheet} from 'react-native';
+import {View, StyleSheet, ImageSourcePropType} from 'react-native';
 import CustomNotification from '../components/common/CustomNotification';
 
 interface Notification {
@@ -8,6 +8,8 @@ interface Notification {
   message: string;
   type?: 'info' | 'success' | 'error' | 'warning';
   duration?: number;
+  image?: ImageSourcePropType | string;
+  onPress?: () => void;
 }
 
 interface NotificationContextType {
@@ -16,6 +18,8 @@ interface NotificationContextType {
     message: string,
     type?: 'info' | 'success' | 'error' | 'warning',
     duration?: number,
+    image?: ImageSourcePropType | string,
+    onPress?: () => void,
   ) => void;
 }
 
@@ -42,6 +46,8 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({
       message: string,
       type: 'info' | 'success' | 'error' | 'warning' = 'info',
       duration: number = 4000,
+      image?: ImageSourcePropType | string,
+      onPress?: () => void,
     ) => {
       const id = `${Date.now()}-${Math.random()}`;
       const notification: Notification = {
@@ -50,6 +56,8 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({
         message,
         type,
         duration,
+        image,
+        onPress,
       };
 
       setNotifications(prev => [...prev, notification]);
@@ -67,7 +75,7 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({
       <View style={styles.container} pointerEvents="box-none">
         {notifications.map((notification, index) => {
           // Calculate position with safe area offset and stacking
-          const topOffset = 50 + index * 90;
+          const topOffset = 50 + index * 95;
           return (
             <View
               key={notification.id}
@@ -81,6 +89,8 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({
                 message={notification.message}
                 type={notification.type}
                 duration={notification.duration}
+                image={notification.image}
+                onPress={notification.onPress}
                 onDismiss={dismissNotification}
               />
             </View>
