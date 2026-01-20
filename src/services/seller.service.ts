@@ -130,5 +130,18 @@ export const sellerService = {
     );
     return response;
   },
+
+  /**
+   * Update property (seller/agent).
+   * Matches website: PUT /seller/properties/update.php
+   * Backend: requireUserType(['seller', 'agent']), checks ownership.
+   */
+  updateProperty: async (propertyId: string | number, propertyData: any) => {
+    const response = await api.put(API_ENDPOINTS.SELLER_PROPERTIES_UPDATE, {
+      property_id: propertyId,
+      ...propertyData,
+    });
+    return response;
+  },
 };
 

@@ -272,32 +272,30 @@ export const propertyService = {
     return propertyService.getProperties(params);
   },
 
-  // Create property (for sellers - uses /seller/properties/add.php)
+  /**
+   * Create property (seller/agent).
+   * Same endpoint for both: /seller/properties/add.php (requireUserType(['seller','agent'])).
+   * Backend: agents skip property limit; sellers are limited by subscription.
+   */
   createProperty: async (propertyData: any, userType: 'seller' | 'agent' = 'seller') => {
     // According to guide: images can be sent as base64 strings or URLs in the request body
-    // Extract images from propertyData
     const {images, ...dataWithoutImages} = propertyData;
     
-    // Prepare the request data
     const requestData = {
       ...dataWithoutImages,
-      // Include images array if provided (as URLs or base64 strings)
       images: images && Array.isArray(images) && images.length > 0 ? images : undefined,
     };
     
-    // Remove undefined/null values
     Object.keys(requestData).forEach(key => {
       if (requestData[key] === undefined || requestData[key] === null || requestData[key] === '') {
         delete requestData[key];
       }
     });
     
-    // Use correct endpoint based on user type
-    const endpoint = userType === 'seller' 
-      ? API_ENDPOINTS.SELLER_PROPERTIES_ADD 
-      : API_ENDPOINTS.PROPERTY_CREATE; // Fallback for agents (may need separate endpoint)
+    // Same endpoint for seller and agent (website: sellerPropertiesAPI.add for both)
+    const endpoint = API_ENDPOINTS.SELLER_PROPERTIES_ADD;
     
-    console.log('[PropertyService] Creating property with endpoint:', endpoint);
+    console.log('[PropertyService] Creating property with endpoint:', endpoint, 'userType:', userType);
     console.log('[PropertyService] Request data:', JSON.stringify(requestData, null, 2));
     
     const response = await api.post(endpoint, requestData);

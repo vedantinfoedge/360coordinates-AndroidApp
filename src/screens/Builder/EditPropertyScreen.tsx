@@ -16,6 +16,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import BuilderHeader from '../../components/BuilderHeader';
 import {propertyService} from '../../services/property.service';
+import {sellerService} from '../../services/seller.service';
 import {formatters} from '../../utils/formatters';
 
 type EditPropertyScreenNavigationProp = NativeStackNavigationProp<
@@ -124,7 +125,7 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
         // You can expand this based on your requirements
       }
       
-      const response = await propertyService.updateProperty(route.params.propertyId, updateData);
+      const response = await sellerService.updateProperty(route.params.propertyId, updateData);
       
       if (response && response.success) {
         Alert.alert('Success', 'Project updated successfully', [

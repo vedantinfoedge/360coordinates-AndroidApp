@@ -462,11 +462,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         images: imageBase64Strings.length > 0 ? imageBase64Strings : undefined,
       };
 
-      console.log('[AddProperty] Creating property with endpoint: /agent/properties/add.php');
+      console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
       console.log('[AddProperty] Images included as base64:', imageBase64Strings.length);
 
-      // Create property with images included in request
-      // Use 'agent' userType to use correct endpoint
+      // Same endpoint as seller; backend skips property limit for agents
       const response: any = await propertyService.createProperty(propertyData, 'agent');
       
       if (response && response.success) {
