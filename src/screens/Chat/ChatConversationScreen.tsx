@@ -23,6 +23,7 @@ import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import {chatService} from '../../services/chat.service';
+import firestore from '@react-native-firebase/firestore';
 
 type ChatConversationScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<ChatStackParamList, 'ChatConversation'>,
@@ -53,6 +54,15 @@ interface Message {
 const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const {conversationId, userId, userName, propertyId, propertyTitle, receiverRole} = route.params || {};
   const {logout, user} = useAuth();
+  
+  console.log('[ChatConversation] Route params:', {
+    conversationId,
+    userId,
+    userName,
+    propertyId,
+    propertyTitle,
+    receiverRole,
+  });
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -60,6 +70,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const [refreshing, setRefreshing] = useState(false);
   const [actualConversationId, setActualConversationId] = useState<string | number | null>(null);
   const [firebaseUnsubscribe, setFirebaseUnsubscribe] = useState<(() => void) | null>(null);
+  const [participantName, setParticipantName] = useState<string>(userName || '');
   const flatListRef = useRef<FlatList>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -86,6 +97,17 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       }
     };
   }, [conversationId, userId, propertyId, user?.id]);
+
+  // Update participant name when route params change
+  useEffect(() => {
+    if (userName && userName.trim()) {
+      setParticipantName(userName);
+    } else {
+      // Determine default name based on user role
+      const isBuyer = user?.user_type === 'buyer';
+      setParticipantName(isBuyer ? 'Property Owner' : 'Buyer');
+    }
+  }, [userName, user?.user_type]);
 
   const initializeConversation = async (): Promise<(() => void) | null> => {
     try {
@@ -352,6 +374,25 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         try {
           setActualConversationId(firebaseRoomId);
           
+          // Try to fetch buyer name from Firebase chat room if not provided or is default
+          if (!userName || !userName.trim() || userName === 'Buyer' || userName === 'Property Owner') {
+            try {
+              const chatRoomDoc = await firestore().collection('chats').doc(firebaseRoomId).get();
+              if (chatRoomDoc.exists) {
+                const roomData = chatRoomDoc.data();
+                console.log('[Chat] Chat room data:', roomData);
+                // Try to get buyer name from room data if available
+                if (roomData?.buyerName && roomData.buyerName.trim()) {
+                  setParticipantName(roomData.buyerName.trim());
+                } else if (roomData?.buyer_name && roomData.buyer_name.trim()) {
+                  setParticipantName(roomData.buyer_name.trim());
+                }
+              }
+            } catch (error) {
+              console.warn('[Chat] Could not fetch buyer name from chat room:', error);
+            }
+          }
+          
           console.log('[Chat] Setting up Firebase message listener for room:', firebaseRoomId);
           
           // Step 3: Listen to messages via Firebase - as per guide
@@ -617,9 +658,23 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     );
   };
 
-  // Get participant name from route params or use default based on role
-  const isBuyer = user?.user_type === 'buyer';
-  const participantName = userName || (isBuyer ? 'Property Owner' : 'Buyer');
+  // Update participant name when route params change
+  useEffect(() => {
+    console.log('[ChatConversation] Updating participant name:', {
+      userName,
+      userType: user?.user_type,
+    });
+    
+    if (userName && userName.trim() && userName !== 'Buyer' && userName !== 'Property Owner') {
+      setParticipantName(userName.trim());
+    } else {
+      // Determine default name based on user role
+      const isBuyer = user?.user_type === 'buyer';
+      const defaultName = isBuyer ? 'Property Owner' : 'Buyer';
+      setParticipantName(defaultName);
+      console.log('[ChatConversation] Using default name:', defaultName);
+    }
+  }, [userName, user?.user_type]);
 
   return (
     <SafeAreaView style={styles.container}>

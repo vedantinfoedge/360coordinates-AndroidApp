@@ -76,19 +76,41 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
       if (response && response.success) {
         const inquiriesData = response.data?.inquiries || response.data || [];
         
-        const formattedInquiries = inquiriesData.map((inq: any) => ({
-          id: inq.id || inq.inquiry_id,
-          property_id: inq.property_id,
-          buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id || inq.buyer_id,
-          property_title: inq.property_title || inq.property?.title || 'Property',
-          buyer_name: inq.buyer_name || inq.name || inq.buyer?.full_name || 'Buyer',
-          buyer_email: inq.buyer_email || inq.email || inq.buyer?.email,
-          buyer_phone: inq.buyer_phone || inq.mobile || inq.buyer?.phone,
-          message: inq.message || '',
-          status: inq.status || 'new',
-          created_at: inq.created_at || inq.created_date || '',
-          property_image: fixImageUrl(inq.property_image || inq.property?.cover_image || ''),
-        }));
+        const formattedInquiries = inquiriesData.map((inq: any) => {
+          // Extract buyer name - match website implementation priority:
+          // 1. inq.buyer?.name (from backend API buyer object - primary source from SQL JOIN)
+          // 2. inq.buyer_name (direct field - fallback)
+          // 3. inq.name (fallback)
+          // 4. 'Buyer' (default)
+          const buyerName = inq.buyer?.name || 
+                           inq.buyer_name || 
+                           inq.name || 
+                           inq.buyer?.full_name ||
+                           'Buyer';
+          
+          console.log('[AgentInquiries] Processing inquiry:', {
+            id: inq.id || inq.inquiry_id,
+            buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id,
+            buyer_name: buyerName,
+            buyerObject: inq.buyer,
+            buyerObjectName: inq.buyer?.name,
+            rawBuyerName: inq.buyer_name,
+          });
+          
+          return {
+            id: inq.id || inq.inquiry_id,
+            property_id: inq.property_id,
+            buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id || inq.buyer_id,
+            property_title: inq.property_title || inq.property?.title || 'Property',
+            buyer_name: buyerName,
+            buyer_email: inq.buyer_email || inq.email || inq.buyer?.email,
+            buyer_phone: inq.buyer_phone || inq.mobile || inq.buyer?.phone,
+            message: inq.message || '',
+            status: inq.status || 'new',
+            created_at: inq.created_at || inq.created_date || '',
+            property_image: fixImageUrl(inq.property_image || inq.property?.cover_image || ''),
+          };
+        });
         
         setAllInquiries(formattedInquiries);
         setInquiries(formattedInquiries);
@@ -98,19 +120,32 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
           const fallbackResponse = await inquiryService.getInbox();
           if (fallbackResponse && fallbackResponse.success) {
             const inquiriesData = fallbackResponse.data?.inquiries || fallbackResponse.data || [];
-            const formattedInquiries = inquiriesData.map((inq: any) => ({
-              id: inq.id || inq.inquiry_id,
-              property_id: inq.property_id,
-              buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id || inq.buyer_id,
-              property_title: inq.property_title || inq.property?.title || 'Property',
-              buyer_name: inq.buyer_name || inq.buyer?.full_name || inq.name || 'Buyer',
-              buyer_email: inq.buyer_email || inq.buyer?.email,
-              buyer_phone: inq.buyer_phone || inq.buyer?.phone,
-              message: inq.message || '',
-              status: inq.status || 'new',
-              created_at: inq.created_at || inq.created_date || '',
-              property_image: fixImageUrl(inq.property_image || inq.property?.cover_image || ''),
-            }));
+            const formattedInquiries = inquiriesData.map((inq: any) => {
+              // Extract buyer name - match website implementation priority:
+              // 1. inq.buyer?.name (from backend API buyer object - primary source from SQL JOIN)
+              // 2. inq.buyer_name (direct field - fallback)
+              // 3. inq.name (fallback)
+              // 4. 'Buyer' (default)
+              const buyerName = inq.buyer?.name || 
+                               inq.buyer_name || 
+                               inq.name || 
+                               inq.buyer?.full_name ||
+                               'Buyer';
+              
+              return {
+                id: inq.id || inq.inquiry_id,
+                property_id: inq.property_id,
+                buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id || inq.buyer_id,
+                property_title: inq.property_title || inq.property?.title || 'Property',
+                buyer_name: buyerName,
+                buyer_email: inq.buyer_email || inq.buyer?.email,
+                buyer_phone: inq.buyer_phone || inq.buyer?.phone,
+                message: inq.message || '',
+                status: inq.status || 'new',
+                created_at: inq.created_at || inq.created_date || '',
+                property_image: fixImageUrl(inq.property_image || inq.property?.cover_image || ''),
+              };
+            });
             setAllInquiries(formattedInquiries);
             setInquiries(formattedInquiries);
           }
@@ -189,9 +224,20 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
   const handleReply = (inquiry: Inquiry) => {
     // Navigate to chat conversation with the buyer
     const buyerId = inquiry.buyer_id || inquiry.id || inquiry.property_id;
-    const buyerName = inquiry.buyer_name || 'Buyer';
+    // Ensure we have a valid buyer name - use buyer_name from inquiry, fallback to 'Buyer'
+    const buyerName = (inquiry.buyer_name && inquiry.buyer_name.trim()) 
+      ? inquiry.buyer_name.trim() 
+      : 'Buyer';
     const propertyId = inquiry.property_id;
     const propertyTitle = inquiry.property_title || 'Property';
+    
+    console.log('[AgentInquiries] Navigating to chat with:', {
+      buyerId,
+      buyerName,
+      propertyId,
+      propertyTitle,
+      inquiryBuyerName: inquiry.buyer_name,
+    });
     
     navigation.navigate('Chat' as any, {
       screen: 'ChatConversation',
