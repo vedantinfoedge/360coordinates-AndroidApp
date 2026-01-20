@@ -367,10 +367,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           onSupportPress={() => {
             try {
               console.log('[BuyerDashboard] Navigating to Support screen');
-              navigation.navigate('Support' as never);
+              const result = navigation.navigate('Support' as never);
+              console.log('[BuyerDashboard] Navigation result:', result);
             } catch (error: any) {
-              console.error('[BuyerDashboard] Error navigating to Support:', error);
-              CustomAlert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
+              console.error('[BuyerDashboard] Navigation error:', error);
+              CustomAlert.alert('Navigation Error', `Could not navigate to Support: ${error?.message || 'Unknown error'}`);
             }
           }}
           onLogoutPress={isLoggedIn ? logout : undefined}
@@ -405,10 +406,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         onSupportPress={() => {
           try {
             console.log('[BuyerDashboard] Navigating to Support screen');
-            navigation.navigate('Support' as never);
+            const result = navigation.navigate('Support' as never);
+            console.log('[BuyerDashboard] Navigation result:', result);
           } catch (error: any) {
-            console.error('[BuyerDashboard] Error navigating to Support:', error);
-            CustomAlert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
+            console.error('[BuyerDashboard] Navigation error:', error);
+            CustomAlert.alert('Navigation Error', `Could not navigate to Support: ${error?.message || 'Unknown error'}`);
           }
         }}
         onLogoutPress={isLoggedIn ? logout : undefined}
