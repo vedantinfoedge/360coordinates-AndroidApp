@@ -46,6 +46,12 @@ export const uploadPropertyImageToFirebase = async (
   onProgress?: (progress: number) => void,
 ): Promise<FirebaseUploadResult> => {
   try {
+    console.log('🔥 Firebase Upload: Starting upload...', {
+      imageUri: imageUri.substring(0, 50),
+      userId,
+      propertyId,
+    });
+
     // Check if Firebase Storage is available
     if (!isFirebaseStorageAvailable()) {
       throw new Error(
@@ -56,9 +62,12 @@ export const uploadPropertyImageToFirebase = async (
     // Generate unique filename
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 15);
-    const fileName = `img_${timestamp}_${randomId}.jpg`;
+    const extension = imageUri.split('.').pop() || 'jpg';
+    const fileName = `img_${timestamp}_${randomId}.${extension}`;
 
     // Determine storage path
+    // Temporary uploads: properties/temp/{userId}/{filename}
+    // Permanent uploads: properties/{propertyId}/{filename}
     let storagePath: string;
     if (propertyId) {
       storagePath = `properties/${propertyId}/${fileName}`;
@@ -66,13 +75,16 @@ export const uploadPropertyImageToFirebase = async (
       storagePath = `properties/temp/${userId}/${fileName}`;
     }
 
+    console.log('🔥 Firebase Upload: Storage path:', storagePath);
+
     // Create storage reference
     let storageRef;
     try {
       const storageInstance = storage();
       storageRef = storageInstance.ref(storagePath);
+      console.log('✅ Firebase Storage reference created');
     } catch (storageError: any) {
-      console.error('[FirebaseStorage] Error getting storage reference:', storageError);
+      console.error('❌ Firebase Storage Error:', storageError);
       throw new Error(`Firebase Storage not initialized: ${storageError.message}`);
     }
 
@@ -82,14 +94,8 @@ export const uploadPropertyImageToFirebase = async (
       fileUri = imageUri.replace('file://', '');
     }
 
-    console.log('[FirebaseStorage] Uploading image:', {
-      originalUri: imageUri.substring(0, 50),
-      fileUri: fileUri.substring(0, 50),
-      storagePath,
-      platform: Platform.OS,
-    });
-
     // Upload file with progress tracking
+    console.log('🔥 Firebase Upload: Uploading file to Firebase...');
     const uploadTask = storageRef.putFile(fileUri);
 
     // Track upload progress if callback provided
@@ -102,14 +108,12 @@ export const uploadPropertyImageToFirebase = async (
 
     // Wait for upload to complete
     await uploadTask;
+    console.log('✅ Firebase Upload: File uploaded successfully');
 
     // Get download URL
+    console.log('🔥 Firebase Upload: Getting download URL...');
     const downloadURL = await storageRef.getDownloadURL();
-
-    console.log('[FirebaseStorage] Upload successful:', {
-      path: storagePath,
-      url: downloadURL.substring(0, 80),
-    });
+    console.log('✅ Firebase Upload: Download URL obtained:', downloadURL.substring(0, 80));
 
     return {
       url: downloadURL,
@@ -117,14 +121,26 @@ export const uploadPropertyImageToFirebase = async (
       fileName: fileName,
     };
   } catch (error: any) {
-    console.error('[FirebaseStorage] Upload error:', error);
+    console.error('❌ Firebase Upload Error:', {
+      message: error.message,
+      code: error.code,
+      imageUri: imageUri.substring(0, 50),
+      userId,
+      propertyId,
+    });
     
     // Provide more specific error messages
-    let errorMessage = 'Failed to upload image';
+    let errorMessage = 'Failed to upload image to Firebase';
     if (error?.code) {
       switch (error.code) {
         case 'storage/unauthorized':
-          errorMessage = 'Permission denied. Please check Firebase Storage security rules.';
+          errorMessage = 'Firebase Storage: Permission denied. Check Storage rules.';
+          break;
+        case 'storage/quota-exceeded':
+          errorMessage = 'Firebase Storage: Quota exceeded. Check Firebase billing.';
+          break;
+        case 'storage/unauthenticated':
+          errorMessage = 'Firebase Storage: User not authenticated.';
           break;
         case 'storage/canceled':
           errorMessage = 'Upload was canceled';
