@@ -16,12 +16,17 @@ import {initializeMapbox} from './src/config/mapbox.config';
 import {initializeFirebase} from './src/config/firebase.config';
 import {initializeMSG91} from './src/config/msg91.config';
 import {notificationService} from './src/services/notification.service';
+import {setNotificationFunction, setAlertModalFunction} from './src/utils/alertHelper';
 
 // Inner component to access notification context
 const AppContent: React.FC = () => {
-  const {showNotification} = useNotification();
+  const {showNotification, showAlert} = useNotification();
 
   useEffect(() => {
+    // Initialize custom alert helper
+    setNotificationFunction(showNotification);
+    setAlertModalFunction(showAlert);
+    
     // Connect notification service to custom notification system
     notificationService.setShowNotificationCallback(showNotification);
 
@@ -59,7 +64,7 @@ const AppContent: React.FC = () => {
     } catch (error) {
       console.warn('Push notification initialization failed (app will continue without notifications):', error);
     }
-  }, [showNotification]);
+  }, [showNotification, showAlert]);
 
   return (
     <>

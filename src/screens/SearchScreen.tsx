@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Alert,
   Image,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -17,6 +16,7 @@ import {useAuth} from '../context/AuthContext';
 import BuyerHeader from '../components/BuyerHeader';
 import {propertySearchService} from '../services/propertySearch.service';
 import {fixImageUrl} from '../utils/imageHelper';
+import CustomAlert from '../utils/alertHelper';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -117,7 +117,7 @@ const SearchScreen: React.FC<Props> = ({navigation}) => {
         setFilteredProperties(formatted);
       } catch (error: any) {
         console.error('Error searching properties:', error);
-        Alert.alert('Error', 'Failed to search properties. Please try again.');
+        CustomAlert.alert('Error', 'Failed to search properties. Please try again.');
       } finally {
         setLoading(false);
       }

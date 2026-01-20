@@ -9,9 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import CustomAlert from '../../utils/alertHelper';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import {FirebaseFirestoreTypes} from '@react-native-firebase/firestore';
@@ -39,7 +39,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({receiverId, receiverName = 'User
 
   useEffect(() => {
     if (!currentUser) {
-      Alert.alert('Error', 'User not authenticated');
+      CustomAlert.alert('Error', 'User not authenticated');
       setLoading(false);
       return;
     }
@@ -92,7 +92,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({receiverId, receiverName = 'User
       },
       (error: Error) => {
         console.error('[ChatScreen] Error listening to messages (query1):', error);
-        Alert.alert('Error', 'Failed to load messages');
+        CustomAlert.alert('Error', 'Failed to load messages');
         setLoading(false);
       },
     );
@@ -114,7 +114,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({receiverId, receiverName = 'User
       },
       (error: Error) => {
         console.error('[ChatScreen] Error listening to messages (query2):', error);
-        Alert.alert('Error', 'Failed to load messages');
+        CustomAlert.alert('Error', 'Failed to load messages');
         setLoading(false);
       },
     );
@@ -178,7 +178,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({receiverId, receiverName = 'User
       }, 100);
     } catch (error: any) {
       console.error('[ChatScreen] Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      CustomAlert.alert('Error', 'Failed to send message. Please try again.');
       setInputText(messageText);
     } finally {
       setSending(false);

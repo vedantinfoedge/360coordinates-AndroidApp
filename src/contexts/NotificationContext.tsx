@@ -1,6 +1,7 @@
 import React, {createContext, useContext, useState, useCallback} from 'react';
-import {View, StyleSheet, ImageSourcePropType} from 'react-native';
+import {View, StyleSheet, ImageSourcePropType, AlertButton} from 'react-native';
 import CustomNotification from '../components/common/CustomNotification';
+import CustomAlertModal from '../components/common/CustomAlertModal';
 
 interface Notification {
   id: string;
@@ -12,6 +13,13 @@ interface Notification {
   onPress?: () => void;
 }
 
+interface AlertModalState {
+  visible: boolean;
+  title: string;
+  message: string;
+  buttons?: AlertButton[];
+}
+
 interface NotificationContextType {
   showNotification: (
     title: string,
@@ -21,6 +29,7 @@ interface NotificationContextType {
     image?: ImageSourcePropType | string,
     onPress?: () => void,
   ) => void;
+  showAlert: (title: string, message: string, buttons?: AlertButton[]) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -39,6 +48,12 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({
   children,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [alertModal, setAlertModal] = useState<AlertModalState>({
+    visible: false,
+    title: '',
+    message: '',
+    buttons: [],
+  });
 
   const showNotification = useCallback(
     (
@@ -65,12 +80,28 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({
     [],
   );
 
+  const showAlert = useCallback(
+    (title: string, message: string, buttons?: AlertButton[]) => {
+      setAlertModal({
+        visible: true,
+        title,
+        message,
+        buttons: buttons || [{text: 'OK'}],
+      });
+    },
+    [],
+  );
+
   const dismissNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(notif => notif.id !== id));
   }, []);
 
+  const closeAlertModal = useCallback(() => {
+    setAlertModal(prev => ({...prev, visible: false}));
+  }, []);
+
   return (
-    <NotificationContext.Provider value={{showNotification}}>
+    <NotificationContext.Provider value={{showNotification, showAlert}}>
       {children}
       <View style={styles.container} pointerEvents="box-none">
         {notifications.map((notification, index) => {
@@ -97,6 +128,13 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({
           );
         })}
       </View>
+      <CustomAlertModal
+        visible={alertModal.visible}
+        title={alertModal.title}
+        message={alertModal.message}
+        buttons={alertModal.buttons}
+        onClose={closeAlertModal}
+      />
     </NotificationContext.Provider>
   );
 };

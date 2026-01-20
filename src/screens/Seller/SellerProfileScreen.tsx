@@ -8,7 +8,6 @@ import {
   TextInput,
   SafeAreaView,
   Image,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import {launchImageLibrary, launchCamera, MediaType, ImagePickerResponse} from 'react-native-image-picker';
@@ -23,6 +22,7 @@ import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import Button from '../../components/common/Button';
 import {sellerService} from '../../services/seller.service';
+import CustomAlert from '../../utils/alertHelper';
 import {userService} from '../../services/user.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {validation} from '../../utils/validation';
@@ -198,7 +198,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
   const handleSave = async () => {
     if (!validateForm()) {
-      Alert.alert('Validation Error', 'Please fix the errors before saving');
+      CustomAlert.alert('Validation Error', 'Please fix the errors before saving');
       return;
     }
     
@@ -240,15 +240,15 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         }
         setOriginalData({...formData, full_name: fullName});
         setIsEditing(false);
-        Alert.alert('Success', 'Profile updated successfully');
+        CustomAlert.alert('Success', 'Profile updated successfully');
         // Reload profile to get updated data
         await loadProfile();
       } else {
-        Alert.alert('Error', (response && (response.message || response.data?.message)) || 'Failed to update profile');
+        CustomAlert.alert('Error', (response && (response.message || response.data?.message)) || 'Failed to update profile');
       }
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', error?.message || 'Failed to update profile');
+      CustomAlert.alert('Error', error?.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
@@ -259,7 +259,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleImagePicker = () => {
-    Alert.alert(
+    CustomAlert.alert(
       'Select Profile Image',
       'Choose an option',
       [
@@ -291,7 +291,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
           const imageType = response.assets[0].type || '';
           const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
           if (!allowedTypes.some(type => imageType.includes(type.split('/')[1]))) {
-            Alert.alert('Error', 'Please select a JPEG, PNG, or WebP image');
+            CustomAlert.alert('Error', 'Please select a JPEG, PNG, or WebP image');
             setSaving(false);
             return;
           }
@@ -299,7 +299,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
           // Validate image size (max 5MB)
           const fileSize = response.assets[0].fileSize || 0;
           if (fileSize > 5 * 1024 * 1024) {
-            Alert.alert('Error', 'Image size must be less than 5MB');
+            CustomAlert.alert('Error', 'Image size must be less than 5MB');
             setSaving(false);
             return;
           }
@@ -320,14 +320,14 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                 });
               }
             }
-            Alert.alert('Success', 'Profile picture updated successfully');
+            CustomAlert.alert('Success', 'Profile picture updated successfully');
             await loadProfile(); // Reload to sync with backend
           } else {
-            Alert.alert('Error', (uploadResponse && uploadResponse.message) || 'Failed to upload image');
+            CustomAlert.alert('Error', (uploadResponse && uploadResponse.message) || 'Failed to upload image');
           }
         } catch (error: any) {
           console.error('Error uploading image:', error);
-          Alert.alert('Error', error?.message || 'Failed to upload image');
+          CustomAlert.alert('Error', error?.message || 'Failed to upload image');
         } finally {
           setSaving(false);
         }

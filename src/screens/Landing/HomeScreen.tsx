@@ -10,7 +10,6 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Animated,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -23,6 +22,7 @@ import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
 import {buyerService, Property} from '../../services/buyer.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import CustomAlert from '../../utils/alertHelper';
 import {formatters} from '../../utils/formatters';
 import {useAuth} from '../../context/AuthContext';
 
@@ -133,7 +133,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
       if (showLoading) {
-        Alert.alert('Error', error?.message || 'Failed to load properties');
+        CustomAlert.alert('Error', error?.message || 'Failed to load properties');
       }
     } finally {
       if (showLoading) {
@@ -185,7 +185,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
       } as never);
     } catch (error: any) {
       console.error('Error navigating to search:', error);
-      Alert.alert('Error', 'Failed to navigate to search. Please try again.');
+      CustomAlert.alert('Error', 'Failed to navigate to search. Please try again.');
     }
   };
 
@@ -397,7 +397,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                     } as never);
                   } catch (error: any) {
                     console.error('Error navigating to all properties:', error);
-                    Alert.alert('Error', 'Failed to load all properties. Please try again.');
+                    CustomAlert.alert('Error', 'Failed to load all properties. Please try again.');
                   }
                 }}>
                 <Text style={styles.seeAllText}>See All</Text>

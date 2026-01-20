@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Share,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -22,6 +21,7 @@ import {useAuth} from '../../context/AuthContext';
 import {buyerService, Property} from '../../services/buyer.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type AllPropertiesScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BuyerTabParamList>,
@@ -132,7 +132,7 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
     } catch (error: any) {
       console.error('Error loading properties:', error);
       if (!append) {
-        Alert.alert('Error', error.message || 'Failed to load properties');
+        CustomAlert.alert('Error', error.message || 'Failed to load properties');
       }
     } finally {
       setLoading(false);
@@ -180,7 +180,7 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
-      Alert.alert('Error', error?.message || 'Failed to update favorite');
+      CustomAlert.alert('Error', error?.message || 'Failed to update favorite');
     }
   };
 

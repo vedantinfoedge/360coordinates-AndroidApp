@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   Platform,
@@ -20,6 +19,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
+import CustomAlert from '../../utils/alertHelper';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -166,7 +166,7 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
       }
     } catch (error: any) {
       console.error('Error loading subscription data:', error);
-      Alert.alert('Error', 'Failed to load subscription data');
+      CustomAlert.alert('Error', 'Failed to load subscription data');
       // Fallback to 3 months from now
       const defaultEndDate = new Date();
       defaultEndDate.setMonth(defaultEndDate.getMonth() + 3);
@@ -233,13 +233,13 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
 
   const handlePlanPress = (plan: SubscriptionPlan) => {
     if (isTrialActive) {
-      Alert.alert(
+      CustomAlert.alert(
         'Plans Locked',
         'Plans are locked during the free trial period. They will be available when your trial ends.',
       );
     } else {
       // Future: Navigate to purchase screen
-      Alert.alert('Coming Soon', 'Subscription purchase will be available soon.');
+      CustomAlert.alert('Coming Soon', 'Subscription purchase will be available soon.');
     }
   };
 

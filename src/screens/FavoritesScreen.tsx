@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Share,
 } from 'react-native';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
@@ -22,6 +21,7 @@ import {formatters} from '../utils/formatters';
 import BuyerHeader from '../components/BuyerHeader';
 import PropertyCard from '../components/PropertyCard';
 import {useAuth} from '../context/AuthContext';
+import CustomAlert from '../utils/alertHelper';
 
 type FavoritesScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BuyerTabParamList, 'Favorites'>,
@@ -115,7 +115,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
     } catch (error: any) {
       console.error('Error loading favorites:', error);
       if (!append) {
-        Alert.alert('Error', error.message || 'Failed to load favorites');
+        CustomAlert.alert('Error', error.message || 'Failed to load favorites');
       }
     } finally {
       setLoading(false);
@@ -147,12 +147,12 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
       await buyerService.toggleFavorite(propertyId);
       
       // Show success message
-      Alert.alert('Removed', 'Property removed from favorites');
+      CustomAlert.alert('Removed', 'Property removed from favorites');
     } catch (error: any) {
       console.error('Error removing favorite:', error);
       // Reload favorites on error to restore state
       loadFavorites(1, false);
-      Alert.alert('Error', 'Failed to remove from favorites. Please try again.');
+      CustomAlert.alert('Error', 'Failed to remove from favorites. Please try again.');
     }
   };
 
@@ -168,7 +168,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
     } catch (error: any) {
       if (error.message !== 'User did not share') {
         console.error('Error sharing property:', error);
-        Alert.alert('Error', 'Failed to share property. Please try again.');
+        CustomAlert.alert('Error', 'Failed to share property. Please try again.');
       }
     }
   };

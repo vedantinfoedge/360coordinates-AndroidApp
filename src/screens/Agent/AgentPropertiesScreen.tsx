@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   Image,
   ActivityIndicator,
   RefreshControl,
@@ -18,6 +17,7 @@ import AgentHeader from '../../components/AgentHeader';
 import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -70,14 +70,14 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     const property = properties.find(p => String(p.id) === String(propertyId));
     
     if (!property) {
-      Alert.alert('Error', 'Property not found');
+      CustomAlert.alert('Error', 'Property not found');
       return;
     }
     
     const limitedEdit = !canEditProperty(property);
     
     if (limitedEdit) {
-      Alert.alert(
+      CustomAlert.alert(
         'Limited Edit Mode',
         'This property was created more than 24 hours ago.\n\nOnly the Title and Pricing fields (price, negotiable, deposit, maintenance) can be edited. Other details are locked.',
         [{text: 'OK'}],
@@ -202,7 +202,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
       }
       
       if (showLoading) {
-        Alert.alert('Error Loading Properties', errorMessage);
+        CustomAlert.alert('Error Loading Properties', errorMessage);
       }
       setProperties([]);
     } finally {
@@ -231,7 +231,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleDelete = (propertyId: string | number) => {
-    Alert.alert(
+    CustomAlert.alert(
       'Delete Property',
       'Are you sure you want to delete this property? This action cannot be undone and the property will be removed from the database and website.',
       [
@@ -257,12 +257,12 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
               if (isSuccess || response?.data?.success) {
                 loadProperties(false);
                 setTimeout(() => {
-                  Alert.alert('Success', 'Property has been deleted and will no longer appear on the app or website.');
+                  CustomAlert.alert('Success', 'Property has been deleted and will no longer appear on the app or website.');
                 }, 100);
               } else {
                 loadProperties(true);
                 const errorMsg = response?.message || response?.error?.message || 'Failed to delete property. Please try again.';
-                Alert.alert('Error', errorMsg);
+                CustomAlert.alert('Error', errorMsg);
               }
             } catch (error: any) {
               loadProperties(true);
@@ -271,7 +271,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
                 error?.response?.data?.message ||
                 error?.response?.message ||
                 'Failed to delete property. Please check your connection and try again.';
-              Alert.alert('Delete Failed', errorMessage);
+              CustomAlert.alert('Delete Failed', errorMessage);
             }
           },
         },

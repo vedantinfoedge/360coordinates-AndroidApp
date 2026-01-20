@@ -8,7 +8,6 @@ import {
   Image,
   TextInput,
   ScrollView,
-  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -18,6 +17,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import {useAuth} from '../../context/AuthContext';
+import CustomAlert from '../../utils/alertHelper';
 
 type InitialScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Initial'>;
 
@@ -112,7 +112,7 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
       });
     } catch (error: any) {
       console.error('Error navigating to search:', error);
-      Alert.alert('Error', 'Failed to navigate to search. Please try again.');
+      CustomAlert.alert('Error', 'Failed to navigate to search. Please try again.');
     }
   };
 
@@ -178,7 +178,7 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
       });
     } catch (error) {
       console.error('[InitialScreen] Error setting targetDashboard:', error);
-      Alert.alert('Error', 'Failed to proceed. Please try again.');
+      CustomAlert.alert('Error', 'Failed to proceed. Please try again.');
     }
   };
 

@@ -8,7 +8,6 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   TextInput,
   Modal,
 } from 'react-native';
@@ -23,6 +22,7 @@ import SellerHeader from '../../components/SellerHeader';
 import {sellerService} from '../../services/seller.service';
 import {inquiryService} from '../../services/inquiry.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import CustomAlert from '../../utils/alertHelper';
 import {formatters} from '../../utils/formatters';
 
 type SellerInquiriesScreenNavigationProp = CompositeNavigationProp<
@@ -121,7 +121,7 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
           setInquiries([]);
         }
       } catch (fallbackError) {
-        Alert.alert('Error', 'Failed to load inquiries');
+        CustomAlert.alert('Error', 'Failed to load inquiries');
         setAllInquiries([]);
         setInquiries([]);
       }

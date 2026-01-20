@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Image,
@@ -23,6 +22,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
+import CustomAlert from '../../utils/alertHelper';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 
@@ -95,7 +95,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   // Check user type access
   useEffect(() => {
     if (user && user.user_type === 'agent') {
-      Alert.alert(
+      CustomAlert.alert(
         'Access Denied',
         'You are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.',
         [
@@ -277,7 +277,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       console.error('Error loading dashboard data:', error);
       // Only show alert for non-404 errors
       if (showLoading && error?.status !== 404 && error?.response?.status !== 404) {
-        Alert.alert('Error', error?.message || 'Failed to load dashboard data');
+        CustomAlert.alert('Error', error?.message || 'Failed to load dashboard data');
       }
     } finally {
       if (showLoading) {
@@ -588,7 +588,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
                     if (statsResponse && statsResponse.success && statsResponse.data) {
                       const currentCount = statsResponse.data.total_properties || 0;
                       if (currentCount >= 3) {
-                        Alert.alert(
+                        CustomAlert.alert(
                           'Property Limit Reached',
                           'You have reached the maximum limit of 3 properties. You cannot add more properties.',
                           [{text: 'OK'}]
@@ -709,7 +709,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
                 if (statsResponse && statsResponse.success && statsResponse.data) {
                   const currentCount = statsResponse.data.total_properties || 0;
                   if (currentCount >= 3) {
-                    Alert.alert(
+                    CustomAlert.alert(
                       'Property Limit Reached',
                       'You have reached the maximum limit of 3 properties. You cannot add more properties.',
                       [{text: 'OK'}]

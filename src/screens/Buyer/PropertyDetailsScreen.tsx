@@ -10,7 +10,6 @@ import {
   Modal,
   Platform,
   ActivityIndicator,
-  Alert,
   Share,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +22,7 @@ import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {propertyService} from '../../services/property.service';
 import {favoriteService} from '../../services/favorite.service';
+import CustomAlert from '../../utils/alertHelper';
 import {buyerService} from '../../services/buyer.service';
 import {fixImageUrl, isValidImageUrl} from '../../utils/imageHelper';
 import BuyerHeader from '../../components/BuyerHeader';
@@ -333,12 +333,12 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         setIsFavorite(propData.is_favorite || false);
         setCurrentImageIndex(0); // Reset to first image
       } else {
-        Alert.alert('Error', 'Failed to load property details');
+        CustomAlert.alert('Error', 'Failed to load property details');
         navigation.goBack();
       }
     } catch (error: any) {
       console.error('[PropertyDetails] Error loading property:', error);
-      Alert.alert('Error', error.message || 'Failed to load property details');
+      CustomAlert.alert('Error', error.message || 'Failed to load property details');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -470,11 +470,11 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         // Update property object
         setProperty({...property, is_favorite: newFavoriteStatus});
       } else {
-        Alert.alert('Error', response?.message || 'Failed to update favorite');
+        CustomAlert.alert('Error', response?.message || 'Failed to update favorite');
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
-      Alert.alert('Error', error.message || 'Failed to update favorite');
+      CustomAlert.alert('Error', error.message || 'Failed to update favorite');
     } finally {
       setTogglingFavorite(false);
     }
@@ -497,7 +497,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     } catch (error: any) {
       if (error.message !== 'User did not share') {
         console.error('Error sharing property:', error);
-        Alert.alert('Error', 'Failed to share property. Please try again.');
+        CustomAlert.alert('Error', 'Failed to share property. Please try again.');
       }
     }
   };
@@ -509,7 +509,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
     // Check if user is logged in
     if (!user) {
-      Alert.alert(
+      CustomAlert.alert(
         'Login Required',
         'Please login to chat with the owner.',
         [
@@ -529,12 +529,12 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       return;
     }
     if (!property) {
-      Alert.alert('Error', 'Property information not available');
+      CustomAlert.alert('Error', 'Property information not available');
       return;
     }
 
     if (interactionLoading) {
-      Alert.alert('Please wait', 'Loading your interaction balance...');
+      CustomAlert.alert('Please wait', 'Loading your interaction balance...');
       return;
     }
     
@@ -545,7 +545,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     const propTitle = property.title || property.property_title || 'Property';
     
     if (!sellerId) {
-      Alert.alert('Error', 'Owner information not available');
+      CustomAlert.alert('Error', 'Owner information not available');
       return;
     }
 
@@ -555,7 +555,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       if (!chatUnlocked) {
         const result = await consumeInteraction();
         if (!result.success) {
-          Alert.alert(
+          CustomAlert.alert(
             'Interaction limit reached',
             'Interaction limit reached. Upgrade to continue.',
           );
@@ -598,13 +598,13 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
 
     if (!property || !property.id) {
-      Alert.alert('Error', 'Property information not available');
+      CustomAlert.alert('Error', 'Property information not available');
       return;
     }
     
     // Check if user is logged in
     if (!user) {
-      Alert.alert(
+      CustomAlert.alert(
         'Login Required',
         'Please login to view owner contact details.',
         [
@@ -630,7 +630,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
     // Check if user is buyer
     if (user.user_type !== 'buyer') {
-      Alert.alert('Access Denied', 'Only buyers can view owner contact details.');
+      CustomAlert.alert('Access Denied', 'Only buyers can view owner contact details.');
       return;
     }
 
@@ -648,12 +648,12 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
 
     if (interactionLoading) {
-      Alert.alert('Please wait', 'Loading your interaction balance...');
+      CustomAlert.alert('Please wait', 'Loading your interaction balance...');
       return;
     }
 
     if (interactionState.remaining <= 0) {
-      Alert.alert(
+      CustomAlert.alert(
         'Interaction limit reached',
         'Interaction limit reached. Upgrade to continue.',
       );
@@ -665,7 +665,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       const result = await consumeInteraction();
 
       if (!result.success) {
-        Alert.alert(
+        CustomAlert.alert(
           'Interaction limit reached',
           'Interaction limit reached. Upgrade to continue.',
         );
@@ -677,7 +677,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       console.log('[PropertyDetails] Contact unlocked for property:', property.id);
     } catch (error: any) {
       console.error('[PropertyDetails] Error in handleViewContact:', error);
-      Alert.alert('Error', 'Failed to process contact view. Please try again.');
+      CustomAlert.alert('Error', 'Failed to process contact view. Please try again.');
     } finally {
       setProcessingContact(false);
     }
@@ -687,7 +687,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     if (phone) {
       Linking.openURL(`tel:${phone}`).catch(err => {
         console.error('Error opening phone:', err);
-        Alert.alert('Error', 'Unable to open phone dialer.');
+        CustomAlert.alert('Error', 'Unable to open phone dialer.');
       });
     }
   };
@@ -696,7 +696,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     if (email) {
       Linking.openURL(`mailto:${email}`).catch(err => {
         console.error('Error opening email:', err);
-        Alert.alert('Error', 'Unable to open email client.');
+        CustomAlert.alert('Error', 'Unable to open email client.');
       });
     }
   };

@@ -10,7 +10,6 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Share,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -23,6 +22,7 @@ import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
+import CustomAlert from '../../utils/alertHelper';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
 import {buyerService, Property} from '../../services/buyer.service';
@@ -108,7 +108,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   // Check user type access
   useEffect(() => {
     if (user && user.user_type === 'agent') {
-      Alert.alert(
+      CustomAlert.alert(
         'Access Denied',
         'You are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.',
         [
@@ -193,7 +193,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
       if (showLoading) {
-        Alert.alert('Error', error?.message || 'Failed to load properties');
+        CustomAlert.alert('Error', error?.message || 'Failed to load properties');
       }
     } finally {
       if (showLoading) {
@@ -263,7 +263,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       navigation.navigate('SearchResults', params as never);
     } catch (error: any) {
       console.error('Error navigating to search:', error);
-      Alert.alert('Error', 'Failed to navigate to search. Please try again.');
+      CustomAlert.alert('Error', 'Failed to navigate to search. Please try again.');
     }
   };
 
@@ -293,11 +293,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         
         console.log(`Property ${propertyId} ${isFavorite ? 'added to' : 'removed from'} favorites`);
       } else {
-        Alert.alert('Error', (response as any)?.message || 'Failed to update favorite');
+        CustomAlert.alert('Error', (response as any)?.message || 'Failed to update favorite');
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
-      Alert.alert('Error', error?.message || 'Failed to update favorite');
+      CustomAlert.alert('Error', error?.message || 'Failed to update favorite');
     }
   };
 
@@ -319,7 +319,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     } catch (error: any) {
       if (error.message !== 'User did not share') {
         console.error('Error sharing property:', error);
-        Alert.alert('Error', 'Failed to share property. Please try again.');
+        CustomAlert.alert('Error', 'Failed to share property. Please try again.');
       }
     }
   };
@@ -370,7 +370,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               navigation.navigate('Support' as never);
             } catch (error: any) {
               console.error('[BuyerDashboard] Error navigating to Support:', error);
-              Alert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
+              CustomAlert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
             }
           }}
           onLogoutPress={isLoggedIn ? logout : undefined}
@@ -408,7 +408,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             navigation.navigate('Support' as never);
           } catch (error: any) {
             console.error('[BuyerDashboard] Error navigating to Support:', error);
-            Alert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
+            CustomAlert.alert('Error', `Failed to open Support screen: ${error?.message || 'Unknown error'}`);
           }
         }}
         onLogoutPress={isLoggedIn ? logout : undefined}
@@ -521,7 +521,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                 } as never);
               } catch (error: any) {
                 console.error('Error navigating to map:', error);
-                Alert.alert('Error', 'Map feature is not available. Please check Mapbox integration.');
+                CustomAlert.alert('Error', 'Map feature is not available. Please check Mapbox integration.');
               }
             }}>
             <Text style={styles.mapSearchIcon}>🗺️</Text>
@@ -568,7 +568,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                   navigation.navigate('SearchResults', params as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
-                  Alert.alert('Error', 'Failed to load all properties. Please try again.');
+                  CustomAlert.alert('Error', 'Failed to load all properties. Please try again.');
                 }
               }}>
               <Text style={styles.seeAllText}>See All</Text>

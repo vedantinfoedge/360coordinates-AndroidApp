@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   Image,
   ActivityIndicator,
   RefreshControl,
@@ -13,6 +12,7 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import CustomAlert from '../../utils/alertHelper';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
 import {colors, spacing, typography, borderRadius} from '../../theme';
@@ -64,7 +64,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         const limit = 3;
         
         if (currentCount >= limit) {
-          Alert.alert(
+          CustomAlert.alert(
             'Property Limit Reached',
             `You have reached the maximum limit of ${limit} properties. You cannot add more properties.`,
             [{text: 'OK'}]
@@ -74,7 +74,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       } else {
         // If API fails, check current properties count
         if (allProperties.length >= 3) {
-          Alert.alert(
+          CustomAlert.alert(
             'Property Limit Reached',
             `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
             [{text: 'OK'}]
@@ -87,7 +87,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       console.error('Error checking property limit:', error);
       // If check fails, use local count as fallback
       if (allProperties.length >= 3) {
-        Alert.alert(
+        CustomAlert.alert(
           'Property Limit Reached',
           `You have reached the maximum limit of 3 properties. You cannot add more properties.`,
           [{text: 'OK'}]
@@ -240,7 +240,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           if (showLoading && (!responseData || (responseData.success === false))) {
             const errorMsg = responseData?.message || responseData?.error?.message || 'No properties found. Start by adding your first property!';
             if (responseData?.success === false) {
-              Alert.alert('Info', errorMsg);
+              CustomAlert.alert('Info', errorMsg);
             }
           }
           setProperties([]);
@@ -250,7 +250,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         console.warn('[SellerProperties] Unexpected response structure:', responseData);
         const errorMsg = responseData?.message || responseData?.error?.message || 'Failed to load properties. Please try again.';
         if (showLoading && responseData?.success === false) {
-          Alert.alert('Error Loading Properties', errorMsg);
+          CustomAlert.alert('Error Loading Properties', errorMsg);
         }
         setProperties([]);
       }
@@ -298,7 +298,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       console.error('[SellerProperties] Final error message:', errorMessage);
       
       if (showLoading) {
-        Alert.alert(
+        CustomAlert.alert(
           'Error Loading Properties', 
           errorMessage + '\n\nPlease try refreshing or contact support if the issue persists.',
           [
@@ -385,14 +385,14 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
     const property = allProperties.find(p => String(p.id) === String(propertyId));
     
     if (!property) {
-      Alert.alert('Error', 'Property not found');
+      CustomAlert.alert('Error', 'Property not found');
       return;
     }
     
     const limitedEdit = !canEditProperty(property);
     
     if (limitedEdit) {
-      Alert.alert(
+      CustomAlert.alert(
         'Limited Edit Mode',
         'This property was created more than 24 hours ago.\n\nOnly the Title and Pricing fields (price, negotiable, deposit, maintenance) can be edited. Other details are locked.',
         [{text: 'OK'}],
@@ -415,7 +415,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleDelete = async (propertyId: string | number) => {
-    Alert.alert(
+    CustomAlert.alert(
       'Delete Property',
       'Are you sure you want to delete this property? This action cannot be undone and the property will be removed from the database and website.',
       [
@@ -450,14 +450,14 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                 
                 // Show success message (but don't double-alert if already shown)
                 setTimeout(() => {
-                  Alert.alert('Success', 'Property has been deleted from the database and will no longer appear on the app or website.');
+                  CustomAlert.alert('Success', 'Property has been deleted from the database and will no longer appear on the app or website.');
                 }, 100);
               } else {
                 // If API failed, reload to restore the property
                 console.warn('[SellerProperties] Delete may have failed, reloading properties');
                 loadMyProperties(true);
                 const errorMsg = response?.message || response?.error?.message || 'Failed to delete property. Please try again.';
-                Alert.alert('Error', errorMsg);
+                CustomAlert.alert('Error', errorMsg);
               }
             } catch (error: any) {
               console.error('[SellerProperties] Delete error:', error);
@@ -470,7 +470,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                                   error?.response?.data?.message ||
                                   error?.response?.message ||
                                   'Failed to delete property. Please check your connection and try again.';
-              Alert.alert('Delete Failed', errorMessage);
+              CustomAlert.alert('Delete Failed', errorMessage);
             }
           },
         },

@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -23,6 +22,7 @@ import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import {chatService} from '../../services/chat.service';
+import CustomAlert from '../../utils/alertHelper';
 import {markChatAsRead} from '../../services/firebase.service';
 import firestore from '@react-native-firebase/firestore';
 
@@ -115,7 +115,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       setLoading(true);
       
       if (!user?.id) {
-        Alert.alert('Error', 'User not authenticated');
+        CustomAlert.alert('Error', 'User not authenticated');
         setLoading(false);
         return null;
       }
@@ -471,14 +471,14 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       // If Firebase is not available, show error instead of API fallback
       if (!actualConversationId && backendChatRoomId) {
         console.warn('[Chat] Firebase not available - chat requires Firebase to be set up');
-        Alert.alert(
+        CustomAlert.alert(
           'Chat Not Available',
           'Firebase is not configured. Please rebuild the app to enable chat functionality.\n\nRun: cd android && ./gradlew clean && cd .. && npm run android',
         );
         setLoading(false);
         return null;
       } else if (!actualConversationId && !backendChatRoomId) {
-        Alert.alert('Error', 'Unable to initialize conversation. Missing required parameters.');
+        CustomAlert.alert('Error', 'Unable to initialize conversation. Missing required parameters.');
         setLoading(false);
         return null;
       }
@@ -560,7 +560,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         }
       } else if (showLoading) {
         // Only show alert for other errors
-        Alert.alert('Error', error.message || 'Failed to load messages');
+        CustomAlert.alert('Error', error.message || 'Failed to load messages');
       }
     } finally {
       if (showLoading) {
@@ -578,7 +578,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     setSending(true);
     
     if (!actualConversationId) {
-      Alert.alert('Error', 'Conversation not initialized. Please try again.');
+      CustomAlert.alert('Error', 'Conversation not initialized. Please try again.');
       setSending(false);
       setInputText(messageText); // Restore message
       return;
@@ -599,7 +599,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       );
       
       if (!firebaseSuccess) {
-        Alert.alert(
+        CustomAlert.alert(
           'Cannot Send Message',
           'Firebase is not available. Please rebuild the app to enable chat functionality.\n\nRun: cd android && ./gradlew clean && cd .. && npm run android',
         );
@@ -607,7 +607,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       }
     } catch (error: any) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', error.message || 'Failed to send message. Please try again.');
+      CustomAlert.alert('Error', error.message || 'Failed to send message. Please try again.');
       setInputText(messageText); // Restore text
     } finally {
       setSending(false);

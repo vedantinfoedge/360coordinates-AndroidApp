@@ -8,7 +8,6 @@ import {
   TextInput,
   SafeAreaView,
   Image,
-  Alert,
   Platform,
   Animated,
 } from 'react-native';
@@ -22,6 +21,7 @@ import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
+import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BuyerTabParamList, 'Profile'>,
@@ -103,7 +103,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const showImagePicker = () => {
-    Alert.alert(
+    CustomAlert.alert(
       'Select Profile Image',
       'Choose an option',
       [
@@ -128,7 +128,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
         return;
       }
       if (response.errorMessage) {
-        Alert.alert('Error', response.errorMessage);
+        CustomAlert.alert('Error', response.errorMessage);
         return;
       }
       if (response.assets && response.assets[0]) {
@@ -141,7 +141,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             // Use new endpoint that syncs with website
             const uploadResponse = await userService.uploadProfileImage(imageUri);
             if (uploadResponse.success) {
-              Alert.alert('Success', 'Profile picture updated successfully');
+              CustomAlert.alert('Success', 'Profile picture updated successfully');
               // Update local state with new image URL
               if (uploadResponse.data?.url) {
                 const {fixImageUrl} = require('../../utils/imageHelper');
@@ -164,11 +164,11 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                 }
               }
             } else {
-              Alert.alert('Error', uploadResponse.message || 'Failed to upload image');
+              CustomAlert.alert('Error', uploadResponse.message || 'Failed to upload image');
             }
           } catch (error: any) {
             console.error('Error uploading profile image:', error);
-            Alert.alert('Error', error.message || 'Failed to upload image');
+            CustomAlert.alert('Error', error.message || 'Failed to upload image');
           }
         }
       }
