@@ -8,6 +8,7 @@ import FavoritesScreen from '../screens/FavoritesScreen';
 
 export type SearchStackParamList = {
   SearchResults: {
+    query?: string;
     searchQuery?: string;
     location?: string;
     city?: string;

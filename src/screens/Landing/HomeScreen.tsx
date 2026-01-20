@@ -366,12 +366,39 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
               </View>
               <TouchableOpacity
                 onPress={() => {
-                  navigation.navigate('Search' as never, {
-                    screen: 'AllProperties',
-                    params: {
-                      listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
-                    },
-                  } as never);
+                  try {
+                    // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
+                    const params: any = {
+                      query: '',
+                      location: '',
+                      listingType: 'all', // Default to show all properties
+                    };
+
+                    // Preserve the currently selected listing type when navigating
+                    if (listingType === 'sale') {
+                      params.status = 'sale';
+                      params.listingType = 'buy';
+                    } else if (listingType === 'rent') {
+                      params.status = 'rent';
+                      params.listingType = 'rent';
+                    } else if (listingType === 'pg') {
+                      params.status = 'rent'; // PG uses rent status in API
+                      params.listingType = 'pg-hostel';
+                    } else if (listingType === 'all') {
+                      // Explicitly set to 'all' to show all properties regardless of type
+                      params.listingType = 'all';
+                    }
+
+                    // Navigate to SearchResults screen
+                    console.log('[HomeScreen] Navigating to SearchResults with params:', params);
+                    navigation.navigate('Search' as never, {
+                      screen: 'SearchResults',
+                      params: params,
+                    } as never);
+                  } catch (error: any) {
+                    console.error('Error navigating to all properties:', error);
+                    Alert.alert('Error', 'Failed to load all properties. Please try again.');
+                  }
                 }}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
