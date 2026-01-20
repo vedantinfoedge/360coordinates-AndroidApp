@@ -541,11 +541,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             <TouchableOpacity
               onPress={() => {
                 try {
-<<<<<<< Updated upstream
-                  // Explore Properties -> See All should open SearchResults with ALL properties
-=======
                   // Explore Properties -> See All should open SearchResults with ALL properties (no filters)
->>>>>>> Stashed changes
                   const params: any = {
                     query: '',
                     location: '',
@@ -563,12 +559,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                     params.listingType = 'pg-hostel';
                   }
 
-<<<<<<< Updated upstream
                   // Navigate directly to SearchResults screen
                   console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
-=======
-                  // Navigate directly to SearchResultsScreen
->>>>>>> Stashed changes
                   navigation.navigate('SearchResults', params as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);

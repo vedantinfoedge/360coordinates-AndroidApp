@@ -77,6 +77,20 @@ export const fixImageUrl = (imagePath: string | null | undefined): string | null
     return null;
   }
   
+  // Reject base64 data URIs - backend should have converted these to file URLs
+  // Check for direct data URIs: "data:image/jpeg;base64,..."
+  if (trimmed.startsWith('data:image/') || trimmed.includes(';base64,')) {
+    console.warn('[fixImageUrl] Rejected base64 data URI:', trimmed.substring(0, 100) + '...');
+    return null;
+  }
+  
+  // Reject URLs that contain base64 data URI patterns (even if embedded in a path)
+  // Example: "https://domain.com/uploads/data:image/jpeg;base64,..."
+  if (trimmed.includes('/data:image/') || trimmed.match(/data:image\/[^;]+;base64/)) {
+    console.warn('[fixImageUrl] Rejected URL containing base64 pattern:', trimmed.substring(0, 100) + '...');
+    return null;
+  }
+  
   // Already full URL (backend should normalize, but verify)
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     // Validate URL format - be lenient with validation
@@ -147,6 +161,18 @@ export const fixImageUrl = (imagePath: string | null | undefined): string | null
  */
 export const isValidImageUrl = (url: string | null | undefined): boolean => {
   if (!url || typeof url !== 'string') return false;
+  
+  // Reject base64 data URIs (backend should convert these to file URLs)
+  if (url.includes('data:image/') || url.includes(';base64,')) {
+    console.warn('[isValidImageUrl] Rejected base64 data URI:', url.substring(0, 100) + '...');
+    return false;
+  }
+  
+  // Reject URLs that contain base64 data URI patterns (even if embedded in a path)
+  if (url.includes('/data:image/') || url.match(/data:image\/[^;]+;base64/)) {
+    console.warn('[isValidImageUrl] Rejected URL containing base64 pattern:', url.substring(0, 100) + '...');
+    return false;
+  }
   
   try {
     const urlObj = new URL(url);

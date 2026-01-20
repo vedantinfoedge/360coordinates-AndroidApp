@@ -28,6 +28,7 @@ import {propertyService} from '../../services/property.service';
 import {propertySearchService} from '../../services/propertySearch.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 
 type SearchResultsScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<SearchStackParamList, 'SearchResults'>,
@@ -99,6 +100,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [showFilters, setShowFilters] = useState(false);
   const [searchText, setSearchText] = useState(initialLocation);
   const [loading, setLoading] = useState(true);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
 
   // Filters - initialize with route params (website-style)
   const [listingType, setListingType] = useState<ListingType | 'all'>(
@@ -204,6 +206,19 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       return 500;
     }
   }, [isAreaBased]);
+
+  // Update status when listingType changes - ensure rent filter is applied
+  useEffect(() => {
+    if (listingType === 'buy') {
+      setStatus('sale');
+    } else if (listingType === 'rent') {
+      setStatus('rent'); // Ensure rent status is set for rent filter
+    } else if (listingType === 'pg-hostel') {
+      setStatus('rent'); // PG uses rent status
+    } else if (listingType === 'all') {
+      setStatus('');
+    }
+  }, [listingType]);
 
   // Clear dependent fields when property type or listing type changes
   useEffect(() => {
@@ -581,6 +596,22 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     setFilteredProperties(filtered);
   };
 
+  // Memoize formatBudgetValue to ensure stable reference
+  const formatBudgetValueMemo = useCallback((value: number, type: ListingType | 'all'): string => {
+    if (type === 'buy') {
+      if (value >= 100) {
+        return `₹${(value / 100).toFixed(1)} Cr`;
+      }
+      return `₹${value}L`;
+    } else {
+      // Rent or PG
+      if (value >= 100) {
+        return `₹${(value / 100).toFixed(1)} Lakh`;
+      }
+      return `₹${value}K`;
+    }
+  }, []);
+
   // Format budget value for display (keep for backward compatibility)
   const formatBudgetValue = formatBudgetValueMemo;
 
@@ -707,23 +738,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   // Memoize formatBudgetDisplay to prevent re-creation on every render
   const formatBudgetDisplay = useCallback((value: number) => {
     return formatBudgetValue(value, listingType);
-  }, [listingType]);
-
-  // Memoize formatBudgetValue to ensure stable reference
-  const formatBudgetValueMemo = useCallback((value: number, type: ListingType | 'all'): string => {
-    if (type === 'buy') {
-      if (value >= 100) {
-        return `₹${(value / 100).toFixed(1)} Cr`;
-      }
-      return `₹${value}L`;
-    } else {
-      // Rent or PG
-      if (value >= 100) {
-        return `₹${(value / 100).toFixed(1)} Lakh`;
-      }
-      return `₹${value}K`;
-    }
-  }, []);
+  }, [listingType, formatBudgetValue]);
 
   const renderProperty = ({item}: {item: Property}) => {
     // Determine property type for PropertyCard
@@ -780,21 +795,42 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       {/* Search Bar */}
       <View style={[styles.searchSection, {marginTop: insets.top + 70}]}>
         <View style={styles.searchBarContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by city, locality, project"
-            placeholderTextColor={colors.textSecondary}
-            value={searchText}
-            onChangeText={(text) => {
-              setSearchText(text);
-              setLocation(text); // Update location immediately when typing
-            }}
-            onSubmitEditing={() => {
-              // Force immediate search on submit
-              loadProperties();
-            }}
-            returnKeyType="search"
-          />
+          <View style={styles.searchInputWrapper}>
+            <Text style={styles.searchIcon}>📍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by city, locality, project"
+              placeholderTextColor={colors.textSecondary}
+              value={searchText}
+              onChangeText={(text: string) => {
+                setSearchText(text);
+                setLocation(text); // Update location immediately when typing
+                setShowLocationSuggestions(text.length >= 2);
+              }}
+              onSubmitEditing={() => {
+                // Force immediate search on submit
+                setShowLocationSuggestions(false);
+                loadProperties();
+              }}
+              returnKeyType="search"
+            />
+          </View>
+          {showLocationSuggestions && searchText.length >= 2 && (
+            <View style={styles.locationSuggestionsContainer}>
+              <LocationAutoSuggest
+                query={searchText}
+                onSelect={(locationData) => {
+                  const locationName = locationData.name || locationData.placeName || '';
+                  setSearchText(locationName);
+                  setLocation(locationName);
+                  setShowLocationSuggestions(false);
+                  // Trigger search after location selection
+                  setTimeout(() => loadProperties(), 100);
+                }}
+                visible={showLocationSuggestions}
+              />
+            </View>
+          )}
           <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setShowFilters(true)}>
@@ -824,7 +860,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         <FlatList
           data={filteredProperties}
           renderItem={renderProperty}
-          keyExtractor={item => item.id}
+          keyExtractor={(item: Property) => item.id}
           contentContainerStyle={[styles.listContent, {paddingBottom: 100}]}
           ItemSeparatorComponent={renderSeparator}
           showsVerticalScrollIndicator={false}
@@ -1095,16 +1131,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
     alignItems: 'center',
+    position: 'relative',
+  },
+  searchInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    fontSize: 20,
+    marginRight: spacing.sm,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
     ...typography.body,
     color: colors.text,
+    padding: 0,
+  },
+  locationSuggestionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: spacing.md,
+    right: spacing.md,
+    marginTop: spacing.xs,
+    zIndex: 1000,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   filterButton: {
     flexDirection: 'row',
