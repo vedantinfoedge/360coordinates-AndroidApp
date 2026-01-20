@@ -23,6 +23,7 @@ import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import {chatService} from '../../services/chat.service';
+import {markChatAsRead} from '../../services/firebase.service';
 import firestore from '@react-native-firebase/firestore';
 
 type ChatConversationScreenNavigationProp = CompositeNavigationProp<
@@ -170,6 +171,16 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           // If we can't parse or don't have required info, just use the conversationId
           console.warn('[Chat] ⚠️ Cannot create Firebase room - missing required info. Using conversationId directly.');
           setActualConversationId(chatRoomId);
+        }
+        
+        // Mark chat as read when conversation is opened
+        if (user?.id) {
+          try {
+            await markChatAsRead(chatRoomId, user.id);
+            console.log('[Chat] ✅ Marked chat as read for user:', user.id);
+          } catch (error) {
+            console.warn('[Chat] Could not mark chat as read:', error);
+          }
         }
         
         // Set up listener for existing room

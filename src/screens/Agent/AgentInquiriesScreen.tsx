@@ -79,14 +79,36 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
         const formattedInquiries = inquiriesData.map((inq: any) => {
           // Extract buyer name - match website implementation priority:
           // 1. inq.buyer?.name (from backend API buyer object - primary source from SQL JOIN)
-          // 2. inq.buyer_name (direct field - fallback)
+          // 2. inq.buyer_name (direct field - fallback, but validate it's not an ID)
           // 3. inq.name (fallback)
           // 4. 'Buyer' (default)
-          const buyerName = inq.buyer?.name || 
-                           inq.buyer_name || 
-                           inq.name || 
-                           inq.buyer?.full_name ||
-                           'Buyer';
+          
+          // Helper function to check if a value is likely an ID (numeric string or number)
+          const isLikelyId = (value: any): boolean => {
+            if (!value) return false;
+            const str = String(value).trim();
+            // Check if it's a pure number (ID) vs a name (has letters/spaces)
+            return /^\d+$/.test(str) && str.length < 10; // IDs are usually short numbers
+          };
+          
+          let buyerName = inq.buyer?.name || 
+                         inq.buyer?.full_name ||
+                         inq.name;
+          
+          // If buyer_name exists, check if it's actually a name or an ID
+          if (inq.buyer_name) {
+            const buyerNameStr = String(inq.buyer_name).trim();
+            if (!isLikelyId(buyerNameStr)) {
+              // It's a name, use it
+              buyerName = buyerName || buyerNameStr;
+            } else {
+              // It's an ID, ignore it and use buyer object name instead
+              console.warn('[AgentInquiries] buyer_name appears to be an ID, using buyer object name instead');
+            }
+          }
+          
+          // Final fallback
+          buyerName = buyerName || 'Buyer';
           
           console.log('[AgentInquiries] Processing inquiry:', {
             id: inq.id || inq.inquiry_id,
@@ -95,6 +117,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
             buyerObject: inq.buyer,
             buyerObjectName: inq.buyer?.name,
             rawBuyerName: inq.buyer_name,
+            isBuyerNameAnId: inq.buyer_name ? isLikelyId(inq.buyer_name) : false,
           });
           
           return {
@@ -123,14 +146,36 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
             const formattedInquiries = inquiriesData.map((inq: any) => {
               // Extract buyer name - match website implementation priority:
               // 1. inq.buyer?.name (from backend API buyer object - primary source from SQL JOIN)
-              // 2. inq.buyer_name (direct field - fallback)
+              // 2. inq.buyer_name (direct field - fallback, but validate it's not an ID)
               // 3. inq.name (fallback)
               // 4. 'Buyer' (default)
-              const buyerName = inq.buyer?.name || 
-                               inq.buyer_name || 
-                               inq.name || 
-                               inq.buyer?.full_name ||
-                               'Buyer';
+              
+              // Helper function to check if a value is likely an ID (numeric string or number)
+              const isLikelyId = (value: any): boolean => {
+                if (!value) return false;
+                const str = String(value).trim();
+                // Check if it's a pure number (ID) vs a name (has letters/spaces)
+                return /^\d+$/.test(str) && str.length < 10; // IDs are usually short numbers
+              };
+              
+              let buyerName = inq.buyer?.name || 
+                             inq.buyer?.full_name ||
+                             inq.name;
+              
+              // If buyer_name exists, check if it's actually a name or an ID
+              if (inq.buyer_name) {
+                const buyerNameStr = String(inq.buyer_name).trim();
+                if (!isLikelyId(buyerNameStr)) {
+                  // It's a name, use it
+                  buyerName = buyerName || buyerNameStr;
+                } else {
+                  // It's an ID, ignore it and use buyer object name instead
+                  console.warn('[AgentInquiries] buyer_name appears to be an ID, using buyer object name instead');
+                }
+              }
+              
+              // Final fallback
+              buyerName = buyerName || 'Buyer';
               
               return {
                 id: inq.id || inq.inquiry_id,
@@ -221,13 +266,41 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const handleReply = (inquiry: Inquiry) => {
+  const handleReply = async (inquiry: Inquiry) => {
+    // Mark inquiry as read when opening chat
+    if (inquiry.id && inquiry.status === 'new') {
+      try {
+        await handleMarkAsRead(inquiry.id);
+      } catch (error) {
+        console.error('[AgentInquiries] Error marking inquiry as read:', error);
+        // Continue anyway - don't block navigation
+      }
+    }
+    
     // Navigate to chat conversation with the buyer
     const buyerId = inquiry.buyer_id || inquiry.id || inquiry.property_id;
-    // Ensure we have a valid buyer name - use buyer_name from inquiry, fallback to 'Buyer'
-    const buyerName = (inquiry.buyer_name && inquiry.buyer_name.trim()) 
-      ? inquiry.buyer_name.trim() 
-      : 'Buyer';
+    
+    // Helper function to check if a value is likely an ID (numeric string or number)
+    const isLikelyId = (value: any): boolean => {
+      if (!value) return false;
+      const str = String(value).trim();
+      // Check if it's a pure number (ID) vs a name (has letters/spaces)
+      return /^\d+$/.test(str) && str.length < 10; // IDs are usually short numbers
+    };
+    
+    // Ensure we have a valid buyer name - validate it's not an ID
+    let buyerName = inquiry.buyer_name;
+    if (!buyerName || buyerName.trim() === '' || isLikelyId(buyerName)) {
+      // If buyer_name is missing or is an ID, use fallback
+      buyerName = 'Buyer';
+      console.warn('[AgentInquiries] buyer_name is missing or appears to be an ID, using fallback:', {
+        buyer_name: inquiry.buyer_name,
+        buyerId: buyerId,
+      });
+    } else {
+      buyerName = buyerName.trim();
+    }
+    
     const propertyId = inquiry.property_id;
     const propertyTitle = inquiry.property_title || 'Property';
     
@@ -237,13 +310,20 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
       propertyId,
       propertyTitle,
       inquiryBuyerName: inquiry.buyer_name,
+      isBuyerNameAnId: isLikelyId(inquiry.buyer_name),
     });
+    
+    // Double-check: ensure userName is never the buyerId
+    if (String(buyerName) === String(buyerId)) {
+      console.error('[AgentInquiries] ERROR: buyerName equals buyerId! Using fallback.');
+      buyerName = 'Buyer';
+    }
     
     navigation.navigate('Chat' as any, {
       screen: 'ChatConversation',
       params: {
         userId: Number(buyerId),
-        userName: buyerName,
+        userName: buyerName, // Ensure this is always a name, never an ID
         propertyId: Number(propertyId),
         propertyTitle: propertyTitle,
         receiverRole: 'agent', // Agent is the receiver role in this context
