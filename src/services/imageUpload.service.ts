@@ -128,14 +128,22 @@ export const uploadPropertyImageWithModeration = async (
       throw new Error('Invalid response from moderation API');
     }
 
-    const moderationStatus = data.data?.moderation_status || data.moderation_status;
+    // Extract moderation status - normalize to uppercase
+    const rawStatus = data.data?.moderation_status || data.moderation_status;
+    const moderationStatus = rawStatus ? String(rawStatus).toUpperCase() : 'PENDING';
 
     if (data.status === 'success' || data.success === true) {
+      // Ensure Firebase URL is always included
+      if (!firebaseUrl) {
+        console.error('[ImageUpload] Firebase URL missing after upload!');
+        throw new Error('Firebase upload succeeded but URL is missing');
+      }
+      
       // Success - image was moderated
       const result: ImageUploadWithModerationResult = {
         success: true,
         firebaseUrl: firebaseUrl,
-        moderationStatus: moderationStatus || 'PENDING',
+        moderationStatus: (moderationStatus as 'SAFE' | 'UNSAFE' | 'PENDING' | 'NEEDS_REVIEW' | 'REJECTED') || 'PENDING',
         message: data.message || 'Image uploaded successfully',
         moderationReason: data.data?.moderation_reason || data.moderation_reason || null,
         imageId: data.data?.image_id || data.image_id || null,
@@ -145,6 +153,8 @@ export const uploadPropertyImageWithModeration = async (
       console.log('[ImageUpload] Upload and moderation successful:', {
         moderationStatus: result.moderationStatus,
         hasImageId: !!result.imageId,
+        hasFirebaseUrl: !!result.firebaseUrl,
+        firebaseUrl: result.firebaseUrl.substring(0, 80),
       });
 
       return result;

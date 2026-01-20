@@ -307,31 +307,53 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 }
               )
                 .then(result => {
+                  console.log('[AddProperty] Firebase upload result received:', {
+                    moderationStatus: result.moderationStatus,
+                    hasFirebaseUrl: !!result.firebaseUrl,
+                    firebaseUrl: result.firebaseUrl?.substring(0, 80),
+                  });
+                  
                   setPhotos(prev => {
                     const updated = [...prev];
                     const imgIndex = prev.length - newPhotos.length + index;
                     if (updated[imgIndex]) {
+                      // Map moderation status from backend to local format
                       let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
                       
-                      if (result.moderationStatus === 'SAFE') {
+                      // Normalize status to uppercase for comparison
+                      const status = String(result.moderationStatus || '').toUpperCase();
+                      
+                      if (status === 'SAFE' || status === 'APPROVED') {
                         moderationStatus = 'APPROVED';
-                      } else if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
+                      } else if (status === 'REJECTED' || status === 'UNSAFE') {
                         moderationStatus = 'REJECTED';
-                      } else if (result.moderationStatus === 'PENDING' || (result.moderationStatus as string) === 'NEEDS_REVIEW') {
+                      } else if (status === 'PENDING' || status === 'NEEDS_REVIEW') {
                         moderationStatus = 'PENDING';
+                      } else {
+                        // Default to PENDING if status is unknown but upload succeeded
+                        console.warn('[AddProperty] Unknown moderation status, defaulting to PENDING:', result.moderationStatus);
+                        moderationStatus = 'PENDING';
+                      }
+                      
+                      // Ensure Firebase URL is set
+                      const firebaseUrl = result.firebaseUrl || result.imageUrl || '';
+                      
+                      if (!firebaseUrl) {
+                        console.error('[AddProperty] Firebase URL missing in result:', result);
                       }
                       
                       updated[imgIndex] = {
                         ...updated[imgIndex],
                         moderationStatus,
                         moderationReason: result.moderationReason || undefined,
-                        imageUrl: result.firebaseUrl, // Firebase URL
+                        imageUrl: firebaseUrl, // Firebase URL - always set if available
                       };
                       
-                      console.log('[AddProperty] Firebase upload result:', {
+                      console.log('[AddProperty] Photo state updated:', {
                         index: imgIndex,
-                        status: moderationStatus,
-                        firebaseUrl: result.firebaseUrl.substring(0, 50) + '...',
+                        moderationStatus,
+                        hasImageUrl: !!updated[imgIndex].imageUrl,
+                        imageUrl: updated[imgIndex].imageUrl?.substring(0, 50) + '...',
                       });
                     }
                     return updated;
@@ -598,14 +620,30 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Option 2: Collect base64 strings for approved/pending images
-      // Backend (add.php) will convert base64 to files and store URLs
-      // Only include approved or pending images (rejected images are excluded)
+      // Collect valid images (approved or pending)
+      // Support both Firebase URLs and base64 data
       const validImages = photos.filter(
-        p =>
-          (p.moderationStatus === 'APPROVED' ||
-            p.moderationStatus === 'PENDING') &&
-          !!p.base64 // Must have base64 data
+        p => {
+          const isValidStatus = p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING';
+          const hasData = !!p.imageUrl || !!p.base64;
+          
+          if (!isValidStatus) {
+            console.log('[AddProperty] Image filtered out - invalid status:', {
+              status: p.moderationStatus,
+              hasImageUrl: !!p.imageUrl,
+              hasBase64: !!p.base64,
+            });
+          }
+          if (!hasData) {
+            console.log('[AddProperty] Image filtered out - no data:', {
+              status: p.moderationStatus,
+              hasImageUrl: !!p.imageUrl,
+              hasBase64: !!p.base64,
+            });
+          }
+          
+          return isValidStatus && hasData;
+        }
       );
       
       // Debug logging
@@ -613,41 +651,40 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         hasUri: !!p.uri,
         moderationStatus: p.moderationStatus,
         hasBase64: !!p.base64,
+        hasImageUrl: !!p.imageUrl,
+        imageUrl: p.imageUrl?.substring(0, 50) || 'none',
         base64Length: p.base64?.length || 0,
       })));
       
-      // Extract base64 strings (format: "data:image/jpeg;base64,...")
-      // Validate and ensure proper formatting
-      const imageBase64Strings = validImages
-        .map(p => {
-          if (!p.base64) return null;
-          
-          // Ensure base64 is properly formatted as data URI
-          let base64 = p.base64.trim();
-          
-          // If it's already a data URI, validate format
-          if (base64.startsWith('data:image/')) {
-            // Check if it has the base64 part
-            if (!base64.includes(';base64,')) {
-              console.warn('[AddProperty] Invalid base64 format (missing ;base64,):', base64.substring(0, 50));
-              return null;
-            }
-            return base64;
-          }
-          
-          // If it's raw base64, format it (shouldn't happen, but handle it)
-          console.warn('[AddProperty] Base64 missing data URI prefix, adding default format');
-          return `data:image/jpeg;base64,${base64}`;
-        })
-        .filter((base64): base64 is string => base64 !== null && base64 !== '');
+      console.log('[AddProperty] Valid images count:', validImages.length, 'out of', photos.length);
       
-      // Check if we have any images
+      // Check if we have any valid images
       if (validImages.length === 0) {
-        Alert.alert(
-          'No Valid Images',
-          'Please upload at least one image that has been approved or is pending review.',
-          [{text: 'OK'}]
-        );
+        const checkingCount = photos.filter(p => p.moderationStatus === 'checking').length;
+        const rejectedCount = photos.filter(p => p.moderationStatus === 'REJECTED').length;
+        const noDataCount = photos.filter(p => 
+          (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') && 
+          !p.imageUrl && !p.base64
+        ).length;
+        
+        let errorMessage = 'Please upload at least one image that has been approved or is pending review.';
+        if (checkingCount > 0) {
+          errorMessage = `Please wait for ${checkingCount} image(s) to finish validating before submitting.`;
+        } else if (noDataCount > 0) {
+          errorMessage = `${noDataCount} image(s) are missing data. Please remove and re-upload them.`;
+        } else if (rejectedCount === photos.length) {
+          errorMessage = 'All images were rejected. Please upload valid property images.';
+        }
+        
+        console.error('[AddProperty] No valid images:', {
+          total: photos.length,
+          checking: checkingCount,
+          rejected: rejectedCount,
+          noData: noDataCount,
+          valid: validImages.length,
+        });
+        
+        Alert.alert('No Valid Images', errorMessage, [{text: 'OK'}]);
         setIsSubmitting(false);
         return;
       }
@@ -657,18 +694,65 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       if (checkingImages.length > 0) {
         Alert.alert(
           'Images Still Validating',
-          'Please wait for all images to be validated before submitting.',
+          `Please wait for ${checkingImages.length} image(s) to be validated before submitting.`,
           [{text: 'OK'}]
         );
         setIsSubmitting(false);
         return;
       }
       
-      // Check if we have base64 data
-      if (imageBase64Strings.length === 0) {
-        console.error('[AddProperty] No base64 data available:', {
+      // Separate Firebase URLs and base64 strings
+      const firebaseUrls: string[] = [];
+      const imageBase64Strings: string[] = [];
+      
+      validImages.forEach((p, idx) => {
+        if (p.imageUrl) {
+          // Firebase URL - send directly (preferred)
+          const url = p.imageUrl.trim();
+          if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            firebaseUrls.push(url);
+            console.log(`[AddProperty] Image ${idx + 1}: Using Firebase URL`);
+          } else {
+            console.warn(`[AddProperty] Image ${idx + 1}: Invalid Firebase URL format:`, url.substring(0, 50));
+          }
+        } else if (p.base64) {
+          // Base64 data - format and include (fallback)
+          let base64 = p.base64.trim();
+          
+          // If it's already a data URI, validate format
+          if (base64.startsWith('data:image/')) {
+            // Check if it has the base64 part
+            if (!base64.includes(';base64,')) {
+              console.warn(`[AddProperty] Image ${idx + 1}: Invalid base64 format (missing ;base64,):`, base64.substring(0, 50));
+              return;
+            }
+            imageBase64Strings.push(base64);
+            console.log(`[AddProperty] Image ${idx + 1}: Using base64 data`);
+          } else {
+            // If it's raw base64, format it
+            console.warn(`[AddProperty] Image ${idx + 1}: Base64 missing data URI prefix, adding default format`);
+            imageBase64Strings.push(`data:image/jpeg;base64,${base64}`);
+          }
+        } else {
+          console.error(`[AddProperty] Image ${idx + 1}: No imageUrl or base64 available!`, {
+            status: p.moderationStatus,
+            hasUri: !!p.uri,
+          });
+        }
+      });
+      
+      // Check if we have any image data (Firebase URLs or base64)
+      if (firebaseUrls.length === 0 && imageBase64Strings.length === 0) {
+        console.error('[AddProperty] No image data available:', {
           validImagesCount: validImages.length,
+          photosWithFirebaseUrl: validImages.filter(p => p.imageUrl).length,
           photosWithBase64: validImages.filter(p => p.base64).length,
+          photoDetails: validImages.map(p => ({
+            status: p.moderationStatus,
+            hasImageUrl: !!p.imageUrl,
+            hasBase64: !!p.base64,
+            imageUrl: p.imageUrl?.substring(0, 50),
+          })),
         });
         Alert.alert(
           'Image Data Missing',
@@ -681,7 +765,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       
       console.log('[AddProperty] Total photos:', photos.length);
       console.log('[AddProperty] Valid images (approved/pending):', validImages.length);
-      console.log('[AddProperty] Base64 images ready for submission:', imageBase64Strings.length);
+      console.log('[AddProperty] Firebase URLs:', firebaseUrls.length);
+      console.log('[AddProperty] Base64 images:', imageBase64Strings.length);
 
       // Property type is already in the correct format from guide
       const propertyData = {
@@ -709,20 +794,28 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : null,
         maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
         amenities: selectedAmenities,
-        // Option 2: Send base64 strings directly to add.php
-        // Backend will convert base64 to files and store URLs
-        images: imageBase64Strings.length > 0 ? imageBase64Strings : undefined,
+        // Send Firebase URLs if available, otherwise send base64 strings
+        // Backend will handle both: Firebase URLs are already stored, base64 will be converted
+        images: firebaseUrls.length > 0 ? firebaseUrls : (imageBase64Strings.length > 0 ? imageBase64Strings : undefined),
+        // Also send a flag to indicate if using Firebase URLs
+        use_firebase_urls: firebaseUrls.length > 0,
       };
 
       console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
       console.log('[AddProperty] Images included:', {
+        firebaseUrls: firebaseUrls.length,
         base64: imageBase64Strings.length,
-        total: imageBase64Strings.length,
+        total: firebaseUrls.length + imageBase64Strings.length,
+        usingFirebase: firebaseUrls.length > 0,
       });
       console.log('[AddProperty] Property data:', JSON.stringify({
         ...propertyData, 
-        images: `[${imageBase64Strings.length} base64 strings]`,
-        imagesPreview: imageBase64Strings.map(b => b.substring(0, 50) + '...'),
+        images: firebaseUrls.length > 0 
+          ? `[${firebaseUrls.length} Firebase URLs]`
+          : `[${imageBase64Strings.length} base64 strings]`,
+        imagesPreview: firebaseUrls.length > 0
+          ? firebaseUrls.map(url => url.substring(0, 50) + '...')
+          : imageBase64Strings.map(b => b.substring(0, 50) + '...'),
       }, null, 2));
 
       // Create property with images included in request (as per guide)
@@ -733,7 +826,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       
       if (response && response.success) {
         // Property created successfully with images
-        const imageCount = imageBase64Strings.length;
+        const imageCount = firebaseUrls.length + imageBase64Strings.length;
         const propertyData = response.data?.property || response.data;
         
         // Log returned property data to verify images were saved and backend conversion
