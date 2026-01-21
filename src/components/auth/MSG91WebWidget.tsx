@@ -104,27 +104,24 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
       widgetId: !!widgetId,
       authToken: !!authToken,
     });
-    onFailure(new Error('MSG91 widget configuration is missing. Please check msg91.config.ts'));
+    // Return silently to avoid setState during render
     return null;
   }
   
-  // Validate credential format
+  // Validate credential format (log only; avoid setState during render)
   if (widgetId.trim().length < 20 || widgetId.trim().length > 30) {
     console.error('[MSG91 Widget] Invalid widget ID format:', widgetId.length, 'characters');
-    onFailure(new Error('Invalid Widget ID format. Widget ID should be 20-30 characters. Please check msg91.config.ts'));
     return null;
   }
   
   if (authToken.trim().length < 20 || authToken.trim().length > 50) {
     console.error('[MSG91 Widget] Invalid auth token format:', authToken.length, 'characters');
-    onFailure(new Error('Invalid Auth Token format. Auth Token should be 20-50 characters. Please check msg91.config.ts'));
     return null;
   }
   
-  // Validate identifier format
+  // Validate identifier format (log only)
   if (!identifier || identifier.trim().length < 10) {
     console.error('[MSG91 Widget] Invalid identifier:', identifier);
-    onFailure(new Error('Invalid phone number or email. Please provide a valid identifier.'));
     return null;
   }
 

@@ -705,21 +705,22 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       </ImageBackground>
 
       {/* MSG91 Phone Verification Widget */}
-      {phone && (
+      {showPhoneWidget && phone && (
         <MSG91WebWidget
           visible={showPhoneWidget}
           onClose={() => {
             setShowPhoneWidget(false);
             setPhoneVerifying(false);
           }}
-          identifier={(() => {
+        identifier={(() => {
             const digits = phone.replace(/\D/g, '');
             if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) {
               return '91' + digits;
             } else if (digits.length === 12 && digits.startsWith('91')) {
               return digits;
             }
-            return digits;
+            // Fallback: return empty string to avoid invalid identifier error
+            return '';
           })()}
           widgetType="sms"
           onSuccess={handlePhoneWidgetSuccess}
