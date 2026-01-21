@@ -20,8 +20,7 @@ import {useRoute} from '@react-navigation/native';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth, UserRole} from '../../context/AuthContext';
-import {otpService} from '../../services/otp.service';
-import {MSG91_CONFIG} from '../../config/msg91.config';
+import MSG91WebWidget from '../../components/auth/MSG91WebWidget';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -50,7 +49,9 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneToken, setPhoneToken] = useState<string | null>(null);
   const [phoneReqId, setPhoneReqId] = useState<string | null>(null);
-  const [phoneMethod, setPhoneMethod] = useState<'msg91-sdk' | 'msg91-rest' | 'backend' | null>(null);
+  const [phoneMethod, setPhoneMethod] = useState<'msg91-sdk' | 'msg91-rest' | 'backend' | 'msg91-widget' | null>(null);
+  const [showMSG91Widget, setShowMSG91Widget] = useState(false);
+  const [widgetPhoneIdentifier, setWidgetPhoneIdentifier] = useState('');
 
   // Handle return from OTP verification screen
   useEffect(() => {
@@ -130,7 +131,98 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
 
   // Email is automatically accepted (no verification needed)
 
-  const handlePhoneVerify = async () => {
+  const extractWidgetToken = (payload: any): string | null => {
+    const candidates = [
+      payload?.extractedToken,
+      payload?.token,
+      payload?.verificationToken,
+      payload?.phoneVerificationToken,
+      payload?.data?.token,
+      payload?.data?.verificationToken,
+      payload?.data?.phoneVerificationToken,
+      payload?.message,
+    ];
+
+    for (const candidate of candidates) {
+      if (candidate && typeof candidate === 'string') {
+        try {
+          const parsed = JSON.parse(candidate);
+          const parsedToken =
+            parsed?.token ||
+            parsed?.verificationToken ||
+            parsed?.phoneVerificationToken ||
+            parsed?.message;
+          if (parsedToken && typeof parsedToken === 'string') {
+            return parsedToken;
+          }
+        } catch {
+          return candidate;
+        }
+      } else if (candidate && typeof candidate === 'object') {
+        const nested =
+          candidate?.token ||
+          candidate?.verificationToken ||
+          candidate?.phoneVerificationToken ||
+          candidate?.message;
+        if (nested && typeof nested === 'string') {
+          return nested;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const handleWidgetSuccess = (data: any) => {
+    const token = extractWidgetToken(data);
+    const reqIdFromWidget =
+      data?.reqId ||
+      data?.requestId ||
+      data?.data?.reqId ||
+      data?.data?.requestId ||
+      token;
+
+    console.log('[Register] MSG91 widget success payload:', {
+      tokenPreview: token ? `${token.substring(0, 12)}...` : 'missing',
+      reqId: reqIdFromWidget,
+    });
+
+    setPhoneToken(token || null);
+    setPhoneReqId(reqIdFromWidget || null);
+    setPhoneMethod('msg91-widget');
+    setPhoneVerified(true);
+    setPhoneVerifying(false);
+
+    CustomAlert.alert(
+      'Verified',
+      'Phone verified via MSG91 widget. You can continue with registration.',
+    );
+  };
+
+  const handleWidgetFailure = (error: any) => {
+    const message =
+      error?.message ||
+      error?.error?.message ||
+      error?.error ||
+      (typeof error === 'string' ? error : 'Verification failed. Please try again.');
+
+    console.error('[Register] MSG91 widget failure:', error);
+    setPhoneVerified(false);
+    setPhoneVerifying(false);
+    setPhoneToken(null);
+    setPhoneReqId(null);
+    setPhoneMethod(null);
+    setShowMSG91Widget(false);
+
+    CustomAlert.alert('Verification Failed', message);
+  };
+
+  const handleWidgetClose = () => {
+    setShowMSG91Widget(false);
+    setPhoneVerifying(false);
+  };
+
+  const handlePhoneVerify = () => {
     if (!phone) {
       CustomAlert.alert('Error', 'Please enter your phone number first');
       return;
@@ -150,57 +242,21 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       CustomAlert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
-    
-    // Send OTP via MSG91 SDK (programmatic approach)
-    // The SDK will try: Native SDK -> REST API -> Backend API
-    console.log('[Register] Sending SMS OTP:', {
-      phone: formattedPhone,
-      context: 'register',
-      formattedLength: formattedPhone.length,
+
+    console.log('[Register] Opening MSG91 widget for phone verification:', {
+      identifier: formattedPhone,
+      length: formattedPhone.length,
     });
-    
-    try {
-      const result = await otpService.sendSMS(formattedPhone, 'register');
-      
-      console.log('[Register] SMS OTP send result:', {
-        success: result.success,
-        method: result.method,
-        reqId: result.reqId,
-        message: result.message,
-      });
-      
-      if (result.success) {
-        setPhoneReqId(result.reqId || result.token);
-        // Use actual method from result, don't default to 'msg91-sdk'
-        const actualMethod = result.method || 'msg91-rest'; // Default to 'msg91-rest' if not specified (REST API was likely used)
-        setPhoneMethod(actualMethod as 'msg91-sdk' | 'msg91-rest' | 'backend');
-        
-        console.log('[Register] Navigating to OTP verification screen:', {
-          phone: formattedPhone,
-          reqId: result.reqId || result.token,
-          method: actualMethod,
-          resultMethod: result.method,
-        });
-        
-        // Navigate to OTP verification screen
-        navigation.navigate('OTPVerification', {
-          phone: formattedPhone,
-          type: 'phone',
-          reqId: result.reqId || result.token,
-          method: actualMethod as 'msg91-sdk' | 'msg91-rest' | 'backend',
-        });
-      } else {
-        console.error('[Register] SMS OTP send failed:', result.message);
-        CustomAlert.alert('Error', result.message || 'Failed to send OTP');
-      }
-    } catch (error: any) {
-      console.error('[Register] Failed to send OTP:', {
-        error: error.message || error,
-        phone: formattedPhone,
-        stack: error.stack,
-      });
-      CustomAlert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
-    }
+
+    // Reset previous verification state and show widget
+    setPhoneVerified(false);
+    setPhoneToken(null);
+    setPhoneReqId(null);
+    setPhoneMethod('msg91-widget');
+
+    setWidgetPhoneIdentifier(formattedPhone);
+    setShowMSG91Widget(true);
+    setPhoneVerifying(true);
   };
 
 
@@ -399,18 +455,27 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   });
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-      {/* Background with gradient pattern */}
-      <ImageBackground
-        source={require('../../assets/browserlogo.png')}
-        style={styles.backgroundImage}
-        imageStyle={styles.backgroundImageStyle}
-        resizeMode="cover">
-        {/* Black Overlay */}
-        <View style={styles.overlay} />
+    <>
+      <MSG91WebWidget
+        visible={showMSG91Widget}
+        onClose={handleWidgetClose}
+        identifier={widgetPhoneIdentifier}
+        widgetType="sms"
+        onSuccess={handleWidgetSuccess}
+        onFailure={handleWidgetFailure}
+      />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+        {/* Background with gradient pattern */}
+        <ImageBackground
+          source={require('../../assets/browserlogo.png')}
+          style={styles.backgroundImage}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="cover">
+          {/* Black Overlay */}
+          <View style={styles.overlay} />
 
         {/* Animated Buildings */}
         <View style={styles.animationContainer}>
@@ -642,7 +707,8 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
         </ScrollView>
       </ImageBackground>
 
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </>
   );
 };
 

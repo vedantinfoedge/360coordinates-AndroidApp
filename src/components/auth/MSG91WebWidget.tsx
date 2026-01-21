@@ -245,6 +245,14 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
     function handleScriptLoad() {
       scriptLoaded = true;
       console.log('MSG91 Widget: Script loaded successfully');
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'script-status',
+          status: 'loaded',
+          timestamp: Date.now(),
+          details: 'otp-provider.js loaded'
+        }));
+      }
     }
     
     function handleScriptError() {
@@ -258,6 +266,12 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
             code: 'SCRIPT_LOAD_ERROR',
             details: 'Script URL: https://verify.msg91.com/otp-provider.js'
           }
+        }));
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'script-status',
+          status: 'error',
+          timestamp: Date.now(),
+          details: 'otp-provider.js failed to load'
         }));
       }
     }
@@ -277,6 +291,12 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                 code: 'SCRIPT_LOAD_TIMEOUT',
                 details: 'Script took longer than 10 seconds to load'
               }
+            }));
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'script-status',
+              status: 'timeout',
+              timestamp: Date.now(),
+              details: 'otp-provider.js did not finish loading within 10s'
             }));
           }
         }
@@ -366,6 +386,17 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
               tokenAuth: config.tokenAuth ? config.tokenAuth.substring(0, 15) + '...' : 'MISSING',
               tokenAuthLength: config.tokenAuth?.length,
             });
+
+            // Notify React Native that we are about to call initSendOTP
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'init-attempt',
+                ts: Date.now(),
+                widgetId: '${widgetId}',
+                identifier: '${identifier}',
+                tokenAuthLength: '${authToken}'.length
+              }));
+            }
             
             // Declare timeout variable BEFORE callbacks (so callbacks can reference it)
             let initTimeout: any = null;
@@ -568,6 +599,29 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
               console.log('MSG91 Widget: initSendOTP called successfully, waiting for response...');
               console.log('MSG91 Widget: Timeout will fire in 6 seconds if no callback is received');
               console.log('MSG91 Widget: If Mobile Integration is disabled, widget will fail silently and timeout will trigger');
+
+              // Confirm to React Native that initSendOTP was invoked
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'init-called',
+                  ts: Date.now(),
+                  widgetId: '${widgetId}',
+                  identifier: '${identifier}'
+                }));
+              }
+
+              // Snapshot container contents after 3 seconds to surface silent widget errors
+              setTimeout(function() {
+                const container = document.getElementById('msg91-widget-container');
+                if (container && window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'container-snapshot',
+                    ts: Date.now(),
+                    innerText: container.innerText || '',
+                    innerHTMLLength: container.innerHTML?.length || 0
+                  }));
+                }
+              }, 3000);
             } catch (initError) {
               if (initTimeout) clearTimeout(initTimeout);
               console.error('MSG91 Widget: Exception calling initSendOTP:', initError);
@@ -669,6 +723,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
     try {
       const message = JSON.parse(event.nativeEvent.data);
       console.log('[MSG91 Widget] Received message:', message);
+      console.log('[MSG91 Widget] Raw message data:', event.nativeEvent.data);
       
       // Mark that we received a response
       responseReceivedRef.current = true;

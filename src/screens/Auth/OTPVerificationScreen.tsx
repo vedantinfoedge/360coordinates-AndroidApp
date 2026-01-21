@@ -28,7 +28,7 @@ type RouteParams = {
   email?: string;
   type?: 'register' | 'forgotPassword';
   reqId?: string;
-  method?: 'msg91-rest' | 'backend';
+  method?: 'msg91-sdk' | 'msg91-rest' | 'backend' | 'msg91-widget';
 };
 
 const OTPVerificationScreen: React.FC = () => {
@@ -162,12 +162,18 @@ const OTPVerificationScreen: React.FC = () => {
           // Use reqId and method from params if available
           // Priority: msg91-sdk (requires reqId) > backend fallback
           const reqId = params.reqId;
-          let method = params.method as 'msg91-sdk' | 'msg91-rest' | 'backend' | undefined;
+          let method = params.method as 'msg91-sdk' | 'msg91-rest' | 'backend' | 'msg91-widget' | undefined;
           
           // If method is not provided but reqId exists, assume msg91-sdk (SDK approach)
           if (!method && reqId) {
             method = 'msg91-sdk';
             console.log('[OTP Verification] Method not provided, inferring msg91-sdk from reqId');
+          }
+
+          if (method === 'msg91-widget') {
+            // Widget flow already validated the OTP; treat it as SDK verification for backend sync
+            console.log('[OTP Verification] Normalizing msg91-widget method to msg91-sdk for verification');
+            method = 'msg91-sdk';
           }
           
           console.log('[OTP Verification] Verifying SMS OTP via MSG91:', {
