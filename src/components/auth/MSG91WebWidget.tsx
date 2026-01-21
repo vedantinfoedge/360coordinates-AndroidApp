@@ -50,6 +50,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const responseReceivedRef = useRef<boolean>(false);
   const nativeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSMSWidget = widgetType === 'sms';
 
   // Memoize widget config to prevent recalculation on every render
   const widgetConfig = useMemo(() => {
@@ -70,18 +71,57 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
 
   // Normalize identifier to MSG91-required phone/email format
   const normalizedIdentifier = useMemo(() => {
-    const raw = identifier || '';
+    const raw = (identifier || '').trim();
+    if (!isSMSWidget) {
+      return raw;
+    }
+
     const digitsOnly = raw.replace(/\D/g, '');
-    // Phone flow expects 91XXXXXXXXXX (12 digits, no +)
+
     if (digitsOnly.startsWith('91') && digitsOnly.length === 12) {
       return digitsOnly;
     }
+
     if (digitsOnly.length === 10 && /^[6-9]\d{9}$/.test(digitsOnly)) {
       return `91${digitsOnly}`;
     }
-    // Fallback to original string for non-phone identifiers (e.g., email)
-    return raw.trim();
-  }, [identifier]);
+
+    if (raw.startsWith('+') && digitsOnly.startsWith('91')) {
+      return digitsOnly;
+    }
+
+    return digitsOnly || raw;
+  }, [identifier, isSMSWidget]);
+
+  const identifierValidationError = useMemo(() => {
+    const raw = (identifier || '').trim();
+
+    if (isSMSWidget) {
+      if (!raw) {
+        return 'Phone number is required for SMS verification.';
+      }
+
+      if (!normalizedIdentifier || normalizedIdentifier.length < 12) {
+        return 'Enter a valid phone (10 digits) — will be sent as 91XXXXXXXXXX.';
+      }
+
+      if (!/^\d{12}$/.test(normalizedIdentifier)) {
+        return 'Phone must contain digits only (91XXXXXXXXXX). Remove spaces or symbols.';
+      }
+
+      return null;
+    }
+
+    if (!raw || raw.length < 5) {
+      return 'Email is required for email verification.';
+    }
+
+    if (!raw.includes('@')) {
+      return 'Enter a valid email address.';
+    }
+
+    return null;
+  }, [identifier, isSMSWidget, normalizedIdentifier]);
 
       // Log configuration only when widget becomes visible (not on every render)
   useEffect(() => {
@@ -104,6 +144,19 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
   // Reset loading when modal opens - MUST BE BEFORE CONDITIONAL RETURN
   useEffect(() => {
     if (visible) {
+      if (identifierValidationError) {
+        console.error('[MSG91 Widget] Identifier validation failed:', identifierValidationError, {
+          identifier,
+          normalizedIdentifier,
+          widgetType,
+        });
+        setLoading(false);
+        setErrorMessage(identifierValidationError);
+        responseReceivedRef.current = true;
+        onFailure(new Error(identifierValidationError));
+        return;
+      }
+
       setLoading(true);
       setErrorMessage(null); // Clear previous errors
       responseReceivedRef.current = false; // Reset response flag
@@ -167,8 +220,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
         nativeTimeoutRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [visible, identifierValidationError, identifier, normalizedIdentifier, widgetType]);
 
   // Validate configuration - AFTER ALL HOOKS
   if (!widgetId || !authToken) {
@@ -191,19 +243,13 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
     return null;
   }
   
-  // Validate identifier format (log only)
-  const isSMSWidget = widgetType === 'sms';
-
-  if (isSMSWidget) {
-    if (!normalizedIdentifier || !/^\d{12}$/.test(normalizedIdentifier)) {
-      console.error('[MSG91 Widget] Invalid phone identifier (expected 91XXXXXXXXXX):', normalizedIdentifier);
-      return null;
-    }
-  } else {
-    if (!normalizedIdentifier || normalizedIdentifier.length < 5) {
-      console.error('[MSG91 Widget] Invalid identifier for email widget:', normalizedIdentifier);
-      return null;
-    }
+  // Log identifier validation outcome (handled via useEffect instead of returning null)
+  if (identifierValidationError) {
+    console.error('[MSG91 Widget] Identifier validation warning:', identifierValidationError, {
+      identifier,
+      normalizedIdentifier,
+      widgetType,
+    });
   }
 
   // HTML content with MSG91 script
