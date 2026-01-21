@@ -780,15 +780,48 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
                     });
                     
                     // Extract buyer name from multiple possible locations
-                    const buyerName = inquiry.buyer?.name || 
-                                     inquiry.buyer?.full_name || 
-                                     inquiry.buyer_name || 
-                                     inquiry.name || 
-                                     inquiry.buyer?.first_name || 
-                                     (inquiry.buyer?.first_name && inquiry.buyer?.last_name 
-                                       ? `${inquiry.buyer.first_name} ${inquiry.buyer.last_name}` 
-                                       : null) ||
-                                     'Buyer';
+                    // Priority: buyer object fields > inquiry buyer_name > inquiry name (last resort)
+                    let buyerName = null;
+                    
+                    // First, try buyer object fields (most reliable)
+                    if (inquiry.buyer) {
+                      if (inquiry.buyer.full_name && inquiry.buyer.full_name.trim() && inquiry.buyer.full_name !== 'Buyer' && !inquiry.buyer.full_name.startsWith('Buyer ')) {
+                        buyerName = inquiry.buyer.full_name.trim();
+                      } else if (inquiry.buyer.name && inquiry.buyer.name.trim() && inquiry.buyer.name !== 'Buyer' && !inquiry.buyer.name.startsWith('Buyer ')) {
+                        buyerName = inquiry.buyer.name.trim();
+                      } else if (inquiry.buyer.first_name || inquiry.buyer.last_name) {
+                        const firstName = inquiry.buyer.first_name?.trim() || '';
+                        const lastName = inquiry.buyer.last_name?.trim() || '';
+                        const fullName = `${firstName} ${lastName}`.trim();
+                        if (fullName && fullName !== 'Buyer' && !fullName.startsWith('Buyer ')) {
+                          buyerName = fullName;
+                        }
+                      }
+                    }
+                    
+                    // If not found, try inquiry.buyer_name
+                    if (!buyerName && inquiry.buyer_name) {
+                      const buyerNameFromField = String(inquiry.buyer_name).trim();
+                      // Validate it's not an ID (numeric) and not default "Buyer"
+                      const isLikelyId = /^\d+$/.test(buyerNameFromField) && buyerNameFromField.length < 10;
+                      if (buyerNameFromField && !isLikelyId && buyerNameFromField !== 'Buyer' && !buyerNameFromField.startsWith('Buyer ')) {
+                        buyerName = buyerNameFromField;
+                      }
+                    }
+                    
+                    // Last resort: try inquiry.name (but validate it's not an ID or default value)
+                    if (!buyerName && inquiry.name) {
+                      const nameFromField = String(inquiry.name).trim();
+                      const isLikelyId = /^\d+$/.test(nameFromField) && nameFromField.length < 10;
+                      if (nameFromField && !isLikelyId && nameFromField !== 'Buyer' && !nameFromField.startsWith('Buyer ')) {
+                        buyerName = nameFromField;
+                      }
+                    }
+                    
+                    // If still no valid name found, use null (will fall back to other sources)
+                    if (!buyerName || buyerName === 'Buyer' || buyerName.startsWith('Buyer ')) {
+                      buyerName = null;
+                    }
                     
                     const buyerProfileImage = inquiry.buyer?.profile_image || 
                                              inquiry.buyer_profile_image || 
@@ -800,31 +833,36 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
                       hasImage: !!buyerProfileImage,
                     });
                     
-                    const fixedImageUrl = buyerProfileImage ? fixImageUrl(buyerProfileImage) : null;
-                    buyerInfo = {
-                      name: buyerName,
-                      profile_image: fixedImageUrl || undefined,
-                    };
-                    
-                    // Cache buyer info
-                    if (buyerId) {
-                      const buyerIdStr = String(buyerId);
-                      setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
-                      console.log('[ChatList] Cached buyer info for buyerId:', buyerIdStr);
+                    // Only create buyerInfo if we found a valid buyer name
+                    if (buyerName) {
+                      const fixedImageUrl = buyerProfileImage ? fixImageUrl(buyerProfileImage) : null;
+                      buyerInfo = {
+                        name: buyerName,
+                        profile_image: fixedImageUrl || undefined,
+                      };
                       
-                      // Also update Firebase chat room document with buyer name for future reference
-                      try {
-                        const db = firestore();
-                        if (db) {
-                          await db.collection('chats').doc(room.chatRoomId).update({
-                            buyerName: buyerInfo.name,
-                            ...(buyerInfo.profile_image && { buyerProfileImage: buyerInfo.profile_image }),
-                          });
-                          console.log('[ChatList] ✅ Updated Firebase chat room with buyer name:', buyerInfo.name);
+                      // Cache buyer info
+                      if (buyerId) {
+                        const buyerIdStr = String(buyerId);
+                        setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
+                        console.log('[ChatList] ✅ Cached buyer info for buyerId:', buyerIdStr, 'Name:', buyerName);
+                        
+                        // Also update Firebase chat room document with buyer name for future reference
+                        try {
+                          const db = firestore();
+                          if (db) {
+                            await db.collection('chats').doc(room.chatRoomId).update({
+                              buyerName: buyerInfo.name,
+                              ...(buyerInfo.profile_image && { buyerProfileImage: buyerInfo.profile_image }),
+                            });
+                            console.log('[ChatList] ✅ Updated Firebase chat room with buyer name:', buyerInfo.name);
+                          }
+                        } catch (updateError) {
+                          console.warn('[ChatList] Could not update Firebase chat room with buyer name:', updateError);
                         }
-                      } catch (updateError) {
-                        console.warn('[ChatList] Could not update Firebase chat room with buyer name:', updateError);
                       }
+                    } else {
+                      console.warn('[ChatList] No valid buyer name found in inquiry for buyerId:', buyerId, 'propertyId:', propertyId);
                     }
                   } else {
                     console.warn('[ChatList] No inquiry found for buyerId:', buyerId, 'propertyId:', propertyId);
