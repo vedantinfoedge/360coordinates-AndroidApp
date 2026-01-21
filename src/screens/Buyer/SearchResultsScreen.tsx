@@ -471,6 +471,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
 
   // Trigger search when location or filters change (debounced)
   // Note: minBudget and maxBudget are excluded to prevent search during slider drag
+  // Note: searchText is excluded to prevent searches while typing (only location triggers searches)
   useEffect(() => {
     // Skip initial mount - it's handled by the mount useEffect
     if (isFirstRender.current) {
@@ -491,7 +492,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       isMounted = false;
       clearTimeout(searchTimeout);
     };
-  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, bathrooms, loadProperties]);
+  }, [location, listingType, selectedPropertyType, budget, bedrooms, area, bathrooms, loadProperties]);
   
   // Separate effect for budget changes (with longer debounce to avoid lag during slider drag)
   useEffect(() => {
@@ -882,13 +883,18 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
               value={searchText}
               onChangeText={(text: string) => {
                 setSearchText(text);
-                setLocation(text); // Update location immediately when typing
+                // Don't update location immediately - only update searchText for autocomplete
+                // Location will be updated when user selects from suggestions or submits
                 setShowLocationSuggestions(text.length >= 2);
               }}
               onSubmitEditing={() => {
-                // Force immediate search on submit
+                // Update location when user submits, then search
+                setLocation(searchText);
                 setShowLocationSuggestions(false);
-                loadProperties();
+                // Small delay to ensure location state is updated
+                setTimeout(() => {
+                  loadProperties();
+                }, 100);
               }}
               returnKeyType="search"
             />
@@ -902,8 +908,10 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                   setSearchText(locationName);
                   setLocation(locationName);
                   setShowLocationSuggestions(false);
-                  // Trigger search after location selection
-                  setTimeout(() => loadProperties(), 100);
+                  // Trigger search after location selection with delay to ensure state is updated
+                  setTimeout(() => {
+                    loadProperties();
+                  }, 150);
                 }}
                 visible={showLocationSuggestions}
               />
