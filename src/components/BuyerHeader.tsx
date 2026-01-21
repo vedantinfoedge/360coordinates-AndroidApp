@@ -67,12 +67,8 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
       items.push({
         label: 'Support',
         onPress: () => {
-          console.log('[BuyerHeader] Support menu item pressed');
           setMenuVisible(false);
-          // Small delay to ensure modal closes before navigation
-          setTimeout(() => {
-            onSupportPress();
-          }, 150);
+          onSupportPress();
         },
       });
     }
