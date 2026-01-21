@@ -68,6 +68,21 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
 
   const { widgetId, authToken } = widgetConfig;
 
+  // Normalize identifier to MSG91-required phone/email format
+  const normalizedIdentifier = useMemo(() => {
+    const raw = identifier || '';
+    const digitsOnly = raw.replace(/\D/g, '');
+    // Phone flow expects 91XXXXXXXXXX (12 digits, no +)
+    if (digitsOnly.startsWith('91') && digitsOnly.length === 12) {
+      return digitsOnly;
+    }
+    if (digitsOnly.length === 10 && /^[6-9]\d{9}$/.test(digitsOnly)) {
+      return `91${digitsOnly}`;
+    }
+    // Fallback to original string for non-phone identifiers (e.g., email)
+    return raw.trim();
+  }, [identifier]);
+
       // Log configuration only when widget becomes visible (not on every render)
   useEffect(() => {
     if (visible) {
@@ -75,15 +90,16 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
         widgetType,
         widgetId,
         authToken: authToken ? `${authToken.substring(0, 10)}...` : 'MISSING',
-        identifier,
+        identifier: normalizedIdentifier,
         widgetIdLength: widgetId?.length,
         authTokenLength: authToken?.length,
+        identifierLength: normalizedIdentifier?.length,
       });
       console.log('[MSG91 Widget] Full Widget ID:', widgetId);
       console.log('[MSG91 Widget] Full Auth Token (first 15 chars):', authToken ? authToken.substring(0, 15) : 'MISSING');
       console.log('[MSG91 Widget] These credentials will be used in WebView HTML');
     }
-  }, [visible, widgetType, widgetId, authToken, identifier]);
+  }, [visible, widgetType, widgetId, authToken, normalizedIdentifier]);
 
   // Reset loading when modal opens - MUST BE BEFORE CONDITIONAL RETURN
   useEffect(() => {
@@ -127,7 +143,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                      '4. ✓ Token ID matches exactly (first 15 chars): ${authToken ? authToken.substring(0, 15) : "MISSING"}\n' +
                      '5. ✓ Widget status is ACTIVE (not disabled)\n' +
                      '6. ✓ IP Whitelisting is DISABLED or your IP is whitelisted\n' +
-                     '7. ✓ Phone number format: ${identifier} (should be 91XXXXXXXXXX)\n\n' +
+                     '7. ✓ Phone number format: ${normalizedIdentifier} (should be 91XXXXXXXXXX)\n\n' +
                      'If all above are correct, check MSG91 Dashboard → Reports for error details.',
             details: 'Widget did not call success/failure callbacks within 7 seconds. ' +
                      'Check console logs for detailed error information from MSG91 widget.'
@@ -176,9 +192,18 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
   }
   
   // Validate identifier format (log only)
-  if (!identifier || identifier.trim().length < 10) {
-    console.error('[MSG91 Widget] Invalid identifier:', identifier);
-    return null;
+  const isSMSWidget = widgetType === 'sms';
+
+  if (isSMSWidget) {
+    if (!normalizedIdentifier || !/^\d{12}$/.test(normalizedIdentifier)) {
+      console.error('[MSG91 Widget] Invalid phone identifier (expected 91XXXXXXXXXX):', normalizedIdentifier);
+      return null;
+    }
+  } else {
+    if (!normalizedIdentifier || normalizedIdentifier.length < 5) {
+      console.error('[MSG91 Widget] Invalid identifier for email widget:', normalizedIdentifier);
+      return null;
+    }
   }
 
   // HTML content with MSG91 script
@@ -323,7 +348,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
         console.log('MSG91 Widget: Checking for initSendOTP function...');
         console.log('MSG91 Widget: widgetId = ${widgetId}');
         console.log('MSG91 Widget: authToken = ${authToken ? authToken.substring(0, 10) + "..." : "MISSING"}');
-        console.log('MSG91 Widget: identifier = ${identifier}');
+        console.log('MSG91 Widget: identifier = ${normalizedIdentifier}');
         console.log('MSG91 Widget: widgetId length = ${widgetId?.length}');
         console.log('MSG91 Widget: authToken length = ${authToken?.length}');
         console.log('MSG91 Widget: window.initSendOTP type =', typeof window.initSendOTP);
@@ -377,7 +402,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
             const config: any = {
               widgetId: '${widgetId}',
               tokenAuth: '${authToken}',
-              identifier: '${identifier}',
+              identifier: '${normalizedIdentifier}',
             };
             
             console.log('MSG91 Widget: Config being used:', {
@@ -393,7 +418,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                 type: 'init-attempt',
                 ts: Date.now(),
                 widgetId: '${widgetId}',
-                identifier: '${identifier}',
+                identifier: '${normalizedIdentifier}',
                 tokenAuthLength: '${authToken}'.length
               }));
             }
@@ -459,8 +484,8 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                   widgetIdLength: '${widgetId}'.length,
                   tokenAuth: '${authToken ? authToken.substring(0, 15) + "..." : "MISSING"}',
                   tokenAuthLength: '${authToken}'.length,
-                  identifier: '${identifier}',
-                  identifierLength: '${identifier}'.length,
+                  identifier: '${normalizedIdentifier}',
+                  identifierLength: '${normalizedIdentifier}'.length,
                 });
                 
                 console.error('MSG91 Widget: Troubleshooting checklist:');
@@ -512,7 +537,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                   config: {
                     widgetId: '${widgetId}',
                     tokenAuthLength: '${authToken}'.length,
-                    identifier: '${identifier}'
+                    identifier: '${normalizedIdentifier}'
                   }
                 };
                 console.error('MSG91 Widget: Error details:', errorInfo);
@@ -535,7 +560,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
             console.log('MSG91 Widget: Verification checklist before calling initSendOTP:');
             console.log('  ✓ Widget ID: ${widgetId} (length: ${widgetId?.length})');
             console.log('  ✓ Token ID: ${authToken ? authToken.substring(0, 15) + "..." : "MISSING"} (length: ${authToken?.length})');
-            console.log('  ✓ Identifier (phone): ${identifier} (length: ${identifier?.length})');
+            console.log('  ✓ Identifier (phone): ${normalizedIdentifier} (length: ${normalizedIdentifier?.length})');
             console.log('  ⚠️  Verify in MSG91 Dashboard:');
             console.log('     1. Widget ID matches exactly (case-sensitive)');
             console.log('     2. Token ID matches exactly (case-sensitive)');
@@ -606,7 +631,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                   type: 'init-called',
                   ts: Date.now(),
                   widgetId: '${widgetId}',
-                  identifier: '${identifier}'
+                  identifier: '${normalizedIdentifier}'
                 }));
               }
 
@@ -934,7 +959,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                   console.log('[WebView] Widget ID from React Native:', '${widgetId}');
                   console.log('[WebView] Auth Token length:', '${authToken}'.length);
                   console.log('[WebView] Auth Token (first 15 chars):', '${authToken}'.substring(0, 15));
-                  console.log('[WebView] Identifier:', '${identifier}');
+                  console.log('[WebView] Identifier:', '${normalizedIdentifier}');
                   console.log('[WebView] All scripts on page:', Array.from(document.scripts).map(s => s.src));
                   console.log('[WebView] Window object keys (filtered):', Object.keys(window).filter(k => k.toLowerCase().includes('msg') || k.toLowerCase().includes('otp') || k.toLowerCase().includes('init')));
                   
