@@ -189,16 +189,21 @@ api.interceptors.response.use(
     
     // Try to get error message from response data
     if (typeof errorData === 'string') {
-      // Check if it's HTML (server error page)
-      if (errorData.includes('<!DOCTYPE') || errorData.includes('<html')) {
+      const trimmed = errorData.trim();
+      // If backend returned an empty body (common for PHP fatals with display_errors off),
+      // keep the previously selected status-based message.
+      if (trimmed.length === 0) {
+        // no-op
+      } else if (trimmed.includes('<!DOCTYPE') || trimmed.includes('<html')) {
+        // HTML (server error page)
         errorMessage = `Server error (${statusCode || 'Unknown'}). Please try again later.`;
       } else {
         try {
-          const parsed = JSON.parse(errorData);
-          errorMessage = parsed.message || errorMessage;
+          const parsed = JSON.parse(trimmed);
+          errorMessage = parsed.message || parsed.error || errorMessage;
         } catch {
-          // If it's not JSON and not HTML, use the string as message
-          errorMessage = errorData.length > 200 ? 'Server error occurred' : errorData;
+          // If it's not JSON and not HTML, only use it if it's reasonably short
+          errorMessage = trimmed.length > 200 ? 'Server error occurred' : trimmed;
         }
       }
     } else if (errorData?.message) {

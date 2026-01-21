@@ -27,6 +27,8 @@ type RouteParams = {
   phone?: string;
   email?: string;
   type?: 'register' | 'forgotPassword';
+  reqId?: string;
+  method?: 'msg91-rest' | 'backend';
 };
 
 const OTPVerificationScreen: React.FC = () => {
@@ -39,6 +41,33 @@ const OTPVerificationScreen: React.FC = () => {
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Log OTP verification screen details when component mounts
+  useEffect(() => {
+    console.log('[OTP Verification] Screen loaded:', {
+      type: params.type,
+      phone: params.phone,
+      email: params.email,
+      reqId: params.reqId,
+      method: params.method,
+      userId: params.userId,
+    });
+    
+    if (params.phone) {
+      console.log('[OTP Verification] SMS OTP verification:', {
+        phone: params.phone,
+        method: params.method || 'unknown',
+        reqId: params.reqId || 'not provided',
+        context: params.type === 'forgotPassword' ? 'forgotPassword' : 'register',
+      });
+    } else if (params.email) {
+      console.log('[OTP Verification] Email OTP verification:', {
+        email: params.email,
+        method: params.method || 'unknown',
+        reqId: params.reqId || 'not provided',
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (timer > 0) {
@@ -57,21 +86,26 @@ const OTPVerificationScreen: React.FC = () => {
 
   const handleOTPComplete = (value: string) => {
     setOtp(value);
-    // Auto-verify when 6 digits entered (with small delay for better UX)
+    // Auto-verify when OTP digits entered (4 digits for MSG91, with small delay for better UX)
     setTimeout(() => {
       handleVerify();
     }, 300);
   };
 
   const handleVerify = async () => {
-    if (otp.length !== 6) {
+    // MSG91 sends 4-digit OTPs, but accept 4-6 digits for flexibility
+    if (otp.length < 4 || otp.length > 6) {
       CustomAlert.alert('Error', 'Please enter the complete OTP');
       return;
     }
 
     const userId = params.userId || params.user_id;
-    if (!userId) {
-      CustomAlert.alert('Error', 'User ID not found. Please try registering again.');
+    const isRegistrationFlow = params.type === 'register' || !params.type;
+    
+    // For registration flow, userId is optional (will be created during registration)
+    // For login/forgot password flows, userId is required
+    if (!userId && !isRegistrationFlow) {
+      CustomAlert.alert('Error', 'User ID not found. Please try again.');
       return;
     }
 
@@ -110,78 +144,192 @@ const OTPVerificationScreen: React.FC = () => {
         }
       }
       
-      // If phone is provided, try MSG91 SMS OTP verification
+      // If phone is provided, try MSG91 SMS OTP verification FIRST
       if (params.phone) {
         try {
-          const phoneNumber = params.phone.startsWith('+') ? params.phone : `+91${params.phone}`;
+          // Format phone number consistently (12 digits: 91XXXXXXXXXX)
+          // Accept both 91XXXXXXXXXX and 10-digit formats
+          let phoneNumber = params.phone.replace(/^\+/, ''); // Remove + if present
+          if (phoneNumber.length === 10) {
+            phoneNumber = `91${phoneNumber}`; // Convert 10 digits to 91XXXXXXXXXX
+          } else if (!phoneNumber.startsWith('91')) {
+            phoneNumber = `91${phoneNumber.slice(-10)}`; // Take last 10 digits and add 91
+          }
+          
           // Determine context: 'forgotPassword' or 'register' (default)
           const context = params.type === 'forgotPassword' ? 'forgotPassword' : 'register';
-          // Use reqId and method from params if available (for widget verification)
+          
+          // Use reqId and method from params if available
+          // Priority: msg91-sdk (requires reqId) > backend fallback
           const reqId = params.reqId;
-          const method = params.method || (reqId ? 'widget' : undefined);
-          console.log('[OTP] Verifying SMS OTP:', {
+          let method = params.method as 'msg91-sdk' | 'msg91-rest' | 'backend' | undefined;
+          
+          // If method is not provided but reqId exists, assume msg91-sdk (SDK approach)
+          if (!method && reqId) {
+            method = 'msg91-sdk';
+            console.log('[OTP Verification] Method not provided, inferring msg91-sdk from reqId');
+          }
+          
+          console.log('[OTP Verification] Verifying SMS OTP via MSG91:', {
             phone: phoneNumber,
+            originalPhone: params.phone,
             context,
-            reqId: reqId ? `${reqId.substring(0, 10)}...` : 'not provided',
-            method: method || 'auto-detect',
+            reqId: reqId ? `${reqId.substring(0, 15)}...` : 'not provided',
+            method: method || 'auto-detect (will try MSG91 SDK, then backend)',
+            otpLength: otp.length,
+            otpValue: otp, // Log OTP for debugging (remove in production if needed)
           });
+          
           const smsVerifyResponse = await otpService.verifySMS(phoneNumber, otp, reqId, context, method);
+          
+          console.log('[OTP Verification] MSG91 SMS verification response:', {
+            success: smsVerifyResponse.success,
+            method: smsVerifyResponse.method,
+            message: smsVerifyResponse.message,
+          });
+          
           if (smsVerifyResponse.success) {
-            // SMS OTP verified via MSG91, now verify with backend
-            await verifyOTP(userId, otp, params.phone);
+            // SMS OTP verified via MSG91
+            console.log('[OTP Verification] MSG91 verification successful');
             
-            // Success - navigation handled by AppNavigator
-            if (params.type === 'forgotPassword') {
-              navigation.navigate('ResetPassword', {otp} as never);
-            } else {
+            // Extract token from verification response (if available)
+            // The verifySMS function now returns token directly if SDK verification succeeds
+            const verificationToken = smsVerifyResponse.token ||
+                                   smsVerifyResponse.data?.token || 
+                                   smsVerifyResponse.data?.verificationToken ||
+                                   smsVerifyResponse.reqId; // Use reqId as token fallback
+            
+            // For registration flow, mark phone as verified and go back to registration
+            if (isRegistrationFlow) {
+              console.log('[OTP Verification] Registration flow - phone verified, returning to registration');
+              console.log('[OTP Verification] Verification token:', verificationToken ? `${verificationToken.substring(0, 20)}...` : 'not provided');
+              
+              // Pass verification result back via navigation params
+              // RegisterScreen will use useFocusEffect to detect this
+              navigation.navigate('Register', {
+                phoneVerified: true,
+                phoneToken: verificationToken || params.reqId, // Use reqId as token if no token in response
+                phoneMethod: smsVerifyResponse.method || params.method,
+              } as any);
+              
               CustomAlert.alert(
                 'Success',
-                'SMS OTP verified successfully! You are now logged in.',
+                'Phone number verified successfully! You can now complete registration.',
                 [
                   {
                     text: 'OK',
                     onPress: () => {
-                      // Navigation handled automatically by AppNavigator
+                      // Navigation already handled above
                     },
                   },
                 ],
               );
+              return;
             }
-            return;
+            
+            // For login/forgot password flows, verify with backend
+            if (userId) {
+              console.log('[OTP Verification] Verifying with backend for authentication...');
+              await verifyOTP(userId, otp, params.phone);
+              
+              // Success - navigation handled by AppNavigator
+              if (params.type === 'forgotPassword') {
+                navigation.navigate('ResetPassword', {otp} as never);
+              } else {
+                CustomAlert.alert(
+                  'Success',
+                  'SMS OTP verified successfully! You are now logged in.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Navigation handled automatically by AppNavigator
+                      },
+                    },
+                  ],
+                );
+              }
+              return;
+            } else {
+              throw new Error('User ID required for login/forgot password flow');
+            }
+          } else {
+            console.error('[OTP Verification] MSG91 verification returned failure:', smsVerifyResponse.message);
+            throw new Error(smsVerifyResponse.message || 'MSG91 verification failed');
           }
         } catch (smsError: any) {
           // MSG91 verification failed, fall back to backend verification
-          console.warn('[OTP] MSG91 SMS verification failed, using backend:', smsError);
+          console.error('[OTP Verification] MSG91 SMS verification failed:', {
+            error: smsError.message || smsError,
+            phone: params.phone,
+            method: params.method,
+            willTryBackend: true,
+          });
+          // Continue to backend fallback below
         }
       }
       
       // Default: Use verifyOTP from AuthContext (fallback to backend)
-      // This handles login automatically
-      await verifyOTP(userId, otp, params.phone);
-      
-      // If we reach here, verification was successful and user is logged in
-      // For forgot password flow, navigate to reset password
-      if (params.type === 'forgotPassword') {
-        navigation.navigate('ResetPassword', {otp} as never);
-      } else {
-        // For registration, show success and navigation will be handled by AppNavigator
-        // The user state change will trigger navigation in AppNavigator
+      // Only if userId is available (not registration flow)
+      if (userId && !isRegistrationFlow) {
+        await verifyOTP(userId, otp, params.phone);
+        
+        // If we reach here, verification was successful and user is logged in
+        // For forgot password flow, navigate to reset password
+        if (params.type === 'forgotPassword') {
+          navigation.navigate('ResetPassword', {otp} as never);
+        } else {
+          // For login flow, show success and navigation will be handled by AppNavigator
+          CustomAlert.alert(
+            'Success',
+            'OTP verified successfully! You are now logged in.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Navigation will be handled automatically by AppNavigator
+                  // when user state changes
+                },
+              },
+            ],
+          );
+        }
+      } else if (isRegistrationFlow) {
+        // For registration flow without userId, just mark as verified and go back
+        console.log('[OTP Verification] Registration flow - phone verified via backend fallback');
         CustomAlert.alert(
           'Success',
-          'OTP verified successfully! You are now logged in.',
+          'Phone number verified successfully! You can now complete registration.',
           [
             {
               text: 'OK',
               onPress: () => {
-                // Navigation will be handled automatically by AppNavigator
-                // when user state changes
+                navigation.goBack();
               },
             },
           ],
         );
+      } else {
+        throw new Error('User ID required for verification');
       }
     } catch (error: any) {
-      CustomAlert.alert('Error', error?.message || 'Invalid OTP. Please try again.');
+      console.error('[OTP Verification] Verification error:', {
+        error: error.message || error,
+        errorStack: error.stack,
+        originalError: error.originalError,
+        backendError: error.backendError,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+      });
+      
+      // Show user-friendly error message
+      let errorMessage = 'Invalid OTP. Please try again.';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.originalError?.message) {
+        errorMessage = error.originalError.message;
+      }
+      
+      CustomAlert.alert('Error', errorMessage);
       setOtp(''); // Clear OTP on error
     } finally {
       setIsLoading(false);
@@ -190,8 +338,13 @@ const OTPVerificationScreen: React.FC = () => {
 
   const handleResendOTP = async () => {
     const userId = params.userId || params.user_id;
-    if (!userId) {
-      CustomAlert.alert('Error', 'User ID not found. Please try registering again.');
+    const isRegistrationFlow = params.type === 'register' || !params.type;
+    
+    // For registration flow, userId is optional (resend doesn't need userId)
+    // For login/forgot password flows, userId is required
+    if (!userId && !isRegistrationFlow) {
+      CustomAlert.alert('Error', 'User ID not found. Please try again.');
+      setIsLoading(false);
       return;
     }
 
@@ -217,25 +370,57 @@ const OTPVerificationScreen: React.FC = () => {
       // If phone is provided, try MSG91 SMS OTP resend
       if (params.phone) {
         try {
-          const phoneNumber = params.phone.startsWith('+') ? params.phone : `+91${params.phone}`;
+          // Format phone number consistently (12 digits: 91XXXXXXXXXX)
+          let phoneNumber = params.phone.replace(/^\+/, ''); // Remove + if present
+          if (phoneNumber.length === 10) {
+            phoneNumber = `91${phoneNumber}`; // Convert 10 digits to 91XXXXXXXXXX
+          } else if (!phoneNumber.startsWith('91')) {
+            phoneNumber = `91${phoneNumber.slice(-10)}`; // Take last 10 digits and add 91
+          }
+          
           // Determine context: 'forgotPassword' or 'register' (default)
           const context = params.type === 'forgotPassword' ? 'forgotPassword' : 'register';
+          
+          console.log(`[OTP Verification] Resending SMS OTP:`, {
+            phone: phoneNumber,
+            context: context,
+            originalPhone: params.phone,
+            method: params.method || 'unknown',
+          });
+          
           const smsResendResponse = await otpService.resendSMS(phoneNumber, context);
+          
+          console.log(`[OTP Verification] Resend SMS response:`, {
+            success: smsResendResponse.success,
+            method: smsResendResponse.method,
+            reqId: smsResendResponse.reqId,
+            message: smsResendResponse.message,
+          });
+          
           if (smsResendResponse.success) {
             setTimer(60);
             setCanResend(false);
             setOtp('');
             CustomAlert.alert('Success', 'New SMS OTP sent successfully!');
             return;
+          } else {
+            console.warn(`[OTP Verification] Resend SMS failed:`, smsResendResponse.message);
           }
         } catch (smsError: any) {
           // MSG91 resend failed, fall back to backend
-          console.warn('[OTP] MSG91 SMS resend failed, using backend:', smsError);
+          console.error('[OTP Verification] MSG91 SMS resend failed, using backend:', {
+            error: smsError.message || smsError,
+            phone: params.phone,
+            context: params.type === 'forgotPassword' ? 'forgotPassword' : 'register',
+          });
         }
       }
       
-      // Default: Use backend resend (fallback)
-      await resendOTP(userId, params.phone);
+      // Default: Use backend resend (fallback) - only if userId available
+      if (userId && !isRegistrationFlow) {
+        await resendOTP(userId, params.phone);
+      }
+      // For registration flow, resend already handled by MSG91 above
       setTimer(60);
       setCanResend(false);
       setOtp('');
@@ -249,8 +434,14 @@ const OTPVerificationScreen: React.FC = () => {
 
   const formatPhone = (phone?: string) => {
     if (!phone) return '';
-    if (phone.length === 10) {
-      return `+91-${phone.slice(0, 5)}-${phone.slice(5)}`;
+    // Handle both 10-digit and 12-digit (91XXXXXXXXXX) formats
+    let phoneNum = phone.replace(/^\+/, ''); // Remove + if present
+    if (phoneNum.length === 12 && phoneNum.startsWith('91')) {
+      // Format 91XXXXXXXXXX to +91-XXXXX-XXXXX
+      return `+91-${phoneNum.slice(2, 7)}-${phoneNum.slice(7)}`;
+    } else if (phoneNum.length === 10) {
+      // Format 10 digits to +91-XXXXX-XXXXX
+      return `+91-${phoneNum.slice(0, 5)}-${phoneNum.slice(5)}`;
     }
     return phone;
   };
@@ -270,6 +461,7 @@ const OTPVerificationScreen: React.FC = () => {
 
         <View style={styles.otpContainer}>
           <OTPInput
+            length={4}
             value={otp}
             onChange={setOtp}
             onComplete={handleOTPComplete}
@@ -291,7 +483,7 @@ const OTPVerificationScreen: React.FC = () => {
         <Button
           title={isLoading ? 'Verifying...' : 'Verify'}
           onPress={handleVerify}
-          disabled={otp.length !== 6 || isLoading}
+          disabled={otp.length < 4 || otp.length > 6 || isLoading}
           loading={isLoading}
           fullWidth
         />

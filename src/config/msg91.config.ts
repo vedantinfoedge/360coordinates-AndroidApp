@@ -5,8 +5,8 @@
  * These are provided by MSG91 dashboard
  * 
  * VERIFIED CREDENTIALS (Updated):
- * - SMS Widget ID: 356c7067734f373437333438 ✓
- * - SMS Auth Token (Token ID): 481618TcNAx989nvQ69410832P1 ✓
+ * - SMS Widget ID: 356c6c6c4141303836323334 ✓
+ * - SMS Auth Token (Token ID): 481618Tel6uFr7IH69704db4P1 ✓
  * - SMS Auth Key (API Key): 481618A2cCSUpaZHTW6936c356P1 (for backend API)
  * - SMS Template ID: 356c6c6c4141303836323334 (for backend API)
  * 
@@ -46,16 +46,29 @@ export const MSG91_CONFIG = {
   EMAIL_AUTH_TOKEN: '481618TX6cdMp7Eg69414e7eP1',
   
   // SMS Widget ID (for Registration)
-  SMS_WIDGET_ID: '356c7067734f373437333438',
+  SMS_WIDGET_ID: '356c6c6c4141303836323334',
   
   // SMS Auth Token (Token ID) - Used for widget initialization
-  SMS_AUTH_TOKEN: '481618TcNAx989nvQ69410832P1',
+  SMS_AUTH_TOKEN: '481618Tel6uFr7IH69704db4P1',
   
   // SMS Auth Key (API Key) - Used for backend API calls
   SMS_AUTH_KEY: '481618A2cCSUpaZHTW6936c356P1',
   
-  // SMS Template ID - Used for backend API calls
-  SMS_TEMPLATE_ID: '356c6c6c4141303836323334',
+  // SMS Template ID - Used for REST API calls
+  // ⚠️ CRITICAL: REST API template IDs are DIFFERENT from Widget IDs!
+  // Widget IDs are hex strings (e.g., '356c6c6c4141303836323334')
+  // REST API Template IDs are usually numeric or different format
+  // 
+  // HOW TO GET CORRECT TEMPLATE ID:
+  // 1. Login to MSG91 Dashboard: https://control.msg91.com
+  // 2. Go to: OTP → Templates / Flow & API → Your Template
+  // 3. Look for "Template ID" or "Flow ID" - this is the REST API template_id
+  // 4. Copy the numeric/alphanumeric ID (NOT the hex Widget ID)
+  // 5. Paste it below
+  // 
+  // CURRENT ISSUE: Using Widget ID instead of Template ID causes delivery failures
+  // If OTP not received, this is likely the cause!
+  SMS_TEMPLATE_ID: '356c6c6c4141303836323334', // ⚠️ LIKELY WRONG - This looks like Widget ID, not Template ID!
   
   // Forgot Password SMS Widget ID
   FORGOT_PASSWORD_WIDGET_ID: '356c686b6c57353338333631',
@@ -87,6 +100,13 @@ export const initializeMSG91 = async () => {
     
     // Initialize with SMS Widget (default, can be switched for email)
     // FIX: Pass tokenAuth as string, not object (per MSG91 SDK docs)
+    console.log('[MSG91] Initializing widget with credentials:', {
+      widgetId: MSG91_CONFIG.SMS_WIDGET_ID,
+      widgetIdLength: MSG91_CONFIG.SMS_WIDGET_ID?.length,
+      authToken: MSG91_CONFIG.SMS_AUTH_TOKEN ? `${MSG91_CONFIG.SMS_AUTH_TOKEN.substring(0, 15)}...` : 'MISSING',
+      authTokenLength: MSG91_CONFIG.SMS_AUTH_TOKEN?.length,
+    });
+    
     OTPWidget.initializeWidget(
       MSG91_CONFIG.SMS_WIDGET_ID,
       MSG91_CONFIG.SMS_AUTH_TOKEN
@@ -96,6 +116,10 @@ export const initializeMSG91 = async () => {
     currentAuthToken = MSG91_CONFIG.SMS_AUTH_TOKEN;
     
     console.log('[MSG91] Widget initialized successfully (SMS widget)');
+    console.log('[MSG91] Current widget context:', {
+      widgetId: currentWidgetId,
+      authTokenLength: currentAuthToken?.length
+    });
     return true;
   } catch (error: any) {
     console.error('[MSG91] Initialization failed:', {
