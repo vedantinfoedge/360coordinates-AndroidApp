@@ -20,6 +20,7 @@ import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth, UserRole} from '../../context/AuthContext';
 import {otpService} from '../../services/otp.service';
+import MSG91WebWidget from '../../components/auth/MSG91WebWidget';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -46,6 +47,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const [phoneVerifying, setPhoneVerifying] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneToken, setPhoneToken] = useState<string | null>(null);
+  const [showPhoneWidget, setShowPhoneWidget] = useState(false);
 
   // Animation values
   const building1Anim = useRef(new Animated.Value(0)).current;
@@ -129,7 +131,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
     
-    // Use native MSG91 SDK instead of WebView widget for faster performance
+    // PRIMARY: Try native MSG91 SDK first (faster, more reliable, no WebView issues)
     setPhoneVerifying(true);
     try {
       const response = await otpService.sendSMS(formattedPhone, 'register');
@@ -137,79 +139,177 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       if (response.success) {
         setPhoneVerified(true);
         
-        // Extract token from response (if available)
-        const token = response.token || response.data?.token || response.data?.verificationToken;
+        // Extract token from response (comprehensive token extraction)
+        const token = response.token || 
+                     response.data?.token || 
+                     response.data?.verificationToken ||
+                     response.verificationToken ||
+                     response.data?.phoneVerificationToken ||
+                     response.message; // Sometimes token is in message field
+        
         if (token) {
           setPhoneToken(token);
           console.log('[Register] Phone verification token stored:', token);
         }
         
-        // Store reqId for verification if needed
         if (response.reqId) {
           console.log('[Register] OTP Request ID:', response.reqId);
         }
         
         CustomAlert.alert('Success', 'Verification SMS sent! Please check your phone and enter the OTP when prompted.');
+        setPhoneVerifying(false);
+        return; // Success - exit early
       } else {
-        CustomAlert.alert('Error', response.message || 'Failed to send verification SMS');
+        // Native SDK failed, fallback to WebView widget
+        console.warn('[Register] Native SDK failed, falling back to WebView widget:', response.message);
+        setPhoneVerifying(false);
+        setShowPhoneWidget(true);
+        return;
       }
     } catch (error: any) {
-      // Log full error details for debugging
-      console.error('[Register] MSG91 SDK failed:', JSON.stringify({
-        status: error?.status,
-        message: error?.message,
-        error: error?.error,
-        responseData: error?.response?.data,
-        originalError: error?.originalError,
-      }, null, 2));
+      // Native SDK error - check if it's a recoverable error
+      console.warn('[Register] Native SDK error, checking if WebView fallback is needed:', error);
       
-      // Provide more helpful error messages
-      let errorMessage = error?.message || 'Failed to send verification SMS. Please try again.';
+      // Check for specific errors that should NOT use WebView fallback
+      const nonRecoverableErrors = [
+        'Invalid phone number',
+        'Please enter a valid',
+      ];
       
-      // Check for specific error types and provide actionable messages
-      if (error?.status === 500) {
-        if (error?.message?.includes('Empty response')) {
-          errorMessage = 'Server error: The backend returned an empty response. The server may be experiencing issues. Please try again later or contact support.';
-        } else {
-          errorMessage = 'Server error occurred. The backend service is currently unavailable. Please try again in a few moments or contact support.';
-        }
-      } else if (error?.message?.includes('IP Blocked') || error?.originalError?.response?.message === 'IPBlocked') {
-        errorMessage = 'MSG91 IP Blocked: Your IP address is blocked in MSG91 dashboard. Please whitelist your IP address or disable IP whitelisting in MSG91 dashboard settings.';
-      } else if (error?.message?.includes('Mobile Integration not enabled') || error?.originalError?.message?.includes('Mobile requests are not allowed')) {
-        errorMessage = 'MSG91 Mobile Integration is not enabled. This needs to be configured in the MSG91 dashboard. The app will use the backend API as a fallback, but it appears to be experiencing issues as well.';
-      } else if (error?.message?.includes('Invalid phone number')) {
-        errorMessage = 'Please enter a valid 10-digit Indian mobile number (starting with 6-9).';
-      } else if (error?.message?.includes('Authentication Failure')) {
-        errorMessage = 'MSG91 authentication failed. Please verify the widget credentials are correct.';
+      const isNonRecoverable = nonRecoverableErrors.some(msg => 
+        error?.message?.includes(msg)
+      );
+      
+      if (isNonRecoverable) {
+        setPhoneVerifying(false);
+        CustomAlert.alert('Error', error?.message || 'Invalid phone number. Please check and try again.');
+        return;
       }
       
-      // Show detailed error for debugging, but user-friendly message
-      CustomAlert.alert(
-        'Unable to Send OTP',
-        errorMessage + '\n\n' + 
-        'Troubleshooting:\n' +
-        '1. Check your internet connection\n' +
-        '2. Verify your phone number is correct\n' +
-        '3. Try again in a few moments\n' +
-        '4. If the problem persists, contact support',
-        [
-          {
-            text: 'OK',
-            style: 'default',
-          },
-          {
-            text: 'Retry',
-            style: 'default',
-            onPress: () => {
-              // Retry sending OTP
-              handlePhoneVerify();
-            },
-          },
-        ]
-      );
-    } finally {
+      // For other errors (401, network, etc.), try WebView widget as fallback
+      console.log('[Register] Attempting WebView widget fallback');
       setPhoneVerifying(false);
+      setShowPhoneWidget(true);
     }
+  };
+
+  // Handle widget success (comprehensive token extraction)
+  const handlePhoneWidgetSuccess = async (data: any) => {
+    console.log('[Register] MSG91 Widget success:', data);
+    setPhoneVerifying(false);
+    setShowPhoneWidget(false);
+    
+    // Comprehensive token extraction from widget response
+    // MSG91 can return tokens in various formats
+    let token = data?.token || 
+                data?.verificationToken || 
+                data?.phoneVerificationToken ||
+                data?.data?.token ||
+                data?.data?.verificationToken ||
+                data?.data?.phoneVerificationToken ||
+                data?.message; // Sometimes token is in message field
+    
+    // If message is a JSON string, try parsing it
+    if (!token && data?.message && typeof data.message === 'string') {
+      try {
+        const parsed = JSON.parse(data.message);
+        token = parsed?.token || 
+                parsed?.verificationToken || 
+                parsed?.phoneVerificationToken ||
+                parsed?.message;
+      } catch (e) {
+        // Not JSON, might be token itself
+        if (data.message.length > 20 && data.message.length < 200) {
+          token = data.message;
+        }
+      }
+    }
+    
+    if (token) {
+      setPhoneToken(token);
+      console.log('[Register] Phone verification token stored from widget:', token);
+    } else {
+      console.warn('[Register] No token found in widget response, but verification succeeded');
+    }
+    
+    setPhoneVerified(true);
+    CustomAlert.alert('Success', 'Phone number verified successfully!');
+  };
+
+  // Handle widget failure - show user-friendly error (native SDK already tried)
+  const handlePhoneWidgetFailure = async (error: any) => {
+    console.warn('[Register] MSG91 Widget failed:', error);
+    setShowPhoneWidget(false);
+    setPhoneVerifying(false);
+    
+    // Extract error details
+    const errorCode = error?.code || error?.error?.code;
+    const errorMessage = error?.message || error?.error?.message || 'Widget verification failed';
+    
+    // Provide specific error messages based on error code
+    let userMessage = 'Failed to verify phone number. ';
+    let actionMessage = '';
+    
+    if (errorCode === '401' || errorMessage?.includes('AuthenticationFailure') || errorMessage?.includes('401')) {
+      userMessage = 'Authentication failed. ';
+      actionMessage = 'Please verify MSG91 credentials in the dashboard.';
+    } else if (errorCode === 'SCRIPT_LOAD_FAILED' || errorMessage?.includes('script failed to load')) {
+      userMessage = 'Widget failed to load. ';
+      actionMessage = 'Please check your internet connection and try again.';
+    } else if (errorCode === 'INVALID_WIDGET_ID' || errorCode === 'INVALID_AUTH_TOKEN') {
+      userMessage = 'Widget configuration error. ';
+      actionMessage = 'Please check MSG91 widget credentials.';
+    } else if (errorMessage?.includes('IP Blocked') || errorCode === '408') {
+      userMessage = 'IP address blocked. ';
+      actionMessage = 'Please whitelist your IP in MSG91 dashboard or disable IP whitelisting.';
+    } else if (errorMessage?.includes('Mobile Integration not enabled')) {
+      userMessage = 'Mobile integration not enabled. ';
+      actionMessage = 'Please enable Mobile Integration in MSG91 dashboard widget settings.';
+    } else {
+      actionMessage = 'Please try again or contact support.';
+    }
+    
+    CustomAlert.alert(
+      'Verification Failed',
+      userMessage + actionMessage + '\n\nNote: The native SDK was already attempted. If this issue persists, please contact support.',
+      [
+        {text: 'OK'},
+        {
+          text: 'Retry',
+          onPress: () => {
+            // Retry with native SDK (skip widget this time)
+            const digits = phone.replace(/\D/g, '');
+            let formattedPhone = '';
+            if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) {
+              formattedPhone = '91' + digits;
+            } else if (digits.length === 12 && digits.startsWith('91')) {
+              formattedPhone = digits;
+            }
+            
+            if (formattedPhone) {
+              setPhoneVerifying(true);
+              otpService.sendSMS(formattedPhone, 'register', true) // skipMSG91 = true to use backend API
+                .then((response) => {
+                  if (response.success) {
+                    setPhoneVerified(true);
+                    const token = response.token || response.data?.token || response.data?.verificationToken;
+                    if (token) setPhoneToken(token);
+                    CustomAlert.alert('Success', 'Verification SMS sent via backend API!');
+                  } else {
+                    CustomAlert.alert('Error', response.message || 'Failed to send OTP');
+                  }
+                })
+                .catch((err) => {
+                  CustomAlert.alert('Error', err?.message || 'Failed to send OTP. Please try again later.');
+                })
+                .finally(() => {
+                  setPhoneVerifying(false);
+                });
+            }
+          }
+        }
+      ]
+    );
   };
 
 
@@ -604,6 +704,28 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
         </ScrollView>
       </ImageBackground>
 
+      {/* MSG91 Phone Verification Widget */}
+      {phone && (
+        <MSG91WebWidget
+          visible={showPhoneWidget}
+          onClose={() => {
+            setShowPhoneWidget(false);
+            setPhoneVerifying(false);
+          }}
+          identifier={(() => {
+            const digits = phone.replace(/\D/g, '');
+            if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) {
+              return '91' + digits;
+            } else if (digits.length === 12 && digits.startsWith('91')) {
+              return digits;
+            }
+            return digits;
+          })()}
+          widgetType="sms"
+          onSuccess={handlePhoneWidgetSuccess}
+          onFailure={handlePhoneWidgetFailure}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };

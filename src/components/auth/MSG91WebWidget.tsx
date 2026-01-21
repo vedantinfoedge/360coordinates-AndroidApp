@@ -13,10 +13,16 @@ import CustomAlert from '../../utils/alertHelper';
 
 // Conditionally import WebView to handle cases where it's not linked
 let WebView: any = null;
+let WebViewAvailable = false;
 try {
-  WebView = require('react-native-webview').WebView;
+  const webviewModule = require('react-native-webview');
+  WebView = webviewModule.WebView;
+  WebViewAvailable = true;
+  console.log('[MSG91 Widget] WebView module loaded successfully');
 } catch (error) {
-  console.warn('[MSG91 Widget] WebView not available. Please install and rebuild: npm install react-native-webview && npm run android');
+  console.warn('[MSG91 Widget] WebView not available:', error);
+  console.warn('[MSG91 Widget] To fix: npm install react-native-webview && npm run android (or npm run ios)');
+  WebViewAvailable = false;
 }
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
@@ -80,9 +86,11 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
       setLoading(true);
       setErrorMessage(null); // Clear previous errors
       // If WebView is not available, show error immediately
-      if (!WebView) {
+      if (!WebViewAvailable || !WebView) {
         setTimeout(() => {
-          onFailure(new Error('WebView not available. Please rebuild the app after installing react-native-webview.'));
+          const errorMsg = 'WebView module is not available. This widget requires react-native-webview to be installed and the app to be rebuilt.\n\nTo fix:\n1. Run: npm install react-native-webview\n2. For iOS: cd ios && pod install && cd ..\n3. Rebuild the app: npm run android (or npm run ios)';
+          console.error('[MSG91 Widget]', errorMsg);
+          onFailure(new Error(errorMsg));
           onClose();
         }, 100);
       }
@@ -99,6 +107,26 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
     onFailure(new Error('MSG91 widget configuration is missing. Please check msg91.config.ts'));
     return null;
   }
+  
+  // Validate credential format
+  if (widgetId.trim().length < 20 || widgetId.trim().length > 30) {
+    console.error('[MSG91 Widget] Invalid widget ID format:', widgetId.length, 'characters');
+    onFailure(new Error('Invalid Widget ID format. Widget ID should be 20-30 characters. Please check msg91.config.ts'));
+    return null;
+  }
+  
+  if (authToken.trim().length < 20 || authToken.trim().length > 50) {
+    console.error('[MSG91 Widget] Invalid auth token format:', authToken.length, 'characters');
+    onFailure(new Error('Invalid Auth Token format. Auth Token should be 20-50 characters. Please check msg91.config.ts'));
+    return null;
+  }
+  
+  // Validate identifier format
+  if (!identifier || identifier.trim().length < 10) {
+    console.error('[MSG91 Widget] Invalid identifier:', identifier);
+    onFailure(new Error('Invalid phone number or email. Please provide a valid identifier.'));
+    return null;
+  }
 
   // HTML content with MSG91 script
   const htmlContent = `
@@ -106,6 +134,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval';">
   <style>
     body {
       margin: 0;
@@ -131,6 +160,14 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
       padding: 20px;
       color: #666;
     }
+    .error {
+      text-align: center;
+      padding: 20px;
+      color: #d32f2f;
+      background: #ffebee;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
     #msg91-widget-container {
       width: 100%;
     }
@@ -143,16 +180,60 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
     </div>
   </div>
 
-  <!-- MSG91 OTP Widget Script -->
-  <script type="text/javascript" src="https://verify.msg91.com/otp-provider.js"></script>
+  <!-- MSG91 OTP Widget Script with error handling -->
+  <script type="text/javascript" src="https://verify.msg91.com/otp-provider.js" 
+    onerror="handleScriptError()" 
+    onload="handleScriptLoad()">
+  </script>
   <script>
-    // Monitor script loading
+    let scriptLoaded = false;
+    let scriptError = false;
+    
+    function handleScriptLoad() {
+      scriptLoaded = true;
+      console.log('MSG91 Widget: Script loaded successfully');
+    }
+    
+    function handleScriptError() {
+      scriptError = true;
+      console.error('MSG91 Widget: Script failed to load');
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'error',
+          error: {
+            message: 'MSG91 script failed to load. Please check your internet connection.',
+            code: 'SCRIPT_LOAD_ERROR',
+            details: 'Script URL: https://verify.msg91.com/otp-provider.js'
+          }
+        }));
+      }
+    }
+    
+    // Monitor script loading with timeout
     window.addEventListener('load', function() {
       console.log('MSG91 Widget: Page loaded, checking for script...');
+      // Set timeout for script loading (10 seconds)
+      setTimeout(function() {
+        if (!scriptLoaded && !scriptError) {
+          console.error('MSG91 Widget: Script loading timeout');
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'error',
+              error: {
+                message: 'MSG91 script loading timeout. Please check your internet connection and try again.',
+                code: 'SCRIPT_LOAD_TIMEOUT',
+                details: 'Script took longer than 10 seconds to load'
+              }
+            }));
+          }
+        }
+      }, 10000);
+      
       if (typeof window.initSendOTP === 'function') {
         console.log('MSG91 Widget: Script loaded successfully, initSendOTP available');
+        scriptLoaded = true;
       } else {
-        console.error('MSG91 Widget: Script not loaded, initSendOTP not found');
+        console.warn('MSG91 Widget: Script not loaded yet, initSendOTP not found');
       }
     });
   </script>
@@ -160,7 +241,10 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
   <script>
     (function() {
       let retryCount = 0;
-      const maxRetries = 10;
+      const maxRetries = 15; // Increased retries
+      const retryDelay = 300; // Reduced delay for faster retries
+      const maxWaitTime = 15000; // 15 second total timeout
+      const startTime = Date.now();
       
       function initWidget() {
         console.log('MSG91 Widget: Checking for initSendOTP function...');
@@ -232,10 +316,38 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
             
             config.success = function(data: any) {
                 console.log('MSG91 Widget: Success!', data);
-                // Send success message to React Native
+                
+                // Comprehensive token extraction
+                let token = data?.token || 
+                           data?.verificationToken || 
+                           data?.phoneVerificationToken ||
+                           data?.data?.token ||
+                           data?.data?.verificationToken ||
+                           data?.data?.phoneVerificationToken ||
+                           data?.message;
+                
+                // If message is JSON string, try parsing
+                if (!token && data?.message && typeof data.message === 'string') {
+                  try {
+                    const parsed = JSON.parse(data.message);
+                    token = parsed?.token || 
+                            parsed?.verificationToken || 
+                            parsed?.phoneVerificationToken ||
+                            parsed?.message;
+                  } catch (e) {
+                    if (data.message.length > 20 && data.message.length < 200) {
+                      token = data.message;
+                    }
+                  }
+                }
+                
+                // Send success message to React Native with extracted token
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'success',
-                  data: data
+                  data: {
+                    ...data,
+                    extractedToken: token, // Add extracted token for convenience
+                  }
                 }));
               };
             
@@ -247,9 +359,31 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                   tokenAuth: '${authToken ? authToken.substring(0, 10) + "..." : "MISSING"}',
                   identifier: '${identifier}'
                 });
+                // Enhanced error extraction for 401 and other common errors
+                let errorCode = error?.code || error?.status || null;
+                let errorMsg = error?.message || error?.error || (typeof error === 'string' ? error : JSON.stringify(error)) || 'Unknown error';
+                
+                // Normalize 401 errors
+                if (errorCode === '401' || errorCode === 401 || errorMsg?.includes('AuthenticationFailure') || errorMsg?.includes('401')) {
+                  errorCode = '401';
+                  errorMsg = 'Authentication failed. Please verify MSG91 widget credentials (Widget ID and Auth Token) in the dashboard.';
+                }
+                
+                // Normalize IP blocked errors
+                if (errorCode === '408' || errorCode === 408 || errorMsg?.includes('IPBlocked') || errorMsg?.includes('IP Blocked')) {
+                  errorCode = '408';
+                  errorMsg = 'IP address blocked. Please whitelist your IP in MSG91 dashboard or disable IP whitelisting.';
+                }
+                
+                // Normalize mobile integration errors
+                if (errorMsg?.includes('Mobile requests are not allowed') || errorMsg?.includes('Mobile Integration')) {
+                  errorCode = 'MOBILE_INTEGRATION_DISABLED';
+                  errorMsg = 'Mobile Integration is not enabled. Please enable it in MSG91 dashboard widget settings.';
+                }
+                
                 const errorInfo = {
-                  message: error?.message || error?.error || (typeof error === 'string' ? error : JSON.stringify(error)) || 'Unknown error',
-                  code: error?.code || error?.status || null,
+                  message: errorMsg,
+                  code: errorCode,
                   type: error?.type || 'failure',
                   fullError: error,
                   config: {
@@ -287,22 +421,44 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
             }));
           }
         } else {
+          // Check if we've exceeded max wait time
+          const elapsedTime = Date.now() - startTime;
+          if (elapsedTime > maxWaitTime) {
+            console.error('MSG91 Widget: Exceeded maximum wait time of', maxWaitTime, 'ms');
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'error',
+              error: {
+                message: 'MSG91 widget script failed to load within ' + (maxWaitTime / 1000) + ' seconds. Please check your internet connection and try again.',
+                code: 'SCRIPT_LOAD_TIMEOUT',
+                details: 'Script URL: https://verify.msg91.com/otp-provider.js'
+              }
+            }));
+            return;
+          }
+          
           // Retry if script not loaded yet
           retryCount++;
-          console.log('MSG91 Widget: initSendOTP not found, retry', retryCount, 'of', maxRetries);
-          console.log('MSG91 Widget: window object keys:', Object.keys(window).filter(k => k.toLowerCase().includes('msg') || k.toLowerCase().includes('otp') || k.toLowerCase().includes('init')));
-          console.log('MSG91 Widget: typeof window.initSendOTP:', typeof window.initSendOTP);
-          console.log('MSG91 Widget: Scripts on page:', Array.from(document.scripts).map(s => s.src));
+          console.log('MSG91 Widget: initSendOTP not found, retry', retryCount, 'of', maxRetries, '(elapsed:', elapsedTime, 'ms)');
+          
           if (retryCount < maxRetries) {
-            setTimeout(initWidget, 500); // Increased delay
+            setTimeout(initWidget, retryDelay);
           } else {
             console.error('MSG91 Widget: Script failed to load after', maxRetries, 'retries');
             console.error('MSG91 Widget: Script URL: https://verify.msg91.com/otp-provider.js');
             console.error('MSG91 Widget: Check network tab for script loading errors');
+            
+            // Check if script tag exists
+            const scriptTag = document.querySelector('script[src*="otp-provider.js"]');
+            if (!scriptTag) {
+              console.error('MSG91 Widget: Script tag not found in DOM');
+            } else {
+              console.log('MSG91 Widget: Script tag found, but initSendOTP not available');
+            }
+            
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'error',
               error: {
-                message: 'MSG91 widget script failed to load after ' + maxRetries + ' retries. The script from https://verify.msg91.com/otp-provider.js may not be loading. Check network connectivity.',
+                message: 'MSG91 widget script failed to load after ' + maxRetries + ' retries. The script from https://verify.msg91.com/otp-provider.js may not be loading. Check network connectivity and try again.',
                 code: 'SCRIPT_LOAD_FAILED',
                 details: 'Script URL: https://verify.msg91.com/otp-provider.js'
               }
@@ -358,19 +514,41 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
         console.warn('[MSG91 Widget] Error code:', message.error?.code);
         console.warn('[MSG91 Widget] Error type:', message.error?.type);
         
-        // Show detailed error to user
+        // Provide user-friendly error messages based on error code
+        let alertTitle = 'Widget Error';
+        let alertMessage = `MSG91 Widget failed to load.\n\nError: ${errorMsg}`;
+        let showBackendOption = true;
+        
+        if (message.error?.code === '401' || errorMsg?.includes('AuthenticationFailure') || errorMsg?.includes('401')) {
+          alertTitle = 'Authentication Failed';
+          alertMessage = 'MSG91 authentication failed (401).\n\nThis usually means:\n1. Widget ID or Auth Token is incorrect\n2. Credentials have expired\n3. Widget is disabled in MSG91 dashboard\n\nPlease verify credentials in MSG91 dashboard.';
+        } else if (message.error?.code === 'SCRIPT_LOAD_FAILED' || message.error?.code === 'SCRIPT_LOAD_TIMEOUT' || message.error?.code === 'SCRIPT_LOAD_ERROR') {
+          alertTitle = 'Script Loading Failed';
+          alertMessage = 'MSG91 widget script failed to load.\n\nPossible causes:\n1. Internet connection issue\n2. MSG91 servers are down\n3. Network firewall blocking the script\n\nPlease check your internet connection and try again.';
+        } else if (message.error?.code === '408' || errorMsg?.includes('IP Blocked')) {
+          alertTitle = 'IP Address Blocked';
+          alertMessage = 'Your IP address is blocked by MSG91.\n\nSolution:\n1. Go to MSG91 Dashboard → Settings → IP Whitelisting\n2. Either whitelist your IP address\n3. Or disable IP whitelisting for production use';
+        } else if (message.error?.code === 'MOBILE_INTEGRATION_DISABLED' || errorMsg?.includes('Mobile Integration')) {
+          alertTitle = 'Mobile Integration Disabled';
+          alertMessage = 'Mobile Integration is not enabled for this widget.\n\nSolution:\n1. Go to MSG91 Dashboard → SendOTP → Widgets\n2. Select your widget\n3. Go to Settings\n4. Enable "Mobile Integration" option';
+        } else if (message.error?.code === 'INVALID_WIDGET_ID' || message.error?.code === 'INVALID_AUTH_TOKEN') {
+          alertTitle = 'Configuration Error';
+          alertMessage = 'Widget configuration is invalid.\n\nPlease check:\n1. Widget ID is correct in msg91.config.ts\n2. Auth Token is correct in msg91.config.ts\n3. Both are active in MSG91 dashboard';
+          showBackendOption = false; // Configuration errors shouldn't use backend
+        }
+        
         CustomAlert.alert(
-          'Widget Error',
-          `MSG91 Widget failed to load.\n\nError: ${errorMsg}\n\nCode: ${message.error?.code || 'N/A'}\n\nPlease check:\n1. Widget ID and Auth Token in MSG91 dashboard\n2. Widget is active/enabled\n3. Internet connection`,
+          alertTitle,
+          alertMessage + (message.error?.code ? `\n\nError Code: ${message.error.code}` : ''),
           [
             {text: 'OK'},
-            {
+            ...(showBackendOption ? [{
               text: 'Use Backend API',
               onPress: () => {
                 onFailure(new Error(errorMsg));
                 onClose();
               }
-            }
+            }] : [])
           ]
         );
         
@@ -384,7 +562,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
   };
 
   // If WebView is not available, show error message
-  if (!WebView) {
+  if (!WebViewAvailable || !WebView) {
     return (
       <Modal
         visible={visible}
@@ -510,15 +688,15 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                 // Keep loading state a bit longer to let widget initialize
                 setTimeout(() => {
                   setLoading(false);
-                }, 3000); // Increased timeout to allow widget to load
+                }, 2000); // Reduced timeout - widget should load faster now
                 
-                // Auto-fallback after 5 seconds if widget doesn't load
+                // Auto-fallback after 12 seconds if widget doesn't load (matches maxWaitTime in script)
                 setTimeout(() => {
                   if (loading) {
                     console.warn('[MSG91 Widget] Widget taking too long, showing fallback option');
                     setErrorMessage('Widget is taking longer than expected to load. You can use the backend API instead.');
                   }
-                }, 5000);
+                }, 12000);
               }}
               onLoadStart={() => {
                 console.log('[MSG91 Widget] WebView started loading');
@@ -526,12 +704,29 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
               onError={(syntheticEvent: any) => {
                 const {nativeEvent} = syntheticEvent;
                 console.error('[MSG91 Widget] WebView error:', nativeEvent);
-                // Don't close modal on WebView errors - let user see what happened
                 setLoading(false);
-                // Only call onFailure for critical errors
+                
+                // Handle different error types
+                let errorMessage = 'WebView error occurred';
                 if (nativeEvent.code === -2 || nativeEvent.description?.includes('net::ERR')) {
-                  // Network error - critical
-                  onFailure(new Error('Network error: ' + nativeEvent.description));
+                  errorMessage = 'Network error: ' + (nativeEvent.description || 'Unable to connect to MSG91 servers');
+                } else if (nativeEvent.description?.includes('ERR_CONNECTION')) {
+                  errorMessage = 'Connection error: Unable to reach MSG91 servers. Please check your internet connection.';
+                } else if (nativeEvent.description?.includes('ERR_NAME_NOT_RESOLVED')) {
+                  errorMessage = 'DNS error: Unable to resolve MSG91 server address. Please check your internet connection.';
+                } else if (nativeEvent.description) {
+                  errorMessage = 'WebView error: ' + nativeEvent.description;
+                }
+                
+                // Only call onFailure for critical errors that prevent widget from working
+                if (nativeEvent.code === -2 || 
+                    nativeEvent.description?.includes('net::ERR') || 
+                    nativeEvent.description?.includes('ERR_CONNECTION') ||
+                    nativeEvent.description?.includes('ERR_NAME_NOT_RESOLVED')) {
+                  onFailure(new Error(errorMessage));
+                } else {
+                  // Non-critical errors - just show message but don't close
+                  setErrorMessage(errorMessage);
                 }
               }}
               onHttpError={(syntheticEvent: any) => {
