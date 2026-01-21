@@ -81,6 +81,15 @@ export const sellerService = {
     return response;
   },
 
+  // Get buyer info by ID (for sellers/agents)
+  // Endpoint: GET /api/seller/buyers/get.php?id={buyerId}
+  getBuyer: async (buyerId: number | string) => {
+    const response = await api.get(API_ENDPOINTS.SELLER_BUYERS_GET, {
+      params: {id: buyerId},
+    });
+    return response;
+  },
+
   // Get seller profile
   getProfile: async () => {
     const response = await api.get(API_ENDPOINTS.SELLER_PROFILE_GET);

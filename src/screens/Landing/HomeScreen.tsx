@@ -244,9 +244,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     <View style={styles.container}>
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile' as never)}
-        onSupportPress={() => {
-          // Navigate to support if needed
-        }}
+        onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={
           isGuest

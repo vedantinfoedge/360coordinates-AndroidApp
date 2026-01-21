@@ -851,9 +851,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           // Navigate to Profile tab in MainTabNavigator
           (navigation as any).getParent()?.navigate('Profile');
         }}
-        onSupportPress={() => {
-          // Navigate to support - can add later
-        }}
+        onSupportPress={() => navigation.navigate('Support')}
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={
           isGuest

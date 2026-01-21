@@ -7,6 +7,7 @@ import SearchNavigator from '../../navigation/SearchNavigator';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
 import FavoritesScreen from '../../screens/FavoritesScreen';
+import SupportScreen from '../../screens/Buyer/SupportScreen';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -14,6 +15,7 @@ export type MainTabParamList = {
   Chat: undefined;
   Profile: undefined;
   Favorites: undefined;
+  Support: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -109,6 +111,14 @@ const MainTabNavigator = () => {
           title: 'Favorites',
           tabBarButton: () => null, // hide from the bottom bar
           headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="Support"
+        component={SupportScreen}
+        options={{
+          title: 'Support',
+          tabBarButton: () => null, // Hide from tab bar
         }}
       />
     </Tab.Navigator>

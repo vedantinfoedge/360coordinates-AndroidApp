@@ -897,6 +897,50 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
               }
             }
             
+            // Step 5: If still no buyer info, call backend API to fetch buyer info directly from database
+            if (!buyerInfo && buyerId) {
+              try {
+                console.log('[ChatList] Calling backend API to fetch buyer info for buyerId:', buyerId);
+                const response: any = await sellerService.getBuyer(buyerId);
+                
+                if (response?.success && response.data?.buyer) {
+                  const buyer = response.data.buyer;
+                  const buyerName = buyer.name || buyer.full_name || 'Buyer';
+                  const buyerProfileImage = buyer.profile_image || undefined;
+                  
+                  if (buyerName && buyerName !== 'Buyer' && !buyerName.startsWith('Buyer ')) {
+                    const fixedImageUrl = buyerProfileImage ? fixImageUrl(buyerProfileImage) : undefined;
+                    buyerInfo = {
+                      name: buyerName,
+                      profile_image: fixedImageUrl,
+                    };
+                    
+                    // Cache buyer info
+                    setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
+                    console.log('[ChatList] ✅ Fetched buyer info from backend API:', buyerName, 'for buyerId:', buyerId);
+                    
+                    // Also update Firebase chat room document with buyer name for future reference
+                    try {
+                      const db = firestore();
+                      if (db) {
+                        await db.collection('chats').doc(room.chatRoomId).update({
+                          buyerName: buyerInfo.name,
+                          ...(buyerInfo.profile_image && { buyerProfileImage: buyerInfo.profile_image }),
+                        });
+                        console.log('[ChatList] ✅ Updated Firebase chat room with buyer name from backend API');
+                      }
+                    } catch (updateError) {
+                      console.warn('[ChatList] Could not update Firebase with buyer name from backend API:', updateError);
+                    }
+                  }
+                } else {
+                  console.warn('[ChatList] Backend API response not successful or no buyer data for buyerId:', buyerId);
+                }
+              } catch (error) {
+                console.warn('[ChatList] Failed to fetch buyer info from backend API for buyerId', buyerId, ':', error);
+              }
+            }
+            
             // Use buyer info if available, otherwise use fallback
             if (buyerInfo && buyerInfo.name && buyerInfo.name !== 'Buyer' && !buyerInfo.name.startsWith('Buyer ')) {
               displayName = buyerInfo.name;
