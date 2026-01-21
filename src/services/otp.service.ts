@@ -368,6 +368,7 @@ export const otpService = {
     try {
       // Try MSG91 SDK first
       const {OTPWidget} = require('@msg91comm/sendotp-react-native');
+      const {switchToEmailWidget, initializeMSG91} = require('../config/msg91.config');
       
       // Ensure widget is initialized before switching
       try {
@@ -376,7 +377,6 @@ export const otpService = {
       } catch (switchError) {
         // If switching fails, try to initialize first
         console.warn('[OTP] Widget switch failed, initializing:', switchError);
-        const {initializeMSG91} = require('../config/msg91.config');
         await initializeMSG91();
         // Try switching again
         await switchToEmailWidget();
