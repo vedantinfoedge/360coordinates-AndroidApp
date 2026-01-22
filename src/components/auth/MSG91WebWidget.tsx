@@ -51,6 +51,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
   const responseReceivedRef = useRef<boolean>(false);
   const nativeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isSMSWidget = widgetType === 'sms';
+  const [useAuthKey, setUseAuthKey] = useState(false); // allow toggling between Token ID and Auth Key for SMS
 
   // Memoize widget config to prevent recalculation on every render
   const widgetConfig = useMemo(() => {
@@ -63,11 +64,15 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
       widgetType === 'email'
         ? MSG91_CONFIG.EMAIL_AUTH_TOKEN
         : MSG91_CONFIG.SMS_AUTH_TOKEN;
+    const resolvedAuthToken =
+      isSMSWidget && useAuthKey
+        ? MSG91_CONFIG.SMS_AUTH_KEY // alternative credential for SMS if needed
+        : authToken;
     
-    return { widgetId, authToken };
-  }, [widgetType]);
+    return { widgetId, authToken, resolvedAuthToken };
+  }, [widgetType, isSMSWidget, useAuthKey]);
 
-  const { widgetId, authToken } = widgetConfig;
+  const { widgetId, authToken, resolvedAuthToken } = widgetConfig;
 
   // Normalize identifier to MSG91-required phone/email format
   const normalizedIdentifier = useMemo(() => {
@@ -129,17 +134,19 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
       console.log('[MSG91 Widget] Configuration:', {
         widgetType,
         widgetId,
-        authToken: authToken ? `${authToken.substring(0, 10)}...` : 'MISSING',
+        authToken: resolvedAuthToken ? `${resolvedAuthToken.substring(0, 10)}...` : 'MISSING',
         identifier: normalizedIdentifier,
         widgetIdLength: widgetId?.length,
-        authTokenLength: authToken?.length,
+        authTokenLength: resolvedAuthToken?.length,
         identifierLength: normalizedIdentifier?.length,
+        usingAuthKey: useAuthKey,
       });
       console.log('[MSG91 Widget] Full Widget ID:', widgetId);
-      console.log('[MSG91 Widget] Full Auth Token (first 15 chars):', authToken ? authToken.substring(0, 15) : 'MISSING');
+      console.log('[MSG91 Widget] Full Auth Token (first 15 chars):', resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : 'MISSING');
+      console.log('[MSG91 Widget] Normalized identifier being sent:', normalizedIdentifier);
       console.log('[MSG91 Widget] These credentials will be used in WebView HTML');
     }
-  }, [visible, widgetType, widgetId, authToken, normalizedIdentifier]);
+  }, [visible, widgetType, widgetId, resolvedAuthToken, normalizedIdentifier, useAuthKey]);
 
   // Reset loading when modal opens - MUST BE BEFORE CONDITIONAL RETURN
   useEffect(() => {
@@ -193,7 +200,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                      '1. ✓ Mobile Integration is ENABLED and SAVED in MSG91 dashboard\n' +
                      '2. ⏱️  Wait 1-2 minutes after enabling (settings propagation delay)\n' +
                      '3. ✓ Widget ID matches exactly: ${widgetId}\n' +
-                     '4. ✓ Token ID matches exactly (first 15 chars): ${authToken ? authToken.substring(0, 15) : "MISSING"}\n' +
+                     '4. ✓ Token ID matches exactly (first 15 chars): ${resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : "MISSING"}\n' +
                      '5. ✓ Widget status is ACTIVE (not disabled)\n' +
                      '6. ✓ IP Whitelisting is DISABLED or your IP is whitelisted\n' +
                      '7. ✓ Phone number format: ${normalizedIdentifier} (should be 91XXXXXXXXXX)\n\n' +
@@ -223,10 +230,10 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
   }, [visible, identifierValidationError, identifier, normalizedIdentifier, widgetType]);
 
   // Validate configuration - AFTER ALL HOOKS
-  if (!widgetId || !authToken) {
+  if (!widgetId || !resolvedAuthToken) {
     console.error('[MSG91 Widget] Missing configuration:', {
       widgetId: !!widgetId,
-      authToken: !!authToken,
+      authToken: !!resolvedAuthToken,
     });
     // Return silently to avoid setState during render
     return null;
@@ -238,8 +245,8 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
     return null;
   }
   
-  if (authToken.trim().length < 20 || authToken.trim().length > 50) {
-    console.error('[MSG91 Widget] Invalid auth token format:', authToken.length, 'characters');
+  if (resolvedAuthToken.trim().length < 20 || resolvedAuthToken.trim().length > 50) {
+    console.error('[MSG91 Widget] Invalid auth token format:', resolvedAuthToken.length, 'characters');
     return null;
   }
   
@@ -393,10 +400,10 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
       function initWidget() {
         console.log('MSG91 Widget: Checking for initSendOTP function...');
         console.log('MSG91 Widget: widgetId = ${widgetId}');
-        console.log('MSG91 Widget: authToken = ${authToken ? authToken.substring(0, 10) + "..." : "MISSING"}');
+        console.log('MSG91 Widget: authToken = ${resolvedAuthToken ? resolvedAuthToken.substring(0, 10) + "..." : "MISSING"}');
         console.log('MSG91 Widget: identifier = ${normalizedIdentifier}');
         console.log('MSG91 Widget: widgetId length = ${widgetId?.length}');
-        console.log('MSG91 Widget: authToken length = ${authToken?.length}');
+        console.log('MSG91 Widget: authToken length = ${resolvedAuthToken?.length}');
         console.log('MSG91 Widget: window.initSendOTP type =', typeof window.initSendOTP);
         console.log('MSG91 Widget: document readyState =', document.readyState);
         
@@ -413,7 +420,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
           return;
         }
         
-        if (!'${authToken}' || '${authToken}'.trim() === '') {
+        if (!'${resolvedAuthToken}' || '${resolvedAuthToken}'.trim() === '') {
           console.error('MSG91 Widget: authToken is empty or invalid');
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'error',
@@ -447,7 +454,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
             // Use tokenAuth parameter with the Auth Token (Token ID)
             const config: any = {
               widgetId: '${widgetId}',
-              tokenAuth: '${authToken}',
+              tokenAuth: '${resolvedAuthToken}',
               identifier: '${normalizedIdentifier}',
             };
             
@@ -465,7 +472,8 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                 ts: Date.now(),
                 widgetId: '${widgetId}',
                 identifier: '${normalizedIdentifier}',
-                tokenAuthLength: '${authToken}'.length
+                tokenAuthLength: '${resolvedAuthToken}'.length,
+                tokenAuthFirst15: '${resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : ''}'
               }));
             }
             
@@ -528,15 +536,15 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                 console.error('MSG91 Widget: Config used:', {
                   widgetId: '${widgetId}',
                   widgetIdLength: '${widgetId}'.length,
-                  tokenAuth: '${authToken ? authToken.substring(0, 15) + "..." : "MISSING"}',
-                  tokenAuthLength: '${authToken}'.length,
+                  tokenAuth: '${resolvedAuthToken ? resolvedAuthToken.substring(0, 15) + "..." : "MISSING"}',
+                  tokenAuthLength: '${resolvedAuthToken}'.length,
                   identifier: '${normalizedIdentifier}',
                   identifierLength: '${normalizedIdentifier}'.length,
                 });
                 
                 console.error('MSG91 Widget: Troubleshooting checklist:');
                 console.error('  1. Verify Widget ID matches MSG91 dashboard: ${widgetId}');
-                console.error('  2. Verify Token ID matches MSG91 dashboard (first 15 chars): ${authToken ? authToken.substring(0, 15) : "MISSING"}');
+                console.error('  2. Verify Token ID matches MSG91 dashboard (first 15 chars): ${resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : "MISSING"}');
                 console.error('  3. Check Mobile Integration is ENABLED and SAVED in MSG91 dashboard');
                 console.error('  4. Check Widget status is ACTIVE (not disabled)');
                 console.error('  5. Check IP Whitelisting is DISABLED or your IP is whitelisted');
@@ -582,7 +590,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                   fullError: error,
                   config: {
                     widgetId: '${widgetId}',
-                    tokenAuthLength: '${authToken}'.length,
+                    tokenAuthLength: '${resolvedAuthToken}'.length,
                     identifier: '${normalizedIdentifier}'
                   }
                 };
@@ -605,7 +613,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
             });
             console.log('MSG91 Widget: Verification checklist before calling initSendOTP:');
             console.log('  ✓ Widget ID: ${widgetId} (length: ${widgetId?.length})');
-            console.log('  ✓ Token ID: ${authToken ? authToken.substring(0, 15) + "..." : "MISSING"} (length: ${authToken?.length})');
+            console.log('  ✓ Token ID: ${resolvedAuthToken ? resolvedAuthToken.substring(0, 15) + "..." : "MISSING"} (length: ${resolvedAuthToken?.length})');
             console.log('  ✓ Identifier (phone): ${normalizedIdentifier} (length: ${normalizedIdentifier?.length})');
             console.log('  ⚠️  Verify in MSG91 Dashboard:');
             console.log('     1. Widget ID matches exactly (case-sensitive)');
@@ -704,7 +712,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                   fullError: initError,
                   config: {
                     widgetId: '${widgetId}',
-                    tokenAuthLength: '${authToken}'.length
+                    tokenAuthLength: '${resolvedAuthToken}'.length
                   }
                 }
               }));
@@ -718,7 +726,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                 fullError: error,
                 config: {
                   widgetId: '${widgetId}',
-                  tokenAuthLength: '${authToken}'.length
+                  tokenAuthLength: '${resolvedAuthToken}'.length
                 }
               }
             }));
@@ -938,6 +946,29 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
             </TouchableOpacity>
           </View>
 
+          {/* Credential + identifier display for quick verification */}
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>Widget ID: {widgetId}</Text>
+            <Text style={styles.infoText}>
+              Auth {isSMSWidget && useAuthKey ? 'Key' : 'Token'}: {resolvedAuthToken ? `${resolvedAuthToken.substring(0, 11)}...` : 'MISSING'}
+            </Text>
+            <Text style={styles.infoText}>
+              Identifier sent: {normalizedIdentifier || 'MISSING'} (expected format {isSMSWidget ? '91XXXXXXXXXX' : 'email'})
+            </Text>
+            {isSMSWidget && (
+              <TouchableOpacity
+                style={styles.toggleButton}
+                onPress={() => setUseAuthKey(prev => !prev)}>
+                <Text style={styles.toggleButtonText}>
+                  {useAuthKey ? 'Use Token ID instead' : 'Use Auth Key instead'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <Text style={styles.infoHint}>
+              Ensure Mobile Integration is enabled and IP Whitelisting is off/whitelisted in MSG91 dashboard.
+            </Text>
+          </View>
+
           {/* Error Message Display */}
           {errorMessage && (
             <View style={styles.errorBanner}>
@@ -995,17 +1026,17 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                 console.log('[MSG91 Widget] WebView loaded - widget should initialize soon');
                 console.log('[MSG91 Widget] Injecting debug JavaScript with credentials:');
                 console.log('[MSG91 Widget] - Widget ID:', widgetId);
-                console.log('[MSG91 Widget] - Auth Token (first 15):', authToken ? authToken.substring(0, 15) : 'MISSING');
-                console.log('[MSG91 Widget] - Identifier:', identifier);
+            console.log('[MSG91 Widget] - Auth Token (first 15):', resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : 'MISSING');
+            console.log('[MSG91 Widget] - Identifier:', normalizedIdentifier);
                 
                 // Inject console.log to WebView for debugging
                 webViewRef.current?.injectJavaScript(`
                   console.log('[WebView] JavaScript injected for debugging');
                   console.log('[WebView] Checking for initSendOTP:', typeof window.initSendOTP);
                   console.log('[WebView] Widget ID from React Native:', '${widgetId}');
-                  console.log('[WebView] Auth Token length:', '${authToken}'.length);
-                  console.log('[WebView] Auth Token (first 15 chars):', '${authToken}'.substring(0, 15));
-                  console.log('[WebView] Identifier:', '${normalizedIdentifier}');
+              console.log('[WebView] Auth Token length:', '${resolvedAuthToken}'.length);
+              console.log('[WebView] Auth Token (first 15 chars):', '${resolvedAuthToken}'.substring(0, 15));
+              console.log('[WebView] Identifier:', '${normalizedIdentifier}');
                   console.log('[WebView] All scripts on page:', Array.from(document.scripts).map(s => s.src));
                   console.log('[WebView] Window object keys (filtered):', Object.keys(window).filter(k => k.toLowerCase().includes('msg') || k.toLowerCase().includes('otp') || k.toLowerCase().includes('init')));
                   
@@ -1245,6 +1276,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#856404',
     marginRight: 8,
+  },
+  infoBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#f9fafb',
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#333',
+    marginBottom: 4,
+  },
+  infoHint: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 6,
+  },
+  toggleButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
+  },
+  toggleButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
   useBackendButton: {
     backgroundColor: '#007AFF',
