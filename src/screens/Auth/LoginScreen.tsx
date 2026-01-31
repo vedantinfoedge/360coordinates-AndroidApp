@@ -6,22 +6,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ImageBackground,
   Image,
-  Animated,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import CustomAlert from '../../utils/alertHelper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
+import {AuthStackParamList} from '../../navigation/AuthNavigator';
+import {colors, spacing} from '../../theme';
 import {useAuth, UserRole} from '../../context/AuthContext';
-
-const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
 // Storage keys for Remember Me feature
 const REMEMBERED_EMAIL_KEY = '@remembered_email';
@@ -29,7 +26,7 @@ const REMEMBERED_PASSWORD_KEY = '@remembered_password';
 const REMEMBER_ME_ENABLED_KEY = '@remember_me_enabled';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
+  AuthStackParamList,
   'Login'
 >;
 
@@ -43,9 +40,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
   const params = (route.params as any) || {};
   const returnTo = params.returnTo;
   const propertyId = params.propertyId;
-  const autoShowContact = params.autoShowContact;
   const userTypeParam = params.userType;
-  const targetDashboard = params.targetDashboard;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>(
@@ -56,63 +51,109 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Animation values
-  const building1Anim = useRef(new Animated.Value(0)).current;
-  const building2Anim = useRef(new Animated.Value(0)).current;
-  const building3Anim = useRef(new Animated.Value(0)).current;
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.3)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoRotation = useRef(new Animated.Value(0)).current;
+  const logoGlow = useRef(new Animated.Value(0)).current;
+  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(50)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const roleButtonAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
+  const progressWidth = useRef(new Animated.Value(0)).current;
 
+  // 360 Logo rotation interpolation
+  const spin = logoRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  // Run animations on mount
   useEffect(() => {
-    // Continuous building animations
-    const animateBuildings = () => {
-      Animated.parallel([
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(building1Anim, {
-              toValue: 1,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(building1Anim, {
-              toValue: 0,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-          ]),
-        ),
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(1000),
-            Animated.timing(building2Anim, {
-              toValue: 1,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(building2Anim, {
-              toValue: 0,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-          ]),
-        ),
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(2000),
-            Animated.timing(building3Anim, {
-              toValue: 1,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(building3Anim, {
-              toValue: 0,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-          ]),
-        ),
-      ]).start();
-    };
+    // Logo entrance with 360 rotation
+    Animated.parallel([
+      // Scale up
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      // Fade in
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      // 360 degree rotation
+      Animated.timing(logoRotation, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // After initial animation, start subtle continuous glow pulse
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(logoGlow, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(logoGlow, {
+            toValue: 0,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    });
 
-    animateBuildings();
+    // Header text fade in (delayed)
+    setTimeout(() => {
+      Animated.timing(headerOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    }, 500);
+
+    // Card slide up animation (delayed)
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.spring(cardTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Staggered role button animations
+      const staggerDelay = 100;
+      roleButtonAnims.forEach((anim, index) => {
+        setTimeout(() => {
+          Animated.spring(anim, {
+            toValue: 1,
+            tension: 80,
+            friction: 8,
+            useNativeDriver: true,
+          }).start();
+        }, index * staggerDelay);
+      });
+    }, 600);
   }, []);
 
   // Load saved credentials on mount
@@ -136,13 +177,8 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
       if (rememberMeEnabled === 'true') {
         const savedEmail = await AsyncStorage.getItem(REMEMBERED_EMAIL_KEY);
         const savedPassword = await AsyncStorage.getItem(REMEMBERED_PASSWORD_KEY);
-        
-        if (savedEmail) {
-          setEmail(savedEmail);
-        }
-        if (savedPassword) {
-          setPassword(savedPassword);
-        }
+        if (savedEmail) setEmail(savedEmail);
+        if (savedPassword) setPassword(savedPassword);
         setRememberMe(true);
       }
     } catch (error) {
@@ -176,7 +212,6 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
       CustomAlert.alert('Error', 'Please enter a valid email address');
@@ -184,143 +219,113 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
     }
 
     setIsLoading(true);
-    // Ensure we have a valid userType string - CRITICAL: Use selectedRole from UI
     const userTypeToUse: string = (retryUserType || selectedRole || 'buyer') as string;
     
-    console.log('[LoginScreen] 🔐 Login attempt:', {
-      email: email.trim(),
-      selectedRole,
-      retryUserType,
-      userTypeToUse,
-    });
-    
     try {
-      // Pass the selected role to login - backend requires userType
-      // Backend validates role access:
-      // - Buyer/Tenant (registered) → Can login as "buyer" OR "seller" ✅
-      // - Seller/Owner (registered) → Can login as "buyer" OR "seller" ✅
-      // - Agent/Builder (registered) → Can ONLY login as "agent" (403 if try buyer/seller) ❌
-      // IMPORTANT: We pass userTypeToUse which is the selected role from the UI
       await login(email.trim(), password, userTypeToUse);
       
-      console.log('[LoginScreen] ✅ Login successful, navigation will happen automatically based on userType:', userTypeToUse);
-      
-      // Save credentials if Remember Me is checked
       if (rememberMe) {
         await saveCredentials(email.trim(), password);
       } else {
-        // Clear saved credentials if Remember Me is unchecked
         await clearSavedCredentials();
       }
       
-      // If returnTo is specified, navigate back to that screen
+      // Set the dashboard preference based on selected role
+      // This ensures navigation goes to correct dashboard after login
+      const dashboardMap: Record<string, string> = {
+        'buyer': 'buyer',
+        'seller': 'seller',
+        'agent': 'agent',
+      };
+      const targetDashboard = dashboardMap[userTypeToUse] || 'buyer';
+      
+      // Save both immediate target and persistent preference
+      await AsyncStorage.setItem('@target_dashboard', targetDashboard);
+      await AsyncStorage.setItem('@user_dashboard_preference', targetDashboard);
+      
+      const parentNav = navigation.getParent();
+      
+      // Handle specific return destinations within the role's dashboard
       if (returnTo === 'Profile') {
-        // Navigate back to MainTabs and then to Profile
-        navigation.getParent()?.navigate('MainTabs' as never, {
-          screen: 'Profile',
-        } as never);
+        if (userTypeToUse === 'seller') {
+          (parentNav as any)?.reset({
+            index: 0,
+            routes: [{name: 'Seller'}],
+          });
+        } else if (userTypeToUse === 'agent') {
+          (parentNav as any)?.reset({
+            index: 0,
+            routes: [{name: 'Agent'}],
+          });
+        } else {
+          (parentNav as any)?.navigate('MainTabs', {screen: 'Profile'});
+        }
       } else if (returnTo === 'Chats') {
-        // Navigate back to MainTabs and then to Chats
-        navigation.getParent()?.navigate('MainTabs' as never, {
-          screen: 'Chats',
-        } as never);
+        if (userTypeToUse === 'seller') {
+          (parentNav as any)?.reset({
+            index: 0,
+            routes: [{name: 'Seller'}],
+          });
+        } else if (userTypeToUse === 'agent') {
+          (parentNav as any)?.reset({
+            index: 0,
+            routes: [{name: 'Agent'}],
+          });
+        } else {
+          (parentNav as any)?.navigate('MainTabs', {screen: 'Chats'});
+        }
       } else if (returnTo === 'PropertyDetails' && propertyId) {
-        // Navigate back to PropertyDetails screen with flag to auto-show contact
-        // Navigate to MainTabs -> Search -> PropertyDetails
-        const parentNav = navigation.getParent();
+        // For property details, always go to buyer view (MainTabs)
         if (parentNav) {
           (parentNav as any).navigate('MainTabs', {
             screen: 'Search',
-            params: {
-              screen: 'PropertyDetails',
-              params: {
-                propertyId: propertyId,
-                returnFromLogin: true,
-              },
-            },
+            params: {screen: 'PropertyDetails', params: {propertyId, returnFromLogin: true}},
           });
         }
       } else {
-        // Navigation will be handled automatically by AppNavigator
-        // It will check for targetDashboard in AsyncStorage (set by InitialScreen)
-        // and navigate to the appropriate dashboard (Seller, Agent, or Builder)
-        // If no targetDashboard, it will navigate based on user.user_type
+        // No specific returnTo - navigate to the selected role's dashboard
+        if (userTypeToUse === 'seller') {
+          (parentNav as any)?.reset({
+            index: 0,
+            routes: [{name: 'Seller'}],
+          });
+        } else if (userTypeToUse === 'agent') {
+          (parentNav as any)?.reset({
+            index: 0,
+            routes: [{name: 'Agent'}],
+          });
+        } else {
+          // Buyer - go to MainTabs
+          (parentNav as any)?.reset({
+            index: 0,
+            routes: [{name: 'MainTabs'}],
+          });
+        }
       }
     } catch (error: any) {
-      console.error('[LoginScreen] Login error:', error);
-      
-      // Handle validation errors (400)
       if (error.status === 400) {
-        const errorMsg = error.message || error.error?.message || 'Validation failed. Please check your email, password, and selected role.';
-        CustomAlert.alert('Validation Failed', errorMsg);
-        return;
-      }
-      
-      // Handle 403 errors with specific messages and auto-retry
-      if (error.status === 403) {
-        const errorMessage = error.message || error.error?.message || 'Access denied. You don\'t have permission to access this dashboard.';
+        CustomAlert.alert('Validation Failed', error.message || 'Please check your credentials.');
+      } else if (error.status === 403) {
         const suggestedUserType = error.data?.suggestedUserType;
-        
-        console.log('[LoginScreen] 403 Error - Suggested user type:', suggestedUserType);
-        
-        // If we have a suggested user type and we're not already retrying, offer to auto-retry
-        if (suggestedUserType && !retryUserType && suggestedUserType !== userTypeToUse) {
-          const suggestedRoleLabel = getRoleLabel(suggestedUserType as UserRole);
-          
+        if (suggestedUserType && !retryUserType) {
           CustomAlert.alert(
             'Access Denied',
-            `${errorMessage}\n\nYou are registered as ${suggestedRoleLabel}. Would you like to switch to ${suggestedRoleLabel} login?`,
+            `You are registered as ${getRoleLabel(suggestedUserType)}. Switch role?`,
             [
-              {
-                text: 'Cancel',
-                style: 'cancel',
-                onPress: () => {
-                  // Update selected role to match suggestion
-                  setSelectedRole(suggestedUserType as UserRole);
-                },
-              },
-              {
-                text: 'Switch & Login',
-                onPress: () => {
-                  setSelectedRole(suggestedUserType as UserRole);
-                  handleLogin(suggestedUserType as UserRole);
-                },
-              },
-            ],
-            {cancelable: false}
-          );
-        } else {
-          // Show error message with role information
-          let roleHint = '';
-          if (errorMessage.includes('Agent/Builder') || errorMessage.includes('agent')) {
-            roleHint = '\n\nYou are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.';
-            setSelectedRole('agent');
-          } else if (errorMessage.includes('Buyer/Tenant') || errorMessage.includes('buyer')) {
-            roleHint = '\n\nYou are registered as a Buyer/Tenant. You can access both Buyer and Seller dashboards.';
-            setSelectedRole('buyer');
-          } else if (errorMessage.includes('Seller/Owner') || errorMessage.includes('seller')) {
-            roleHint = '\n\nYou are registered as a Seller/Owner. You can access both Buyer and Seller dashboards.';
-            setSelectedRole('seller');
-          }
-          
-          CustomAlert.alert(
-            'Access Denied',
-            errorMessage + roleHint,
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Role already updated above
-                },
-              },
+              {text: 'Cancel', onPress: () => setSelectedRole(suggestedUserType)},
+              {text: 'Switch & Login', onPress: () => {
+                setSelectedRole(suggestedUserType);
+                handleLogin(suggestedUserType);
+              }},
             ]
           );
+        } else {
+          CustomAlert.alert('Access Denied', error.message || 'Access denied.');
         }
       } else if (error.status === 401) {
-        CustomAlert.alert('Login Failed', 'Invalid email or password. Please check your credentials and try again.');
+        CustomAlert.alert('Login Failed', 'Invalid email or password.');
       } else {
-        const errorMsg = error.message || error.error?.message || 'Login failed. Please try again.';
-        CustomAlert.alert('Error', errorMsg);
+        CustomAlert.alert('Error', error.message || 'Login failed.');
       }
     } finally {
       setIsLoading(false);
@@ -335,441 +340,376 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
-      case 'buyer':
-        return 'Buyer/Tenant';
-      case 'seller':
-        return 'Seller/Owner';
-      case 'agent':
-        return 'Agent/Builder';
+      case 'buyer': return 'Buyer/Tenant';
+      case 'seller': return 'Seller/Owner';
+      case 'agent': return 'Agent/Builder';
     }
   };
 
-  // Building animation transforms
-  const building1TranslateY = building1Anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -20],
-  });
+  const completedFields = [email, password].filter(Boolean).length;
 
-  const building2TranslateY = building2Anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -15],
-  });
+  // Animate progress bar when fields change
+  useEffect(() => {
+    Animated.timing(progressWidth, {
+      toValue: (completedFields / 2) * 100,
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [completedFields]);
 
-  const building3TranslateY = building3Anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -25],
-  });
+  // Button press animation
+  const handlePressIn = () => {
+    Animated.spring(buttonScale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(buttonScale, {
+      toValue: 1,
+      friction: 3,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-      {/* Background with gradient pattern */}
-      <ImageBackground
-        source={require('../../assets/browserlogo.png')}
-        style={styles.backgroundImage}
-        imageStyle={styles.backgroundImageStyle}
-        resizeMode="cover">
-        {/* Overlay for better text readability */}
-        <View style={styles.overlay} />
+    <View style={styles.container}>
+      {/* Fixed Header with 360 logo animation */}
+      <View style={styles.fixedHeader}>
+        <Animated.View style={{
+          transform: [
+            {scale: logoScale},
+            {rotate: spin}, // 360-degree rotation
+          ],
+          opacity: logoOpacity,
+        }}>
+          <Animated.View style={{
+            shadowColor: colors.primary,
+            shadowOffset: {width: 0, height: 0},
+            shadowOpacity: logoGlow.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.3, 0.8],
+            }),
+            shadowRadius: logoGlow.interpolate({
+              inputRange: [0, 1],
+              outputRange: [8, 20],
+            }),
+            elevation: 8,
+            borderRadius: 40,
+          }}>
+            <Image
+              source={require('../../assets/App-icon.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
+        </Animated.View>
+        <Animated.Text style={[styles.appName, {opacity: headerOpacity, transform: [{translateY: headerOpacity.interpolate({
+          inputRange: [0, 1],
+          outputRange: [15, 0],
+        })}]}]}>
+          360Coordinates
+        </Animated.Text>
+        <Animated.View style={[styles.progressBarContainer, {opacity: headerOpacity}]}>
+          <View style={styles.progressBar}>
+            <Animated.View style={[styles.progressFill, {width: progressWidth.interpolate({
+              inputRange: [0, 100],
+              outputRange: ['0%', '100%'],
+            })}]} />
+          </View>
+          <Text style={styles.progressText}>{completedFields}/2 fields completed</Text>
+        </Animated.View>
+      </View>
 
-        {/* Animated Buildings */}
-        <View style={styles.animationContainer}>
-          <Animated.View
-            style={[
-              styles.building,
-              styles.building1,
-              {transform: [{translateY: building1TranslateY}]},
-            ]}>
-            <Text style={styles.buildingEmoji}>🏢</Text>
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.building,
-              styles.building2,
-              {transform: [{translateY: building2TranslateY}]},
-            ]}>
-            <Text style={styles.buildingEmoji}>🏗️</Text>
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.building,
-              styles.building3,
-              {transform: [{translateY: building3TranslateY}]},
-            ]}>
-            <Text style={styles.buildingEmoji}>🏠</Text>
-          </Animated.View>
-        </View>
-
+      {/* Scrollable Form */}
+      <KeyboardAvoidingView
+        style={styles.formContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
-          onScroll={Animated.event(
-            [{nativeEvent: {contentOffset: {y: scrollY}}}],
-            {useNativeDriver: false},
-          )}>
-          {/* Transparent Card */}
-          <View style={styles.card}>
-            {/* Logo */}
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/browserlogo.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
+          keyboardShouldPersistTaps="handled">
+          
+          <Animated.View style={[styles.card, {
+            opacity: cardOpacity,
+            transform: [{translateY: cardTranslateY}],
+          }]}>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Sign in to continue</Text>
 
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>Welcome Back</Text>
-              <Text style={styles.subtitle}>
-                Sign in to continue to your account
-              </Text>
-            </View>
-
-            {/* Role Selection - Square boxes with minimal radius */}
+            {/* Role Selection with staggered animation */}
             <View style={styles.roleContainer}>
-              {roles.map(role => (
-                <TouchableOpacity
+              {roles.map((role, index) => (
+                <Animated.View
                   key={role.value}
-                  style={[
-                    styles.roleButton,
-                    selectedRole === role.value && styles.roleButtonSelected,
-                  ]}
-                  onPress={() => {
-                    console.log('[LoginScreen] Role selected:', role.value);
-                    setSelectedRole(role.value);
-                  }}
-                  activeOpacity={0.7}>
-                  <View style={styles.roleButtonInner}>
+                  style={{
+                    flex: 1,
+                    opacity: roleButtonAnims[index],
+                    transform: [{
+                      scale: roleButtonAnims[index].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.8, 1],
+                      }),
+                    }],
+                  }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.roleButton,
+                      selectedRole === role.value && styles.roleButtonSelected,
+                    ]}
+                    onPress={() => setSelectedRole(role.value)}
+                    activeOpacity={0.7}>
                     <Text style={styles.roleIcon}>{role.icon}</Text>
-                    <Text
-                      style={[
-                        styles.roleButtonText,
-                        selectedRole === role.value &&
-                          styles.roleButtonTextSelected,
-                      ]}
-                      numberOfLines={2}>
+                    <Text style={[
+                      styles.roleButtonText,
+                      selectedRole === role.value && styles.roleButtonTextSelected,
+                    ]}>
                       {role.label}
                     </Text>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </Animated.View>
               ))}
             </View>
 
-            {/* Info Banner */}
-            <View style={styles.infoBanner}>
-              <Text style={styles.infoIcon}>ℹ️</Text>
-              <Text style={styles.infoText}>
-                Buyers and Sellers can switch between these two dashboards
-              </Text>
+            {/* Email Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email Address</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor={colors.textSecondary}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
             </View>
 
-            {/* Form */}
-            <View style={styles.form}>
-              {/* Email Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email Address</Text>
+            {/* Password Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordContainer}>
                 <TextInput
-                  style={styles.input}
-                  placeholder="Enter your email"
+                  style={styles.passwordInput}
+                  placeholder="Enter your password"
                   placeholderTextColor={colors.textSecondary}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
                   autoCapitalize="none"
+                  autoCorrect={false}
                 />
-              </View>
-
-              {/* Password Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Password</Text>
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={styles.passwordInput}
-                    placeholder="Enter your password"
-                    placeholderTextColor={colors.textSecondary}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeButton}
-                    onPress={() => setShowPassword(!showPassword)}>
-                    <Text style={styles.eyeIcon}>
-                      {showPassword ? '👁️' : '👁️‍🗨️'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Remember Me & Forgot Password */}
-              <View style={styles.optionsRow}>
                 <TouchableOpacity
-                  style={styles.checkboxContainer}
-                  onPress={async () => {
-                    const newRememberMe = !rememberMe;
-                    setRememberMe(newRememberMe);
-                    // If unchecking, clear saved credentials
-                    if (!newRememberMe) {
-                      await clearSavedCredentials();
-                    }
-                  }}>
-                  <View
-                    style={[
-                      styles.checkbox,
-                      rememberMe && styles.checkboxChecked,
-                    ]}>
-                    {rememberMe && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Remember me</Text>
-                </TouchableOpacity>
-                <TouchableOpacity>
-                  <Text style={styles.forgotPassword}>Forgot Password?</Text>
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}>
+                  <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
                 </TouchableOpacity>
               </View>
+            </View>
 
-              {/* Sign In Button */}
+            {/* Remember Me & Forgot Password */}
+            <View style={styles.optionsRow}>
               <TouchableOpacity
-                style={styles.signInButton}
-                onPress={() => {
-                  console.log('[LoginScreen] Sign In button pressed, selectedRole:', selectedRole);
-                  handleLogin();
-                }}
-                disabled={isLoading}>
+                style={styles.checkboxContainer}
+                onPress={async () => {
+                  const newVal = !rememberMe;
+                  setRememberMe(newVal);
+                  if (!newVal) await clearSavedCredentials();
+                }}>
+                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                  {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.checkboxLabel}>Remember me</Text>
+              </TouchableOpacity>
+              <TouchableOpacity>
+                <Text style={styles.forgotPassword}>Forgot Password?</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Sign In Button with animation */}
+            <Animated.View style={{transform: [{scale: buttonScale}]}}>
+              <TouchableOpacity
+                style={[styles.signInButton, isLoading && styles.signInButtonDisabled]}
+                onPress={() => handleLogin()}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                disabled={isLoading}
+                activeOpacity={0.9}>
                 <Text style={styles.signInButtonText}>
-                  {isLoading
-                    ? 'Signing in...'
-                    : `Sign In as ${getRoleLabel(selectedRole)}`}
+                  {isLoading ? 'Signing in...' : `Sign In as ${getRoleLabel(selectedRole)}`}
                 </Text>
               </TouchableOpacity>
+            </Animated.View>
 
-              {/* Register Link */}
-              <View style={styles.registerContainer}>
-                <Text style={styles.registerText}>Don't have an account? </Text>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Register')}>
-                  <Text style={styles.registerLink}>Register now</Text>
-                </TouchableOpacity>
-              </View>
+            {/* Register Link */}
+            <View style={styles.registerContainer}>
+              <Text style={styles.registerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                <Text style={styles.registerLink}>Register now</Text>
+              </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
         </ScrollView>
-      </ImageBackground>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FAFAFA',
   },
-  backgroundImage: {
-    flex: 1,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-  },
-  backgroundImageStyle: {
-    opacity: 0.15,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  animationContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
-    zIndex: 0,
-  },
-  building: {
+  fixedHeader: {
+    backgroundColor: '#FAFAFA',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 119, 192, 0.1)',
   },
-  building1: {
-    marginLeft: SCREEN_WIDTH * 0.1,
+  logoImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginBottom: spacing.xs,
   },
-  building2: {
-    marginLeft: SCREEN_WIDTH * 0.05,
+  appName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: spacing.sm,
   },
-  building3: {
-    marginRight: SCREEN_WIDTH * 0.1,
+  progressBarContainer: {
+    width: '100%',
+    alignItems: 'center',
   },
-  buildingEmoji: {
-    fontSize: 80,
-    opacity: 0.5,
+  progressBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: colors.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  formContainer: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
     padding: spacing.lg,
-    zIndex: 1,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  logoImage: {
-    width: 150,
-    height: 50,
+    paddingBottom: 40,
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    borderRadius: 20,
+    padding: spacing.lg,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  header: {
-    marginBottom: spacing.xl,
-    alignItems: 'center',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   title: {
-    ...typography.h1,
-    fontSize: 28,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: 24,
     fontWeight: '700',
+    color: colors.secondary,
     textAlign: 'center',
+    marginBottom: spacing.xs,
   },
-              subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
+  subtitle: {
     fontSize: 14,
+    color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: spacing.lg,
   },
   roleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     gap: spacing.sm,
   },
   roleButton: {
     flex: 1,
-    borderRadius: 8, // Minimal radius for square boxes
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: spacing.sm,
+    alignItems: 'center',
   },
   roleButtonSelected: {
-    borderWidth: 2,
     borderColor: colors.primary,
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.3,
-    elevation: 4,
-  },
-  roleButtonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    gap: spacing.xs,
-    minHeight: 40,
+    backgroundColor: colors.accent,
   },
   roleIcon: {
-    fontSize: 18,
+    fontSize: 20,
+    marginBottom: 4,
   },
   roleButtonText: {
-    ...typography.caption,
+    fontSize: 10,
     color: colors.text,
-    fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
-    flexShrink: 1,
   },
   roleButtonTextSelected: {
-    ...typography.caption,
-    color: colors.surface,
-    fontSize: 12,
+    color: colors.primary,
     fontWeight: '700',
-    textAlign: 'center',
-  },
-  infoBanner: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(247, 247, 247, 0.9)',
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.lg,
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  infoIcon: {
-    fontSize: 16,
-  },
-  infoText: {
-    ...typography.caption,
-    color: colors.text,
-    fontSize: 12,
-    flex: 1,
-  },
-  form: {
-    marginTop: spacing.md,
   },
   inputContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   label: {
-    ...typography.caption,
-    color: colors.text,
-    marginBottom: spacing.sm,
-    fontWeight: '600',
     fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
   },
   input: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
     padding: spacing.md,
-    ...typography.body,
-    color: colors.text,
     fontSize: 16,
-    borderWidth: 2,
+    color: colors.text,
+    borderWidth: 1,
     borderColor: colors.border,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: colors.border,
   },
   passwordInput: {
     flex: 1,
     padding: spacing.md,
-    ...typography.body,
-    color: colors.text,
     fontSize: 16,
+    color: colors.text,
   },
   eyeButton: {
     padding: spacing.md,
   },
   eyeIcon: {
-    fontSize: 20,
+    fontSize: 18,
   },
   optionsRow: {
     flexDirection: 'row',
@@ -780,7 +720,6 @@ const styles = StyleSheet.create({
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
   },
   checkbox: {
     width: 20,
@@ -790,10 +729,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: spacing.xs,
   },
   checkboxChecked: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   checkmark: {
     color: colors.surface,
@@ -801,26 +741,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   checkboxLabel: {
-    ...typography.caption,
-    color: colors.text,
     fontSize: 14,
+    color: colors.text,
   },
   forgotPassword: {
-    ...typography.caption,
-    color: colors.text,
     fontSize: 14,
-    fontWeight: '500',
+    color: colors.primary,
+    fontWeight: '600',
   },
   signInButton: {
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.cta,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: spacing.lg,
   },
+  signInButtonDisabled: {
+    backgroundColor: colors.textSecondary,
+  },
   signInButtonText: {
-    ...typography.body,
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
@@ -828,19 +767,15 @@ const styles = StyleSheet.create({
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
   },
   registerText: {
-    ...typography.body,
     color: colors.textSecondary,
     fontSize: 14,
   },
   registerLink: {
-    ...typography.body,
-    color: colors.text,
+    color: colors.primary,
     fontSize: 14,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
+    fontWeight: '700',
   },
 });
 

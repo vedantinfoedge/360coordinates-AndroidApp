@@ -11,6 +11,8 @@ import {
   Platform,
   ActivityIndicator,
   Dimensions,
+  Share,
+  Animated,
 } from 'react-native';
 import RangeSlider from '../../components/common/RangeSlider';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -68,6 +70,7 @@ interface Property {
   state: string;
   bhk: number;
   cover_image: string;
+  images?: string[];
   is_favorite: boolean;
 }
 
@@ -125,6 +128,26 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   // Refs to track budget values during drag (without triggering state updates)
   const pendingMinBudget = useRef<number>(0);
   const pendingMaxBudget = useRef<number>(1000);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const searchBarHeight = 120; // Approximate height of search bar + results header
+
+  // Search bar: visible at top, hides on scroll down
+  const searchBarAnimatedStyle = {
+    transform: [
+      {
+        translateY: scrollY.interpolate({
+          inputRange: [0, searchBarHeight],
+          outputRange: [0, -searchBarHeight],
+          extrapolate: 'clamp',
+        }),
+      },
+    ],
+    opacity: scrollY.interpolate({
+      inputRange: [0, searchBarHeight / 2],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    }),
+  };
 
   // Property type classification
   const bedroomBasedTypes = [
@@ -437,6 +460,11 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         const isRent = propStatus === 'rent';
         const isPG = propStatus === 'pg' || (prop.property_type || '').toLowerCase().includes('pg') || (prop.property_type || '').toLowerCase().includes('hostel');
         
+        const coverUrl = fixImageUrl(prop.cover_image || prop.image || prop.images?.[0] || '') || '';
+        const imagesList =
+          prop.images && Array.isArray(prop.images)
+            ? prop.images.map((url: string) => fixImageUrl(url)).filter(Boolean)
+            : undefined;
         return {
           id: prop.id?.toString() || prop.property_id?.toString() || '',
           name: prop.title || prop.property_title || prop.name || 'Untitled Property',
@@ -450,7 +478,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           city: prop.city || '',
           state: prop.state || '',
           bhk: prop.bedrooms || 0,
-          cover_image: fixImageUrl(prop.cover_image || prop.image || prop.images?.[0] || '') || '',
+          cover_image: coverUrl,
+          images: imagesList,
           is_favorite: prop.is_favorite || false,
         };
       });
@@ -740,9 +769,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleShareProperty = async (property: Property) => {
     try {
-      const {Share} = require('react-native');
-      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
-      const shareMessage = `Check out this property: ${property.name}\nLocation: ${property.location}\nPrice: ${property.price}\n\nView more: ${shareUrl}`;
+      const shareMessage = `Check out this property: ${property.name}\nLocation: ${property.location}\nPrice: ${property.price}\n\nVisit us: https://360coordinates.com`;
       
       await Share.share({
         message: shareMessage,
@@ -818,10 +845,10 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const renderProperty = ({item}: {item: Property}) => {
     // Determine property type for PropertyCard
     const propertyType = item.type === 'buy' ? 'buy' : item.type === 'rent' ? 'rent' : 'pg-hostel';
-    
     return (
       <PropertyCard
         image={item.cover_image}
+        images={item.images}
         name={item.name}
         location={item.location}
         price={item.price}
@@ -848,7 +875,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     <View style={styles.container}>
       <BuyerHeader
         onProfilePress={() => {
-          // Navigate to Profile tab in MainTabNavigator
           (navigation as any).getParent()?.navigate('Profile');
         }}
         onSupportPress={() => navigation.navigate('Support')}
@@ -867,10 +893,12 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         showProfile={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
+        scrollY={scrollY}
+        headerHeight={headerHeight}
       />
 
-      {/* Search Bar */}
-      <View style={[styles.searchSection, {marginTop: headerHeight}]}>
+      {/* Search Bar - hides on scroll down, shows at top */}
+      <Animated.View style={[styles.searchSectionAnimated, {top: insets.top}, searchBarAnimatedStyle]}>
         <View style={styles.searchBarContainer}>
           <View style={styles.searchInputWrapper}>
             <Text style={styles.searchIcon}>📍</Text>
@@ -881,15 +909,11 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
               value={searchText}
               onChangeText={(text: string) => {
                 setSearchText(text);
-                // Don't update location immediately - only update searchText for autocomplete
-                // Location will be updated when user selects from suggestions or submits
                 setShowLocationSuggestions(text.length >= 2);
               }}
               onSubmitEditing={() => {
-                // Update location when user submits, then search
                 setLocation(searchText);
                 setShowLocationSuggestions(false);
-                // Small delay to ensure location state is updated
                 setTimeout(() => {
                   loadProperties();
                 }, 100);
@@ -906,7 +930,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                   setSearchText(locationName);
                   setLocation(locationName);
                   setShowLocationSuggestions(false);
-                  // Trigger search after location selection with delay to ensure state is updated
                   setTimeout(() => {
                     loadProperties();
                   }, 150);
@@ -922,32 +945,36 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             <Text style={styles.filterText}>Filters</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Results Count */}
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsCount}>
-          {filteredProperties.length} Properties Found
-        </Text>
-        <TouchableOpacity onPress={clearFilters}>
-          <Text style={styles.clearText}>Clear All</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Results Count */}
+        <View style={styles.resultsHeader}>
+          <Text style={styles.resultsCount}>
+            {filteredProperties.length} Properties Found
+          </Text>
+          <TouchableOpacity onPress={clearFilters}>
+            <Text style={styles.clearText}>Clear All</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
       {/* Properties List */}
       {loading ? (
-        <View style={styles.loadingContainer}>
+        <View style={[styles.loadingContainer, {paddingTop: insets.top + searchBarHeight}]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading properties...</Text>
         </View>
       ) : (
-        <FlatList
+        <Animated.FlatList
           data={filteredProperties}
           renderItem={renderProperty}
           keyExtractor={(item: Property) => item.id}
-          contentContainerStyle={[styles.listContent, {paddingBottom: 100}]}
+          contentContainerStyle={[styles.listContent, {paddingTop: insets.top + searchBarHeight, paddingBottom: 100}]}
           ItemSeparatorComponent={renderSeparator}
           showsVerticalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{nativeEvent: {contentOffset: {y: scrollY}}}],
+            {useNativeDriver: true},
+          )}
+          scrollEventThrottle={16}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No properties found</Text>
@@ -1059,7 +1086,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
 
               {/* Budget Range Slider */}
               <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Budget</Text>
+                <Text style={styles.filterLabel}>Budget Range</Text>
                 <View style={styles.budgetSliderContainer}>
                   <RangeSlider
                     min={0}
@@ -1072,23 +1099,11 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                     formatValue={formatBudgetDisplay}
                     step={listingType === 'buy' ? 5 : 1}
                     showMarkers={true}
-                    gradientColors={
-                      listingType === 'buy'
-                        ? [colors.accent, colors.primary, colors.secondary]
-                        : [colors.accent, colors.primary, colors.accent]
-                    }
                   />
                   <Text style={styles.priceLabel}>
-                    {(() => {
-                      const max = maxBudgetForType;
-                      if (selectedPropertyType === 'PG / Hostel' || listingType === 'pg-hostel') {
-                        return `Range: 0 to ${formatBudgetValueMemo(max, listingType)}/month (in thousands)`;
-                      } else if (listingType === 'buy') {
-                        return `Range: 0 to ${formatBudgetValueMemo(max, listingType)} (in Lakhs)`;
-                      } else {
-                        return `Range: 0 to ${formatBudgetValueMemo(max, listingType)}/month (in thousands)`;
-                      }
-                    })()}
+                    {listingType === 'buy' 
+                      ? 'Drag the handles to set your budget range'
+                      : 'Drag the handles to set your monthly budget'}
                   </Text>
                 </View>
               </View>
@@ -1215,6 +1230,14 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 10,
   },
+  searchSectionAnimated: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.sm,
+    zIndex: 15,
+  },
   searchBarContainer: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -1226,11 +1249,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
   },
   searchIcon: {
@@ -1263,11 +1286,16 @@ const styles = StyleSheet.create({
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.text,
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: spacing.xs,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   filterIcon: {
     fontSize: 14,
@@ -1296,9 +1324,10 @@ const styles = StyleSheet.create({
   },
   clearText: {
     ...typography.body,
-    color: colors.text,
+    color: colors.primary,
     textDecorationLine: 'underline',
     fontSize: 14,
+    fontWeight: '500',
   },
   listContent: {
     padding: spacing.md,
@@ -1338,31 +1367,34 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
+    borderTopLeftRadius: borderRadius.xxl,
+    borderTopRightRadius: borderRadius.xxl,
     maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderLight,
+    backgroundColor: colors.accentSoft,
   },
   modalTitle: {
     ...typography.h2,
-    color: colors.text,
+    color: colors.primary,
     fontWeight: '700',
   },
   modalClose: {
     fontSize: 24,
     color: colors.textSecondary,
+    padding: spacing.xs,
   },
   filtersScroll: {
     maxHeight: 500,
@@ -1370,7 +1402,7 @@ const styles = StyleSheet.create({
   filterSection: {
     padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderLight,
   },
   filterLabel: {
     ...typography.h3,
@@ -1386,14 +1418,14 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: borderRadius.round,
-    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: colors.surface,
   },
   filterChipActive: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterChipText: {
     ...typography.caption,
@@ -1414,8 +1446,9 @@ const styles = StyleSheet.create({
   priceLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
     fontSize: 12,
+    textAlign: 'center',
   },
   priceTextInput: {
     backgroundColor: colors.surfaceSecondary,
@@ -1431,7 +1464,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.borderLight,
+    backgroundColor: colors.surface,
   },
   clearButton: {
     flex: 1,
@@ -1439,20 +1473,25 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
   clearButtonText: {
     ...typography.body,
-    color: colors.text,
+    color: colors.primary,
     fontWeight: '600',
   },
   applyButton: {
     flex: 1,
-    backgroundColor: colors.text,
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   applyButtonText: {
     ...typography.body,

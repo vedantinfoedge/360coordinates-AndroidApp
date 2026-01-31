@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -28,21 +28,55 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   onClose,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scrollViewRef = useRef<any>(null);
+
+  // Update currentIndex when initialIndex changes (when modal opens with different image)
+  useEffect(() => {
+    if (visible && initialIndex >= 0 && initialIndex < images.length) {
+      setCurrentIndex(initialIndex);
+      // Scroll to the correct position when modal opens
+      setTimeout(() => {
+        // @ts-ignore - scrollTo exists on ScrollView ref
+        scrollViewRef.current?.scrollTo({
+          x: initialIndex * SCREEN_WIDTH,
+          animated: false,
+        });
+      }, 100);
+    }
+  }, [visible, initialIndex, images.length]);
 
   const handlePrevious = () => {
     if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+      const newIndex = currentIndex - 1;
+      setCurrentIndex(newIndex);
+      // @ts-ignore - scrollTo exists on ScrollView ref
+      scrollViewRef.current?.scrollTo({
+        x: newIndex * SCREEN_WIDTH,
+        animated: true,
+      });
     }
   };
 
   const handleNext = () => {
     if (currentIndex < images.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+      const newIndex = currentIndex + 1;
+      setCurrentIndex(newIndex);
+      // @ts-ignore - scrollTo exists on ScrollView ref
+      scrollViewRef.current?.scrollTo({
+        x: newIndex * SCREEN_WIDTH,
+        animated: true,
+      });
     }
   };
 
   const handleThumbnailPress = (index: number) => {
     setCurrentIndex(index);
+    // @ts-ignore - scrollTo exists on ScrollView ref
+    scrollViewRef.current?.scrollTo({
+      x: index * SCREEN_WIDTH,
+      animated: true,
+    });
   };
 
   if (!visible || images.length === 0) {
@@ -69,16 +103,30 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         {/* Main Image */}
         <View style={styles.imageContainer}>
           <ScrollView
+            ref={scrollViewRef}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(event) => {
+            onMomentumScrollEnd={(event: any) => {
               const index = Math.round(
                 event.nativeEvent.contentOffset.x / SCREEN_WIDTH
               );
-              setCurrentIndex(index);
+              if (index >= 0 && index < images.length) {
+                setCurrentIndex(index);
+              }
             }}
-            contentOffset={{x: currentIndex * SCREEN_WIDTH, y: 0}}>
+            onScroll={(event: any) => {
+              const index = Math.round(
+                event.nativeEvent.contentOffset.x / SCREEN_WIDTH
+              );
+              if (index >= 0 && index < images.length && index !== currentIndex) {
+                setCurrentIndex(index);
+              }
+            }}
+            scrollEventThrottle={16}
+            contentContainerStyle={{
+              width: SCREEN_WIDTH * images.length,
+            }}>
             {images.map((image, index) => (
               <Image
                 key={index}
@@ -113,8 +161,8 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
               data={images}
               horizontal
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(item, index) => `${index}`}
-              renderItem={({item, index}) => (
+              keyExtractor={(item: string, index: number) => `${index}`}
+              renderItem={({item, index}: {item: string; index: number}) => (
                 <TouchableOpacity
                   onPress={() => handleThumbnailPress(index)}
                   style={[

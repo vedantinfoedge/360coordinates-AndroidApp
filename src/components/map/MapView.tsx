@@ -204,8 +204,8 @@ const MapViewComponent: React.FC<MapViewProps> = ({
 
         {/* Property markers with price tags (website style) or simple markers */}
         {markers.map(marker => {
-          // Default purple (#8B5CF6), Selected orange (#F97316)
-          const markerColor = marker.color || '#8B5CF6';
+          // Default blue (#0077C0), Selected orange (#F97316)
+          const markerColor = marker.color || '#0077C0';
           const isSelected = markerColor === '#F97316';
           const hasPrice = marker.price !== undefined && marker.price !== null;
           
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     zIndex: 100, // Selected markers on top
   },
   priceTag: {
-    backgroundColor: '#8B5CF6', // Default purple
+    backgroundColor: '#0077C0', // Default blue
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20, // Pill-shaped
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#0077C0',
     borderWidth: 3,
     borderColor: colors.surface,
     justifyContent: 'center',

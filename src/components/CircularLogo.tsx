@@ -30,7 +30,7 @@ const CircularLogo: React.FC<CircularLogoProps> = ({
 
         {/* Main Text */}
         <Text style={[styles.mainText, {fontSize: size * 0.15}]}>
-          Indiapropertys
+          360Coordinates
         </Text>
 
         {/* Purple Underline */}

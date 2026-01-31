@@ -41,6 +41,7 @@ export interface Property {
   views_count: number;
   inquiry_count: number;
   is_favorite?: boolean;
+  project_type?: 'upcoming' | null;
   created_at: string;
 }
 

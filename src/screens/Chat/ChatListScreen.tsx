@@ -91,6 +91,10 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
   const [buyerCache, setBuyerCache] = useState<Record<string, {name: string; profile_image?: string}>>({});
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const previousUserTypeRef = useRef<string | undefined>(undefined);
+  
+  // Header animation values for hide/show on scroll
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerHeight = insets.top + 70;
 
   // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
@@ -1285,6 +1289,8 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           showProfile={false}
           showSignIn={true}
           showSignUp={true}
+          scrollY={scrollY}
+          headerHeight={headerHeight}
         />
         <Animated.View
           style={[
@@ -1348,6 +1354,8 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           showProfile={isLoggedIn}
           showSignIn={isGuest}
           showSignUp={isGuest}
+          scrollY={scrollY}
+          headerHeight={headerHeight}
         />
         <View style={[styles.loadingContainer, {paddingTop: insets.top + 60 + spacing.md * 2}]}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -1381,9 +1389,11 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
         showProfile={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
+        scrollY={scrollY}
+        headerHeight={headerHeight}
       />
       {chatList.length > 0 ? (
-        <FlatList
+        <Animated.FlatList
           data={chatList}
           renderItem={renderChatItem}
           keyExtractor={(item: ChatListItem) => item.id}
@@ -1392,6 +1402,11 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             {paddingTop: insets.top + 60 + spacing.md * 2},
           ]}
           showsVerticalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{nativeEvent: {contentOffset: {y: scrollY}}}],
+            {useNativeDriver: true}
+          )}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1439,7 +1454,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#128C7E', // WhatsApp green
+    backgroundColor: '#0077C0', // Brand blue
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0,
@@ -1448,7 +1463,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   avatarUnread: {
-    backgroundColor: '#075E54', // Darker green for unread
+    backgroundColor: '#005A94', // Darker blue for unread
   },
   avatarText: {
     fontSize: 20,
@@ -1503,7 +1518,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   unreadBadge: {
-    backgroundColor: '#25D366', // WhatsApp green badge
+    backgroundColor: '#0077C0', // Brand blue badge
     borderRadius: 10,
     minWidth: 20,
     height: 20,

@@ -320,8 +320,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     if (!selectedProperty) return;
     
     try {
-      const shareUrl = `https://demo1.indiapropertys.com/property/${selectedProperty.id}`;
-      const shareMessage = `Check out this property: ${selectedProperty.title}\nLocation: ${selectedProperty.location}\nPrice: ${formatters.price(selectedProperty.price, selectedProperty.status === 'rent')}\n\nView more: ${shareUrl}`;
+      const shareMessage = `Check out this property: ${selectedProperty.title}\nLocation: ${selectedProperty.location}\nPrice: ${formatters.price(selectedProperty.price, selectedProperty.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
       
       await Share.share({
         message: shareMessage,
@@ -347,8 +346,8 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       return '#F97316'; // Orange color for selected property
     }
     
-    // Purple (#8B5CF6) for all other properties
-    return '#8B5CF6'; // Purple color for other properties
+    // Blue (#0077C0) for all other properties
+    return '#0077C0'; // Blue color for other properties
   };
 
   // Format price for marker display (as per guide: ₹X.XL format)

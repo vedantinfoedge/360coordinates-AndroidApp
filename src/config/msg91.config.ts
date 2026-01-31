@@ -6,8 +6,8 @@
  * 
  * VERIFIED CREDENTIALS (Updated):
  * - SMS Widget ID: 356c6c6c4141303836323334 ✓
- * - SMS Auth Token (Token ID): 481618Tel6uFr7IH69704db4P1 ✓
- * - SMS Auth Key (API Key): 481618A2cCSUpaZHTW6936c356P1 (for backend API)
+ * - SMS Auth Token (Token ID): 481618Tel6uFr7IH69704db4P1 ✓ (used for widget)
+ * - SMS Auth Key (API Key): 481618AN27OcgiyMj6978a032P1 ✓ (used for backend API)
  * - SMS Template ID: 356c6c6c4141303836323334 (for backend API)
  * 
  * NOTE: The widget uses tokenAuth parameter which should be the Auth Token (Token ID).
@@ -52,7 +52,7 @@ export const MSG91_CONFIG = {
   SMS_AUTH_TOKEN: '481618Tel6uFr7IH69704db4P1',
   
   // SMS Auth Key (API Key) - Used for backend API calls
-  SMS_AUTH_KEY: '481618A2cCSUpaZHTW6936c356P1',
+  SMS_AUTH_KEY: '481618AN27OcgiyMj6978a032P1',
   
   // SMS Template ID - Used for REST API calls
   // ⚠️ CRITICAL: REST API template IDs are DIFFERENT from Widget IDs!

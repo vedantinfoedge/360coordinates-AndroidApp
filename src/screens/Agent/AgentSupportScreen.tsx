@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   Linking,
   Platform,
+  Animated,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -75,7 +76,7 @@ const faqs = [
     id: '8',
     question: 'How do I report a problem?',
     answer:
-      'You can contact our support team via email at info@indiapropertys.com or use the contact form on this support page. We typically respond within 24 hours.',
+      'You can contact our support team via email at info@360coordinates.com or use the contact form on this support page. We typically respond within 24 hours.',
   },
 ];
 
@@ -89,9 +90,10 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
     subject: '',
     message: '',
   });
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const handleEmailPress = () => {
-    const email = 'info@indiapropertys.com';
+    const email = 'info@360coordinates.com';
     const subject = 'Support Query';
     const body = '';
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -121,7 +123,7 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
     // In real app, send to backend
-    const email = 'info@indiapropertys.com';
+    const email = 'info@360coordinates.com';
     const subject = contactForm.subject || 'Contact Form Query';
     const body = `Name: ${contactForm.name}\nEmail: ${contactForm.email}\n\nMessage:\n${contactForm.message}`;
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -138,12 +140,18 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
           // Already on support page
         }}
         onLogoutPress={logout}
+        scrollY={scrollY}
       />
 
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}>
+        contentContainerStyle={styles.scrollContent}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true}
+        )}
+        scrollEventThrottle={16}>
         {/* Contact Information Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Information</Text>
@@ -157,7 +165,7 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Email</Text>
-              <Text style={styles.contactValue}>info@indiapropertys.com</Text>
+              <Text style={styles.contactValue}>info@360coordinates.com</Text>
             </View>
             <Text style={styles.contactArrow}>→</Text>
           </TouchableOpacity>
@@ -275,7 +283,7 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -283,12 +291,13 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
   section: {

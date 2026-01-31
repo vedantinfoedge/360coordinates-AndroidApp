@@ -970,43 +970,16 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         
         // Log returned property data to verify images were saved and backend conversion
         if (propertyData) {
-          console.log('[AddProperty] ✅ Property created with ID:', propertyData.id || propertyData.property_id);
-          console.log('[AddProperty] Property cover_image:', propertyData.cover_image);
-          console.log('[AddProperty] Property images array:', propertyData.images);
-          
-          // Verify backend converted base64 to URLs
-          if (propertyData.images && Array.isArray(propertyData.images)) {
-            const base64InResponse = propertyData.images.filter((img: any) => 
-              typeof img === 'string' && (img.includes('data:image/') || img.includes(';base64,'))
-            );
-            if (base64InResponse.length > 0) {
-              console.error('[AddProperty] ⚠️ Backend returned base64 instead of URLs!', {
-                count: base64InResponse.length,
-                total: propertyData.images.length,
-                sample: base64InResponse[0]?.substring(0, 100),
-              });
-            } else {
-              console.log('[AddProperty] ✅ Backend successfully converted base64 to URLs:', {
-                count: propertyData.images.length,
-                sampleUrls: propertyData.images.slice(0, 3).map((url: any) => 
-                  typeof url === 'string' ? url.substring(0, 80) + '...' : url
-                ),
-              });
-            }
-          }
-          
-          if (!propertyData.cover_image && propertyData.images && propertyData.images.length > 0) {
-            console.warn('[AddProperty] Warning: Property created but cover_image not set. First image:', propertyData.images[0]);
-          }
-          if (imageCount > 0 && (!propertyData.cover_image && !propertyData.images)) {
-            console.error('[AddProperty] Error: Images were sent but not returned in response!');
+          if (__DEV__) {
+            console.log('[AddProperty] ✅ Property created with ID:', propertyData.id || propertyData.property_id);
           }
         }
         
+        // Show success popup with 24-hour edit notice
         CustomAlert.alert(
-          'Success', 
-          `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
-          [{text: 'OK', onPress: () => navigation.goBack()}]
+          '🎉 Property Published!', 
+          `Your property has been listed successfully!${imageCount > 0 ? `\n\n📸 ${imageCount} image(s) uploaded.` : ''}\n\n⏰ Important: You can fully edit your property for the next 24 hours.\n\nAfter 24 hours, you will only be able to change:\n• Title\n• Price\n• Location`, 
+          [{text: 'Got it!', onPress: () => navigation.goBack()}]
         );
       } else {
         const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
@@ -1067,7 +1040,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   onPress={() => setPropertyStatus('sale')}>
                   {propertyStatus === 'sale' ? (
                     <LinearGradient
-                      colors={['#8B5CF6', '#6D28D9']}
+                      colors={['#0077C0', '#005A94']}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 0}}
                       style={styles.typeButtonGradient}>
@@ -1087,7 +1060,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   onPress={() => setPropertyStatus('rent')}>
                   {propertyStatus === 'rent' ? (
                     <LinearGradient
-                      colors={['#8B5CF6', '#6D28D9']}
+                      colors={['#0077C0', '#005A94']}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 0}}
                       style={styles.typeButtonGradient}>
@@ -1205,7 +1178,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.mapButton}
                   onPress={() => setLocationPickerVisible(true)}>
                   <LinearGradient
-                    colors={['#8B5CF6', '#6D28D9']}
+                    colors={['#0077C0', '#005A94']}
                     start={{x: 0, y: 0}}
                     end={{x: 1, y: 0}}
                     style={styles.mapButtonGradient}>
@@ -1916,7 +1889,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </LinearGradient>
                 ) : (
                   <LinearGradient
-                    colors={['#8B5CF6', '#6D28D9']}
+                    colors={['#0077C0', '#005A94']}
                     start={{x: 0, y: 0}}
                     end={{x: 1, y: 0}}
                     style={styles.nextButtonGradient}>
@@ -1936,17 +1909,22 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
     width: '95%',
     maxWidth: 600,
-    height: '90%',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    height: '92%',
+    backgroundColor: '#FAFAFA', // Clean off-white
+    borderRadius: 20,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
   },
   safeArea: {
     flex: 1,
@@ -1957,37 +1935,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    minHeight: 70,
+    minHeight: 64,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#F3F4F6',
   },
   headerTitle: {
-    ...typography.h1,
-    fontSize: 24,
-    color: colors.text,
+    fontSize: 20,
+    color: '#1D242B', // Dark Charcoal
     fontWeight: '700',
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.border,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButtonText: {
-    fontSize: 20,
-    color: colors.text,
+    fontSize: 18,
+    color: '#6B7280',
     fontWeight: '600',
   },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#F3F4F6',
   },
   stepItem: {
     flex: 1,
@@ -1997,38 +1976,39 @@ const styles = StyleSheet.create({
   stepCircle: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
   stepCircleCompleted: {
-    backgroundColor: '#43A047',
+    backgroundColor: '#10B981',
   },
   stepCircleActive: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: colors.primary,
   },
   stepIcon: {
-    fontSize: 20,
+    fontSize: 18,
   },
   stepCheckmark: {
-    fontSize: 24,
+    fontSize: 20,
     color: colors.surface,
     fontWeight: 'bold',
   },
   stepLabel: {
     ...typography.caption,
     fontSize: 10,
-    color: colors.textSecondary,
+    color: '#9CA3AF',
     textAlign: 'center',
+    fontWeight: '500',
   },
   stepLabelCompleted: {
-    color: '#43A047',
+    color: '#10B981',
     fontWeight: '600',
   },
   stepLabelActive: {
-    color: '#8B5CF6',
+    color: colors.primary,
     fontWeight: '700',
   },
   stepLine: {
@@ -2037,59 +2017,79 @@ const styles = StyleSheet.create({
     left: '60%',
     right: '-40%',
     height: 2,
-    backgroundColor: colors.border,
+    backgroundColor: '#E5E7EB',
     zIndex: -1,
   },
   stepLineCompleted: {
-    backgroundColor: '#43A047',
+    backgroundColor: '#10B981',
   },
   stepLineActive: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: colors.primary,
   },
   content: {
     flex: 1,
+    backgroundColor: '#FAFAFA',
   },
   contentContainer: {
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   stepContent: {
     flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   stepTitle: {
-    ...typography.h1,
-    fontSize: 24,
-    color: colors.text,
+    fontSize: 22,
+    color: '#1D242B', // Dark Charcoal
     marginBottom: spacing.xs,
     fontWeight: '700',
   },
   stepSubtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#6B7280',
     marginBottom: spacing.xl,
     fontSize: 14,
+    lineHeight: 22,
   },
   inputContainer: {
     marginBottom: spacing.lg,
   },
   label: {
     ...typography.caption,
-    color: colors.text,
+    color: '#374151',
     marginBottom: spacing.sm,
     fontWeight: '600',
     fontSize: 14,
   },
   required: {
-    color: '#E53935',
+    color: '#EF4444',
   },
   input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md - 2,
     ...typography.body,
     color: colors.text,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+    fontSize: 15,
+    minHeight: 50,
+    marginTop: spacing.xs,
+  },
+  inputFocused: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  inputError: {
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
   },
   textArea: {
     height: 120,
@@ -2098,9 +2098,28 @@ const styles = StyleSheet.create({
   },
   charCount: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#9CA3AF',
     textAlign: 'right',
     marginTop: spacing.xs,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  charCountWarning: {
+    color: '#F59E0B',
+  },
+  charCountError: {
+    color: '#EF4444',
+  },
+  errorText: {
+    ...typography.caption,
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: spacing.xs,
+  },
+  errorIcon: {
+    fontSize: 14,
+    marginRight: spacing.xs,
   },
   typeButtonsContainer: {
     flexDirection: 'row',
@@ -2149,25 +2168,22 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginTop: spacing.sm,
-    marginHorizontal: -spacing.xs / 2, // Negative margin for spacing
+    gap: spacing.sm,
   },
   propertyTypeButton: {
-    width: '48%', // Two columns with space between
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
+    width: '48%',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 14,
     padding: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 100,
-    marginHorizontal: spacing.xs / 2, // Half margin on each side
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
   propertyTypeButtonActive: {
-    borderColor: '#8B5CF6',
     borderWidth: 2,
-    backgroundColor: '#F3F0FF',
+    borderColor: colors.primary,
+    backgroundColor: '#E3F6FF', // Light blue
   },
   propertyTypeIcon: {
     fontSize: 32,
@@ -2175,13 +2191,13 @@ const styles = StyleSheet.create({
   },
   propertyTypeText: {
     ...typography.body,
-    color: colors.text,
-    fontSize: 14,
+    color: '#374151',
+    fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',
   },
   propertyTypeTextActive: {
-    color: '#8B5CF6',
+    color: colors.primary,
     fontWeight: '600',
   },
   mapContainer: {
@@ -2231,23 +2247,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   numberButton: {
-    width: 60,
-    height: 50,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
+    width: 56,
+    height: 46,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   numberButtonActive: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
+    backgroundColor: colors.primary,
   },
   numberButtonText: {
     ...typography.body,
-    color: colors.text,
-    fontSize: 16,
+    color: '#374151',
+    fontSize: 15,
     fontWeight: '600',
   },
   numberButtonTextActive: {
@@ -2294,89 +2307,94 @@ const styles = StyleSheet.create({
   amenitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-    marginTop: spacing.sm,
-    marginHorizontal: -spacing.xs, // Negative margin for spacing
+    marginTop: spacing.md,
+    marginHorizontal: -spacing.xs, // Negative margin to account for item margins
   },
   amenityButton: {
-    width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 4) / 3, // Responsive width for 3 columns
-    minWidth: 90, // Minimum width for small screens
-    maxWidth: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 4) / 3, // Max width same as width
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    width: '31%', // 3 columns with gaps
+    marginHorizontal: '1%',
+    marginBottom: spacing.sm,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 14,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 90,
-    marginHorizontal: spacing.xs / 2, // Half margin on each side
-    marginBottom: spacing.md, // Bottom margin for wrapping
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
   },
   amenityButtonActive: {
-    borderColor: '#8B5CF6',
     borderWidth: 2,
-    backgroundColor: '#F3F0FF',
+    borderColor: colors.primary,
+    backgroundColor: '#E3F6FF',
   },
   amenityIcon: {
-    fontSize: 24,
-    marginBottom: spacing.xs,
+    fontSize: 26,
+    marginBottom: spacing.xs + 2,
   },
   amenityText: {
     ...typography.caption,
-    color: colors.text,
-    fontSize: 12,
+    color: '#374151',
+    fontSize: 11,
     textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 14,
   },
   amenityTextActive: {
-    color: '#8B5CF6',
-    fontWeight: '600',
+    color: colors.primary,
+    fontWeight: '700',
   },
   photoUploadArea: {
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: '#E5E7EB',
     borderStyle: 'dashed',
-    borderRadius: borderRadius.md,
-    padding: spacing.xxl,
+    borderRadius: 14,
+    padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 200,
-    backgroundColor: '#FAFAFA',
+    minHeight: 160,
+    backgroundColor: '#F9F5FF', // Light purple tint
   },
   photoUploadIcon: {
-    fontSize: 48,
+    fontSize: 40,
     marginBottom: spacing.md,
   },
   photoUploadText: {
     ...typography.body,
-    color: colors.text,
-    fontSize: 16,
+    color: '#1D242B', // Dark Charcoal
+    fontSize: 15,
     fontWeight: '600',
     marginBottom: spacing.xs,
   },
   photoUploadSubtext: {
     ...typography.body,
-    color: colors.text,
-    fontSize: 14,
+    color: '#6B7280',
+    fontSize: 13,
     marginBottom: spacing.sm,
   },
   photoUploadHint: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#9CA3AF',
     fontSize: 12,
   },
   photosPreview: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
-    marginTop: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
   photoPreviewItem: {
     width: 100,
     height: 100,
-    borderRadius: borderRadius.md,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   photoPreviewImage: {
     width: '100%',
@@ -2384,47 +2402,47 @@ const styles = StyleSheet.create({
   },
   moderationBadge: {
     position: 'absolute',
-    top: 4,
-    left: 4,
+    top: 6,
+    left: 6,
     paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-    minWidth: 60,
+    paddingVertical: 3,
+    borderRadius: 6,
+    minWidth: 24,
     alignItems: 'center',
   },
   moderationBadgeText: {
     ...typography.caption,
     color: colors.surface,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   reasonBadge: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     padding: 4,
   },
   reasonText: {
     ...typography.caption,
     color: colors.surface,
-    fontSize: 8,
+    fontSize: 9,
   },
   photoRemoveButton: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   photoRemoveText: {
     color: colors.surface,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   priceInputContainer: {
@@ -2432,9 +2450,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
     borderRadius: borderRadius.md,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     paddingLeft: spacing.md,
+    minHeight: 48,
+    marginTop: spacing.xs,
+  },
+  priceInputContainerFocused: {
+    borderColor: '#0077C0',
+    backgroundColor: colors.surface,
   },
   currencySymbol: {
     ...typography.body,
@@ -2464,8 +2488,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
+    backgroundColor: '#0077C0',
+    borderColor: '#0077C0',
   },
   checkboxCheck: {
     color: colors.surface,
@@ -2478,29 +2502,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   summaryButton: {
-    backgroundColor: '#F3F0FF',
-    borderRadius: borderRadius.md,
+    backgroundColor: '#E3F6FF', // Light blue
+    borderRadius: 10,
     padding: spacing.md,
     alignItems: 'center',
     marginBottom: spacing.md,
   },
   summaryButtonText: {
     ...typography.body,
-    color: '#8B5CF6',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
   listingSummary: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 14,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   summaryTitle: {
-    ...typography.h3,
-    color: colors.text,
-    fontSize: 18,
+    fontSize: 16,
+    color: '#1D242B', // Dark Charcoal
     fontWeight: '700',
     marginBottom: spacing.md,
   },
@@ -2508,68 +2529,79 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   summaryLabel: {
     ...typography.body,
-    color: colors.textSecondary,
-    fontSize: 14,
+    color: '#6B7280',
+    fontSize: 13,
   },
   summaryValue: {
     ...typography.body,
-    color: colors.text,
-    fontSize: 14,
+    color: '#374151',
+    fontSize: 13,
     fontWeight: '600',
     flex: 1,
     textAlign: 'right',
   },
   footer: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 4,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#E5E7EB',
     gap: spacing.md,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 4,
     paddingHorizontal: spacing.md,
     gap: spacing.xs,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
   },
   backButtonIcon: {
     ...typography.body,
-    color: colors.text,
-    fontSize: 18,
+    color: '#374151',
+    fontSize: 16,
     fontWeight: '600',
   },
   backButtonText: {
     ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
-    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+    fontSize: 14,
   },
   cancelButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.sm + 4,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelButtonText: {
     ...typography.body,
-    color: colors.text,
+    color: '#DC2626',
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 14,
   },
   nextButton: {
     flex: 1,
-    borderRadius: borderRadius.md,
+    borderRadius: 12,
     overflow: 'hidden',
+    minHeight: 50,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   disabledButton: {
     opacity: 0.6,
@@ -2578,8 +2610,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
+    paddingVertical: spacing.md + 2,
+    gap: spacing.sm,
   },
   nextButtonText: {
     ...typography.body,
@@ -2597,8 +2629,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
+    paddingVertical: spacing.md + 2,
+    gap: spacing.sm,
   },
   publishButtonIcon: {
     ...typography.body,
@@ -2654,13 +2686,7 @@ const styles = StyleSheet.create({
   },
   hintText: {
     ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: spacing.xs,
-  },
-  errorText: {
-    ...typography.caption,
-    color: colors.error,
+    color: '#9CA3AF',
     fontSize: 12,
     marginTop: spacing.xs,
   },

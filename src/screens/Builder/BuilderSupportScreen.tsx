@@ -75,7 +75,7 @@ const faqs = [
     id: '8',
     question: 'How do I report a problem?',
     answer:
-      'You can contact our support team via email at info@indiapropertys.com or use the contact form on this support page. We typically respond within 24 hours.',
+      'You can contact our support team via email at info@360coordinates.com or use the contact form on this support page. We typically respond within 24 hours.',
   },
 ];
 
@@ -91,7 +91,7 @@ const BuilderSupportScreen: React.FC<Props> = ({navigation}) => {
   });
 
   const handleEmailPress = () => {
-    const email = 'info@indiapropertys.com';
+    const email = 'info@360coordinates.com';
     const subject = 'Support Query';
     const body = '';
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -121,7 +121,7 @@ const BuilderSupportScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
     // In real app, send to backend
-    const email = 'info@indiapropertys.com';
+    const email = 'info@360coordinates.com';
     const subject = contactForm.subject || 'Contact Form Query';
     const body = `Name: ${contactForm.name}\nEmail: ${contactForm.email}\n\nMessage:\n${contactForm.message}`;
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -157,7 +157,7 @@ const BuilderSupportScreen: React.FC<Props> = ({navigation}) => {
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Email</Text>
-              <Text style={styles.contactValue}>info@indiapropertys.com</Text>
+              <Text style={styles.contactValue}>info@360coordinates.com</Text>
             </View>
             <Text style={styles.contactArrow}>→</Text>
           </TouchableOpacity>

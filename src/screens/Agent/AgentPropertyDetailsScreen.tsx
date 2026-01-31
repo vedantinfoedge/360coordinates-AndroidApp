@@ -16,7 +16,7 @@ import {RouteProp} from '@react-navigation/native';
 import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {propertyService} from '../../services/property.service';
-import {fixImageUrl, isValidImageUrl} from '../../utils/imageHelper';
+import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
 import AgentHeader from '../../components/AgentHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
@@ -37,12 +37,7 @@ type Props = {
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
-// Property image type (matches website format)
-interface PropertyImage {
-  id: number;
-  url: string;
-  alt: string;
-}
+// PropertyImage type is imported from imageHelper
 
 const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
@@ -85,64 +80,36 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         propertyId: responseData?.data?.property?.id,
         propertyTitle: responseData?.data?.property?.title,
         imagesField: responseData?.data?.property?.images,
+        imagesType: typeof responseData?.data?.property?.images,
+        imagesIsArray: Array.isArray(responseData?.data?.property?.images),
+        imagesLength: responseData?.data?.property?.images?.length,
+        imagesRaw: JSON.stringify(responseData?.data?.property?.images),
+        coverImage: responseData?.data?.property?.cover_image,
       });
       
       if (responseData && responseData.success && responseData.data) {
         const propData = responseData.data.property || responseData.data;
         
-        // Convert array of strings to array of objects (like website)
-        let propertyImages: PropertyImage[] = [];
+        console.log('[AgentPropertyDetails] Property data before processing:', {
+          hasImages: !!propData.images,
+          imagesType: typeof propData.images,
+          imagesIsArray: Array.isArray(propData.images),
+          imagesLength: Array.isArray(propData.images) ? propData.images.length : 0,
+          imagesRaw: JSON.stringify(propData.images),
+          coverImage: propData.cover_image,
+        });
         
-        // Primary: Extract from images array and convert to objects
-        if (propData.images && Array.isArray(propData.images) && propData.images.length > 0) {
-          propertyImages = propData.images
-            .map((img: any, idx: number) => {
-              if (typeof img === 'string') {
-                const trimmed = img.trim();
-                if (trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') {
-                  const fixedUrl = fixImageUrl(trimmed);
-                  if (fixedUrl && isValidImageUrl(fixedUrl) && !fixedUrl.includes('placeholder')) {
-                    return {
-                      id: idx + 1,
-                      url: fixedUrl,
-                      alt: propData.title || `Property image ${idx + 1}`
-                    };
-                  }
-                }
-              } else if (typeof img === 'object' && img !== null) {
-                const url = img.url || img.image_url || img.src || img.path || img.image || '';
-                if (url && typeof url === 'string') {
-                  const fixedUrl = fixImageUrl(url.trim());
-                  if (fixedUrl && isValidImageUrl(fixedUrl)) {
-                    return {
-                      id: idx + 1,
-                      url: fixedUrl,
-                      alt: propData.title || `Property image ${idx + 1}`
-                    };
-                  }
-                }
-              }
-              return null;
-            })
-            .filter((img: PropertyImage | null): img is PropertyImage => {
-              if (!img || !img.url || img.url.length === 0) return false;
-              return isValidImageUrl(img.url);
-            });
-        }
+        // ✅ Use helper function to validate and process images (EXACTLY like website)
+        let propertyImages: PropertyImage[] = validateAndProcessPropertyImages(
+          propData.images,
+          propData.title || 'Property',
+          propData.cover_image
+        );
         
-        // Fallback: Use cover_image if no images array found
-        if (propertyImages.length === 0 && propData.cover_image) {
-          const coverImageUrl = fixImageUrl(propData.cover_image);
-          if (coverImageUrl && isValidImageUrl(coverImageUrl) && !coverImageUrl.includes('placeholder')) {
-            propertyImages = [{
-              id: 1,
-              url: coverImageUrl,
-              alt: propData.title || 'Property image'
-            }];
-          }
-        }
+        console.log(`[AgentPropertyDetails] Processed ${propertyImages.length} valid images from ${propData.images?.length || 0} total`);
+        console.log('[AgentPropertyDetails] Final propertyImages:', propertyImages.map(img => ({id: img.id, url: img.url})));
         
-        // Final fallback: Placeholder
+        // Final fallback: Placeholder (only if absolutely no images)
         if (propertyImages.length === 0) {
           propertyImages = [{
             id: 1,
@@ -173,11 +140,10 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     if (!property) return;
     
     try {
-      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
       const priceText = property.price 
         ? `₹${parseFloat(property.price).toLocaleString('en-IN')}${property.status === 'rent' ? '/month' : ''}`
         : 'Price not available';
-      const shareMessage = `Check out this property!\n\n${property.title || 'Property'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nView more details: ${shareUrl}`;
+      const shareMessage = `Check out this property!\n\n${property.title || 'Property'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nVisit us: https://360coordinates.com`;
       
       await Share.share({
         message: shareMessage,
@@ -207,15 +173,16 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     );
   }
 
-  // Get property images - already converted to objects
+  // Get property images - already converted to objects in loadPropertyDetails
+  // Use all images that have a valid URL (don't filter out - they're already processed)
   const propertyImages: PropertyImage[] = property.images && Array.isArray(property.images) && property.images.length > 0
     ? property.images.filter((img: any): img is PropertyImage => {
+        // Only filter out null/undefined or empty URLs
         return img && 
                typeof img === 'object' && 
                img.url && 
                typeof img.url === 'string' &&
-               img.url.trim() !== '' &&
-               img.url.startsWith('http');
+               img.url.trim() !== '';
       })
     : [];
   
@@ -398,7 +365,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           ) : (
             <View style={styles.imageContainer}>
               <Image
-                source={require('../../assets/logo.jpeg')}
+                source={require('../../assets/logo.png')}
                 style={styles.image}
                 resizeMode="cover"
               />

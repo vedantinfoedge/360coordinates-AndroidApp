@@ -11,7 +11,7 @@ try {
   process.exit(1);
 }
 
-const sourceImage = path.join(__dirname, '../src/assets/App-icon.jpg');
+const sourceImage = path.join(__dirname, '../src/assets/App-icon.png');
 const outputDir = path.join(__dirname, '../');
 
 // iOS icon sizes (in points, need to multiply by scale)
@@ -42,7 +42,7 @@ async function generateIcons() {
     process.exit(1);
   }
 
-  console.log('Generating app icons from App-icon.jpg...\n');
+  console.log('Generating app icons from App-icon.png...\n');
 
   // Generate iOS icons
   console.log('Generating iOS icons...');

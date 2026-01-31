@@ -76,7 +76,7 @@ const Logo: React.FC<LogoProps> = ({
 
         {/* Main Text */}
         <Text style={[styles.mainText, sizeStyles.mainText, {color: textColor}]}>
-          Indiapropertys
+          360Coordinates
         </Text>
 
         {/* House Base (underline beneath "propertys") */}

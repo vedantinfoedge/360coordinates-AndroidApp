@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Share,
+  Animated,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -39,9 +41,11 @@ type Props = {
 
 const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
   const {logout, user, isAuthenticated} = useAuth();
+  const insets = useSafeAreaInsets();
   const listingType = route?.params?.listingType || 'all';
+  const headerHeight = insets.top + 70;
+  const scrollY = useRef(new Animated.Value(0)).current;
   
-  // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
   const isGuest = !isLoggedIn;
   
@@ -157,7 +161,7 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleToggleFavorite = async (propertyId: number) => {
     try {
-      const response = await buyerService.toggleFavorite(propertyId);
+      const response = await buyerService.toggleFavorite(propertyId) as any;
       if (response && response.success) {
         const isFavorite = response.data?.is_favorite ?? response.data?.favorite ?? !favoriteIds.has(propertyId);
         
@@ -186,8 +190,7 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleShareProperty = async (property: Property) => {
     try {
-      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
-      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nView more: ${shareUrl}`;
+      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
       
       await Share.share({
         message: shareMessage,
@@ -200,20 +203,27 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
-  const renderProperty = ({item}: {item: Property}) => (
-    <PropertyCard
-      image={fixImageUrl(item.cover_image || item.images?.[0])}
-      name={item.title}
-      location={item.location}
-      price={formatters.price(item.price, item.status === 'rent')}
-      type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-      onPress={() => navigation.navigate('PropertyDetails', {propertyId: item.id})}
-      onFavoritePress={() => handleToggleFavorite(item.id)}
-      onSharePress={() => handleShareProperty(item)}
-      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
-      property={item}
-    />
-  );
+  const renderProperty = ({item}: {item: Property}) => {
+    const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+    const images: string[] | undefined = item.images?.length
+      ? item.images.map((url: string) => fixImageUrl(url)).filter((url): url is string => Boolean(url))
+      : undefined;
+    return (
+      <PropertyCard
+        image={imageUrl || undefined}
+        images={images}
+        name={item.title}
+        location={item.location}
+        price={formatters.price(item.price, item.status === 'rent')}
+        type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
+        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+        onFavoritePress={() => handleToggleFavorite(item.id)}
+        onSharePress={() => handleShareProperty(item)}
+        isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+        property={item}
+      />
+    );
+  };
 
   const getScreenTitle = () => {
     if (listingType === 'buy') return 'All Properties - Buy';
@@ -272,6 +282,8 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
         showProfile={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
+        scrollY={scrollY}
+        headerHeight={headerHeight}
       />
       
       {/* Header with Title */}
@@ -283,12 +295,17 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
       </View>
 
       {/* Properties List */}
-      <FlatList
+      <Animated.FlatList
         data={properties}
         renderItem={renderProperty}
-        keyExtractor={item => String(item.id)}
-        contentContainerStyle={styles.listContent}
+        keyExtractor={(item: any) => String(item.id)}
+          contentContainerStyle={[styles.listContent, {paddingTop: insets.top + spacing.md}]}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true},
+        )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

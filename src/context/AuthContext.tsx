@@ -18,7 +18,18 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string, userType?: string) => Promise<void>;
-  register: (name: string, email: string, phone: string, password: string, role: UserRole, emailToken?: string, phoneToken?: string) => Promise<any>;
+  register: (
+    name: string,
+    email: string,
+    phone: string,
+    password: string,
+    role: UserRole,
+    emailToken?: string,
+    phoneToken?: string,
+    phoneOtp?: string,
+    phoneVerificationMethod?: string,
+    phoneVerifiedFlag?: boolean,
+  ) => Promise<any>;
   verifyOTP: (userId: number, otp: string) => Promise<void>;
   resendOTP: (userId: number) => Promise<void>;
   logout: () => Promise<void>;
@@ -217,6 +228,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     role: UserRole,
     emailToken?: string,
     phoneToken?: string,
+    phoneOtp?: string, // For backend verification fallback
+    phoneVerificationMethod?: string,
+    phoneVerifiedFlag?: boolean,
   ) => {
     const response: any = await authService.register({
       fullName: name,
@@ -226,6 +240,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
       userType: role,
       emailVerificationToken: emailToken,
       phoneVerificationToken: phoneToken,
+      phoneOtp: phoneOtp, // Pass OTP if no token available (backend verification)
+      phoneVerificationMethod: phoneVerificationMethod,
+      phoneVerified: phoneVerifiedFlag,
     });
     
     if (response && response.success) {

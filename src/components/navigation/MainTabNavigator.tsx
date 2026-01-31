@@ -8,6 +8,7 @@ import ChatNavigator from '../../navigation/ChatNavigator';
 import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
 import FavoritesScreen from '../../screens/FavoritesScreen';
 import SupportScreen from '../../screens/Buyer/SupportScreen';
+import RecentlyViewedScreen from '../../screens/Buyer/RecentlyViewedScreen';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -16,6 +17,7 @@ export type MainTabParamList = {
   Profile: undefined;
   Favorites: undefined;
   Support: undefined;
+  RecentlyViewed: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -118,6 +120,15 @@ const MainTabNavigator = () => {
         component={SupportScreen}
         options={{
           title: 'Support',
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="RecentlyViewed"
+        component={RecentlyViewedScreen}
+        options={{
+          title: 'Recently Viewed',
+          headerShown: false,
           tabBarButton: () => null, // Hide from tab bar
         }}
       />

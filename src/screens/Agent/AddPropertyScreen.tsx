@@ -753,7 +753,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   onPress={() => setPropertyStatus('sell')}>
                   {propertyStatus === 'sell' ? (
                     <LinearGradient
-                      colors={['#8B5CF6', '#6D28D9']}
+                      colors={['#0077C0', '#005A94']}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 0}}
                       style={styles.typeButtonGradient}>
@@ -773,7 +773,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   onPress={() => setPropertyStatus('rent')}>
                   {propertyStatus === 'rent' ? (
                     <LinearGradient
-                      colors={['#8B5CF6', '#6D28D9']}
+                      colors={['#0077C0', '#005A94']}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 0}}
                       style={styles.typeButtonGradient}>
@@ -891,7 +891,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.mapButton}
                   onPress={() => setLocationPickerVisible(true)}>
                   <LinearGradient
-                    colors={['#8B5CF6', '#6D28D9']}
+                    colors={['#0077C0', '#005A94']}
                     start={{x: 0, y: 0}}
                     end={{x: 1, y: 0}}
                     style={styles.mapButtonGradient}>
@@ -1586,7 +1586,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </LinearGradient>
                 ) : (
                   <LinearGradient
-                    colors={['#8B5CF6', '#6D28D9']}
+                    colors={['#0077C0', '#005A94']}
                     start={{x: 0, y: 0}}
                     end={{x: 1, y: 0}}
                     style={styles.nextButtonGradient}>
@@ -1710,7 +1710,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#43A047',
   },
   stepCircleActive: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#0077C0',
   },
   stepIcon: {
     fontSize: 20,
@@ -1732,7 +1732,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   stepLabelActive: {
-    color: '#8B5CF6',
+    color: '#0077C0',
     fontWeight: '700',
   },
   stepLine: {
@@ -1748,7 +1748,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#43A047',
   },
   stepLineActive: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#0077C0',
   },
   content: {
     flex: 1,
@@ -1883,9 +1883,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   propertyTypeButtonActive: {
-    borderColor: '#8B5CF6',
+    borderColor: '#0077C0',
     borderWidth: 2,
-    backgroundColor: '#F3F0FF',
+    backgroundColor: '#E3F6FF',
   },
   propertyTypeIcon: {
     fontSize: 32,
@@ -1899,7 +1899,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   propertyTypeTextActive: {
-    color: '#8B5CF6',
+    color: '#0077C0',
     fontWeight: '600',
   },
   mapContainer: {
@@ -1980,8 +1980,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   numberButtonActive: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
+    backgroundColor: '#0077C0',
+    borderColor: '#0077C0',
   },
   numberButtonText: {
     ...typography.body,
@@ -2053,9 +2053,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md, // Bottom margin for wrapping
   },
   amenityButtonActive: {
-    borderColor: '#8B5CF6',
+    borderColor: '#0077C0',
     borderWidth: 2,
-    backgroundColor: '#F3F0FF',
+    backgroundColor: '#E3F6FF',
   },
   amenityIcon: {
     fontSize: 24,
@@ -2203,8 +2203,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
+    backgroundColor: '#0077C0',
+    borderColor: '#0077C0',
   },
   checkboxCheck: {
     color: colors.surface,
@@ -2217,7 +2217,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   summaryButton: {
-    backgroundColor: '#F3F0FF',
+    backgroundColor: '#E3F6FF',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
@@ -2225,7 +2225,7 @@ const styles = StyleSheet.create({
   },
   summaryButtonText: {
     ...typography.body,
-    color: '#8B5CF6',
+    color: '#0077C0',
     fontSize: 14,
     fontWeight: '600',
   },

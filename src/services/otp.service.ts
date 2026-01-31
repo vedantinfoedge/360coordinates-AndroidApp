@@ -626,6 +626,84 @@ export const otpService = {
     return await otpService.sendSMS(phone, context);
   },
 
+  /**
+   * MSG91 v5 REST flow via backend (mobile apps)
+   *
+   * Backend endpoints:
+   * - POST /otp/msg91-send.php    → proxies to MSG91 /api/v5/otp
+   * - POST /otp/msg91-verify.php → proxies to MSG91 /api/v5/otp/verify
+   *
+   * This flow treats MSG91 as source of truth:
+   * - App never generates/stores OTP locally
+   * - Backend does NOT use its own otp_verifications table for this path
+   */
+
+  // Send SMS OTP via backend → MSG91 v5 REST
+  msg91SendViaBackend: async (phone: string) => {
+    // Normalize phone to canonical app format: +91XXXXXXXXXX
+    let digits = phone.replace(/\D/g, '');
+    if (digits.length === 10) {
+      digits = `91${digits}`;
+    } else if (!digits.startsWith('91')) {
+      digits = `91${digits.slice(-10)}`;
+    }
+    const normalizedPhone = `+${digits}`;
+
+    console.log('[OTP] MSG91 REST send via backend:', {
+      original: phone,
+      normalizedPhone,
+      endpoint: API_ENDPOINTS.MSG91_OTP_SEND,
+    });
+
+    const apiRes: any = await api.post(API_ENDPOINTS.MSG91_OTP_SEND, {
+      phone: normalizedPhone,
+    });
+
+    const requestId =
+      apiRes?.data?.requestId ||
+      apiRes?.data?.reqId ||
+      apiRes?.requestId ||
+      apiRes?.reqId;
+
+    return {
+      success: apiRes?.success === true,
+      message: apiRes?.message || '',
+      data: apiRes?.data,
+      requestId,
+      method: 'msg91' as const,
+    };
+  },
+
+  // Verify SMS OTP via backend → MSG91 v5 REST
+  msg91VerifyViaBackend: async (phone: string, otp: string, requestId?: string) => {
+    // Normalize phone to canonical app format: +91XXXXXXXXXX
+    let digits = phone.replace(/\D/g, '');
+    if (digits.length === 10) {
+      digits = `91${digits}`;
+    } else if (!digits.startsWith('91')) {
+      digits = `91${digits.slice(-10)}`;
+    }
+    const normalizedPhone = `+${digits}`;
+
+    console.log('[OTP] MSG91 REST verify via backend:', {
+      original: phone,
+      normalizedPhone,
+      hasRequestId: !!requestId,
+      endpoint: API_ENDPOINTS.MSG91_OTP_VERIFY,
+    });
+
+    const payload: any = {
+      phone: normalizedPhone,
+      otp,
+    };
+    if (requestId) {
+      payload.requestId = requestId;
+    }
+
+    const res = await api.post(API_ENDPOINTS.MSG91_OTP_VERIFY, payload);
+    return res;
+  },
+
   // Retry Email OTP using MSG91 SDK
   // reqId: Request ID from sendOTP response
   // channel: Optional channel code ('SMS-11', 'VOICE-4', 'EMAIL-3', 'WHATSAPP-12')

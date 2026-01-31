@@ -16,7 +16,7 @@ interface OTPInputProps {
 }
 
 const OTPInput: React.FC<OTPInputProps> = ({
-  length = 4, // default to 4-digit OTPs (MSG91)
+  length = 4, // default to 4-digit OTPs
   value,
   onChange,
   onComplete,

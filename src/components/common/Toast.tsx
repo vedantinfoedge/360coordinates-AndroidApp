@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E53935',
   },
   info: {
-    backgroundColor: '#022b5f',
+    backgroundColor: '#0077C0',
   },
   message: {
     color: '#FFFFFF',

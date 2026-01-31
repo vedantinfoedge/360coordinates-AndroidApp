@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   Share,
+  Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -24,11 +25,18 @@ import {propertyService} from '../../services/property.service';
 import {favoriteService} from '../../services/favorite.service';
 import CustomAlert from '../../utils/alertHelper';
 import {buyerService} from '../../services/buyer.service';
-import {fixImageUrl, isValidImageUrl} from '../../utils/imageHelper';
+import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
 import BuyerHeader from '../../components/BuyerHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {Linking} from 'react-native';
+import {
+  viewedPropertiesService,
+  isPropertyUnlocked,
+  markPropertyUnlocked,
+  addViewedProperty,
+  ViewedProperty,
+} from '../../services/viewedProperties.service';
 import {capitalize, capitalizeAmenity} from '../../utils/formatters';
 
 // Import WebView with error handling
@@ -52,21 +60,18 @@ type Props = {
 };
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
+// Calculate image carousel width accounting for container margins
+const IMAGE_CAROUSEL_WIDTH = SCREEN_WIDTH - (spacing.md * 2);
 
-// Property image type (matches website format)
-interface PropertyImage {
-  id: number;
-  url: string;
-  alt: string;
-}
+// PropertyImage type is imported from imageHelper
 
 const TOTAL_INTERACTION_LIMIT = 5;
 const INTERACTION_STORAGE_KEY = 'interaction_remaining';
-const CONTACT_UNLOCK_PREFIX = 'contactUnlocked_';
-const CHAT_STARTED_PREFIX = 'chatStarted_';
 
 const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
+  const headerHeight = insets.top + 70;
+  const scrollY = useRef(new Animated.Value(0)).current;
   const {logout, user, isAuthenticated} = useAuth();
   const [property, setProperty] = useState<any>(null);
   
@@ -80,15 +85,16 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [togglingFavorite, setTogglingFavorite] = useState(false);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
-  const imageScrollViewRef = useRef<ScrollView>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageScrollViewRef = useRef<any>(null);
 
   const [interactionState, setInteractionState] = useState({
     remaining: TOTAL_INTERACTION_LIMIT,
     max: TOTAL_INTERACTION_LIMIT,
   });
   const [interactionLoading, setInteractionLoading] = useState(true);
-  const [contactUnlocked, setContactUnlocked] = useState(false);
-  const [chatUnlocked, setChatUnlocked] = useState(false);
+  // Single unlock flag - one credit unlocks both chat and contact for this property
+  const [propertyUnlocked, setPropertyUnlocked] = useState(false);
   const [processingContact, setProcessingContact] = useState(false);
   const [processingChat, setProcessingChat] = useState(false);
 
@@ -104,8 +110,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     if (property?.id) {
       loadPropertyUnlockState(property.id);
     } else {
-      setContactUnlocked(false);
-      setChatUnlocked(false);
+      setPropertyUnlocked(false);
     }
   }, [property?.id]);
 
@@ -167,104 +172,16 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       if (responseData && responseData.success && responseData.data) {
         const propData = responseData.data.property || responseData.data;
         
-        // ✅ CRITICAL: Convert array of strings to array of objects (EXACTLY like website)
-        // Website does: prop.images.map((img, idx) => ({id: idx + 1, url: img, alt: prop.title}))
-        // Backend returns: images: ["https://...", "https://...", ...] (array of URL strings)
-        let propertyImages: PropertyImage[] = [];
+        // ✅ Use helper function to validate and process images (EXACTLY like website)
+        let propertyImages: PropertyImage[] = validateAndProcessPropertyImages(
+          propData.images,
+          propData.title || 'Property',
+          propData.cover_image
+        );
         
-        // Primary: Extract from images array and convert to objects
-        if (propData.images && Array.isArray(propData.images) && propData.images.length > 0) {
-          console.log(`[PropertyDetails] Converting ${propData.images.length} images to objects (like website)`);
-          
-          propertyImages = propData.images
-            .map((img: any, idx: number) => {
-              // Handle string URLs (primary format from backend)
-                if (typeof img === 'string') {
-                const trimmed = img.trim();
-                if (trimmed && 
-                    trimmed !== '' && 
-                    trimmed !== 'null' && 
-                    trimmed !== 'undefined' &&
-                    trimmed.length > 0) {
-                  // Backend already provides full URLs, but validate and fix if needed
-                  const fixedUrl = fixImageUrl(trimmed);
-                  if (fixedUrl && 
-                      isValidImageUrl(fixedUrl) &&
-                      !fixedUrl.includes('placeholder') &&
-                      !fixedUrl.includes('unsplash.com')) {
-                    // ✅ Convert to object format (like website)
-                    return {
-                      id: idx + 1,
-                      url: fixedUrl,  // Full URL from backend
-                      alt: propData.title || `Property image ${idx + 1}`
-                    };
-                  } else if (idx === 0) {
-                    console.warn(`[PropertyDetails] Invalid image URL at index ${idx}:`, trimmed, '->', fixedUrl);
-                  }
-                }
-              }
-              // Handle object format (if backend ever returns objects)
-              else if (typeof img === 'object' && img !== null) {
-                const url = img.url || img.image_url || img.src || img.path || img.image || '';
-                if (url && typeof url === 'string') {
-                  const fixedUrl = fixImageUrl(url.trim());
-                  if (fixedUrl && isValidImageUrl(fixedUrl)) {
-                    return {
-                      id: idx + 1,
-                      url: fixedUrl,
-                      alt: propData.title || `Property image ${idx + 1}`
-                    };
-                  }
-                }
-                    }
-                    return null;
-            })
-            .filter((img: PropertyImage | null): img is PropertyImage => {
-              if (!img || !img.url || img.url.length === 0) return false;
-              return isValidImageUrl(img.url);
-            });
-        }
+        console.log(`[PropertyDetails] Processed ${propertyImages.length} valid images from ${propData.images?.length || 0} total`);
         
-        // Fallback 1: Check response.data.images (if backend returns at top level)
-        if (propertyImages.length === 0 && responseData.data.images && Array.isArray(responseData.data.images)) {
-          console.log('[PropertyDetails] Using fallback: response.data.images');
-          propertyImages = responseData.data.images
-            .map((img: any, idx: number) => {
-              if (typeof img === 'string') {
-                const trimmed = img.trim();
-                if (trimmed && trimmed !== '' && trimmed !== 'null') {
-                  const fixedUrl = fixImageUrl(trimmed);
-                  if (fixedUrl && isValidImageUrl(fixedUrl) && !fixedUrl.includes('placeholder')) {
-                    return {
-                      id: idx + 1,
-                      url: fixedUrl,
-                      alt: propData.title || `Property image ${idx + 1}`
-                    };
-                  }
-                }
-                }
-                return null;
-              })
-            .filter((img: PropertyImage | null): img is PropertyImage => {
-              if (!img || !img.url) return false;
-              return isValidImageUrl(img.url);
-            });
-        }
-        
-        // Fallback 2: Use cover_image if no images array found
-        if (propertyImages.length === 0 && propData.cover_image) {
-          console.log('[PropertyDetails] Using fallback: cover_image');
-          const coverImageUrl = fixImageUrl(propData.cover_image);
-          if (coverImageUrl && isValidImageUrl(coverImageUrl) && !coverImageUrl.includes('placeholder')) {
-            propertyImages = [{
-              id: 1,
-              url: coverImageUrl,
-              alt: propData.title || 'Property image'
-            }];
-          }
-        }
-        
-        // Final fallback: Placeholder (only if absolutely no images)
+        // Final fallback: Placeholder (only if absolutely no images - mobile app needs to show something)
         if (propertyImages.length === 0) {
           console.log('[PropertyDetails] Using final fallback: placeholder');
           propertyImages = [{
@@ -390,21 +307,13 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const loadPropertyUnlockState = async (propertyId: string | number) => {
     try {
-      const id = String(propertyId);
-      const keys = [
-        `${CONTACT_UNLOCK_PREFIX}${id}`,
-        `${CHAT_STARTED_PREFIX}${id}`,
-      ];
-      const results = await AsyncStorage.multiGet(keys);
-      const contactValue = results.find(item => item[0] === keys[0])?.[1];
-      const chatValue = results.find(item => item[0] === keys[1])?.[1];
-
-      setContactUnlocked(contactValue === 'true');
-      setChatUnlocked(chatValue === 'true');
+      // Check if property is already unlocked (single credit for both chat and contact)
+      const unlocked = await isPropertyUnlocked(propertyId);
+      setPropertyUnlocked(unlocked);
+      console.log('[PropertyDetails] Property unlock state:', {propertyId, unlocked});
     } catch (error) {
       console.error('[PropertyDetails] Error loading unlock state:', error);
-      setContactUnlocked(false);
-      setChatUnlocked(false);
+      setPropertyUnlocked(false);
     }
   };
 
@@ -445,24 +354,52 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
-  const unlockContactForProperty = async (propertyId: string | number) => {
+  /**
+   * Unlock property and save to viewed history
+   * Single credit consumption - unlocks both chat and contact for this property
+   */
+  const unlockPropertyAndSaveHistory = async (action: 'chat' | 'contact') => {
+    if (!property) return;
+    
     try {
-      await AsyncStorage.setItem(
-        `${CONTACT_UNLOCK_PREFIX}${propertyId}`,
-        'true',
-      );
-      setContactUnlocked(true);
+      const propId = property.id || property.property_id;
+      
+      // Mark property as unlocked
+      await markPropertyUnlocked(propId);
+      setPropertyUnlocked(true);
+      
+      // Get owner details for history
+      const ownerName = property.seller?.name || 
+                       property.seller_name || 
+                       property.owner?.name || 
+                       property.owner?.full_name || 
+                       'Property Owner';
+      const ownerPhone = property.seller?.phone || 
+                        property.seller_phone || 
+                        property.owner?.phone || 
+                        '';
+      const ownerEmail = property.seller?.email || 
+                        property.seller_email || 
+                        property.owner?.email || 
+                        '';
+      
+      // Save to viewed properties history
+      const viewedProperty: ViewedProperty = {
+        propertyId: propId,
+        propertyTitle: property.title || property.property_title || 'Property',
+        propertyLocation: property.location || property.city || '',
+        propertyPrice: property.price ? `₹${parseFloat(property.price).toLocaleString('en-IN')}` : '',
+        ownerName,
+        ownerPhone,
+        ownerEmail,
+        viewedAt: new Date().toISOString(),
+        action,
+      };
+      
+      await addViewedProperty(viewedProperty);
+      console.log('[PropertyDetails] Property unlocked and saved to history:', propId);
     } catch (error) {
-      console.error('[PropertyDetails] Error unlocking contact:', error);
-    }
-  };
-
-  const markChatStartedForProperty = async (propertyId: string | number) => {
-    try {
-      await AsyncStorage.setItem(`${CHAT_STARTED_PREFIX}${propertyId}`, 'true');
-      setChatUnlocked(true);
-    } catch (error) {
-      console.error('[PropertyDetails] Error saving chat state:', error);
+      console.error('[PropertyDetails] Error unlocking property:', error);
     }
   };
 
@@ -494,11 +431,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     if (!property) return;
     
     try {
-      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
       const priceText = property.price 
         ? `₹${parseFloat(property.price).toLocaleString('en-IN')}${property.status === 'rent' ? '/month' : ''}`
         : 'Price not available';
-      const shareMessage = `Check out this property!\n\n${property.title || 'Property'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nView more details: ${shareUrl}`;
+      const shareMessage = `Check out this property!\n\n${property.title || 'Property'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nVisit us: https://360coordinates.com`;
       
       await Share.share({
         message: shareMessage,
@@ -528,10 +464,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             text: 'Login',
             onPress: () => {
               // Navigate to auth, then return to this screen after login
-              navigation.navigate('Auth' as never, {
+              (navigation as any).navigate('Auth', {
                 screen: 'Login',
                 params: {returnTo: 'PropertyDetails', propertyId: route.params.propertyId},
-              } as never);
+              });
             },
           },
         ]
@@ -543,14 +479,18 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       return;
     }
 
+    // Check if user is buyer
+    if (user.user_type !== 'buyer') {
+      CustomAlert.alert('Access Denied', 'Only buyers can chat with owners.');
+      return;
+    }
+
     if (interactionLoading) {
       CustomAlert.alert('Please wait', 'Loading your interaction balance...');
       return;
     }
     
     const sellerId = property.seller_id || property.owner?.id || property.owner?.user_id || property.user_id;
-    // Prioritize seller object from backend, then fallback to flat fields
-    const sellerName = property.seller?.name || property.seller_name || property.owner?.name || property.owner?.full_name || 'Property Owner';
     const propId = property.id || property.property_id;
     const propTitle = property.title || property.property_title || 'Property';
     
@@ -562,7 +502,16 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     try {
       setProcessingChat(true);
 
-      if (!chatUnlocked) {
+      // If property not unlocked yet, consume a credit
+      if (!propertyUnlocked) {
+        if (interactionState.remaining <= 0) {
+          CustomAlert.alert(
+            'Interaction limit reached',
+            'Interaction limit reached. Upgrade to continue.',
+          );
+          return;
+        }
+        
         const result = await consumeInteraction();
         if (!result.success) {
           CustomAlert.alert(
@@ -571,21 +520,24 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           );
           return;
         }
-        await markChatStartedForProperty(propId);
+        
+        // Unlock property and save to history (single credit for both chat and contact)
+        await unlockPropertyAndSaveHistory('chat');
       }
     
-      console.log('[PropertyDetails] Navigating to chat:', {
+      console.log('[PropertyDetails] Navigating to chat (without showing owner details):', {
         userId: sellerId,
-        userName: sellerName,
         propertyId: propId,
         propertyTitle: propTitle,
       });
       
+      // Navigate to chat WITHOUT passing owner name/contact details
+      // Owner details should only be visible via "Show Owner Details" action
       (navigation as any).navigate('Chat', {
         screen: 'ChatConversation',
         params: {
           userId: Number(sellerId),
-          userName: sellerName,
+          userName: '', // Don't pass owner name - will show as "Property Owner"
           propertyId: Number(propId),
           propertyTitle: propTitle,
         },
@@ -601,6 +553,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       user: user ? {id: user.id, type: user.user_type} : null,
       propertyId: property?.id,
       hasProperty: !!property,
+      propertyUnlocked,
     });
     
     if (processingContact) {
@@ -651,8 +604,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       return;
     }
 
-    // If contact already unlocked for this property, show immediately
-    if (contactUnlocked) {
+    // If property already unlocked (via chat or previous contact view), show immediately
+    if (propertyUnlocked) {
       setShowContactModal(true);
       return;
     }
@@ -682,9 +635,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         return;
       }
 
-      await unlockContactForProperty(property.id);
+      // Unlock property and save to history (single credit for both chat and contact)
+      await unlockPropertyAndSaveHistory('contact');
       setShowContactModal(true);
-      console.log('[PropertyDetails] Contact unlocked for property:', property.id);
+      console.log('[PropertyDetails] Property unlocked for contact view:', property.id);
     } catch (error: any) {
       console.error('[PropertyDetails] Error in handleViewContact:', error);
       CustomAlert.alert('Error', 'Failed to process contact view. Please try again.');
@@ -695,7 +649,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handlePhonePress = (phone: string) => {
     if (phone) {
-      Linking.openURL(`tel:${phone}`).catch(err => {
+      Linking.openURL(`tel:${phone}`).catch((err: any) => {
         console.error('Error opening phone:', err);
         CustomAlert.alert('Error', 'Unable to open phone dialer.');
       });
@@ -704,7 +658,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleEmailPress = (email: string) => {
     if (email) {
-      Linking.openURL(`mailto:${email}`).catch(err => {
+      Linking.openURL(`mailto:${email}`).catch((err: any) => {
         console.error('Error opening email:', err);
         CustomAlert.alert('Error', 'Unable to open email client.');
       });
@@ -765,15 +719,15 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   // Get property images - already converted to objects in loadPropertyDetails (like website format)
   // Format: [{id: 1, url: "https://...", alt: "..."}, {id: 2, url: "https://...", alt: "..."}, ...]
+  // Use all images that have a valid URL (don't filter out - they're already processed)
   const propertyImages: PropertyImage[] = property.images && Array.isArray(property.images) && property.images.length > 0
     ? property.images.filter((img: any): img is PropertyImage => {
-        // Ensure it's an object with url property (website format)
+        // Only filter out null/undefined or empty URLs (images are already processed in loadPropertyDetails)
         return img && 
                typeof img === 'object' && 
                img.url && 
                typeof img.url === 'string' &&
-               img.url.trim() !== '' &&
-               img.url.startsWith('http');
+               img.url.trim() !== '';
       })
     : [];
   
@@ -810,13 +764,15 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         showProfile={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
+        scrollY={scrollY}
+        headerHeight={headerHeight}
       />
 
       {/* Favorite and Share Buttons - Positioned below header */}
       <View style={[styles.actionButtonsTop, {top: (insets.top + 60)}]}>
         <TouchableOpacity
           style={styles.favoriteButton}
-          onPress={(e) => {
+          onPress={(e: any) => {
             e.stopPropagation();
             handleToggleFavorite();
           }}
@@ -824,14 +780,14 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           activeOpacity={0.7}>
           <View style={styles.favoriteButtonInner}>
             <Text style={styles.favoriteIcon}>
-              {isFavorite ? '❤️' : '🤍'}
+            {isFavorite ? '❤️' : '🤍'}
             </Text>
           </View>
         </TouchableOpacity>
         
         <TouchableOpacity
           style={styles.shareButtonTop}
-          onPress={(e) => {
+          onPress={(e: any) => {
             e.stopPropagation();
             handleShareProperty();
           }}
@@ -843,10 +799,15 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       </View>
 
       {/* Scrollable Content with Image */}
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}>
+        contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + spacing.md}]}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true},
+        )}
+        scrollEventThrottle={16}>
         {/* Image Slider/Carousel - Display ALL property images */}
         <View style={styles.imageCarouselContainer}>
           {propertyImages.length > 0 ? (
@@ -856,17 +817,17 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={event => {
+            onMomentumScrollEnd={(event: any) => {
               const index = Math.round(
-                event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
+                event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
               );
                   if (index >= 0 && index < propertyImages.length) {
               setCurrentImageIndex(index);
                   }
                 }}
-                onScroll={event => {
+                onScroll={(event: any) => {
                   const index = Math.round(
-                    event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
+                    event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
                   );
                   if (index >= 0 && index < propertyImages.length && index !== currentImageIndex) {
                     setCurrentImageIndex(index);
@@ -876,10 +837,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             style={styles.imageCarousel}
                 contentContainerStyle={{
                   ...styles.imageCarouselContent,
-                  width: SCREEN_WIDTH * propertyImages.length,  // ✅ CRITICAL: Total width = screen width × image count
+                  width: IMAGE_CAROUSEL_WIDTH * propertyImages.length,  // ✅ Account for container margins
                 }}
                 decelerationRate="fast"
-                snapToInterval={SCREEN_WIDTH}
+                snapToInterval={IMAGE_CAROUSEL_WIDTH}
                 snapToAlignment="center">
                 {/* ✅ CRITICAL: Map through ALL images using object format (like website) */}
                 {propertyImages.map((image: PropertyImage, index: number) => (
@@ -895,8 +856,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       source={{uri: image.url}}  // ✅ Use image.url (object property, not string directly)
                     style={styles.image}
                     resizeMode="cover"
-                    defaultSource={require('../../assets/logo.jpeg')}
-                      onError={(error) => {
+                    defaultSource={require('../../assets/logo.png')}
+                      onError={(error: any) => {
                         console.error(`[PropertyDetails] Image ${index} (id: ${image.id}) failed to load:`, image.url);
                         console.error('[PropertyDetails] Error details:', {
                           id: image.id,
@@ -917,17 +878,17 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 ))}
               </ScrollView>
               
-              {/* Image Counter - Show current image number */}
-              {propertyImages.length > 1 && (
+              {/* Image Counter - Hidden per user request */}
+              {/* {propertyImages.length > 1 && (
                 <View style={styles.imageCounter}>
                   <Text style={styles.imageCounterText}>
                     {currentImageIndex + 1} / {propertyImages.length}
                   </Text>
               </View>
-            )}
+            )} */}
           
-          {/* Navigation Arrows - Only show if more than 1 image */}
-          {propertyImages.length > 1 && (
+          {/* Navigation Arrows - Hidden per user request */}
+          {/* {propertyImages.length > 1 && (
             <>
               <TouchableOpacity
                 style={[styles.carouselNavButton, styles.carouselNavButtonLeft]}
@@ -937,7 +898,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                     : propertyImages.length - 1;
                   setCurrentImageIndex(newIndex);
                   imageScrollViewRef.current?.scrollTo({
-                    x: newIndex * SCREEN_WIDTH,
+                    x: newIndex * IMAGE_CAROUSEL_WIDTH,
                     animated: true,
                   });
                     }}
@@ -952,7 +913,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                     : 0;
                   setCurrentImageIndex(newIndex);
                   imageScrollViewRef.current?.scrollTo({
-                    x: newIndex * SCREEN_WIDTH,
+                    x: newIndex * IMAGE_CAROUSEL_WIDTH,
                     animated: true,
                   });
                     }}
@@ -960,7 +921,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 <Text style={styles.carouselNavButtonText}>›</Text>
               </TouchableOpacity>
             </>
-          )}
+          )} */}
 
               {/* Image Indicators/Dots - Positioned at bottom */}
         {propertyImages.length > 1 && (
@@ -971,7 +932,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       onPress={() => {
                         setCurrentImageIndex(index);
                         imageScrollViewRef.current?.scrollTo({
-                          x: index * SCREEN_WIDTH,
+                          x: index * IMAGE_CAROUSEL_WIDTH,
                           animated: true,
                         });
                       }}
@@ -990,7 +951,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           ) : (
             <View style={styles.imageContainer}>
               <Image
-                source={require('../../assets/logo.jpeg')}
+                source={require('../../assets/logo.png')}
                 style={styles.image}
                 resizeMode="cover"
               />
@@ -1013,7 +974,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       ? {uri: fixImageUrl(property.cover_image)}
                       : propertyImages.length > 0
                       ? {uri: propertyImages[0].url}
-                      : require('../../assets/logo.jpeg')
+                      : require('../../assets/logo.png')
                   }
                   style={styles.videoThumbnailImage}
                   resizeMode="cover"
@@ -1031,26 +992,37 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         {/* Title and Price */}
         <View style={styles.headerSection}>
           <Text style={styles.title}>{capitalize(property.title || 'Property Title')}</Text>
-          <Text style={styles.location}>📍 {property.location || property.city || 'Location not specified'}</Text>
+          <View style={styles.locationContainer}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <Text style={styles.location}>{property.location || property.city || 'Location not specified'}</Text>
+          </View>
           <Text style={styles.price}>{formattedPrice}</Text>
         </View>
 
         {/* Quick Info */}
         <View style={styles.quickInfo}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoIcon}>🛏️</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoIcon}>🛏</Text>
+            </View>
             <Text style={styles.infoText}>{property.bedrooms} Beds</Text>
           </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoIcon}>🚿</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoIcon}>🚿</Text>
+            </View>
             <Text style={styles.infoText}>{property.bathrooms} Baths</Text>
           </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoIcon}>📐</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoIcon}>📐</Text>
+            </View>
             <Text style={styles.infoText}>{property.area}</Text>
           </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoIcon}>🏢</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoIcon}>🏢</Text>
+            </View>
             <Text style={styles.infoText}>{property.floor}</Text>
           </View>
         </View>
@@ -1127,7 +1099,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <Text style={styles.mapButtonText}>View on Map</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Fixed Action Buttons */}
       <View style={[styles.actionButtons, {paddingBottom: insets.bottom}]}>
@@ -1214,9 +1186,13 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 
                 {/* Phone - Always show (with "Not available" if missing) */}
                 <View style={styles.contactItem}>
-                  <Text style={styles.contactLabel}>Phone</Text>
+                  <View style={styles.contactLabelContainer}>
+                    <Text style={styles.contactLabelIcon}>📞</Text>
+                    <Text style={styles.contactLabel}>Phone</Text>
+                  </View>
                   {(property.seller?.phone || property.seller_phone || property.owner?.phone) ? (
                     <TouchableOpacity 
+                      style={styles.contactValueContainer}
                       onPress={() => handlePhonePress(
                         property.seller?.phone || 
                         property.seller_phone || 
@@ -1234,9 +1210,13 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 
                 {/* Email - Always show (with "Not available" if missing) */}
                 <View style={styles.contactItem}>
-                  <Text style={styles.contactLabel}>Email</Text>
+                  <View style={styles.contactLabelContainer}>
+                    <Text style={styles.contactLabelIcon}>✉</Text>
+                    <Text style={styles.contactLabel}>Email</Text>
+                  </View>
                   {(property.seller?.email || property.seller_email || property.owner?.email) ? (
                     <TouchableOpacity 
+                      style={styles.contactValueContainer}
                       onPress={() => handleEmailPress(
                         property.seller?.email || 
                         property.seller_email || 
@@ -1309,7 +1289,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                     domStorageEnabled={true}
                     startInLoadingState={true}
                     scalesPageToFit={true}
-                    onError={(syntheticEvent) => {
+                    onError={(syntheticEvent: any) => {
                       const {nativeEvent} = syntheticEvent;
                       console.error('[PropertyDetails] Video error:', nativeEvent);
                       CustomAlert.alert(
@@ -1328,7 +1308,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       style={styles.videoErrorButton}
                       onPress={() => {
                         if (property.video_url) {
-                          Linking.openURL(property.video_url).catch(err => {
+                          Linking.openURL(property.video_url).catch((err: any) => {
                             console.error('Error opening video URL:', err);
                           });
                         }
@@ -1370,31 +1350,52 @@ const styles = StyleSheet.create({
     paddingBottom: 100, // Space for sticky buttons
   },
   imageCarouselContainer: {
-    height: 300,
+    height: 450,
     position: 'relative',
+    paddingTop: spacing.md,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xl + spacing.xl, // Extra space to show top rounded corners below header
+    backgroundColor: colors.surfaceSecondary,
   },
   imageCarousel: {
-    height: 300,
+    height: 410,
+    borderRadius: borderRadius.xl,
   },
   imageCarouselContent: {
     alignItems: 'center',
     // Width will be set dynamically: SCREEN_WIDTH * propertyImages.length
   },
   imageContainer: {
-    width: SCREEN_WIDTH,
-    height: 300,
+    width: IMAGE_CAROUSEL_WIDTH, // Account for container margins
+    height: 410,
+    borderRadius: borderRadius.xl,
+    paddingTop: spacing.md,
+    overflow: 'hidden',
   },
   carouselNavButton: {
     position: 'absolute',
     top: '50%',
-    marginTop: -20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    marginTop: -24,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+    ...Platform.select({
+      android: {
+        elevation: 6,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+    }),
   },
   carouselNavButtonLeft: {
     left: spacing.md,
@@ -1403,13 +1404,14 @@ const styles = StyleSheet.create({
     right: spacing.md,
   },
   carouselNavButtonText: {
-    fontSize: 24,
-    color: colors.surface,
+    fontSize: 28,
+    color: colors.primary, // Purple arrows
     fontWeight: 'bold',
   },
   image: {
     width: '100%',
     height: '100%',
+    borderRadius: borderRadius.xl,
   },
   imageIndicators: {
     position: 'absolute',
@@ -1434,19 +1436,31 @@ const styles = StyleSheet.create({
   },
   imageCounter: {
     position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    top: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: 'rgba(2, 43, 95, 0.85)', // Navy with opacity
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     zIndex: 3,
+    ...Platform.select({
+      android: {
+        elevation: 4,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+    }),
   },
   imageCounterText: {
     ...typography.caption,
     color: colors.surface,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   backButton: {
     position: 'absolute',
@@ -1479,6 +1493,8 @@ const styles = StyleSheet.create({
   },
   actionButtonsTop: {
     position: 'absolute',
+    paddingTop: spacing.xl,
+    paddingRight: spacing.xs,
     right: spacing.md,
     zIndex: 100,
     flexDirection: 'row',
@@ -1515,7 +1531,8 @@ const styles = StyleSheet.create({
     }),
   },
   favoriteIcon: {
-    fontSize: 20,
+    fontSize: 22,
+    color: colors.primary, // Purple for favorite
   },
   shareIcon: {
     fontSize: 18,
@@ -1526,65 +1543,103 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: colors.surface,
-    padding: spacing.lg,
+    padding: spacing.xl,
+    paddingTop: spacing.xl + spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   title: {
-    ...typography.h1,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: 28,
     fontWeight: '700',
+    color: colors.secondary, // Dark Charcoal #1D242B
+    marginBottom: spacing.sm,
+    lineHeight: 36,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  locationIcon: {
+    fontSize: 16,
   },
   location: {
-    ...typography.body,
+    fontSize: 16,
+    fontWeight: '500',
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    flex: 1,
   },
   price: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 32,
     fontWeight: '700',
+    color: colors.primary, // Blue #0077C0
+    marginTop: spacing.xs,
   },
   quickInfo: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     justifyContent: 'space-around',
+    gap: spacing.sm,
   },
-  infoItem: {
+  infoCard: {
+    flex: 1,
     alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    minHeight: 80,
+    justifyContent: 'center',
     gap: spacing.xs,
   },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + '15', // 15% opacity purple
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
   infoIcon: {
-    fontSize: 24,
+    fontSize: 20,
   },
   infoText: {
     ...typography.caption,
     color: colors.text,
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   section: {
     backgroundColor: colors.surface,
-    padding: spacing.lg,
-    marginTop: spacing.md,
+    padding: spacing.xl,
+    marginTop: spacing.lg,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: colors.border,
   },
   sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.md,
+    fontSize: 20,
     fontWeight: '700',
+    color: colors.secondary, // Navy
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary + '30', // 30% opacity purple accent line
   },
   description: {
     ...typography.body,
     color: colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: 26,
+    fontSize: 16,
   },
   detailsGrid: {
     flexDirection: 'row',
@@ -1593,22 +1648,37 @@ const styles = StyleSheet.create({
   },
   detailItem: {
     width: '47%',
-    padding: spacing.md,
+    padding: spacing.lg,
     backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    ...Platform.select({
+      android: {
+        elevation: 2,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 1},
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+    }),
   },
   detailLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
     fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   detailValue: {
     ...typography.body,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
   amenitiesGrid: {
     flexDirection: 'row',
@@ -1619,17 +1689,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '47%',
+    backgroundColor: colors.surfaceSecondary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     gap: spacing.sm,
+    marginBottom: spacing.xs,
   },
   amenityIcon: {
     fontSize: 16,
-    color: colors.text,
+    color: colors.primary, // Purple checkmark
     fontWeight: 'bold',
   },
   amenityText: {
     ...typography.body,
     color: colors.text,
     fontSize: 14,
+    fontWeight: '500',
   },
   address: {
     ...typography.body,
@@ -1638,16 +1716,18 @@ const styles = StyleSheet.create({
   },
   mapButton: {
     backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primary + '40', // Purple border with opacity
+    marginTop: spacing.md,
   },
   mapButtonText: {
     ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
+    color: colors.primary, // Purple text
+    fontWeight: '700',
+    fontSize: 16,
   },
   ownerCard: {
     backgroundColor: colors.surfaceSecondary,
@@ -1727,28 +1807,45 @@ const styles = StyleSheet.create({
   contactButton: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.text,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary, // Purple border
+    minHeight: 52,
   },
   contactButtonText: {
     ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
+    color: colors.primary, // Purple text
+    fontWeight: '700',
+    fontSize: 16,
   },
   chatButton: {
     flex: 1,
-    backgroundColor: colors.text,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.primary, // Purple background
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    ...Platform.select({
+      android: {
+        elevation: 4,
+      },
+      ios: {
+        shadowColor: colors.primary,
+        shadowOffset: {width: 0, height: 4},
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   chatButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
   modalOverlay: {
     flex: 1,
@@ -1769,48 +1866,78 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   modalTitle: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 24,
     fontWeight: '700',
+    color: colors.secondary, // Navy
   },
   modalClose: {
-    fontSize: 24,
+    fontSize: 28,
     color: colors.textSecondary,
+    fontWeight: '300',
   },
   contactDetails: {
-    gap: spacing.lg,
+    gap: spacing.xl,
     marginBottom: spacing.lg,
   },
   contactItem: {
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  contactLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  contactLabelIcon: {
+    fontSize: 18,
   },
   contactLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  contactValueContainer: {
+    marginTop: spacing.xs,
   },
   contactValue: {
     ...typography.body,
     color: colors.text,
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '600',
   },
   contactLink: {
-    color: colors.text,
+    color: colors.primary, // Purple for links
     textDecorationLine: 'underline',
   },
   modalChatButton: {
-    backgroundColor: colors.text,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.primary, // Purple
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    ...Platform.select({
+      android: {
+        elevation: 4,
+      },
+      ios: {
+        shadowColor: colors.primary,
+        shadowOffset: {width: 0, height: 4},
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   modalChatButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
   contactButtonDisabled: {
     opacity: 0.5,
@@ -1826,19 +1953,21 @@ const styles = StyleSheet.create({
   },
   limitText: {
     ...typography.caption,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.textSecondary,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    fontWeight: '600',
   },
   limitTextError: {
-    color: '#DC2626',
-    borderColor: '#FCA5A5',
+    color: colors.error,
+    borderColor: colors.error + '40',
     backgroundColor: '#FEE2E2',
+    fontWeight: '700',
   },
   modalLimitInfo: {
     paddingHorizontal: spacing.lg,

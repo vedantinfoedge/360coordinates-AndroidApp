@@ -2,6 +2,7 @@ import api from './api.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_ENDPOINTS} from '../config/api.config';
 import {fixImageUrl} from '../utils/imageHelper';
+import {uploadProfileImageWithFirebase} from './profileImageUpload.service';
 
 export const userService = {
   // Get profile (exact backend structure: user + profile)
@@ -105,30 +106,39 @@ export const userService = {
     }
   },
 
-  // Upload profile image (new endpoint as per guide - syncs with website)
-  uploadProfileImage: async (imageUri: string) => {
+  // Upload profile image (Firebase Storage → Backend API pattern)
+  uploadProfileImage: async (imageUri: string, onProgress?: (progress: number) => void) => {
     try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: imageUri,
-        type: 'image/jpeg',
-        name: 'profile.jpg',
-      } as any);
+      // Get user ID from stored user data
+      let userId: number | string | null = null;
+      try {
+        const userData = await AsyncStorage.getItem('@propertyapp_user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          userId = user.id || user.user_id;
+        }
+      } catch (e) {
+        console.error('[UserService] Error getting user ID:', e);
+      }
 
-      const response = await api.post(API_ENDPOINTS.UPLOAD_PROFILE_IMAGE, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      if (!userId) {
+        throw new Error('User ID not found. Please login again.');
+      }
 
-      // Update stored user data if successful (as per guide)
-      if (response.success && response.data?.url) {
+      // Use Firebase Storage flow (or fallback to direct backend upload)
+      const result = await uploadProfileImageWithFirebase(
+        imageUri,
+        userId,
+        onProgress,
+      );
+
+      // Update stored user data if successful
+      if (result.success && result.imageUrl) {
         try {
-          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
           const userData = await AsyncStorage.getItem('@propertyapp_user');
           if (userData) {
             const user = JSON.parse(userData);
-            user.profile_image = fixImageUrl(response.data.url);
+            user.profile_image = fixImageUrl(result.imageUrl);
             await AsyncStorage.setItem('@propertyapp_user', JSON.stringify(user));
             
             // Also update AuthContext if available
@@ -145,10 +155,19 @@ export const userService = {
         }
       }
 
-      return response;
+      // Return response in the same format as before for compatibility
+      return {
+        success: result.success,
+        message: result.message,
+        data: {
+          url: result.imageUrl,
+        },
+      };
     } catch (error: any) {
+      console.error('[UserService] Profile image upload error:', error);
+      
       // If 404, the endpoint might not exist yet - return a graceful error
-      if (error.status === 404) {
+      if (error.status === 404 || error.message?.includes('404')) {
         return {
           success: false,
           message: 'Profile picture upload endpoint not available. Please contact support.',

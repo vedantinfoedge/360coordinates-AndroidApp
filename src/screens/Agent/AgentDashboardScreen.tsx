@@ -73,6 +73,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Entrance animations
@@ -458,12 +459,18 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
           await logout();
         }}
         subscriptionDays={daysRemaining}
+        scrollY={scrollY}
       />
 
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true}
+        )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }>
@@ -693,7 +700,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
           )}
         </View>
         </Animated.View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -701,7 +708,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA', // Clean off-white
   },
   loadingContainer: {
     flex: 1,
@@ -717,7 +724,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
   agentHeader: {

@@ -21,6 +21,7 @@ const ChatStack = createNativeStackNavigator<ChatStackParamList>();
 const ChatNavigator = () => {
   return (
     <ChatStack.Navigator
+      initialRouteName="ChatList"
       screenOptions={{
         headerShown: false, // We use custom headers in screens
       }}>

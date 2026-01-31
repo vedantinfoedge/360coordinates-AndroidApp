@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   },
   messageMe: {
     alignSelf: 'flex-end',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#0077C0',
   },
   messageOther: {
     alignSelf: 'flex-start',

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   Linking,
   Platform,
+  Animated,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -75,7 +76,7 @@ const faqs = [
     id: '8',
     question: 'How do I report a problem?',
     answer:
-      'You can contact our support team via email at info@indiapropertys.com or use the contact form on this support page. We typically respond within 24 hours.',
+      'You can contact our support team via email at info@360coordinates.com or use the contact form on this support page. We typically respond within 24 hours.',
   },
 ];
 
@@ -89,9 +90,10 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
     subject: '',
     message: '',
   });
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const handleEmailPress = () => {
-    const email = 'info@indiapropertys.com';
+    const email = 'info@360coordinates.com';
     const subject = 'Support Query';
     const body = '';
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -121,7 +123,7 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
     // In real app, send to backend
-    const email = 'info@indiapropertys.com';
+    const email = 'info@360coordinates.com';
     const subject = contactForm.subject || 'Contact Form Query';
     const body = `Name: ${contactForm.name}\nEmail: ${contactForm.email}\n\nMessage:\n${contactForm.message}`;
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -139,12 +141,18 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
         }}
         onSubscriptionPress={() => navigation.navigate('Subscription')}
         onLogoutPress={logout}
+        scrollY={scrollY}
       />
 
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}>
+        contentContainerStyle={styles.scrollContent}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true}
+        )}
+        scrollEventThrottle={16}>
         {/* Contact Information Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Information</Text>
@@ -158,7 +166,7 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Email</Text>
-              <Text style={styles.contactValue}>info@indiapropertys.com</Text>
+              <Text style={styles.contactValue}>info@360coordinates.com</Text>
             </View>
             <Text style={styles.contactArrow}>→</Text>
           </TouchableOpacity>
@@ -276,7 +284,7 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -290,6 +298,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingTop: spacing.md, // Minimal top padding since header starts hidden
     paddingBottom: spacing.xl,
   },
   section: {
@@ -314,19 +323,25 @@ const styles = StyleSheet.create({
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surfaceSecondary,
+    marginBottom: spacing.md,
   },
   contactIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.surfaceSecondary,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary + '15',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
   },
   contactIcon: {
-    fontSize: 24,
+    fontSize: 20,
   },
   contactInfo: {
     flex: 1,
@@ -336,11 +351,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.xs,
     fontSize: 12,
+    fontWeight: '600',
   },
   contactValue: {
     ...typography.body,
     color: colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   contactArrow: {
@@ -355,52 +371,60 @@ const styles = StyleSheet.create({
   },
   faqItem: {
     marginBottom: spacing.md,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     overflow: 'hidden',
   },
   faqQuestion: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
+    padding: spacing.lg,
     backgroundColor: colors.surfaceSecondary,
+    minHeight: 60,
   },
   faqQuestionText: {
     ...typography.body,
     color: colors.text,
     flex: 1,
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 16,
+    lineHeight: 22,
+    paddingRight: spacing.md,
   },
   faqToggle: {
     ...typography.h2,
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: 'bold',
+    color: colors.primary,
+    fontSize: 28,
+    fontWeight: '700',
+    minWidth: 32,
+    textAlign: 'center',
   },
   faqAnswer: {
-    padding: spacing.md,
+    padding: spacing.lg,
     backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   faqAnswerText: {
     ...typography.body,
     color: colors.textSecondary,
     lineHeight: 24,
+    fontSize: 15,
   },
   form: {
     marginTop: spacing.md,
   },
   inputContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   label: {
     ...typography.caption,
     color: colors.text,
     marginBottom: spacing.sm,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 15,
   },
   input: {
     backgroundColor: colors.surfaceSecondary,
@@ -409,26 +433,36 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     fontSize: 16,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
+    minHeight: 48,
   },
   textArea: {
-    height: 120,
+    height: 140,
     paddingTop: spacing.md,
     textAlignVertical: 'top',
+    lineHeight: 22,
   },
   submitButton: {
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
-    marginTop: spacing.md,
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+    minHeight: 52,
   },
   submitButtonText: {
     ...typography.body,
     color: colors.surface,
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 17,
+    letterSpacing: 0.5,
   },
 });
 

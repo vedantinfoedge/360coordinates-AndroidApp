@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   Image,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import {launchImageLibrary, launchCamera, MediaType, ImagePickerResponse} from 'react-native-image-picker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -62,6 +63,9 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
   const [originalData, setOriginalData] = useState({...formData});
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  
+  // Scroll animation for header hide/show
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   // Load profile data on mount
   useEffect(() => {
@@ -480,13 +484,20 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       <SellerHeader
         onProfilePress={() => {}}
         onSupportPress={() => navigation.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
         onLogoutPress={handleLogout}
+        scrollY={scrollY}
       />
 
-      <ScrollView 
+      <Animated.ScrollView 
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{paddingTop: 0}}>
+        contentContainerStyle={{paddingTop: 30}}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true}
+        )}
+        scrollEventThrottle={16}>
         {/* Profile Card Section */}
         <View style={styles.topSection}>
           <View style={styles.avatarContainer}>
@@ -522,9 +533,15 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
             </View>
           )}
           <View style={styles.statsRow}>
-            <Text style={styles.statText}>{stats.listedProperties} Properties</Text>
-            <Text style={styles.statText}>•</Text>
-            <Text style={styles.statText}>{stats.inquiries} Inquiries</Text>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.listedProperties}</Text>
+              <Text style={styles.statLabel}>Properties</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.inquiries}</Text>
+              <Text style={styles.statLabel}>Inquiries</Text>
+            </View>
           </View>
           <Text style={styles.memberSince}>Member since {memberSince}</Text>
         </View>
@@ -771,7 +788,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('MyProperties')}>
+            onPress={() => navigation.navigate('MyProperties')}
+            activeOpacity={0.7}>
             <Text style={styles.menuIcon}>🏘️</Text>
             <Text style={styles.menuText}>My Properties</Text>
             <Text style={styles.menuArrow}>→</Text>
@@ -781,7 +799,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Inquiries')}>
+            onPress={() => navigation.navigate('Inquiries')}
+            activeOpacity={0.7}>
             <Text style={styles.menuIcon}>💬</Text>
             <Text style={styles.menuText}>Inquiries</Text>
             <Text style={styles.menuArrow}>→</Text>
@@ -791,7 +810,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Support' as never)}>
+            onPress={() => navigation.navigate('Support' as never)}
+            activeOpacity={0.7}>
             <Text style={styles.menuIcon}>🆘</Text>
             <Text style={styles.menuText}>Support</Text>
             <Text style={styles.menuArrow}>→</Text>
@@ -801,7 +821,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Subscription' as never)}>
+            onPress={() => navigation.navigate('Subscription' as never)}
+            activeOpacity={0.7}>
             <Text style={styles.menuIcon}>💳</Text>
             <Text style={styles.menuText}>Subscription</Text>
             <Text style={styles.menuArrow}>→</Text>
@@ -809,13 +830,16 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.menuDivider} />
 
-          <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+          <TouchableOpacity 
+            style={styles.menuItem} 
+            onPress={handleLogout}
+            activeOpacity={0.7}>
             <Text style={styles.menuIcon}>🚪</Text>
             <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -823,7 +847,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA', // Clean off-white
   },
   loadingContainer: {
     flex: 1,
@@ -834,7 +858,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: spacing.md,
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#6B7280',
   },
   scrollView: {
     flex: 1,
@@ -845,105 +869,146 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   avatarContainer: {
     position: 'relative',
     marginBottom: spacing.md,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.surfaceSecondary,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#E3F6FF', // Light blue
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: colors.secondary,
+    borderWidth: 3,
+    borderColor: colors.primary,
   },
   avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 4,
-    borderColor: colors.secondary,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: colors.primary,
   },
   avatarText: {
-    ...typography.h1,
-    color: colors.text,
+    fontSize: 32,
+    color: colors.primary,
     fontWeight: '700',
   },
   editPhotoButton: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.accent,
+    bottom: 2,
+    right: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   editPhotoText: {
-    fontSize: 16,
+    fontSize: 14,
   },
   name: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 22,
+    color: '#1D242B', // Dark Charcoal
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
   email: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#6B7280',
     marginBottom: spacing.sm,
+    fontSize: 14,
   },
   roleBadge: {
-    backgroundColor: colors.accent,
+    backgroundColor: '#E3F6FF', // Light blue
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.round,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: 20,
     marginBottom: spacing.sm,
   },
   roleText: {
     ...typography.caption,
-    color: colors.surface,
+    color: colors.primary,
     fontWeight: '600',
+    fontSize: 12,
   },
   verifiedBadge: {
-    backgroundColor: colors.success,
+    backgroundColor: '#D1FAE5', // Light green tint
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
+    paddingVertical: 3,
+    borderRadius: 20,
     marginBottom: spacing.sm,
   },
   verifiedText: {
     ...typography.caption,
-    color: colors.surface,
-    fontSize: 10,
+    color: '#059669', // Green text
+    fontSize: 11,
     fontWeight: '600',
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-    gap: spacing.sm,
+    marginBottom: spacing.md,
+    backgroundColor: '#FAFAFA',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: 14,
+    gap: spacing.lg,
   },
-  statText: {
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 20,
+    color: '#1D242B', // Dark Charcoal
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  statLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#6B7280',
     fontSize: 12,
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: '#E5E7EB',
   },
   memberSince: {
     ...typography.caption,
-    color: colors.textSecondary,
-    opacity: 0.8,
+    color: '#9CA3AF',
+    fontSize: 12,
   },
   section: {
     backgroundColor: colors.surface,
     marginTop: spacing.md,
     padding: spacing.lg,
+    borderRadius: 16,
+    marginHorizontal: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -952,41 +1017,49 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   sectionTitle: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 18,
+    color: '#1D242B', // Dark Charcoal
     fontWeight: '700',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   editButtonText: {
     ...typography.body,
     color: colors.primary,
     fontWeight: '600',
+    fontSize: 14,
   },
   editActions: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   cancelButton: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs + 2,
   },
   cancelButtonText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#6B7280',
+    fontSize: 14,
   },
   saveButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: 8,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   saveButtonText: {
     ...typography.body,
     color: colors.surface,
     fontWeight: '600',
+    fontSize: 14,
   },
   form: {
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   row: {
     flexDirection: 'row',
@@ -1000,73 +1073,95 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.caption,
-    color: colors.text,
+    color: '#374151',
     fontWeight: '600',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    fontSize: 14,
   },
   input: {
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md - 2,
     ...typography.body,
     color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: 48,
+    fontSize: 15,
   },
   inputDisabled: {
     opacity: 0.6,
+    backgroundColor: '#F3F4F6',
   },
   inputError: {
-    borderColor: colors.error,
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
   },
   errorText: {
     ...typography.caption,
-    color: colors.error,
-    fontSize: 11,
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '500',
     marginTop: spacing.xs,
   },
   hintText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#9CA3AF',
     fontSize: 11,
     marginTop: spacing.xs,
   },
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
+    paddingTop: spacing.md,
   },
   menuSection: {
     backgroundColor: colors.surface,
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xxl,
+    borderRadius: 16,
+    marginHorizontal: spacing.md,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.lg,
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.lg,
+    minHeight: 54,
   },
   menuIcon: {
-    fontSize: 24,
+    fontSize: 20,
     marginRight: spacing.md,
-    width: 30,
+    width: 26,
+    textAlign: 'center',
   },
   menuText: {
     ...typography.body,
-    color: colors.text,
+    color: '#374151',
     flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
   },
   logoutText: {
-    color: colors.error,
+    color: '#EF4444',
+    fontWeight: '600',
   },
   menuArrow: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#9CA3AF',
     fontSize: 18,
+    fontWeight: '500',
   },
   menuDivider: {
     height: 1,
-    backgroundColor: colors.border,
-    marginLeft: spacing.xxl + spacing.md,
+    backgroundColor: '#F3F4F6',
+    marginLeft: spacing.xxl + spacing.sm,
   },
 });
 

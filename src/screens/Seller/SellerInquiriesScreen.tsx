@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  Animated,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -58,6 +59,9 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [propertyFilter, setPropertyFilter] = useState<number | null>(null);
+  
+  // Scroll animation for header hide/show
+  const scrollY = useRef(new Animated.Value(0)).current;
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   useEffect(() => {
@@ -208,45 +212,68 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
     });
   };
 
-  const renderInquiry = ({item}: {item: Inquiry}) => (
-    <TouchableOpacity
-      style={styles.inquiryCard}
-      onPress={() => handleMarkAsRead(item.id)}>
-      <View style={styles.inquiryHeader}>
-        <View style={styles.inquiryInfo}>
-          <Text style={styles.buyerName}>{item.buyer_name}</Text>
-          <Text style={styles.propertyTitle}>{capitalize(item.property_title)}</Text>
-          <Text style={styles.inquiryDate}>
-            {formatters.timeAgo(item.created_at)}
-          </Text>
-        </View>
-        {item.status === 'new' && (
-          <View style={styles.newBadge}>
-            <Text style={styles.newBadgeText}>New</Text>
+  const renderInquiry = ({item}: {item: Inquiry}) => {
+    const [expanded, setExpanded] = React.useState(false);
+    const messageLines = item.message.split('\n').length;
+    const shouldTruncate = !expanded && messageLines > 2;
+    
+    return (
+      <TouchableOpacity
+        style={styles.inquiryCard}
+        onPress={() => handleMarkAsRead(item.id)}
+        activeOpacity={0.9}>
+        <View style={styles.inquiryHeader}>
+          <View style={styles.inquiryHeaderLeft}>
+            <View style={styles.buyerAvatarPlaceholder}>
+              <Text style={styles.buyerAvatarText}>
+                {item.buyer_name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.inquiryInfo}>
+              <Text style={styles.buyerName}>{item.buyer_name}</Text>
+              <Text style={styles.propertyTitle}>{capitalize(item.property_title)}</Text>
+              <Text style={styles.inquiryDate}>
+                {formatters.timeAgo(item.created_at)}
+              </Text>
+            </View>
           </View>
-        )}
-      </View>
-      <Text style={styles.inquiryMessage} numberOfLines={3}>
-        {item.message}
-      </Text>
-      <View style={styles.inquiryActions}>
-        {item.buyer_phone && (
+          {item.status === 'new' && (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>New</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.inquiryMessage} numberOfLines={expanded ? undefined : 2}>
+          {item.message}
+        </Text>
+        {shouldTruncate && (
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => {
-              // Handle phone call
-            }}>
-            <Text style={styles.actionButtonText}>📞 Call</Text>
+            onPress={() => setExpanded(true)}
+            style={styles.readMoreButton}>
+            <Text style={styles.readMoreText}>Read more</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={[styles.actionButton, styles.replyButton]}
-          onPress={() => handleReply(item)}>
-          <Text style={[styles.actionButtonText, styles.replyButtonText]}>💬 Chat</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.inquiryActions}>
+          {item.buyer_phone && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                // Handle phone call
+              }}
+              activeOpacity={0.7}>
+              <Text style={styles.actionButtonText}>📞 Call</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.actionButton, styles.replyButton]}
+            onPress={() => handleReply(item)}
+            activeOpacity={0.7}>
+            <Text style={[styles.actionButtonText, styles.replyButtonText]}>💬 Chat</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading && inquiries.length === 0) {
     return (
@@ -256,8 +283,9 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
           onSupportPress={() => navigation.navigate('Support')}
           onSubscriptionPress={() => navigation.navigate('Subscription')}
           onLogoutPress={logout}
+          scrollY={scrollY}
         />
-        <View style={[styles.centerContainer, {flex: 1}]}>
+        <View style={[styles.centerContainer, {flex: 1, marginTop: spacing.md}]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading inquiries...</Text>
         </View>
@@ -271,10 +299,11 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
         onLogoutPress={logout}
+        scrollY={scrollY}
       />
       
       {/* Search and Filter Bar */}
-      <View style={styles.searchBar}>
+      <View style={[styles.searchBar, {marginTop: spacing.md}]}>
         <View style={styles.searchInputContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
@@ -317,7 +346,8 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
                       styles.filterOption,
                       statusFilter === status && styles.filterOptionActive,
                     ]}
-                    onPress={() => setStatusFilter(status)}>
+                    onPress={() => setStatusFilter(status)}
+                    activeOpacity={0.7}>
                     <Text
                       style={[
                         styles.filterOptionText,
@@ -341,22 +371,28 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
       
       {inquiries.length === 0 ? (
         <View style={[styles.centerContainer, {flex: 1}]}>
-          <Text style={styles.emptyText}>No inquiries yet</Text>
+          <View style={styles.emptyIconContainer}>
+            <Text style={styles.emptyIcon}>💬</Text>
+          </View>
+          <Text style={styles.emptyTitle}>No Inquiries Yet</Text>
           <Text style={styles.emptySubtext}>
-            Inquiries from buyers will appear here
+            Inquiries from buyers will appear here when they contact you about your properties
           </Text>
         </View>
       ) : (
         <>
           {filteredInquiries.length === 0 && searchQuery ? (
             <View style={styles.centerContainer}>
-              <Text style={styles.emptyText}>No inquiries found</Text>
+              <View style={styles.emptyIconContainer}>
+                <Text style={styles.emptyIcon}>🔍</Text>
+              </View>
+              <Text style={styles.emptyTitle}>No Inquiries Found</Text>
               <Text style={styles.emptySubtext}>
-                Try adjusting your search or filters
+                Try adjusting your search terms or filters to find what you're looking for
               </Text>
             </View>
           ) : (
-            <FlatList
+            <Animated.FlatList
               data={filteredInquiries}
               renderItem={renderInquiry}
               keyExtractor={item => String(item.id)}
@@ -369,6 +405,11 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
                   colors={[colors.primary]}
                 />
               }
+              onScroll={Animated.event(
+                [{nativeEvent: {contentOffset: {y: scrollY}}}],
+                {useNativeDriver: true}
+              )}
+              scrollEventThrottle={16}
             />
           )}
         </>
@@ -380,7 +421,7 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA', // Clean off-white
   },
   centerContainer: {
     justifyContent: 'center',
@@ -388,172 +429,247 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   listContent: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   inquiryCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    borderRadius: 14,
+    padding: spacing.lg,
     marginBottom: spacing.md,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   inquiryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  inquiryHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: spacing.md,
+  },
+  buyerAvatarPlaceholder: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buyerAvatarText: {
+    ...typography.h3,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: 17,
   },
   inquiryInfo: {
     flex: 1,
   },
   buyerName: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: 16,
+    color: '#1D242B', // Dark Charcoal
+    fontWeight: '600',
+    marginBottom: 3,
+    lineHeight: 22,
   },
   propertyTitle: {
     ...typography.body,
     color: colors.primary,
-    marginBottom: spacing.xs,
+    marginBottom: 3,
+    fontSize: 13,
   },
   inquiryDate: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#9CA3AF',
+    fontSize: 12,
   },
   newBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    backgroundColor: '#E3F6FF', // Light blue background
+    borderRadius: 20,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   newBadgeText: {
-    ...typography.small,
-    color: colors.surface,
+    fontSize: 11,
+    color: colors.primary,
     fontWeight: '600',
   },
   inquiryMessage: {
     ...typography.body,
-    color: colors.text,
+    color: '#374151',
+    marginBottom: spacing.sm,
+    lineHeight: 22,
+    fontSize: 14,
+  },
+  readMoreButton: {
+    alignSelf: 'flex-start',
     marginBottom: spacing.md,
+  },
+  readMoreText: {
+    ...typography.body,
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   inquiryActions: {
     flexDirection: 'row',
     gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   actionButton: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 10,
+    backgroundColor: '#FAFAFA',
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 42,
   },
   replyButton: {
     backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   actionButtonText: {
     ...typography.caption,
-    color: colors.text,
+    color: '#374151',
     fontWeight: '600',
+    fontSize: 13,
   },
   replyButtonText: {
     color: colors.surface,
   },
   loadingText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#6B7280',
     marginTop: spacing.md,
   },
-  emptyText: {
-    ...typography.h2,
-    color: colors.text,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#E3F6FF', // Light blue
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  emptyIcon: {
+    fontSize: 36,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    color: '#1D242B', // Dark Charcoal
+    fontWeight: '700',
     marginBottom: spacing.sm,
+    textAlign: 'center',
+    lineHeight: 28,
   },
   emptySubtext: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#6B7280',
     textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 22,
+    paddingHorizontal: spacing.lg,
   },
   searchBar: {
     flexDirection: 'row',
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#F3F4F6',
     gap: spacing.sm,
   },
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
     paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    height: 46,
   },
   searchIcon: {
-    fontSize: 18,
+    fontSize: 16,
     marginRight: spacing.sm,
   },
   searchInput: {
     flex: 1,
     ...typography.body,
     color: colors.text,
-    paddingVertical: spacing.sm,
+    paddingVertical: 0,
+    fontSize: 14,
+    height: 46,
   },
   filterButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#E3F6FF', // Light blue
+    borderRadius: 12,
     justifyContent: 'center',
+    height: 46,
   },
   filterButtonText: {
     ...typography.body,
-    color: colors.surface,
+    color: colors.primary,
     fontWeight: '600',
+    fontSize: 14,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
     maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   modalTitle: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 20,
+    color: '#1D242B', // Dark Charcoal
     fontWeight: '700',
   },
   modalClose: {
-    ...typography.h2,
-    color: colors.textSecondary,
     fontSize: 24,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   filterSection: {
     marginBottom: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   filterLabel: {
     ...typography.body,
-    color: colors.text,
+    color: '#1D242B', // Dark Charcoal
     fontWeight: '600',
     marginBottom: spacing.md,
+    fontSize: 15,
   },
   filterOptions: {
     flexDirection: 'row',
@@ -563,19 +679,20 @@ const styles = StyleSheet.create({
   filterOption: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: '#FAFAFA',
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterOptionActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   filterOptionText: {
     ...typography.body,
-    color: colors.text,
+    color: '#374151',
     fontSize: 12,
+    fontWeight: '500',
   },
   filterOptionTextActive: {
     color: colors.surface,
@@ -584,14 +701,20 @@ const styles = StyleSheet.create({
   applyButton: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: spacing.lg,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   applyButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '700',
+    fontWeight: '600',
+    fontSize: 15,
   },
 });
 

@@ -37,6 +37,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
   const insets = useSafeAreaInsets();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(30)).current;
+  const scrollY = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
     Animated.parallel([
@@ -93,9 +94,26 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     setIsEditing(false);
   };
 
-  const handleSave = () => {
-    // In real app, save to backend
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      // Only save name and address (email and phone are locked)
+      const {buyerService} = require('../../services/buyer.service');
+      const updateResponse = await buyerService.updateProfile({
+        full_name: formData.name,
+        address: formData.address,
+      });
+
+      if (updateResponse && updateResponse.success) {
+        CustomAlert.alert('Success', 'Profile updated successfully');
+        setOriginalData({...formData});
+        setIsEditing(false);
+      } else {
+        CustomAlert.alert('Error', updateResponse?.message || 'Failed to update profile');
+      }
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      CustomAlert.alert('Error', error?.message || 'Failed to update profile');
+    }
   };
 
   const handleLogout = async () => {
@@ -209,7 +227,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             {
               opacity: fadeAnim,
               transform: [{translateY: slideAnim}],
-              paddingTop: insets.top + 70,
+              paddingTop: insets.top + spacing.md,
             },
           ]}>
           <View style={styles.loginContent}>
@@ -244,79 +262,91 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     <View style={styles.container}>
       {/* Custom Header */}
       <BuyerHeader
-        onProfilePress={() => {
-          // Already on profile page
-        }}
-        onSupportPress={() => {
-          navigation.navigate('Support' as never);
-        }}
+        onProfilePress={() => {}}
+        onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={handleLogout}
         showLogout={true}
         showProfile={true}
         showSignIn={false}
         showSignUp={false}
+        scrollY={scrollY}
       />
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <Animated.ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{paddingTop: insets.top + 60}}>
+        contentContainerStyle={{paddingTop: spacing.md}}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true},
+        )}
+        scrollEventThrottle={16}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
+          <View style={styles.profileGradient}>
+            <View style={styles.avatarContainer}>
+              <TouchableOpacity
+                style={styles.avatarWrapper}
+                onPress={showImagePicker}
+                activeOpacity={0.8}>
+                {profileImage ? (
+                  <Image 
+                    source={{uri: profileImage}} 
+                    style={styles.avatarImage}
+                    defaultSource={require('../../assets/logo.png')}
+                  />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>
+                      {(userData.full_name || 'User')
+                        .split(' ')
+                        .map(n => n[0])
+                        .join('')
+                        .toUpperCase()
+                        .slice(0, 2)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.cameraIconContainer}>
+                  <Text style={styles.cameraIcon}>📷</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.userName}>{userData.full_name || 'User'}</Text>
+            <Text style={styles.userEmail}>{userData.email}</Text>
             <TouchableOpacity
-              style={styles.avatarWrapper}
+              style={styles.uploadButton}
               onPress={showImagePicker}
               activeOpacity={0.8}>
-              {profileImage ? (
-                <Image 
-                  source={{uri: profileImage}} 
-                  style={styles.avatarImage}
-                  defaultSource={require('../../assets/logo.jpeg')}
-                />
-              ) : (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {(userData.full_name || 'User')
-                      .split(' ')
-                      .map(n => n[0])
-                      .join('')
-                      .toUpperCase()
-                      .slice(0, 2)}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.cameraIconContainer}>
-                <Text style={styles.cameraIcon}>📷</Text>
-              </View>
+              <Text style={styles.uploadButtonText}>
+                {profileImage ? 'Change Photo' : 'Upload Photo'}
+              </Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{userData.full_name || 'User'}</Text>
-          <Text style={styles.userEmail}>{userData.email}</Text>
-          <TouchableOpacity
-            style={styles.uploadButton}
-            onPress={showImagePicker}>
-            <Text style={styles.uploadButtonText}>
-              {profileImage ? 'Change Photo' : 'Upload Photo'}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Edit/Cancel Buttons */}
         <View style={styles.actionButtons}>
           {!isEditing ? (
-            <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-              <Text style={styles.editButtonText}>Edit Profile</Text>
+            <TouchableOpacity 
+              style={styles.editButton} 
+              onPress={handleEdit}
+              activeOpacity={0.8}>
+              <Text style={styles.editButtonText}>✏️ Edit Profile</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.editActions}>
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={handleCancel}>
+                onPress={handleCancel}
+                activeOpacity={0.8}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Save</Text>
+              <TouchableOpacity 
+                style={styles.saveButton} 
+                onPress={handleSave}
+                activeOpacity={0.8}>
+                <Text style={styles.saveButtonText}>✓ Save</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -325,7 +355,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
         {/* Form Fields */}
         <View style={styles.formSection}>
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Full Name</Text>
+            <View style={styles.labelContainer}>
+              <Text style={styles.labelIcon}>👤</Text>
+              <Text style={styles.label}>Full Name</Text>
+            </View>
             {isEditing ? (
               <TextInput
                 style={styles.input}
@@ -340,33 +373,32 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
+            <View style={styles.labelContainer}>
+              <Text style={styles.labelIcon}>✉</Text>
+              <Text style={styles.label}>Email</Text>
+            </View>
             {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={formData.email}
-                onChangeText={text => setFormData({...formData, email: text})}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholder="Enter your email"
-                placeholderTextColor={colors.textSecondary}
-              />
+              <View style={styles.lockedInput}>
+                <Text style={styles.lockedInputText}>{formData.email}</Text>
+                <Text style={styles.lockedLabel}>🔒 Locked</Text>
+              </View>
             ) : (
               <Text style={styles.value}>{formData.email}</Text>
             )}
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Phone Number</Text>
+            <View style={styles.labelContainer}>
+              <Text style={styles.labelIcon}>📞</Text>
+              <Text style={styles.label}>Phone Number</Text>
+            </View>
             {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={formData.phone}
-                onChangeText={text => setFormData({...formData, phone: text})}
-                keyboardType="phone-pad"
-                placeholder="Enter your phone number"
-                placeholderTextColor={colors.textSecondary}
-              />
+              <View style={styles.lockedInput}>
+                <Text style={styles.lockedInputText}>
+                  {formData.phone || 'Not provided'}
+                </Text>
+                <Text style={styles.lockedLabel}>🔒 Locked</Text>
+              </View>
             ) : (
               <Text style={styles.value}>
                 {formData.phone || 'Not provided'}
@@ -375,7 +407,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Address</Text>
+            <View style={styles.labelContainer}>
+              <Text style={styles.labelIcon}>📍</Text>
+              <Text style={styles.label}>Address</Text>
+            </View>
             {isEditing ? (
               <TextInput
                 style={[styles.input, styles.textArea]}
@@ -401,22 +436,57 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.optionsSection}>
           <TouchableOpacity 
             style={styles.optionItem}
-            onPress={() => navigation.navigate('Favorites')}>
-            <Text style={styles.optionText}>My Favorites</Text>
-            <Text style={styles.optionArrow}>→</Text>
+            onPress={() => navigation.navigate('Favorites')}
+            activeOpacity={0.7}>
+            <View style={styles.optionLeft}>
+              <View style={styles.optionIconContainer}>
+                <Text style={styles.optionIcon}>❤</Text>
+              </View>
+              <Text style={styles.optionText}>My Favorites</Text>
+            </View>
+            <Text style={styles.optionArrow}>›</Text>
           </TouchableOpacity>
           <View style={styles.divider} />
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={styles.optionText}>My Inquiries</Text>
-            <Text style={styles.optionArrow}>→</Text>
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => navigation.navigate('Chat')}
+            activeOpacity={0.7}>
+            <View style={styles.optionLeft}>
+              <View style={styles.optionIconContainer}>
+                <Text style={styles.optionIcon}>💬</Text>
+              </View>
+              <Text style={styles.optionText}>My Inquiries</Text>
+            </View>
+            <Text style={styles.optionArrow}>›</Text>
           </TouchableOpacity>
           <View style={styles.divider} />
-          <TouchableOpacity style={styles.optionItem} onPress={handleLogout}>
-            <Text style={[styles.optionText, styles.logoutText]}>Logout</Text>
-            <Text style={styles.optionArrow}>→</Text>
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => (navigation as any).navigate('RecentlyViewed')}
+            activeOpacity={0.7}>
+            <View style={styles.optionLeft}>
+              <View style={[styles.optionIconContainer, styles.recentIconContainer]}>
+                <Text style={styles.optionIcon}>🕐</Text>
+              </View>
+              <Text style={styles.optionText}>Recently Viewed</Text>
+            </View>
+            <Text style={styles.optionArrow}>›</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity 
+            style={styles.optionItem} 
+            onPress={handleLogout}
+            activeOpacity={0.7}>
+            <View style={styles.optionLeft}>
+              <View style={[styles.optionIconContainer, styles.logoutIconContainer]}>
+                <Text style={styles.optionIcon}>🚪</Text>
+              </View>
+              <Text style={[styles.optionText, styles.logoutText]}>Logout</Text>
+            </View>
+            <Text style={styles.optionArrow}>›</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -424,18 +494,24 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA',
   },
   scrollView: {
     flex: 1,
   },
   profileSection: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    overflow: 'hidden',
+  },
+  profileGradient: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl + spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 3,
+    borderBottomColor: colors.primary + '30',
   },
   avatarContainer: {
     marginBottom: spacing.md,
@@ -446,18 +522,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.text,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 4,
+    borderColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: colors.border,
+    borderWidth: 4,
+    borderColor: colors.surface,
   },
   avatarText: {
     ...typography.h2,
@@ -469,42 +554,56 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
     borderColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   cameraIcon: {
-    fontSize: 16,
+    fontSize: 18,
   },
   uploadButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   uploadButtonText: {
     ...typography.caption,
     color: colors.primary,
-    fontWeight: '600',
-    fontSize: 14,
+    fontWeight: '700',
+    fontSize: 15,
   },
   userName: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 26,
+    color: colors.secondary,
+    marginTop: spacing.md,
     marginBottom: spacing.xs,
     fontWeight: '700',
+    lineHeight: 32,
   },
   userEmail: {
     ...typography.body,
     color: colors.textSecondary,
+    fontSize: 15,
+    marginTop: spacing.xs,
   },
   actionButtons: {
     paddingHorizontal: spacing.lg,
@@ -514,15 +613,21 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   editButton: {
-    backgroundColor: colors.text,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   editButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
   editActions: {
     flexDirection: 'row',
@@ -531,56 +636,73 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
   },
   cancelButtonText: {
     ...typography.body,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
   saveButton: {
     flex: 1,
-    backgroundColor: colors.text,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   saveButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
   formSection: {
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.xl,
     marginTop: spacing.md,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: colors.border,
   },
   inputContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  labelIcon: {
+    fontSize: 18,
   },
   label: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    fontWeight: '600',
-    fontSize: 14,
+    fontWeight: '700',
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   input: {
     backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     ...typography.body,
     color: colors.text,
     fontSize: 16,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
   },
   textArea: {
@@ -594,32 +716,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: spacing.sm,
   },
+  lockedInput: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    opacity: 0.7,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lockedInputText: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 16,
+    flex: 1,
+  },
+  lockedLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginLeft: spacing.sm,
+  },
   optionsSection: {
     backgroundColor: colors.surface,
     marginTop: spacing.md,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
   },
   optionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.surface,
+  },
+  optionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: spacing.md,
+  },
+  optionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionIcon: {
+    fontSize: 18,
+  },
+  logoutIconContainer: {
+    backgroundColor: colors.error + '15',
+  },
+  recentIconContainer: {
+    backgroundColor: colors.accent + '15',
   },
   optionText: {
     ...typography.body,
     color: colors.text,
     fontSize: 16,
+    fontWeight: '600',
   },
   logoutText: {
-    color: colors.text,
+    color: colors.error,
   },
   optionArrow: {
-    ...typography.body,
+    fontSize: 24,
     color: colors.textSecondary,
-    fontSize: 18,
+    fontWeight: '300',
   },
   divider: {
     height: 1,

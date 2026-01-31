@@ -166,6 +166,129 @@ export const uploadPropertyImageToFirebase = async (
 };
 
 /**
+ * Upload profile image to Firebase Storage
+ * @param imageUri - Local file URI (file:// or content://)
+ * @param userId - User ID
+ * @param onProgress - Progress callback (optional) - receives percentage 0-100
+ * @returns Firebase download URL and path
+ */
+export const uploadProfileImageToFirebase = async (
+  imageUri: string,
+  userId: number | string,
+  onProgress?: (progress: number) => void,
+): Promise<FirebaseUploadResult> => {
+  try {
+    console.log('🔥 Firebase Profile Upload: Starting upload...', {
+      imageUri: imageUri.substring(0, 50),
+      userId,
+    });
+
+    // Check if Firebase Storage is available
+    if (!isFirebaseStorageAvailable()) {
+      throw new Error(
+        'Firebase Storage is not available. Please rebuild the app: cd android && ./gradlew clean && cd .. && npm run android'
+      );
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(2, 15);
+    const extension = imageUri.split('.').pop() || 'jpg';
+    const fileName = `profile_${timestamp}_${randomId}.${extension}`;
+
+    // Storage path: profiles/{userId}/{filename}
+    const storagePath = `profiles/${userId}/${fileName}`;
+
+    console.log('🔥 Firebase Profile Upload: Storage path:', storagePath);
+
+    // Create storage reference
+    let storageRef;
+    try {
+      const storageInstance = storage();
+      storageRef = storageInstance.ref(storagePath);
+      console.log('✅ Firebase Storage reference created');
+    } catch (storageError: any) {
+      console.error('❌ Firebase Storage Error:', storageError);
+      throw new Error(`Firebase Storage not initialized: ${storageError.message}`);
+    }
+
+    // Convert file:// URI to proper format for React Native
+    let fileUri = imageUri;
+    if (Platform.OS === 'android' && imageUri.startsWith('file://')) {
+      fileUri = imageUri.replace('file://', '');
+    }
+
+    // Upload file with progress tracking
+    console.log('🔥 Firebase Profile Upload: Uploading file to Firebase...');
+    const uploadTask = storageRef.putFile(fileUri);
+
+    // Track upload progress if callback provided
+    if (onProgress) {
+      uploadTask.on('state_changed', snapshot => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        onProgress(progress);
+      });
+    }
+
+    // Wait for upload to complete
+    await uploadTask;
+    console.log('✅ Firebase Profile Upload: File uploaded successfully');
+
+    // Get download URL
+    console.log('🔥 Firebase Profile Upload: Getting download URL...');
+    const downloadURL = await storageRef.getDownloadURL();
+    console.log('✅ Firebase Profile Upload: Download URL obtained:', downloadURL.substring(0, 80));
+
+    return {
+      url: downloadURL,
+      path: storagePath,
+      fileName: fileName,
+    };
+  } catch (error: any) {
+    console.error('❌ Firebase Profile Upload Error:', {
+      message: error.message,
+      code: error.code,
+      imageUri: imageUri.substring(0, 50),
+      userId,
+    });
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to upload profile image to Firebase';
+    if (error?.code) {
+      switch (error.code) {
+        case 'storage/unauthorized':
+          errorMessage = 'Firebase Storage: Permission denied. Check Storage rules.';
+          break;
+        case 'storage/quota-exceeded':
+          errorMessage = 'Firebase Storage: Quota exceeded. Check Firebase billing.';
+          break;
+        case 'storage/unauthenticated':
+          errorMessage = 'Firebase Storage: User not authenticated.';
+          break;
+        case 'storage/canceled':
+          errorMessage = 'Upload was canceled';
+          break;
+        case 'storage/unknown':
+          errorMessage = 'Unknown error occurred. Please check your network connection.';
+          break;
+        case 'storage/invalid-argument':
+          errorMessage = 'Invalid file. Please try selecting a different image.';
+          break;
+        case 'storage/not-found':
+          errorMessage = 'Storage path not found';
+          break;
+        default:
+          errorMessage = error.message || `Upload failed: ${error.code}`;
+      }
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+    
+    throw new Error(errorMessage);
+  }
+};
+
+/**
  * Delete image from Firebase Storage
  * @param storagePath - Firebase Storage path
  */

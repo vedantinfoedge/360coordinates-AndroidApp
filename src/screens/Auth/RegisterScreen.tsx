@@ -6,26 +6,26 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ImageBackground,
   Image,
-  Animated,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomAlert from '../../utils/alertHelper';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useRoute} from '@react-navigation/native';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
+import {useRoute, useFocusEffect} from '@react-navigation/native';
+import {AuthStackParamList} from '../../navigation/AuthNavigator';
+import {colors, spacing} from '../../theme';
 import {useAuth, UserRole} from '../../context/AuthContext';
 import MSG91WebWidget from '../../components/auth/MSG91WebWidget';
-
-const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
+import {otpService} from '../../services/otp.service';
+import {switchToSMSWidget, initializeMSG91} from '../../config/msg91.config';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
+  AuthStackParamList,
   'Register'
 >;
 
@@ -47,174 +47,233 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [phoneVerifying, setPhoneVerifying] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneMsg91Token, setPhoneMsg91Token] = useState<string | null>(null);
   const [phoneToken, setPhoneToken] = useState<string | null>(null);
   const [phoneReqId, setPhoneReqId] = useState<string | null>(null);
   const [phoneMethod, setPhoneMethod] = useState<'msg91-sdk' | 'msg91-rest' | 'backend' | 'msg91-widget' | null>(null);
+  const [verifiedOtp, setVerifiedOtp] = useState<string | null>(null);
   const [showMSG91Widget, setShowMSG91Widget] = useState(false);
   const [widgetPhoneIdentifier, setWidgetPhoneIdentifier] = useState('');
-
-  // Handle return from OTP verification screen
-  useEffect(() => {
-    const params = route.params as any;
-    if (params?.phoneVerified === true) {
-      console.log('[Register] Phone verified via OTP verification screen');
-      setPhoneVerified(true);
-      if (params.phoneToken) {
-        setPhoneToken(params.phoneToken);
-      }
-      if (params.phoneMethod) {
-        setPhoneMethod(params.phoneMethod);
-      }
-      // Clear params to avoid re-triggering
-      navigation.setParams({phoneVerified: undefined, phoneToken: undefined, phoneMethod: undefined} as any);
-    }
-  }, [route.params, navigation]);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Animation values
-  const building1Anim = useRef(new Animated.Value(0)).current;
-  const building2Anim = useRef(new Animated.Value(0)).current;
-  const building3Anim = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.3)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoRotation = useRef(new Animated.Value(0)).current;
+  const logoGlow = useRef(new Animated.Value(0)).current;
+  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(60)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const roleButtonAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
+  const progressWidth = useRef(new Animated.Value(0)).current;
+  const verifyButtonPulse = useRef(new Animated.Value(1)).current;
 
+  // 360 Logo rotation interpolation
+  const spin = logoRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  // Run animations on mount
   useEffect(() => {
-    // Continuous building animations
-    const animateBuildings = () => {
-      Animated.parallel([
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(building1Anim, {
-              toValue: 1,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(building1Anim, {
-              toValue: 0,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-          ]),
-        ),
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(1000),
-            Animated.timing(building2Anim, {
-              toValue: 1,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(building2Anim, {
-              toValue: 0,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-          ]),
-        ),
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(2000),
-            Animated.timing(building3Anim, {
-              toValue: 1,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(building3Anim, {
-              toValue: 0,
-              duration: 3000,
-              useNativeDriver: true,
-            }),
-          ]),
-        ),
-      ]).start();
-    };
+    // Logo entrance with 360 rotation
+    Animated.parallel([
+      // Scale up
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      // Fade in
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      // 360 degree rotation
+      Animated.timing(logoRotation, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // After initial animation, start subtle continuous glow pulse
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(logoGlow, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(logoGlow, {
+            toValue: 0,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    });
 
-    animateBuildings();
+    // Header text fade in (delayed)
+    setTimeout(() => {
+      Animated.timing(headerOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    }, 500);
+
+    // Card slide up animation (delayed)
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.spring(cardTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Staggered role button animations
+      const staggerDelay = 100;
+      roleButtonAnims.forEach((anim, index) => {
+        setTimeout(() => {
+          Animated.spring(anim, {
+            toValue: 1,
+            tension: 80,
+            friction: 8,
+            useNativeDriver: true,
+          }).start();
+        }, index * staggerDelay);
+      });
+    }, 600);
+
+    // Pulse animation for verify button
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(verifyButtonPulse, {
+          toValue: 1.05,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(verifyButtonPulse, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseAnimation.start();
+
+    return () => pulseAnimation.stop();
   }, []);
 
-  // Email is automatically accepted (no verification needed)
+  // Handle return from OTP verification screen
+  useFocusEffect(
+    React.useCallback(() => {
+      const params = route.params as any;
+      
+      if (params?.name !== undefined) setName(params.name);
+      if (params?.email !== undefined) setEmail(params.email);
+      if (params?.phone !== undefined) {
+        const rawPhone = String(params.phone ?? '');
+        const digitsOnly = rawPhone.replace(/\D/g, '');
+        let phoneToRestore = digitsOnly;
+        if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+          phoneToRestore = digitsOnly.slice(2);
+        } else if (digitsOnly.length > 10) {
+          phoneToRestore = digitsOnly.slice(-10);
+        }
+        setPhone(phoneToRestore);
+      }
+      if (params?.selectedRole !== undefined) setSelectedRole(params.selectedRole);
+      
+      if (params?.phoneVerified === true) {
+        setPhoneVerified(true);
+        if (params.phoneToken) setPhoneToken(params.phoneToken);
+        if (params.phoneMethod) setPhoneMethod(params.phoneMethod);
+        if (params.verifiedOtp) setVerifiedOtp(params.verifiedOtp);
+        navigation.setParams({
+          phoneVerified: undefined,
+          phoneToken: undefined,
+          phoneMethod: undefined,
+          verifiedOtp: undefined,
+          phone: undefined,
+          name: undefined,
+          email: undefined,
+          selectedRole: undefined,
+        } as any);
+      }
+    }, [route.params, navigation])
+  );
 
   const extractWidgetToken = (payload: any): string | null => {
     const candidates = [
-      payload?.extractedToken,
-      payload?.token,
-      payload?.verificationToken,
-      payload?.phoneVerificationToken,
-      payload?.data?.token,
-      payload?.data?.verificationToken,
-      payload?.data?.phoneVerificationToken,
+      payload?.extractedToken, payload?.token, payload?.verificationToken,
+      payload?.phoneVerificationToken, payload?.data?.token,
+      payload?.data?.verificationToken, payload?.data?.phoneVerificationToken,
       payload?.message,
     ];
-
     for (const candidate of candidates) {
       if (candidate && typeof candidate === 'string') {
         try {
           const parsed = JSON.parse(candidate);
-          const parsedToken =
-            parsed?.token ||
-            parsed?.verificationToken ||
-            parsed?.phoneVerificationToken ||
-            parsed?.message;
-          if (parsedToken && typeof parsedToken === 'string') {
-            return parsedToken;
-          }
+          const parsedToken = parsed?.token || parsed?.verificationToken || parsed?.message;
+          if (parsedToken && typeof parsedToken === 'string') return parsedToken;
         } catch {
           return candidate;
         }
-      } else if (candidate && typeof candidate === 'object') {
-        const nested =
-          candidate?.token ||
-          candidate?.verificationToken ||
-          candidate?.phoneVerificationToken ||
-          candidate?.message;
-        if (nested && typeof nested === 'string') {
-          return nested;
-        }
       }
     }
-
     return null;
   };
 
   const handleWidgetSuccess = (data: any) => {
     const token = extractWidgetToken(data);
-    const reqIdFromWidget =
-      data?.reqId ||
-      data?.requestId ||
-      data?.data?.reqId ||
-      data?.data?.requestId ||
-      token;
+    const reqIdFromWidget = data?.reqId || data?.requestId || data?.data?.reqId || token;
 
-    console.log('[Register] MSG91 widget success payload:', {
-      tokenPreview: token ? `${token.substring(0, 12)}...` : 'missing',
-      reqId: reqIdFromWidget,
-    });
+    if (!token) {
+      CustomAlert.alert('Verification Error', 'Could not read verification token.');
+      setPhoneVerified(false);
+      setPhoneToken(null);
+      setPhoneVerifying(false);
+      setShowMSG91Widget(false);
+      return;
+    }
 
-    setPhoneToken(token || null);
+    const msg91PayloadForBackend = JSON.stringify({...data, extractedToken: token});
+    setPhoneMsg91Token(msg91PayloadForBackend);
+    setPhoneToken(token);
     setPhoneReqId(reqIdFromWidget || null);
     setPhoneMethod('msg91-widget');
     setPhoneVerified(true);
     setPhoneVerifying(false);
-
-    CustomAlert.alert(
-      'Verified',
-      'Phone verified via MSG91 widget. You can continue with registration.',
-    );
+    setShowMSG91Widget(false);
   };
 
-  const handleWidgetFailure = (error: any) => {
-    const message =
-      error?.message ||
-      error?.error?.message ||
-      error?.error ||
-      (typeof error === 'string' ? error : 'Verification failed. Please try again.');
-
-    console.error('[Register] MSG91 widget failure:', error);
-    setPhoneVerified(false);
-    setPhoneVerifying(false);
-    setPhoneToken(null);
-    setPhoneReqId(null);
-    setPhoneMethod(null);
+  const handleWidgetFailure = async (error: any) => {
     setShowMSG91Widget(false);
-
-    CustomAlert.alert('Verification Failed', message);
+    setPhoneVerifying(false);
+    setPhoneVerified(false);
+    setPhoneMsg91Token(null);
+    setPhoneToken(null);
+    CustomAlert.alert('Verification Failed', error?.message || 'Please try again.');
   };
 
   const handleWidgetClose = () => {
@@ -222,199 +281,188 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     setPhoneVerifying(false);
   };
 
-  const handlePhoneVerify = () => {
+  const handlePhoneVerify = async () => {
     if (!phone) {
       CustomAlert.alert('Error', 'Please enter your phone number first');
       return;
     }
     
-    // Format phone number (matching website workflow)
-    // Website accepts: 10 digits (starts with 6-9) or 12 digits (starts with 91)
-    // Format: 91XXXXXXXXXX (country code + number, no + sign)
     const digits = phone.replace(/\D/g, '');
-    
-    let formattedPhone = '';
-    if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) {
-      formattedPhone = '91' + digits; // Add country code
-    } else if (digits.length === 12 && digits.startsWith('91')) {
-      formattedPhone = digits; // Already formatted
-    } else {
+    if (!(digits.length === 10 && /^[6-9]\d{9}$/.test(digits))) {
       CustomAlert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
 
-    console.log('[Register] Opening MSG91 widget for phone verification:', {
-      identifier: formattedPhone,
-      length: formattedPhone.length,
-    });
+    const formattedPhoneForSDK = '91' + digits;
+    const normalizedPhone = '+91' + digits;
 
-    // Reset previous verification state and show widget
+    setPhoneVerifying(true);
     setPhoneVerified(false);
+    setPhoneMsg91Token(null);
     setPhoneToken(null);
     setPhoneReqId(null);
-    setPhoneMethod('msg91-widget');
+    setPhoneMethod(null);
 
-    setWidgetPhoneIdentifier(formattedPhone);
-    setShowMSG91Widget(true);
-    setPhoneVerifying(true);
+    try {
+      const {OTPWidget} = require('@msg91comm/sendotp-react-native');
+      
+      try {
+        await switchToSMSWidget();
+      } catch {
+        await initializeMSG91();
+        await switchToSMSWidget();
+      }
+      
+      const response = await OTPWidget.sendOTP({identifier: formattedPhoneForSDK});
+      
+      if (response && (response.success || response.status === 'success' || response.type === 'success')) {
+        let reqId = response.reqId || response.requestId || response.data?.reqId || response.id;
+        
+        if (!reqId && response.message && /^[0-9a-fA-F]{20,32}$/.test(String(response.message).trim())) {
+          reqId = response.message;
+        }
+
+        if (reqId) setPhoneReqId(reqId);
+        setPhoneMethod('msg91-sdk');
+
+        (navigation as any).navigate('OTPVerification', {
+          phone: normalizedPhone,
+          type: 'register',
+          reqId: reqId,
+          method: 'msg91-sdk',
+          formData: {name, email, phone: normalizedPhone, selectedRole},
+        });
+      } else {
+        throw new Error(response?.message || 'Failed to send OTP');
+      }
+    } catch (error: any) {
+      CustomAlert.alert('Error', error?.message || 'Failed to send OTP.');
+    } finally {
+      setPhoneVerifying(false);
+    }
   };
-
-
-
 
   const handleRegister = async () => {
     if (!name || !email || !phone || !password || !confirmPassword) {
       CustomAlert.alert('Error', 'Please fill all fields');
       return;
     }
-
     if (!selectedRole) {
       CustomAlert.alert('Error', 'Please select a role');
       return;
     }
-
-    // Validate password length (minimum 6 characters)
-    if (password.length < 6) {
-      CustomAlert.alert('Error', 'Password must be at least 6 characters long');
+    if (!agreedToTerms) {
+      CustomAlert.alert('Error', 'Please agree to Terms & Conditions');
       return;
     }
-
+    if (password.length < 6) {
+      CustomAlert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
     if (password !== confirmPassword) {
       CustomAlert.alert('Error', 'Passwords do not match');
       return;
     }
-
-    // Validate phone number (10 digits)
-    const phoneRegex = /^[0-9]{10}$/;
-    if (!phoneRegex.test(phone.replace(/[^0-9]/g, ''))) {
-      CustomAlert.alert('Error', 'Please enter a valid 10-digit phone number');
+    if (!phoneVerified) {
+      CustomAlert.alert('Error', 'Please verify your phone number');
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
       CustomAlert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
-    // Check if phone is verified (email is automatically accepted)
-    if (!phoneVerified) {
-      CustomAlert.alert('Error', 'Please verify your phone number before registering');
-      return;
-    }
-
     setIsLoading(true);
     try {
-      // Extract actual token from MSG91 response (matching website workflow)
-      // Website handles JSON format tokens
-      let actualPhoneToken = phoneToken;
-      if (phoneToken) {
-        try {
-          const parsed = typeof phoneToken === 'string' 
-            ? JSON.parse(phoneToken) 
-            : phoneToken;
-          
-          // Website extracts: parsed.message || parsed.token || parsed.verificationToken || original
-          actualPhoneToken = parsed?.message || 
-                             parsed?.token || 
-                             parsed?.verificationToken || 
-                             phoneToken;
-        } catch (e) {
-          // Not JSON, use as-is
-          actualPhoneToken = phoneToken;
-        }
+      let phoneVerificationTokenToSend: string | undefined;
+      let phoneOtpToSend: string | undefined;
+      let phoneVerificationMethodToSend: string | undefined;
+      let phoneVerifiedFlagToSend: boolean | undefined;
+
+      if ((phoneMethod === 'msg91-widget' || phoneMethod === 'msg91-sdk') && phoneMsg91Token) {
+        phoneVerificationTokenToSend = phoneMsg91Token;
+      } else if (phoneMethod === 'backend' && verifiedOtp) {
+        phoneOtpToSend = verifiedOtp;
+      } else if (phoneToken) {
+        phoneVerificationTokenToSend = phoneToken;
       }
-      
-      // Format phone for registration (matching website: +91XXXXXXXXXX)
+
+      if (!phoneVerificationTokenToSend && !phoneOtpToSend) {
+        CustomAlert.alert('Error', 'Phone verification details missing. Please verify again.');
+        setIsLoading(false);
+        return;
+      }
+
       const phoneDigits = phone.replace(/\D/g, '');
-      let formattedPhoneForRegistration = '';
-      if (phoneDigits.length === 10) {
-        formattedPhoneForRegistration = '+91' + phoneDigits;
-      } else if (phoneDigits.length === 12 && phoneDigits.startsWith('91')) {
-        formattedPhoneForRegistration = '+' + phoneDigits;
-      } else {
-        formattedPhoneForRegistration = '+91' + phoneDigits.slice(-10); // Fallback
-      }
-      
+      const formattedPhone = phoneDigits.length === 10 ? '+91' + phoneDigits : '+91' + phoneDigits.slice(-10);
+
       const response = await register(
-        name,
-        email,
-        formattedPhoneForRegistration,
-        password,
-        selectedRole,
-        undefined, // No email token needed (email auto-verified)
-        actualPhoneToken || undefined,
+        name, email, formattedPhone, password, selectedRole,
+        undefined, phoneVerificationTokenToSend, phoneOtpToSend,
+        phoneVerificationMethodToSend, phoneVerifiedFlagToSend,
       );
       
-      // Handle registration response (matching website workflow)
-      if (response && response.success) {
-        // Check if auto-login happened (token and user in response)
+      if (response?.success) {
         if (response.data?.token && response.data?.user) {
-          // Auto-login successful - navigate to dashboard (AppNavigator will handle routing)
-          CustomAlert.alert(
-            'Success',
-            `Registration successful! Welcome, ${name}!`,
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Navigation will be handled automatically by AppNavigator
-                  // based on user type from AuthContext
-                },
-              },
-            ],
-          );
-        } else if (response.data?.user_id) {
-          // Legacy flow: OTP verification required
-          // Format phone for navigation (12 digits: 91XXXXXXXXXX)
-          const phoneDigits = phone.replace(/\D/g, '');
-          let formattedPhoneForNav = '';
-          if (phoneDigits.length === 10) {
-            formattedPhoneForNav = '91' + phoneDigits;
-          } else if (phoneDigits.length === 12 && phoneDigits.startsWith('91')) {
-            formattedPhoneForNav = phoneDigits;
-          } else {
-            formattedPhoneForNav = '91' + phoneDigits.slice(-10);
-          }
+          // Set the dashboard preference based on selected role
+          const dashboardMap: Record<string, string> = {
+            'buyer': 'buyer',
+            'seller': 'seller',
+            'agent': 'agent',
+          };
+          const targetDashboard = dashboardMap[selectedRole] || 'buyer';
           
-          navigation.navigate('OTPVerification', {
+          // Save both immediate target and persistent preference
+          await AsyncStorage.setItem('@target_dashboard', targetDashboard);
+          await AsyncStorage.setItem('@user_dashboard_preference', targetDashboard);
+          
+          CustomAlert.alert('Success', `Welcome, ${name}!`, [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate to the selected role's dashboard
+                const parentNav = navigation.getParent();
+                if (selectedRole === 'seller') {
+                  (parentNav as any)?.reset({
+                    index: 0,
+                    routes: [{name: 'Seller'}],
+                  });
+                } else if (selectedRole === 'agent') {
+                  (parentNav as any)?.reset({
+                    index: 0,
+                    routes: [{name: 'Agent'}],
+                  });
+                } else {
+                  // Buyer - go to MainTabs
+                  (parentNav as any)?.reset({
+                    index: 0,
+                    routes: [{name: 'MainTabs'}],
+                  });
+                }
+              },
+            },
+          ]);
+        } else if (response.data?.user_id) {
+          const formattedPhoneForNav = '91' + phone.replace(/\D/g, '').slice(-10);
+          (navigation as any).navigate('OTPVerification', {
             userId: response.data.user_id,
-            user_id: response.data.user_id, // Support both formats
-            phone: formattedPhoneForNav, // Pass 12-digit format
-            email: email,
-            type: 'register',
-            reqId: phoneReqId || undefined, // Pass reqId if available
-            method: phoneMethod || undefined, // Pass method if available
+            phone: formattedPhoneForNav,
+            email, type: 'register',
+            reqId: phoneReqId || undefined,
+            method: phoneMethod || undefined,
+            formData: {
+              name,
+              email,
+              phone: formattedPhoneForNav,
+              selectedRole: selectedRole, // Pass the selected role for navigation after OTP
+            },
           });
         }
       }
     } catch (error: any) {
-      // Handle validation errors (422) with detailed messages
-      if (error.status === 422 && error.data?.errors) {
-        const errors = error.data.errors;
-        let errorMessages: string[] = [];
-        
-        // Collect all validation error messages
-        Object.keys(errors).forEach((field) => {
-          const fieldError = errors[field];
-          if (typeof fieldError === 'string') {
-            errorMessages.push(`${field.charAt(0).toUpperCase() + field.slice(1)}: ${fieldError}`);
-          } else if (Array.isArray(fieldError)) {
-            errorMessages.push(`${field.charAt(0).toUpperCase() + field.slice(1)}: ${fieldError.join(', ')}`);
-          }
-        });
-        
-        if (errorMessages.length > 0) {
-          CustomAlert.alert('Validation Error', errorMessages.join('\n'));
-        } else {
-          CustomAlert.alert('Validation Error', error.data?.message || 'Please check your input and try again');
-        }
-      } else {
-        // Handle other errors
-        const errorMessage = error.message || error.data?.message || 'Registration failed. Please try again.';
-        CustomAlert.alert('Error', errorMessage);
-      }
+      CustomAlert.alert('Error', error.message || 'Registration failed.');
     } finally {
       setIsLoading(false);
     }
@@ -429,30 +477,40 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const getRoleLabel = (role: UserRole | null) => {
     if (!role) return 'User';
     switch (role) {
-      case 'buyer':
-        return 'Buyer/Tenant';
-      case 'seller':
-        return 'Seller/Owner';
-      case 'agent':
-        return 'Agent/Builder';
+      case 'buyer': return 'Buyer/Tenant';
+      case 'seller': return 'Seller/Owner';
+      case 'agent': return 'Agent/Builder';
     }
   };
 
-  // Building animation transforms
-  const building1TranslateY = building1Anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -20],
-  });
+  const completedFields = [selectedRole, name, email, phone, phoneVerified, password, confirmPassword, agreedToTerms].filter(Boolean).length;
 
-  const building2TranslateY = building2Anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -15],
-  });
+  // Animate progress bar when fields change
+  useEffect(() => {
+    Animated.timing(progressWidth, {
+      toValue: (completedFields / 8) * 100,
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [completedFields]);
 
-  const building3TranslateY = building3Anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -25],
-  });
+  // Button press animation
+  const handlePressIn = () => {
+    Animated.spring(buttonScale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(buttonScale, {
+      toValue: 1,
+      friction: 3,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <>
@@ -464,106 +522,107 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
         onSuccess={handleWidgetSuccess}
         onFailure={handleWidgetFailure}
       />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-        {/* Background with gradient pattern */}
-        <ImageBackground
-          source={require('../../assets/browserlogo.png')}
-          style={styles.backgroundImage}
-          imageStyle={styles.backgroundImageStyle}
-          resizeMode="cover">
-          {/* Black Overlay */}
-          <View style={styles.overlay} />
-
-        {/* Animated Buildings */}
-        <View style={styles.animationContainer}>
-          <Animated.View
-            style={[
-              styles.building,
-              styles.building1,
-              {transform: [{translateY: building1TranslateY}]},
-            ]}>
-            <Text style={styles.buildingEmoji}>🏢</Text>
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.building,
-              styles.building2,
-              {transform: [{translateY: building2TranslateY}]},
-            ]}>
-            <Text style={styles.buildingEmoji}>🏗️</Text>
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.building,
-              styles.building3,
-              {transform: [{translateY: building3TranslateY}]},
-            ]}>
-            <Text style={styles.buildingEmoji}>🏠</Text>
-          </Animated.View>
-        </View>
-
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.contentContainer}
-          showsVerticalScrollIndicator={false}>
-          {/* Transparent Card */}
-          <View style={styles.card}>
-            {/* Logo */}
-            <View style={styles.logoContainer}>
+      <View style={styles.container}>
+        {/* Fixed Header with 360 logo animation */}
+        <View style={styles.fixedHeader}>
+          <Animated.View style={{
+            transform: [
+              {scale: logoScale},
+              {rotate: spin}, // 360-degree rotation
+            ],
+            opacity: logoOpacity,
+          }}>
+            <Animated.View style={{
+              shadowColor: colors.primary,
+              shadowOffset: {width: 0, height: 0},
+              shadowOpacity: logoGlow.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.3, 0.8],
+              }),
+              shadowRadius: logoGlow.interpolate({
+                inputRange: [0, 1],
+                outputRange: [8, 20],
+              }),
+              elevation: 8,
+              borderRadius: 35,
+            }}>
               <Image
-                source={require('../../assets/browserlogo.png')}
+                source={require('../../assets/App-icon.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
+            </Animated.View>
+          </Animated.View>
+          <Animated.Text style={[styles.appName, {opacity: headerOpacity, transform: [{translateY: headerOpacity.interpolate({
+            inputRange: [0, 1],
+            outputRange: [15, 0],
+          })}]}]}>
+            360Coordinates
+          </Animated.Text>
+          <Animated.View style={[styles.progressBarContainer, {opacity: headerOpacity}]}>
+            <View style={styles.progressBar}>
+              <Animated.View style={[styles.progressFill, {width: progressWidth.interpolate({
+                inputRange: [0, 100],
+                outputRange: ['0%', '100%'],
+              })}]} />
             </View>
+            <Text style={styles.progressText}>{completedFields}/8 fields completed</Text>
+          </Animated.View>
+        </View>
 
-            {/* Header */}
-            <View style={styles.header}>
+        {/* Scrollable Form */}
+        <KeyboardAvoidingView
+          style={styles.formContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
+            
+            <Animated.View style={[styles.card, {
+              opacity: cardOpacity,
+              transform: [{translateY: cardTranslateY}],
+            }]}>
               <Text style={styles.title}>Create Account</Text>
-              <Text style={styles.subtitle}>Sign up to get started</Text>
-            </View>
+              <Text style={styles.subtitle}>Join us to get started</Text>
 
-            {/* Role Selection - Square boxes with minimal radius */}
-            <View style={styles.roleContainer}>
-              {roles.map(role => (
-                <TouchableOpacity
-                  key={role.value}
-                  style={[
-                    styles.roleButton,
-                    selectedRole === role.value && styles.roleButtonSelected,
-                  ]}
-                  onPress={() => setSelectedRole(role.value)}
-                  activeOpacity={0.7}>
-                  <View style={styles.roleButtonInner}>
-                    <Text style={styles.roleIcon}>{role.icon}</Text>
-                    <Text
+              {/* Role Selection with staggered animation */}
+              <View style={styles.roleContainer}>
+                {roles.map((role, index) => (
+                  <Animated.View
+                    key={role.value}
+                    style={{
+                      flex: 1,
+                      opacity: roleButtonAnims[index],
+                      transform: [{
+                        scale: roleButtonAnims[index].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.8, 1],
+                        }),
+                      }],
+                    }}>
+                    <TouchableOpacity
                       style={[
-                        styles.roleButtonText,
-                        selectedRole === role.value &&
-                          styles.roleButtonTextSelected,
+                        styles.roleButton,
+                        selectedRole === role.value && styles.roleButtonSelected,
                       ]}
-                      numberOfLines={2}>
-                      {role.label}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+                      onPress={() => setSelectedRole(role.value)}
+                      activeOpacity={0.7}>
+                      <Text style={styles.roleIcon}>{role.icon}</Text>
+                      <Text style={[
+                        styles.roleButtonText,
+                        selectedRole === role.value && styles.roleButtonTextSelected,
+                      ]}>
+                        {role.label}
+                      </Text>
+                      {selectedRole === role.value && <Text style={styles.selectedCheck}>✓</Text>}
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
 
-            {/* Info Banner */}
-            <View style={styles.infoBanner}>
-              <Text style={styles.infoIcon}>ℹ️</Text>
-              <Text style={styles.infoText}>
-                Select your role to access the appropriate dashboard
-              </Text>
-            </View>
-
-            {/* Form */}
-            <View style={styles.form}>
-              {/* Full Name Input */}
+              {/* Name Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Full Name</Text>
                 <TextInput
@@ -573,10 +632,11 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
+                  autoCorrect={false}
                 />
               </View>
 
-              {/* Email Input (No verification needed) */}
+              {/* Email Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Email Address</Text>
                 <TextInput
@@ -587,48 +647,53 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
                 />
               </View>
 
-              {/* Phone Input with Verify Button */}
+              {/* Phone Input */}
               <View style={styles.inputContainer}>
                 <View style={styles.labelRow}>
-                <Text style={styles.label}>Phone Number</Text>
-                  {phoneVerified && (
-                    <Text style={styles.verifiedBadge}>✓ Verified</Text>
-                  )}
+                  <Text style={styles.label}>Phone Number</Text>
+                  {phoneVerified && <Text style={styles.verifiedBadge}>✓ Verified</Text>}
                 </View>
-                <View style={styles.inputWithButton}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your 10-digit phone number"
-                  placeholderTextColor={colors.textSecondary}
-                  value={phone}
-                    onChangeText={(text) => {
-                      setPhone(text);
-                      setPhoneVerified(false);
-                      setPhoneToken(null);
-                      setPhoneReqId(null);
-                      setPhoneMethod(null);
-                    }}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                />
-                  <TouchableOpacity
-                    style={[
-                      styles.verifyButton,
-                      phoneVerified && styles.verifyButtonVerified,
-                    ]}
-                    onPress={handlePhoneVerify}
-                    disabled={!phone || phoneVerifying || phoneVerified}>
-                    {phoneVerifying ? (
-                      <ActivityIndicator size="small" color={colors.surface} />
-                    ) : phoneVerified ? (
-                      <Text style={styles.verifyButtonText}>✓</Text>
-                    ) : (
-                      <Text style={styles.verifyButtonText}>Verify</Text>
-                    )}
-                  </TouchableOpacity>
+                <View style={styles.phoneRow}>
+                  <View style={styles.phoneInputContainer}>
+                    <Text style={styles.countryCode}>+91</Text>
+                    <TextInput
+                      style={styles.phoneInput}
+                      placeholder="10-digit number"
+                      placeholderTextColor={colors.textSecondary}
+                      value={phone}
+                      onChangeText={(text: string) => {
+                        setPhone(text);
+                        setPhoneVerified(false);
+                        setPhoneToken(null);
+                      }}
+                      keyboardType="phone-pad"
+                      maxLength={10}
+                    />
+                  </View>
+                  <Animated.View style={{
+                    transform: [{scale: !phoneVerified && phone ? verifyButtonPulse : 1}],
+                  }}>
+                    <TouchableOpacity
+                      style={[
+                        styles.verifyButton,
+                        phoneVerified && styles.verifyButtonVerified,
+                      ]}
+                      onPress={handlePhoneVerify}
+                      disabled={!phone || phoneVerifying || phoneVerified}
+                      activeOpacity={0.8}>
+                      {phoneVerifying ? (
+                        <ActivityIndicator size="small" color={colors.surface} />
+                      ) : phoneVerified ? (
+                        <Text style={styles.verifyButtonText}>✓</Text>
+                      ) : (
+                        <Text style={styles.verifyButtonText}>Verify</Text>
+                      )}
+                    </TouchableOpacity>
+                  </Animated.View>
                 </View>
               </View>
 
@@ -638,19 +703,16 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                 <View style={styles.passwordContainer}>
                   <TextInput
                     style={styles.passwordInput}
-                    placeholder="Enter your password"
+                    placeholder="Min 6 characters"
                     placeholderTextColor={colors.textSecondary}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
+                    autoCorrect={false}
                   />
-                  <TouchableOpacity
-                    style={styles.eyeButton}
-                    onPress={() => setShowPassword(!showPassword)}>
-                    <Text style={styles.eyeIcon}>
-                      {showPassword ? '👁️' : '👁️‍🗨️'}
-                    </Text>
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -667,47 +729,61 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                     onChangeText={setConfirmPassword}
                     secureTextEntry={!showConfirmPassword}
                     autoCapitalize="none"
+                    autoCorrect={false}
                   />
-                  <TouchableOpacity
-                    style={styles.eyeButton}
-                    onPress={() =>
-                      setShowConfirmPassword(!showConfirmPassword)
-                    }>
-                    <Text style={styles.eyeIcon}>
-                      {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
-                    </Text>
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                    <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
                   </TouchableOpacity>
+                  {confirmPassword && password === confirmPassword && (
+                    <Text style={styles.matchIcon}>✓</Text>
+                  )}
                 </View>
               </View>
 
-              {/* Register Button */}
+              {/* Terms Checkbox */}
               <TouchableOpacity
-                style={[
-                  styles.registerButton,
-                  !selectedRole && styles.registerButtonDisabled,
-                ]}
-                onPress={handleRegister}
-                disabled={isLoading || !selectedRole}>
-                <Text style={styles.registerButtonText}>
-                  {isLoading
-                    ? 'Creating account...'
-                    : `Register as ${getRoleLabel(selectedRole)}`}
+                style={styles.termsContainer}
+                onPress={() => setAgreedToTerms(!agreedToTerms)}>
+                <View style={[styles.termsCheckbox, agreedToTerms && styles.termsCheckboxChecked]}>
+                  {agreedToTerms && <Text style={styles.termsCheckmark}>✓</Text>}
+                </View>
+                <Text style={styles.termsText}>
+                  I agree to the{' '}
+                  <Text style={styles.termsLink}>Terms & Conditions</Text>
+                  {' '}and{' '}
+                  <Text style={styles.termsLink}>Privacy Policy</Text>
                 </Text>
               </TouchableOpacity>
+
+              {/* Register Button with animation */}
+              <Animated.View style={{transform: [{scale: buttonScale}]}}>
+                <TouchableOpacity
+                  style={[
+                    styles.registerButton,
+                    (!selectedRole || isLoading || !agreedToTerms) && styles.registerButtonDisabled,
+                  ]}
+                  onPress={handleRegister}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  disabled={isLoading || !selectedRole || !agreedToTerms}
+                  activeOpacity={0.9}>
+                  <Text style={styles.registerButtonText}>
+                    {isLoading ? 'Creating Account...' : `Register as ${getRoleLabel(selectedRole)}`}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
 
               {/* Login Link */}
               <View style={styles.loginContainer}>
                 <Text style={styles.loginText}>Already have an account? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                <TouchableOpacity onPress={() => (navigation as any).navigate('Login')}>
                   <Text style={styles.loginLink}>Login now</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
-        </ScrollView>
-      </ImageBackground>
-
-      </KeyboardAvoidingView>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
     </>
   );
 };
@@ -715,222 +791,194 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FAFAFA',
   },
-  backgroundImage: {
-    flex: 1,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-  },
-  backgroundImageStyle: {
-    opacity: 0.15,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  animationContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
-    zIndex: 0,
-  },
-  building: {
+  fixedHeader: {
+    backgroundColor: '#FAFAFA',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 119, 192, 0.1)',
   },
-  building1: {
-    marginLeft: SCREEN_WIDTH * 0.1,
+  logoImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: spacing.xs,
   },
-  building2: {
-    marginLeft: SCREEN_WIDTH * 0.05,
+  appName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: spacing.sm,
   },
-  building3: {
-    marginRight: SCREEN_WIDTH * 0.1,
+  progressBarContainer: {
+    width: '100%',
+    alignItems: 'center',
   },
-  buildingEmoji: {
-    fontSize: 80,
-    opacity: 0.5,
+  progressBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: colors.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  formContainer: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
     padding: spacing.lg,
-    zIndex: 1,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  logoImage: {
-    width: 150,
-    height: 50,
+    paddingBottom: 40,
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    borderRadius: 20,
+    padding: spacing.lg,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  header: {
-    marginBottom: spacing.xl,
-    alignItems: 'center',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   title: {
-    ...typography.h1,
-    fontSize: 28,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: 24,
     fontWeight: '700',
+    color: colors.secondary,
     textAlign: 'center',
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
     fontSize: 14,
+    color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: spacing.lg,
   },
   roleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     gap: spacing.sm,
   },
   roleButton: {
     flex: 1,
-    borderRadius: 8, // Minimal radius for square boxes
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: spacing.sm,
+    alignItems: 'center',
+    position: 'relative',
   },
   roleButtonSelected: {
-    borderWidth: 2,
     borderColor: colors.primary,
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.3,
-    elevation: 4,
-  },
-  roleButtonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    gap: spacing.xs,
-    minHeight: 40,
+    backgroundColor: colors.accent,
   },
   roleIcon: {
-    fontSize: 18,
+    fontSize: 20,
+    marginBottom: 4,
   },
   roleButtonText: {
-    ...typography.caption,
+    fontSize: 9,
     color: colors.text,
-    fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
-    flexShrink: 1,
   },
   roleButtonTextSelected: {
-    ...typography.caption,
-    color: colors.surface,
-    fontSize: 12,
+    color: colors.primary,
     fontWeight: '700',
-    textAlign: 'center',
   },
-  infoBanner: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(247, 247, 247, 0.9)',
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.lg,
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  infoIcon: {
-    fontSize: 16,
-  },
-  infoText: {
-    ...typography.caption,
-    color: colors.text,
-    fontSize: 12,
-    flex: 1,
-  },
-  form: {
-    marginTop: spacing.md,
+  selectedCheck: {
+    position: 'absolute',
+    top: 2,
+    right: 4,
+    fontSize: 10,
+    color: colors.primary,
+    fontWeight: 'bold',
   },
   inputContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   labelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   label: {
-    ...typography.caption,
+    fontSize: 14,
     color: colors.text,
     fontWeight: '600',
-    fontSize: 14,
+    marginBottom: spacing.xs,
   },
   verifiedBadge: {
-    ...typography.caption,
-    color: colors.success,
     fontSize: 12,
+    color: colors.success,
     fontWeight: '600',
   },
-  inputWithButton: {
+  input: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: spacing.md,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  phoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  input: {
+  phoneInputContainer: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    ...typography.body,
-    color: colors.text,
-    fontSize: 16,
-    borderWidth: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: colors.border,
+    paddingLeft: spacing.md,
+  },
+  countryCode: {
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '600',
+    marginRight: spacing.xs,
+  },
+  phoneInput: {
+    flex: 1,
+    padding: spacing.md,
+    paddingLeft: 0,
+    fontSize: 16,
+    color: colors.text,
   },
   verifyButton: {
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     minWidth: 80,
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 48,
   },
   verifyButtonVerified: {
     backgroundColor: colors.success,
   },
   verifyButtonText: {
-    ...typography.caption,
     color: colors.surface,
     fontWeight: '600',
     fontSize: 14,
@@ -938,46 +986,73 @@ const styles = StyleSheet.create({
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: colors.border,
+    paddingRight: spacing.sm,
   },
   passwordInput: {
     flex: 1,
     padding: spacing.md,
-    ...typography.body,
-    color: colors.text,
     fontSize: 16,
-  },
-  eyeButton: {
-    padding: spacing.md,
+    color: colors.text,
   },
   eyeIcon: {
-    fontSize: 20,
+    fontSize: 18,
+    padding: spacing.xs,
+  },
+  matchIcon: {
+    fontSize: 16,
+    color: colors.success,
+    marginRight: spacing.xs,
+  },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  termsCheckbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+    marginTop: 2,
+  },
+  termsCheckboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  termsCheckmark: {
+    color: colors.surface,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   registerButton: {
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.cta,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
     marginBottom: spacing.lg,
-    shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   registerButtonDisabled: {
-    backgroundColor: colors.disabled,
-    opacity: 0.6,
-    shadowOpacity: 0,
-    elevation: 0,
+    backgroundColor: colors.textSecondary,
   },
   registerButtonText: {
-    ...typography.body,
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
@@ -985,19 +1060,15 @@ const styles = StyleSheet.create({
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
   },
   loginText: {
-    ...typography.body,
     color: colors.textSecondary,
     fontSize: 14,
   },
   loginLink: {
-    ...typography.body,
     color: colors.primary,
     fontSize: 14,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
+    fontWeight: '700',
   },
 });
 

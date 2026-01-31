@@ -1,6 +1,7 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {View, Text} from 'react-native';
+import {getFocusedRouteNameFromRoute} from '@react-navigation/native';
 import BuyerDashboardScreen from '../../screens/Buyer/BuyerDashboardScreen';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
@@ -10,6 +11,7 @@ import PropertyDetailsScreen from '../../screens/Buyer/PropertyDetailsScreen';
 import PropertyMapScreen from '../../screens/Buyer/PropertyMapScreen';
 import SupportScreen from '../../screens/Buyer/SupportScreen';
 import FavoritesScreen from '../../screens/FavoritesScreen';
+import RecentlyViewedScreen from '../../screens/Buyer/RecentlyViewedScreen';
 import {colors, spacing} from '../../theme';
 import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
 
@@ -20,6 +22,7 @@ export type BuyerTabParamList = {
   Profile: undefined;
   Chat: undefined;
   Favorites: undefined;
+  RecentlyViewed: undefined;
   PropertyList: {searchQuery?: string} | undefined;
   SearchResults: {searchQuery?: string; location?: string; listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
   AllProperties: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
@@ -123,6 +126,8 @@ const BuyerTabNavigator = () => {
         options={{
           title: 'Chats',
           headerShown: false,
+          // Reset Chat stack to ChatList when tab is blurred (navigated away from)
+          unmountOnBlur: true,
           tabBarIcon: ({color}) => (
             <View style={{position: 'relative', alignItems: 'center', justifyContent: 'center'}}>
               <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
@@ -155,6 +160,13 @@ const BuyerTabNavigator = () => {
             </View>
           ),
         }}
+        listeners={({navigation}) => ({
+          // Reset to ChatList when Chats tab is pressed
+          tabPress: (e) => {
+            // Navigate to ChatList when tab is pressed
+            navigation.navigate('Chats', {screen: 'ChatList'});
+          },
+        })}
       />
       <Tab.Screen
         name="Profile"
@@ -174,6 +186,8 @@ const BuyerTabNavigator = () => {
           title: 'Chat',
           headerShown: false,
           tabBarButton: () => null, // Hide from tab bar
+          // Reset Chat stack when navigated away
+          unmountOnBlur: true,
         }}
       />
       <Tab.Screen
@@ -182,6 +196,15 @@ const BuyerTabNavigator = () => {
         options={{
           title: 'Favorites',
           headerShown: false, // Hide default header for custom header
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="RecentlyViewed"
+        component={RecentlyViewedScreen}
+        options={{
+          title: 'Recently Viewed',
+          headerShown: false,
           tabBarButton: () => null, // Hide from tab bar
         }}
       />

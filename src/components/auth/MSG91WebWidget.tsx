@@ -185,32 +185,38 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
         return;
       }
       
-      // Set React Native-side timeout as backup (7 seconds - slightly longer than JS timeout)
+      // Set React Native-side timeout as backup (12 seconds - slightly longer than JS timeout of 10s)
       // This ensures we catch the error even if JavaScript timeout doesn't fire
-      console.log('[MSG91 Widget] Setting React Native-side timeout (7 seconds) as backup...');
       nativeTimeoutRef.current = setTimeout(() => {
         if (!responseReceivedRef.current) {
-          console.error('[MSG91 Widget] React Native-side timeout FIRED - no response received from widget');
-          console.error('[MSG91 Widget] This indicates the widget failed silently (likely Mobile Integration disabled)');
+          // Only log in development mode to reduce console noise
+          if (typeof __DEV__ !== 'undefined' && __DEV__) {
+            console.warn('[MSG91 Widget] Timeout: Widget did not respond (Mobile Integration may be disabled)');
+          }
           setLoading(false);
+          
+          // Build error message with actual values (not template literals)
+          const tokenPreview = resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : 'MISSING';
           const timeoutError = {
             code: 'INIT_TIMEOUT',
-            message: 'Widget initialization timeout. The widget did not respond within 7 seconds.\n\n' +
-                     'Even if Mobile Integration is enabled, please verify:\n\n' +
-                     '1. ✓ Mobile Integration is ENABLED and SAVED in MSG91 dashboard\n' +
-                     '2. ⏱️  Wait 1-2 minutes after enabling (settings propagation delay)\n' +
-                     '3. ✓ Widget ID matches exactly: ${widgetId}\n' +
-                     '4. ✓ Token ID matches exactly (first 15 chars): ${resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : "MISSING"}\n' +
-                     '5. ✓ Widget status is ACTIVE (not disabled)\n' +
-                     '6. ✓ IP Whitelisting is DISABLED or your IP is whitelisted\n' +
-                     '7. ✓ Phone number format: ${normalizedIdentifier} (should be 91XXXXXXXXXX)\n\n' +
-                     'If all above are correct, check MSG91 Dashboard → Reports for error details.',
-            details: 'Widget did not call success/failure callbacks within 7 seconds. ' +
-                     'Check console logs for detailed error information from MSG91 widget.'
+            message: 'Widget initialization timeout. The widget did not respond within 12 seconds.\n\n' +
+                     'This usually means Mobile Integration is disabled in MSG91 dashboard.\n\n' +
+                     'To enable:\n' +
+                     '1. Go to MSG91 Dashboard → Settings → Mobile Integration\n' +
+                     '2. Enable Mobile Integration and SAVE\n' +
+                     '3. Wait 1-2 minutes for settings to propagate\n' +
+                     '4. Try again\n\n' +
+                     'If Mobile Integration is already enabled, verify:\n' +
+                     `• Widget ID: ${widgetId}\n` +
+                     `• Token ID (first 15 chars): ${tokenPreview}\n` +
+                     `• Phone format: ${normalizedIdentifier} (should be 91XXXXXXXXXX)\n` +
+                     '• Widget status is ACTIVE',
+            details: 'Widget did not call success/failure callbacks within 12 seconds. ' +
+                     'Check MSG91 Dashboard → Reports for detailed error information.'
           };
           onFailure(timeoutError);
         }
-      }, 7000);
+      }, 12000); // Increased from 7000 to 12000ms (12 seconds) to match increased JS timeout
     } else {
       // Modal closed - clear timeout
       if (nativeTimeoutRef.current) {
@@ -250,8 +256,8 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
     return null;
   }
   
-  // Log identifier validation outcome (handled via useEffect instead of returning null)
-  if (identifierValidationError) {
+  // Log identifier validation outcome only when widget is visible (handled via useEffect instead of returning null)
+  if (visible && identifierValidationError) {
     console.error('[MSG91 Widget] Identifier validation warning:', identifierValidationError, {
       identifier,
       normalizedIdentifier,
@@ -629,55 +635,75 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
               hasFailureCallback: typeof config.failure === 'function'
             }));
             
-            // Set timeout for widget initialization (6 seconds - reduced for faster feedback)
-            // If widget doesn't respond within 6 seconds, assume it failed
-            // This is shorter than the script loading timeout to catch initialization issues
+            // Set timeout for widget initialization (10 seconds - increased to allow widget more time)
+            // If widget doesn't respond within 10 seconds, assume it failed
             // Set timeout AFTER defining callbacks but BEFORE calling initSendOTP
-            console.log('MSG91 Widget: Setting initialization timeout (6 seconds)...');
             const initStartTime = Date.now();
             initTimeout = setTimeout(function() {
               const elapsed = Date.now() - initStartTime;
-              console.error('MSG91 Widget: Initialization timeout FIRED after', elapsed, 'ms');
-              console.error('MSG91 Widget: Widget did not respond within 6 seconds');
-              console.error('MSG91 Widget: This usually means Mobile Integration is not enabled or widget failed silently');
-              console.error('MSG91 Widget: ReactNativeWebView available?', !!window.ReactNativeWebView);
+              
+              // Check if widget container has meaningful content (indicates widget is trying to load)
+              const container = document.getElementById('msg91-widget-container');
+              const hasContent = container && container.innerHTML && container.innerHTML.length > 100;
+              
+              // Only log verbose timeout details in development
+              if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                console.warn('MSG91 Widget: Initialization timeout after', elapsed, 'ms');
+                if (hasContent) {
+                  console.warn('MSG91 Widget: Container has content but no callback received - Mobile Integration may be disabled');
+                }
+              }
               
               if (window.ReactNativeWebView) {
+                // Build error message with actual values
+                // Note: These variables are interpolated from the outer template literal context
+                const widgetIdValue = '${widgetId}';
+                const tokenPreviewValue = '${resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : "MISSING"}';
+                const identifierValue = '${normalizedIdentifier}';
+                
+                const detailsBase = 'Widget did not call success/failure callbacks within 10 seconds. ' +
+                                   (hasContent ? 'Widget container has content but callbacks not triggered - Mobile Integration likely disabled.' : 
+                                    'Mobile Integration may not be enabled.');
+                const detailsWithValues = detailsBase + 
+                                         '\\n\\nWidget ID: ' + widgetIdValue +
+                                         '\\nToken ID (first 15): ' + tokenPreviewValue +
+                                         '\\nPhone: ' + identifierValue;
+                
                 const timeoutMessage = {
                   type: 'error',
                   error: {
-                    message: 'Widget initialization timeout. The widget did not respond. This usually means:\n\n1. Mobile Integration is not enabled in MSG91 dashboard\n2. Widget credentials are incorrect\n3. Widget is disabled\n\nPlease check MSG91 dashboard settings.',
+                    message: 'Widget initialization timeout. The widget did not respond within 10 seconds.\\n\\n' +
+                             'This usually means:\\n' +
+                             '1. Mobile Integration is not enabled in MSG91 dashboard\\n' +
+                             '2. Widget credentials are incorrect\\n' +
+                             '3. Widget is disabled\\n\\n' +
+                             'Please check MSG91 dashboard settings.',
                     code: 'INIT_TIMEOUT',
-                    details: 'Widget did not call success/failure callbacks within 6 seconds. Mobile Integration may not be enabled.'
+                    details: detailsWithValues
                   }
                 };
-                console.error('MSG91 Widget: Sending timeout error message:', timeoutMessage);
                 try {
                   window.ReactNativeWebView.postMessage(JSON.stringify(timeoutMessage));
-                  console.log('MSG91 Widget: Timeout message sent successfully');
                 } catch (postError) {
-                  console.error('MSG91 Widget: Failed to send timeout message:', postError);
+                  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                    console.error('MSG91 Widget: Failed to send timeout message:', postError);
+                  }
                 }
-              } else {
-                console.error('MSG91 Widget: ReactNativeWebView not available, cannot send timeout message');
               }
-            }, 6000);
-            console.log('MSG91 Widget: Initialization timeout set, will fire in 6 seconds if no callback received');
+            }, 10000); // Increased from 6000 to 10000ms (10 seconds)
             
             try {
-              console.log('MSG91 Widget: About to call initSendOTP...');
-              console.log('MSG91 Widget: Config object:', JSON.stringify({
-                widgetId: config.widgetId,
-                identifier: config.identifier,
-                hasSuccessCallback: typeof config.success === 'function',
-                hasFailureCallback: typeof config.failure === 'function',
-                tokenAuthLength: config.tokenAuth?.length
-              }));
+              // Only log verbose details in development
+            if (typeof __DEV__ !== 'undefined' && __DEV__) {
+              console.log('MSG91 Widget: Calling initSendOTP...');
+            }
               
               window.initSendOTP(config);
-              console.log('MSG91 Widget: initSendOTP called successfully, waiting for response...');
-              console.log('MSG91 Widget: Timeout will fire in 6 seconds if no callback is received');
-              console.log('MSG91 Widget: If Mobile Integration is disabled, widget will fail silently and timeout will trigger');
+              
+              // Only log verbose details in development
+              if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                console.log('MSG91 Widget: initSendOTP called, waiting for response...');
+              }
 
               // Confirm to React Native that initSendOTP was invoked
               if (window.ReactNativeWebView) {
@@ -693,14 +719,42 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
               setTimeout(function() {
                 const container = document.getElementById('msg91-widget-container');
                 if (container && window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                  const snapshot = {
                     type: 'container-snapshot',
                     ts: Date.now(),
                     innerText: container.innerText || '',
-                    innerHTMLLength: container.innerHTML?.length || 0
-                  }));
+                    innerHTMLLength: container.innerHTML?.length || 0,
+                    innerHTML: container.innerHTML || '',
+                    hasButtons: container.querySelector('button') !== null,
+                    hasInputs: container.querySelector('input') !== null,
+                    hasIframe: container.querySelector('iframe') !== null
+                  };
+                  window.ReactNativeWebView.postMessage(JSON.stringify(snapshot));
+                  
+                  // If widget has UI elements but no callbacks fired, it might be waiting for user interaction
+                  if (snapshot.hasButtons || snapshot.hasInputs) {
+                    console.log('MSG91 Widget: Container has interactive elements - widget may be waiting for user interaction');
+                  }
                 }
               }, 3000);
+              
+              // Additional check after 5 seconds - see if widget rendered any UI
+              setTimeout(function() {
+                const container = document.getElementById('msg91-widget-container');
+                if (container && window.ReactNativeWebView && !responseReceivedRef.current) {
+                  const hasVisibleContent = container.innerHTML && container.innerHTML.length > 200;
+                  const hasInteractiveElements = container.querySelector('button, input, iframe') !== null;
+                  
+                  if (hasVisibleContent || hasInteractiveElements) {
+                    console.warn('MSG91 Widget: Widget has rendered UI but callbacks not fired. Widget may require user interaction.');
+                    // Try to detect if there's a button that needs to be clicked
+                    const sendButton = container.querySelector('button[type="submit"], button:contains("Send"), button:contains("Verify")');
+                    if (sendButton) {
+                      console.log('MSG91 Widget: Found send button - widget may need manual trigger');
+                    }
+                  }
+                }
+              }, 5000);
             } catch (initError) {
               if (initTimeout) clearTimeout(initTimeout);
               console.error('MSG91 Widget: Exception calling initSendOTP:', initError);
@@ -818,6 +872,26 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
         console.log('[MSG91 Widget] Success - closing modal');
         onSuccess(message.data);
         onClose();
+      } else if (message.type === 'container-snapshot') {
+        // Log container state for debugging
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.log('[MSG91 Widget] Container snapshot:', {
+            innerText: message.innerText,
+            innerHTMLLength: message.innerHTMLLength,
+            hasButtons: message.hasButtons,
+            hasInputs: message.hasInputs,
+            hasIframe: message.hasIframe
+          });
+          
+          // If widget has UI but no callbacks, suggest checking credentials
+          if ((message.hasButtons || message.hasInputs) && message.innerHTMLLength > 200) {
+            console.warn('[MSG91 Widget] Widget UI rendered but callbacks not firing. Possible causes:');
+            console.warn('  1. Widget ID or Token ID mismatch');
+            console.warn('  2. Widget status not ACTIVE');
+            console.warn('  3. IP whitelisting blocking requests');
+            console.warn('  4. Widget waiting for user interaction');
+          }
+        }
       } else if (message.type === 'failure' || message.type === 'error') {
         setLoading(false);
         console.log('[MSG91 Widget] Failure/Error received:', message);
@@ -1023,11 +1097,10 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                 }
               }}
               onLoadEnd={() => {
-                console.log('[MSG91 Widget] WebView loaded - widget should initialize soon');
-                console.log('[MSG91 Widget] Injecting debug JavaScript with credentials:');
-                console.log('[MSG91 Widget] - Widget ID:', widgetId);
-            console.log('[MSG91 Widget] - Auth Token (first 15):', resolvedAuthToken ? resolvedAuthToken.substring(0, 15) : 'MISSING');
-            console.log('[MSG91 Widget] - Identifier:', normalizedIdentifier);
+                // Only log verbose details in development
+                if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                  console.log('[MSG91 Widget] WebView loaded - widget initializing');
+                }
                 
                 // Inject console.log to WebView for debugging
                 webViewRef.current?.injectJavaScript(`
@@ -1058,13 +1131,16 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
                   setLoading(false);
                 }, 2000); // Reduced timeout - widget should load faster now
                 
-                // Auto-fallback after 12 seconds if widget doesn't load (matches maxWaitTime in script)
+                // Auto-fallback after 15 seconds if widget doesn't load (increased to match new timeout)
                 setTimeout(() => {
                   if (loading) {
-                    console.warn('[MSG91 Widget] Widget taking too long, showing fallback option');
+                    // Only log in development mode
+                    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                      console.warn('[MSG91 Widget] Widget loading slowly - showing fallback option');
+                    }
                     setErrorMessage('Widget is taking longer than expected to load. You can use the backend API instead.');
                   }
-                }, 12000);
+                }, 15000); // Increased from 12000 to 15000ms to match increased timeout
               }}
               onLoadStart={() => {
                 console.log('[MSG91 Widget] WebView started loading');
@@ -1282,7 +1358,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#FAFAFA',
   },
   infoText: {
     fontSize: 12,

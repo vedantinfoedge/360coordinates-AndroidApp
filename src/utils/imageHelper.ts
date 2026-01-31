@@ -213,6 +213,124 @@ export const getProfileImageUrl = (imagePath: string | null | undefined): string
 };
 
 /**
+ * Property Image type (matches website format)
+ */
+export interface PropertyImage {
+  id: number;
+  url: string;
+  alt: string;
+}
+
+/**
+ * Validate and process property images array
+ * Converts array of strings/objects to standardized PropertyImage objects
+ * Filters out invalid URLs and ensures all URLs are absolute
+ * 
+ * @param images Array of image URLs (strings) or image objects from API
+ * @param propertyTitle Title of the property (for alt text)
+ * @param coverImage Fallback cover image URL if images array is empty
+ * @returns Array of validated PropertyImage objects
+ */
+export const validateAndProcessPropertyImages = (
+  images: any[] | null | undefined,
+  propertyTitle: string = 'Property',
+  coverImage?: string | null | undefined
+): PropertyImage[] => {
+  const propertyImages: PropertyImage[] = [];
+  
+  console.log('[validateAndProcessPropertyImages] Input:', {
+    imagesType: typeof images,
+    isArray: Array.isArray(images),
+    imagesLength: Array.isArray(images) ? images.length : 0,
+    images: images,
+    coverImage: coverImage,
+  });
+  
+  // Primary: Process images array
+  if (Array.isArray(images) && images.length > 0) {
+    console.log(`[validateAndProcessPropertyImages] Processing ${images.length} images`);
+    
+    images.forEach((img: any, idx: number) => {
+      let imageUrl: string | null = null;
+      let rawValue: any = null;
+      
+      // Handle string URLs (primary format from backend)
+      if (typeof img === 'string') {
+        rawValue = img;
+        const trimmed = img.trim();
+        if (trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') {
+          imageUrl = fixImageUrl(trimmed);
+          console.log(`[validateAndProcessPropertyImages] Image ${idx + 1} (string):`, {
+            raw: trimmed,
+            fixed: imageUrl,
+            isValid: !!imageUrl,
+          });
+        } else {
+          console.warn(`[validateAndProcessPropertyImages] Image ${idx + 1} empty/invalid string:`, trimmed);
+        }
+      }
+      // Handle object format (if backend returns objects)
+      else if (typeof img === 'object' && img !== null) {
+        rawValue = img;
+        const url = img.url || img.image_url || img.src || img.path || img.image || '';
+        if (url && typeof url === 'string') {
+          const trimmed = url.trim();
+          if (trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') {
+            imageUrl = fixImageUrl(trimmed);
+            console.log(`[validateAndProcessPropertyImages] Image ${idx + 1} (object):`, {
+              raw: trimmed,
+              fixed: imageUrl,
+              isValid: !!imageUrl,
+            });
+          } else {
+            console.warn(`[validateAndProcessPropertyImages] Image ${idx + 1} empty/invalid URL in object:`, url);
+          }
+        } else {
+          console.warn(`[validateAndProcessPropertyImages] Image ${idx + 1} no URL found in object:`, img);
+        }
+      } else {
+        console.warn(`[validateAndProcessPropertyImages] Image ${idx + 1} unexpected type:`, typeof img, img);
+      }
+      
+      // Only include if we have a valid URL
+      if (imageUrl) {
+        propertyImages.push({
+          id: idx + 1,
+          url: imageUrl,
+          alt: propertyTitle || `Property image ${idx + 1}`
+        });
+        console.log(`[validateAndProcessPropertyImages] ✅ Added image ${idx + 1}:`, imageUrl);
+      } else {
+        console.warn(`[validateAndProcessPropertyImages] ❌ Skipped image ${idx + 1} - invalid URL:`, rawValue);
+      }
+    });
+  } else {
+    console.log('[validateAndProcessPropertyImages] No images array or empty array');
+  }
+  
+  // Fallback: Use cover_image if no images array found
+  if (propertyImages.length === 0 && coverImage) {
+    console.log('[validateAndProcessPropertyImages] Using fallback cover_image:', coverImage);
+    const coverImageUrl = fixImageUrl(coverImage);
+    if (coverImageUrl) {
+      propertyImages.push({
+        id: 1,
+        url: coverImageUrl,
+        alt: propertyTitle || 'Property image'
+      });
+      console.log('[validateAndProcessPropertyImages] ✅ Added cover_image:', coverImageUrl);
+    } else {
+      console.warn('[validateAndProcessPropertyImages] ❌ Cover image invalid URL:', coverImage);
+    }
+  }
+  
+  console.log(`[validateAndProcessPropertyImages] Final result: ${propertyImages.length} valid images`);
+  console.log('[validateAndProcessPropertyImages] Images:', propertyImages.map(img => ({id: img.id, url: img.url})));
+  
+  return propertyImages;
+};
+
+/**
  * Fix property images array - Convert all relative image URLs to absolute
  * @param property Property object with images array
  * @returns Property with fixed image URLs

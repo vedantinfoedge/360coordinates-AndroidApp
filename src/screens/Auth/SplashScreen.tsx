@@ -55,11 +55,11 @@ const SplashScreen: React.FC = () => {
       style={styles.container}>
       <View style={styles.content}>
         <Image
-          source={require('../../assets/broserlogo.jpeg')}
+          source={require('../../assets/logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.appName}>IndiaPropertys</Text>
+        <Text style={styles.appName}>360Coordinates</Text>
         <Text style={styles.tagline}>Find Your Dream Property in India</Text>
       </View>
       <ActivityIndicator size="large" color={colors.surface} style={styles.loader} />

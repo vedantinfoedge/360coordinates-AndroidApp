@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Share,
+  Animated,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -104,6 +105,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const [searchLocation, setSearchLocation] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerHeight = insets.top + 70;
 
   // Check user type access
   useEffect(() => {
@@ -309,8 +312,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
   const handleShareProperty = async (property: Property) => {
     try {
-      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
-      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nView more: ${shareUrl}`;
+      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
       
       await Share.share({
         message: shareMessage,
@@ -326,9 +328,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
   const renderPropertyCard = ({item}: {item: Property}) => {
     const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+    const images: string[] | undefined = item.images?.length
+      ? item.images
+          .map((url: string) => fixImageUrl(url))
+          .filter((url): url is string => Boolean(url))
+      : undefined;
     return (
       <PropertyCard
         image={imageUrl || undefined}
+        images={images}
         name={item.title}
         location={item.location}
         price={formatters.price(item.price, item.status === 'rent')}
@@ -374,6 +382,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             console.log('[BuyerDashboard] Navigating to Register screen');
             (navigation as any).navigate('Auth', {screen: 'Register'});
           }}
+          onAddPropertyPress={isLoggedIn ? async () => {
+            // Set dashboard preference and navigate to Seller dashboard
+            await AsyncStorage.setItem('@target_dashboard', 'seller');
+            await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
+            (navigation as any).reset({
+              index: 0,
+              routes: [{name: 'Seller'}],
+            });
+          } : undefined}
           showProfile={isLoggedIn}
           showLogout={isLoggedIn}
           showSignIn={isGuest}
@@ -404,24 +421,38 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           console.log('[BuyerDashboard] Navigating to Register screen');
           (navigation as any).navigate('Auth', {screen: 'Register'});
         }}
+        onAddPropertyPress={isLoggedIn ? async () => {
+          // Set dashboard preference and navigate to Seller dashboard
+          await AsyncStorage.setItem('@target_dashboard', 'seller');
+          await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
+          (navigation as any).reset({
+            index: 0,
+            routes: [{name: 'Seller'}],
+          });
+        } : undefined}
         showProfile={isLoggedIn}
         showLogout={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
+        scrollY={scrollY}
+        headerHeight={headerHeight}
       />
 
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + 70}]}
+        contentContainerStyle={[styles.scrollContent, {paddingTop: headerHeight}]}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true},
+        )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }>
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>
-            {user ? `Hello, ${(user.full_name || '').split(' ')[0]}` : 'Welcome'}
-          </Text>
+          <Text style={styles.welcomeText}>Welcome</Text>
           <Text style={styles.welcomeSubtext}>
             Find your dream property in India
           </Text>
@@ -596,7 +627,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             renderItem={renderCityCard}
           />
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -604,19 +635,20 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA',
   },
   welcomeSection: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
   welcomeText: {
@@ -631,7 +663,7 @@ const styles = StyleSheet.create({
   },
   searchSection: {
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   searchContainer: {
     position: 'relative',
@@ -640,15 +672,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 2,
   },
   searchIcon: {
@@ -687,23 +717,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
     gap: spacing.sm,
   },
   toggleButton: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: 12,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: 9999,
+    backgroundColor: colors.accentLighter || colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 44,
   },
   toggleButtonActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   toggleButtonText: {
     ...typography.body,
@@ -718,13 +746,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     marginTop: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: 44,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   mapSearchIcon: {
     fontSize: 18,
@@ -736,8 +768,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   section: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
+    marginTop: 28,
+    marginBottom: spacing.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -763,50 +795,45 @@ const styles = StyleSheet.create({
   },
   propertiesList: {
     paddingHorizontal: spacing.lg,
-    gap: spacing.md,
+    gap: 0,
   },
   propertyCardStyle: {
     width: '100%',
     marginRight: 0,
   },
   propertySeparator: {
-    height: spacing.md,
+    height: 22,
   },
   citiesList: {
     paddingLeft: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.lg,
   },
   cityCard: {
     width: 100,
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: spacing.lg,
     paddingTop: spacing.xxl,
-    paddingHorizontal:spacing.md,
+    paddingHorizontal: spacing.md,
   },
   cityImageContainer: {
     width: 100,
     height: 100,
-    borderRadius: borderRadius.lg,
+    borderRadius: 14,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 3,
   },
   cityImage: {
     width: '100%',
     height: '100%',
-    borderRadius: borderRadius.lg,
+    borderRadius: 14,
   },
   cityName: {
     ...typography.body,

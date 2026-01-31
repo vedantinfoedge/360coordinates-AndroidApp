@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useMemo} from 'react';
+import React, {useState, useCallback, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Dimensions,
   TextInput,
   Modal,
+  Animated,
 } from 'react-native';
 import CustomAlert from '../../utils/alertHelper';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -51,6 +52,9 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  
+  // Scroll animation for header hide/show
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   // Check property limit before adding
   // According to backend: Sellers have limits based on subscription (free=3, basic=10, pro=10, premium=10)
@@ -593,16 +597,20 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
               onPress={(e: any) => {
                 e.stopPropagation();
                 handleEdit(item.id);
-              }}>
-              <Text style={styles.editButtonText}>✏️ Edit</Text>
+              }}
+              activeOpacity={0.7}>
+              <Text style={styles.editButtonIcon}>✏</Text>
+              <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.deleteButton}
               onPress={(e: any) => {
                 e.stopPropagation();
                 handleDelete(item.id);
-              }}>
-              <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
+              }}
+              activeOpacity={0.7}>
+              <Text style={styles.deleteButtonIcon}>🗑</Text>
+              <Text style={styles.deleteButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -618,8 +626,9 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         onSupportPress={() => navigation.navigate('Support')}
         onSubscriptionPress={() => navigation.navigate('Subscription')}
         onLogoutPress={logout}
+        scrollY={scrollY}
       />
-      <View style={styles.header}>
+      <View style={[styles.header, {marginTop: spacing.xxl}]}>
         <Text style={styles.headerTitle}>My Properties</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity
@@ -638,7 +647,9 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       {/* Search and Filter Bar */}
       <View style={styles.searchBar}>
         <View style={styles.searchInputContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <View style={styles.searchIconContainer}>
+            <Text style={styles.searchIcon}>🔍</Text>
+          </View>
           <TextInput
             style={styles.searchInput}
             placeholder="Search properties..."
@@ -649,8 +660,9 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         </View>
         <TouchableOpacity
           style={styles.filterButton}
-          onPress={() => setShowFilterModal(true)}>
-          <Text style={styles.filterButtonText}>Filter</Text>
+          onPress={() => setShowFilterModal(true)}
+          activeOpacity={0.7}>
+          <Text style={styles.filterButtonIcon}>⚙</Text>
         </TouchableOpacity>
       </View>
       
@@ -679,7 +691,8 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                       styles.filterOption,
                       statusFilter === status && styles.filterOptionActive,
                     ]}
-                    onPress={() => setStatusFilter(status)}>
+                    onPress={() => setStatusFilter(status)}
+                    activeOpacity={0.7}>
                     <Text
                       style={[
                         styles.filterOptionText,
@@ -687,10 +700,17 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                       ]}>
                       {status.charAt(0).toUpperCase() + status.slice(1)}
                     </Text>
+                    {statusFilter === status && (
+                      <View style={styles.filterOptionCheck}>
+                        <Text style={styles.filterOptionCheckText}>✓</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
+            
+            <View style={styles.filterDivider} />
             
             <View style={styles.filterSection}>
               <Text style={styles.filterLabel}>Sort By</Text>
@@ -701,7 +721,8 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                     styles.sortOption,
                     sortBy === option && styles.sortOptionActive,
                   ]}
-                  onPress={() => setSortBy(option)}>
+                  onPress={() => setSortBy(option)}
+                  activeOpacity={0.7}>
                   <Text
                     style={[
                       styles.sortOptionText,
@@ -712,7 +733,11 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                     {option === 'price-high' && 'Price: High to Low'}
                     {option === 'price-low' && 'Price: Low to High'}
                   </Text>
-                  {sortBy === option && <Text style={styles.checkmark}>✓</Text>}
+                  {sortBy === option && (
+                    <View style={styles.sortOptionCheck}>
+                      <Text style={styles.checkmark}>✓</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -732,29 +757,37 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         </View>
       ) : properties.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🏠</Text>
-          <Text style={styles.emptyText}>No properties listed</Text>
+          <View style={styles.emptyIconContainer}>
+            <Text style={styles.emptyIcon}>🏠</Text>
+          </View>
+          <Text style={styles.emptyTitle}>No Properties Listed</Text>
           <Text style={styles.emptySubtext}>
-            Add your first property to get started
+            Start by adding your first property to showcase it to potential buyers
           </Text>
-        <TouchableOpacity
-          style={styles.emptyAddButton}
-          onPress={handleAddProperty}>
-          <Text style={styles.emptyAddButtonText}>Add Property</Text>
-        </TouchableOpacity>
+          <Text style={styles.emptyTip}>
+            💡 Tip: Add clear photos and detailed descriptions to attract more inquiries
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyAddButton}
+            onPress={handleAddProperty}
+            activeOpacity={0.8}>
+            <Text style={styles.emptyAddButtonText}>+ Add Your First Property</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>
           {filteredAndSortedProperties.length === 0 && searchQuery ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={styles.emptyText}>No properties found</Text>
+              <View style={styles.emptyIconContainer}>
+                <Text style={styles.emptyIcon}>🔍</Text>
+              </View>
+              <Text style={styles.emptyTitle}>No Properties Found</Text>
               <Text style={styles.emptySubtext}>
-                Try adjusting your search or filters
+                Try adjusting your search terms or filters to find what you're looking for
               </Text>
             </View>
           ) : (
-            <FlatList
+            <Animated.FlatList
               data={filteredAndSortedProperties}
               renderItem={renderProperty}
               keyExtractor={(item: any, index: number) => String(item.id || item.property_id || index)}
@@ -763,6 +796,11 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
               }
               showsVerticalScrollIndicator={false}
+              onScroll={Animated.event(
+                [{nativeEvent: {contentOffset: {y: scrollY}}}],
+                {useNativeDriver: true}
+              )}
+              scrollEventThrottle={16}
             />
           )}
         </>
@@ -774,57 +812,66 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA', // Clean off-white
   },
   listContent: {
-    padding: spacing.md,
+    padding: spacing.lg,
+    paddingTop: spacing.md,
   },
   propertyCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.md,
+    borderRadius: 16,
+    marginBottom: spacing.lg,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   propertyImagePlaceholder: {
-    width: SCREEN_WIDTH > 600 ? 120 : '100%',
-    height: SCREEN_WIDTH > 600 ? 200 : 180,
-    backgroundColor: colors.border,
+    width: '100%',
+    height: 200,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderText: {
-    fontSize: 48,
-    opacity: 0.5,
+    fontSize: 44,
+    opacity: 0.4,
     marginBottom: spacing.xs,
   },
   placeholderSubtext: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#9CA3AF',
     fontSize: 12,
-    opacity: 0.7,
+    opacity: 0.8,
   },
   propertyInfo: {
-    padding: spacing.md,
-    flex: 1, // Take remaining space
+    padding: spacing.lg,
+    flex: 1,
   },
   propertyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
   },
   propertyTitle: {
-    ...typography.h3,
-    color: colors.text,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1D242B', // Dark Charcoal
     flex: 1,
+    marginRight: spacing.sm,
+    lineHeight: 24,
   },
   statusBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: 20,
   },
   statusText: {
-    ...typography.small,
+    fontSize: 11,
     color: colors.surface,
     fontWeight: '600',
   },
@@ -834,18 +881,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   locationIcon: {
-    fontSize: 14,
+    fontSize: 13,
     marginRight: spacing.xs,
   },
   propertyLocation: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#6B7280',
     flex: 1,
+    fontSize: 13,
   },
   propertyStatsRow: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
+    gap: spacing.lg,
+    marginBottom: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   propertyStatItem: {
     flexDirection: 'row',
@@ -853,11 +904,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   propertyStatIcon: {
-    fontSize: 16,
+    fontSize: 14,
   },
   propertyStatText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#6B7280',
     fontSize: 12,
   },
   propertyFooter: {
@@ -867,8 +918,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   propertyPrice: {
-    ...typography.h3,
-    color: colors.accent,
+    fontSize: 20,
+    color: colors.primary,
     fontWeight: '700',
     flex: 1,
   },
@@ -883,84 +934,121 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
   },
-  emptyText: {
-    ...typography.h2,
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  emptySubtext: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#F3F4F6',
   },
   headerTitle: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1D242B', // Dark Charcoal
     flex: 1,
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
   },
   viewPlansButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.sm,
+    backgroundColor: '#E3F6FF', // Light blue
+    paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    minWidth: 100,
+    borderRadius: 10,
+    minWidth: 90,
     alignItems: 'center',
     justifyContent: 'center',
   },
   viewPlansButtonText: {
     ...typography.body,
-    color: colors.surface,
+    color: colors.primary,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
   },
   addButton: {
     backgroundColor: colors.primary,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    minWidth: 120,
+    borderRadius: 10,
+    minWidth: 110,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addButtonText: {
     ...typography.body,
     color: colors.surface,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#E3F6FF', // Light blue
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   emptyIcon: {
-    fontSize: 64,
+    fontSize: 36,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    color: '#1D242B', // Dark Charcoal
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+    lineHeight: 28,
+  },
+  emptySubtext: {
+    ...typography.body,
+    color: '#6B7280',
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 22,
     marginBottom: spacing.md,
-    opacity: 0.5,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyTip: {
+    ...typography.caption,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    fontSize: 13,
+    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    lineHeight: 20,
   },
   emptyAddButton: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
-    borderRadius: borderRadius.md,
-    marginTop: spacing.lg,
-    minWidth: 200,
+    borderRadius: 12,
+    marginTop: spacing.sm,
+    minWidth: 220,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+    minHeight: 50,
   },
   emptyAddButtonText: {
     ...typography.body,
     color: colors.surface,
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 15,
   },
   propertyContent: {
     flexDirection: SCREEN_WIDTH > 600 ? 'row' : 'column', // Responsive layout
@@ -979,7 +1067,7 @@ const styles = StyleSheet.create({
     minWidth: SCREEN_WIDTH > 600 ? undefined : (SCREEN_WIDTH - spacing.md * 2 - spacing.xs * 4) / 3,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xs,
-    borderRadius: borderRadius.sm,
+    borderRadius: 8,
     marginHorizontal: spacing.xs / 2,
     marginBottom: spacing.xs,
     alignItems: 'center',
@@ -987,31 +1075,50 @@ const styles = StyleSheet.create({
   editButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
+    minHeight: 40,
+    gap: spacing.xs,
+  },
+  editButtonIcon: {
+    fontSize: 14,
   },
   editButtonText: {
-    ...typography.caption,
+    ...typography.body,
     color: colors.surface,
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 13,
   },
   deleteButton: {
-    backgroundColor: colors.error,
+    backgroundColor: '#FEE2E2', // Light red tint
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
+    minHeight: 40,
+    gap: spacing.xs,
+  },
+  deleteButtonIcon: {
+    fontSize: 14,
   },
   deleteButtonText: {
-    ...typography.caption,
-    color: colors.surface,
+    ...typography.body,
+    color: '#DC2626', // Red text
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 13,
   },
   propertyImage: {
-    width: SCREEN_WIDTH > 600 ? 120 : '100%', // Full width on small screens, fixed on large
-    height: SCREEN_WIDTH > 600 ? 200 : 180, // Responsive height
+    width: '100%',
+    height: 200,
     resizeMode: 'cover',
+    backgroundColor: '#F3F4F6',
   },
   loadingContainer: {
     flex: 1,
@@ -1021,154 +1128,203 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#6B7280',
     marginTop: spacing.md,
   },
   searchBar: {
     flexDirection: 'row',
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#F3F4F6',
     gap: spacing.sm,
+    alignItems: 'center',
   },
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
     paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    height: 46,
+  },
+  searchIconContainer: {
+    width: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
   },
   searchIcon: {
-    fontSize: 18,
-    marginRight: spacing.sm,
+    fontSize: 16,
   },
   searchInput: {
     flex: 1,
     ...typography.body,
     color: colors.text,
-    paddingVertical: spacing.sm,
+    paddingVertical: 0,
+    fontSize: 14,
+    height: 46,
   },
   filterButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
+    width: 46,
+    height: 46,
+    backgroundColor: '#E3F6FF', // Light blue
+    borderRadius: 12,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  filterButtonText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '600',
+  filterButtonIcon: {
+    fontSize: 18,
+    color: colors.primary,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
     maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   modalTitle: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 20,
+    color: '#1D242B', // Dark Charcoal
     fontWeight: '700',
   },
   modalClose: {
-    ...typography.h2,
-    color: colors.textSecondary,
     fontSize: 24,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   filterSection: {
     marginBottom: spacing.xl,
   },
   filterLabel: {
-    ...typography.body,
-    color: colors.text,
+    fontSize: 15,
+    color: '#1D242B', // Dark Charcoal
     fontWeight: '600',
     marginBottom: spacing.md,
   },
+  filterDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: spacing.lg,
+  },
   filterOptions: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 10,
     flexWrap: 'wrap',
   },
   filterOption: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: 10,
+    backgroundColor: '#FAFAFA',
+    gap: spacing.xs,
+    minHeight: 42,
   },
   filterOptionActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   filterOptionText: {
     ...typography.body,
-    color: colors.text,
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '500',
   },
   filterOptionTextActive: {
     color: colors.surface,
     fontWeight: '600',
+  },
+  filterOptionCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterOptionCheckText: {
+    color: colors.surface,
+    fontSize: 11,
+    fontWeight: '700',
   },
   sortOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: 50,
   },
   sortOptionActive: {
-    backgroundColor: colors.primary + '20',
+    backgroundColor: '#E3F6FF', // Light blue
+    borderWidth: 2,
     borderColor: colors.primary,
   },
   sortOptionText: {
     ...typography.body,
-    color: colors.text,
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
   },
   sortOptionTextActive: {
     color: colors.primary,
     fontWeight: '600',
   },
+  sortOptionCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+  },
   checkmark: {
-    ...typography.body,
-    color: colors.primary,
+    color: colors.surface,
+    fontSize: 12,
     fontWeight: '700',
   },
   applyButton: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: spacing.lg,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   applyButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '700',
+    fontWeight: '600',
+    fontSize: 15,
   },
   actionButtonDisabled: {
     opacity: 0.5,
-    backgroundColor: colors.textSecondary,
+    backgroundColor: '#9CA3AF',
   },
 });
 

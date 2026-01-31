@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomAlert from '../../utils/alertHelper';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -15,6 +16,7 @@ import OTPInput from '../../components/auth/OTPInput';
 import {authService} from '../../services/auth.service';
 import {otpService} from '../../services/otp.service';
 import {useAuth} from '../../context/AuthContext';
+import {switchToSMSWidget, switchToForgotPasswordWidget, initializeMSG91} from '../../config/msg91.config';
 
 type OTPVerificationScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -29,6 +31,12 @@ type RouteParams = {
   type?: 'register' | 'forgotPassword';
   reqId?: string;
   method?: 'msg91-sdk' | 'msg91-rest' | 'backend' | 'msg91-widget';
+  formData?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    selectedRole?: 'buyer' | 'seller' | 'agent' | null;
+  };
 };
 
 const OTPVerificationScreen: React.FC = () => {
@@ -84,18 +92,58 @@ const OTPVerificationScreen: React.FC = () => {
     }
   }, [timer]);
 
+  // Helper function to handle role-based navigation after successful OTP verification
+  const handleSuccessNavigation = async () => {
+    const selectedRole = params.formData?.selectedRole;
+    
+    if (selectedRole) {
+      // Set the dashboard preference based on selected role
+      const dashboardMap: Record<string, string> = {
+        'buyer': 'buyer',
+        'seller': 'seller',
+        'agent': 'agent',
+      };
+      const targetDashboard = dashboardMap[selectedRole] || 'buyer';
+      
+      // Save both immediate target and persistent preference
+      await AsyncStorage.setItem('@target_dashboard', targetDashboard);
+      await AsyncStorage.setItem('@user_dashboard_preference', targetDashboard);
+      
+      // Navigate to the selected role's dashboard
+      const parentNav = navigation.getParent();
+      if (selectedRole === 'seller') {
+        (parentNav as any)?.reset({
+          index: 0,
+          routes: [{name: 'Seller'}],
+        });
+      } else if (selectedRole === 'agent') {
+        (parentNav as any)?.reset({
+          index: 0,
+          routes: [{name: 'Agent'}],
+        });
+      } else {
+        // Buyer - go to MainTabs
+        (parentNav as any)?.reset({
+          index: 0,
+          routes: [{name: 'MainTabs'}],
+        });
+      }
+    }
+    // If no selectedRole, AppNavigator will handle navigation based on user data
+  };
+
   const handleOTPComplete = (value: string) => {
     setOtp(value);
-    // Auto-verify when OTP digits entered (4 digits for MSG91, with small delay for better UX)
+    // Auto-verify when all OTP digits are entered (4 digits), with small delay for better UX
     setTimeout(() => {
       handleVerify();
     }, 300);
   };
 
   const handleVerify = async () => {
-    // MSG91 sends 4-digit OTPs, but accept 4-6 digits for flexibility
-    if (otp.length < 4 || otp.length > 6) {
-      CustomAlert.alert('Error', 'Please enter the complete OTP');
+    // Expect a 4-digit OTP
+    if (otp.length !== 4) {
+      CustomAlert.alert('Error', 'Please enter the 4-digit OTP');
       return;
     }
 
@@ -130,7 +178,8 @@ const OTPVerificationScreen: React.FC = () => {
                   {
                     text: 'OK',
                     onPress: () => {
-                      // Navigation handled automatically by AppNavigator
+                      // Navigate based on selected role
+                      handleSuccessNavigation();
                     },
                   },
                 ],
@@ -144,7 +193,7 @@ const OTPVerificationScreen: React.FC = () => {
         }
       }
       
-      // If phone is provided, try MSG91 SMS OTP verification FIRST
+      // If phone is provided, handle SMS OTP verification
       if (params.phone) {
         try {
           // Format phone number consistently (12 digits: 91XXXXXXXXXX)
@@ -163,6 +212,99 @@ const OTPVerificationScreen: React.FC = () => {
           // Priority: msg91-sdk (requires reqId) > backend fallback
           const reqId = params.reqId;
           let method = params.method as 'msg91-sdk' | 'msg91-rest' | 'backend' | 'msg91-widget' | undefined;
+
+          // NEW: MSG91 REST mobile flow (app → backend → MSG91)
+          // In this path, backend is already proxying to MSG91 v5 and is the source of truth.
+          if (isRegistrationFlow && method === 'msg91-rest') {
+            console.log('[OTP Verification] MSG91 REST mobile flow detected - verifying via backend proxy only');
+
+            const restVerifyResponse = await otpService.msg91VerifyViaBackend(
+              phoneNumber,
+              otp,
+              reqId,
+            );
+
+            console.log('[OTP Verification] MSG91 REST verify response:', {
+              success: restVerifyResponse?.success,
+              message: restVerifyResponse?.message,
+              data: restVerifyResponse?.data,
+            });
+
+            if (restVerifyResponse && restVerifyResponse.success) {
+              // Treat phone as fully verified via MSG91; no local OTP/token needed
+              navigation.navigate('Register', {
+                phoneVerified: true,
+                phoneToken: undefined,
+                phoneMethod: 'msg91',
+                verifiedOtp: undefined,
+                phone: params.formData?.phone || phoneNumber,
+                name: params.formData?.name,
+                email: params.formData?.email,
+                selectedRole: params.formData?.selectedRole,
+              } as any);
+
+              CustomAlert.alert(
+                'Success',
+                'Phone number verified successfully! You can now complete registration.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Navigation already handled above
+                    },
+                  },
+                ],
+              );
+              return;
+            }
+
+            throw new Error(
+              restVerifyResponse?.message || 'Invalid or expired OTP. Please try again.',
+            );
+          }
+
+          // SPECIAL CASE: Registration flow using backend OTP verification
+          // -------------------------------------------------------------
+          // When method is 'backend' for registration, the website flow sends
+          // the OTP ONLY to /auth/register.php (no separate /otp/verify_sms call).
+          //
+          // Our earlier implementation was calling otpService.verifySMS first
+          // (which hits /otp/verify_sms) and THEN sending the same OTP again
+          // to /auth/register.php, causing the backend to respond:
+          //   "Invalid phone OTP"
+          //
+          // To match the website behaviour:
+          // - For registration + backend, we MUST NOT call verifySMS here.
+          // - Instead, we simply capture the OTP and pass it to RegisterScreen
+          //   as verifiedOtp, and the /auth/register.php call will validate it.
+          if (isRegistrationFlow && method === 'backend') {
+            console.log('[OTP Verification] Registration + backend flow detected - skipping /otp/verify_sms and passing OTP directly to registration');
+
+            navigation.navigate('Register', {
+              phoneVerified: true,
+              phoneToken: undefined,
+              phoneMethod: 'backend',
+              verifiedOtp: otp,
+              phone: params.formData?.phone || phoneNumber,
+              name: params.formData?.name,
+              email: params.formData?.email,
+              selectedRole: params.formData?.selectedRole,
+            } as any);
+
+            CustomAlert.alert(
+              'Success',
+              'Phone number verified successfully! You can now complete registration.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    // Navigation already handled above
+                  },
+                },
+              ],
+            );
+            return;
+          }
           
           // If method is not provided but reqId exists, assume msg91-sdk (SDK approach)
           if (!method && reqId) {
@@ -176,7 +318,197 @@ const OTPVerificationScreen: React.FC = () => {
             method = 'msg91-sdk';
           }
           
-          console.log('[OTP Verification] Verifying SMS OTP via MSG91:', {
+          // NEW: Use MSG91 SDK directly for msg91-sdk method (with or without reqId)
+          if (method === 'msg91-sdk') {
+            console.log('[OTP Verification] Verifying OTP via MSG91 SDK directly:', {
+              phone: phoneNumber,
+              reqId: reqId ? `${reqId.substring(0, 15)}...` : 'not provided',
+              otpLength: otp.length,
+              willTryWithReqId: !!reqId,
+              willTryWithPhone: !reqId,
+            });
+            
+            try {
+              // Step 3: Frontend calls SDK to verify OTP
+              // SDK verifies with MSG91 and returns a token
+              const {OTPWidget} = require('@msg91comm/sendotp-react-native');
+              
+              // Ensure widget is initialized and switched correctly
+              try {
+                if (context === 'forgotPassword') {
+                  await switchToForgotPasswordWidget();
+                } else {
+                  await switchToSMSWidget();
+                }
+              } catch (switchError) {
+                console.warn('[OTP Verification] Widget switch failed, initializing:', switchError);
+                await initializeMSG91();
+                if (context === 'forgotPassword') {
+                  await switchToForgotPasswordWidget();
+                } else {
+                  await switchToSMSWidget();
+                }
+              }
+              
+              let verifyResponse;
+              
+              // Try verification with reqId first (preferred method)
+              if (reqId) {
+                console.log('[OTP Verification] Attempting SDK verifyOTP with reqId:', reqId.substring(0, 15) + '...');
+                verifyResponse = await OTPWidget.verifyOTP({
+                  reqId: reqId,
+                  otp: otp,
+                });
+              } else {
+                // Alternative: Try verification with phone number and OTP (if SDK supports it)
+                console.log('[OTP Verification] No reqId available, attempting SDK verifyOTP with phone number');
+                console.log('[OTP Verification] Note: Some MSG91 SDK versions may require reqId - this may fail');
+                
+                // Format phone for SDK (91XXXXXXXXXX, no + sign)
+                const phoneForSDK = phoneNumber.replace(/^\+/, '');
+                
+                try {
+                  // Try with phone number instead of reqId
+                  verifyResponse = await OTPWidget.verifyOTP({
+                    identifier: phoneForSDK,
+                    otp: otp,
+                  });
+                } catch (phoneVerifyError: any) {
+                  console.warn('[OTP Verification] SDK verifyOTP with phone number failed:', phoneVerifyError);
+                  throw new Error('MSG91 SDK requires reqId for verification. Please try resending OTP.');
+                }
+              }
+              
+              // Enhanced logging to capture full verification response structure
+              console.log('[OTP Verification] ========== MSG91 SDK verifyOTP FULL RESPONSE ==========');
+              console.log('[OTP Verification] Response type:', typeof verifyResponse);
+              console.log('[OTP Verification] Response keys:', verifyResponse ? Object.keys(verifyResponse) : 'null/undefined');
+              console.log('[OTP Verification] Full response object:', JSON.stringify(verifyResponse, null, 2));
+              console.log('[OTP Verification] Response.token:', verifyResponse?.token);
+              console.log('[OTP Verification] Response.data?.token:', verifyResponse?.data?.token);
+              console.log('[OTP Verification] Response.verificationToken:', verifyResponse?.verificationToken);
+              console.log('[OTP Verification] Response.data?.verificationToken:', verifyResponse?.data?.verificationToken);
+              console.log('[OTP Verification] Response.message:', verifyResponse?.message);
+              console.log('[OTP Verification] Response.success:', verifyResponse?.success);
+              console.log('[OTP Verification] Response.status:', verifyResponse?.status);
+              console.log('[OTP Verification] Response.type:', verifyResponse?.type);
+              console.log('[OTP Verification] Response.verified:', verifyResponse?.verified);
+              console.log('[OTP Verification] ====================================================');
+              
+              // Check for authentication errors (401)
+              if (verifyResponse && (verifyResponse.code === '401' || verifyResponse.code === 401 || (verifyResponse.type === 'error' && verifyResponse.message === 'AuthenticationFailure'))) {
+                throw new Error('MSG91 Authentication Failure - Invalid widget credentials');
+              }
+              
+              // Check if verification was successful
+              if (verifyResponse && (verifyResponse.success || verifyResponse.status === 'success' || verifyResponse.type === 'success' || verifyResponse.verified)) {
+                console.log('[OTP Verification] ✅ OTP verified successfully via MSG91 SDK');
+                
+                // Step 4: Extract verification token from SDK response
+                // SDK returns verification token that backend will trust
+                // Check all possible fields where MSG91 might return the token
+                const verificationToken = verifyResponse.token || 
+                                         verifyResponse.data?.token || 
+                                         verifyResponse.data?.verificationToken ||
+                                         verifyResponse.verificationToken ||
+                                         verifyResponse.data?.phoneVerificationToken ||
+                                         verifyResponse.data?.message ||
+                                         verifyResponse.message || // Sometimes token is in message field
+                                         verifyResponse.data?.reqId ||
+                                         verifyResponse.reqId ||
+                                         reqId; // Use reqId as fallback token
+                
+                if (!verificationToken) {
+                  throw new Error('MSG91 SDK did not return verification token');
+                }
+                
+                console.log('[OTP Verification] Verification token extracted:', {
+                  tokenPreview: verificationToken ? `${verificationToken.substring(0, 20)}...` : 'missing',
+                });
+                
+                // For registration flow, navigate back with token
+                if (isRegistrationFlow) {
+                  console.log('[OTP Verification] Registration flow - returning to RegisterScreen with SDK token');
+                  
+                  // Build JSON payload for backend as phoneVerificationToken (same format as widget)
+                  const msg91PayloadForBackend = JSON.stringify({
+                    ...verifyResponse,
+                    extractedToken: verificationToken,
+                    reqId: reqId,
+                  });
+                  
+                  navigation.navigate('Register', {
+                    phoneVerified: true,
+                    phoneMsg91Token: msg91PayloadForBackend, // Full MSG91 payload for backend
+                    phoneToken: verificationToken, // Human-readable token preview
+                    phoneMethod: 'msg91-sdk',
+                    phoneReqId: reqId,
+                    verifiedOtp: undefined, // No OTP needed, SDK already verified
+                    // Restore form data
+                    phone: params.formData?.phone || phoneNumber,
+                    name: params.formData?.name,
+                    email: params.formData?.email,
+                    selectedRole: params.formData?.selectedRole,
+                  } as any);
+                  
+                  CustomAlert.alert(
+                    'Success',
+                    'Phone number verified successfully! You can now complete registration.',
+                    [
+                      {
+                        text: 'OK',
+                        onPress: () => {
+                          // Navigation already handled above
+                        },
+                      },
+                    ],
+                  );
+                  return;
+                }
+                
+                // For login/forgot password flows, verify with backend
+                if (userId) {
+                  console.log('[OTP Verification] Verifying with backend for authentication...');
+                  await verifyOTP(userId, otp, params.phone);
+                  
+                  // Success - navigation handled by AppNavigator
+                  if (params.type === 'forgotPassword') {
+                    navigation.navigate('ResetPassword', {otp} as never);
+                  } else {
+                    CustomAlert.alert(
+                      'Success',
+                      'SMS OTP verified successfully! You are now logged in.',
+                      [
+                        {
+                          text: 'OK',
+                          onPress: () => {
+                            // Navigate based on selected role
+                            handleSuccessNavigation();
+                          },
+                        },
+                      ],
+                    );
+                  }
+                  return;
+                } else {
+                  throw new Error('User ID required for login/forgot password flow');
+                }
+              } else {
+                // If MSG91 SDK returns failure response
+                const errorMsg = verifyResponse?.message || verifyResponse?.error || 'MSG91 SDK verification returned failure response';
+                console.error('[OTP Verification] MSG91 SDK verification returned failure:', errorMsg);
+                throw new Error(`OTP verification failed: ${errorMsg}`);
+              }
+            } catch (sdkError: any) {
+              console.error('[OTP Verification] MSG91 SDK verification failed:', {
+                error: sdkError.message || sdkError,
+                willTryBackend: false, // Don't fallback, SDK is primary method
+              });
+              throw sdkError; // Re-throw to show error to user
+            }
+          }
+          
+          console.log('[OTP Verification] Verifying SMS OTP via MSG91/backend helper:', {
             phone: phoneNumber,
             originalPhone: params.phone,
             context,
@@ -188,35 +520,79 @@ const OTPVerificationScreen: React.FC = () => {
           
           const smsVerifyResponse = await otpService.verifySMS(phoneNumber, otp, reqId, context, method);
           
-          console.log('[OTP Verification] MSG91 SMS verification response:', {
+          console.log('[OTP Verification] SMS verification response:', {
             success: smsVerifyResponse.success,
             method: smsVerifyResponse.method,
             message: smsVerifyResponse.message,
+            hasToken: !!smsVerifyResponse.token,
+            isRegistrationFlow,
           });
           
           if (smsVerifyResponse.success) {
-            // SMS OTP verified via MSG91
-            console.log('[OTP Verification] MSG91 verification successful');
+            // SMS OTP verified (via MSG91 SDK or backend fallback)
+            console.log('[OTP Verification] OTP verification successful via:', smsVerifyResponse.method || 'unknown');
             
             // Extract token from verification response (if available)
             // The verifySMS function now returns token directly if SDK verification succeeds
-            const verificationToken = smsVerifyResponse.token ||
+            // For backend API, we may need to use reqId or a special marker
+            let verificationToken = smsVerifyResponse.token ||
                                    smsVerifyResponse.data?.token || 
                                    smsVerifyResponse.data?.verificationToken ||
-                                   smsVerifyResponse.reqId; // Use reqId as token fallback
+                                   smsVerifyResponse.data?.phoneVerificationToken;
+            
+            // If no token from response, use reqId as fallback (for backend API verification)
+            if (!verificationToken) {
+              if (smsVerifyResponse.method === 'backend' && params.reqId) {
+                // Backend API verification - use reqId as token
+                verificationToken = params.reqId;
+                console.log('[OTP Verification] Using reqId as token for backend verification:', params.reqId.substring(0, 15) + '...');
+              } else if (smsVerifyResponse.reqId) {
+                verificationToken = smsVerifyResponse.reqId;
+                console.log('[OTP Verification] Using response reqId as token:', smsVerifyResponse.reqId.substring(0, 15) + '...');
+              } else if (params.reqId) {
+                verificationToken = params.reqId;
+                console.log('[OTP Verification] Using original reqId as token fallback:', params.reqId.substring(0, 15) + '...');
+              } else {
+                console.warn('[OTP Verification] ⚠️ No token or reqId available - registration may fail!');
+              }
+            }
             
             // For registration flow, mark phone as verified and go back to registration
             if (isRegistrationFlow) {
               console.log('[OTP Verification] Registration flow - phone verified, returning to registration');
-              console.log('[OTP Verification] Verification token:', verificationToken ? `${verificationToken.substring(0, 20)}...` : 'not provided');
+              console.log('[OTP Verification] Verification details:', {
+                token: verificationToken ? `${verificationToken.substring(0, 20)}...` : 'not provided',
+                method: smsVerifyResponse.method || params.method,
+                phone: phoneNumber,
+              });
               
               // Pass verification result back via navigation params
               // RegisterScreen will use useFocusEffect to detect this
-              navigation.navigate('Register', {
+              // Also pass form data to restore form fields
+              const navigationParams = {
                 phoneVerified: true,
-                phoneToken: verificationToken || params.reqId, // Use reqId as token if no token in response
-                phoneMethod: smsVerifyResponse.method || params.method,
-              } as any);
+                phoneToken: verificationToken || undefined,
+                phoneMethod: smsVerifyResponse.method || params.method || 'backend',
+                // For backend verification, pass the OTP that was verified (as fallback if no token)
+                verifiedOtp: (smsVerifyResponse.method === 'backend' && !verificationToken) ? otp : undefined,
+                // Restore form data if available
+                phone: params.formData?.phone || phoneNumber,
+                name: params.formData?.name,
+                email: params.formData?.email,
+                selectedRole: params.formData?.selectedRole,
+              };
+              
+              console.log('[OTP Verification] Navigating back to Register with params:', {
+                phoneVerified: navigationParams.phoneVerified,
+                phoneToken: navigationParams.phoneToken ? `${navigationParams.phoneToken.substring(0, 10)}...` : 'none',
+                phoneMethod: navigationParams.phoneMethod,
+                phone: navigationParams.phone,
+                hasName: !!navigationParams.name,
+                hasEmail: !!navigationParams.email,
+                selectedRole: navigationParams.selectedRole,
+              });
+              
+              navigation.navigate('Register', navigationParams as any);
               
               CustomAlert.alert(
                 'Success',
@@ -249,7 +625,8 @@ const OTPVerificationScreen: React.FC = () => {
                     {
                       text: 'OK',
                       onPress: () => {
-                        // Navigation handled automatically by AppNavigator
+                        // Navigate based on selected role
+                        handleSuccessNavigation();
                       },
                     },
                   ],
@@ -285,7 +662,7 @@ const OTPVerificationScreen: React.FC = () => {
         if (params.type === 'forgotPassword') {
           navigation.navigate('ResetPassword', {otp} as never);
         } else {
-          // For login flow, show success and navigation will be handled by AppNavigator
+          // For login flow, show success and navigate to selected role's dashboard
           CustomAlert.alert(
             'Success',
             'OTP verified successfully! You are now logged in.',
@@ -293,16 +670,43 @@ const OTPVerificationScreen: React.FC = () => {
               {
                 text: 'OK',
                 onPress: () => {
-                  // Navigation will be handled automatically by AppNavigator
-                  // when user state changes
+                  // Navigate based on selected role
+                  handleSuccessNavigation();
                 },
               },
             ],
           );
         }
       } else if (isRegistrationFlow) {
-        // For registration flow without userId, just mark as verified and go back
+        // For registration flow without userId, mark as verified and navigate back with params
         console.log('[OTP Verification] Registration flow - phone verified via backend fallback');
+        
+        // Format phone for navigation (12 digits: 91XXXXXXXXXX)
+        let phoneNumber = params.phone?.replace(/^\+/, '') || '';
+        if (phoneNumber.length === 10) {
+          phoneNumber = `91${phoneNumber}`;
+        } else if (!phoneNumber.startsWith('91') && phoneNumber.length > 0) {
+          phoneNumber = `91${phoneNumber.slice(-10)}`;
+        }
+        
+        // Navigate back to Register screen with verification params
+        // This ensures RegisterScreen detects phoneVerified via useFocusEffect
+        // Also pass form data to restore form fields
+        // For backend verification, pass the OTP that was verified (since no token available)
+        console.log('[OTP Verification] Backend fallback - passing verified OTP for registration');
+        
+        navigation.navigate('Register', {
+          phoneVerified: true,
+          phoneToken: params.reqId || undefined, // Try reqId as token, but likely won't work
+          phoneMethod: 'backend', // Backend verification was used
+          verifiedOtp: otp, // Pass the OTP that was verified (backend will accept this)
+          // Restore form data if available
+          phone: params.formData?.phone || phoneNumber,
+          name: params.formData?.name,
+          email: params.formData?.email,
+          selectedRole: params.formData?.selectedRole,
+        } as any);
+        
         CustomAlert.alert(
           'Success',
           'Phone number verified successfully! You can now complete registration.',
@@ -310,7 +714,7 @@ const OTPVerificationScreen: React.FC = () => {
             {
               text: 'OK',
               onPress: () => {
-                navigation.goBack();
+                // Navigation already handled above
               },
             },
           ],
@@ -387,6 +791,42 @@ const OTPVerificationScreen: React.FC = () => {
           // Determine context: 'forgotPassword' or 'register' (default)
           const context = params.type === 'forgotPassword' ? 'forgotPassword' : 'register';
           
+          // For MSG91 REST mobile flow, use backend proxy directly
+          if (params.method === 'msg91-rest') {
+            console.log('[OTP Verification] Resending OTP via MSG91 REST backend flow:', {
+              phone: phoneNumber,
+              context,
+            });
+
+            const restSendResponse = await otpService.msg91SendViaBackend(phoneNumber);
+
+            console.log('[OTP Verification] MSG91 REST resend response:', {
+              success: restSendResponse?.success,
+              message: restSendResponse?.message,
+              data: restSendResponse?.data,
+            });
+
+            if (!restSendResponse || !restSendResponse.success) {
+              throw new Error(restSendResponse?.message || 'Failed to resend OTP');
+            }
+
+            // Update reqId if backend returns a new one
+            const newReqId =
+              restSendResponse.data?.requestId || restSendResponse.data?.reqId;
+            if (newReqId) {
+              (route as any).params = {
+                ...(route.params as any),
+                reqId: newReqId,
+              };
+            }
+
+            setTimer(60);
+            setCanResend(false);
+            setOtp('');
+            CustomAlert.alert('Success', 'New SMS OTP sent successfully!');
+            return;
+          }
+
           console.log(`[OTP Verification] Resending SMS OTP:`, {
             phone: phoneNumber,
             context: context,
@@ -489,7 +929,7 @@ const OTPVerificationScreen: React.FC = () => {
         <Button
           title={isLoading ? 'Verifying...' : 'Verify'}
           onPress={handleVerify}
-          disabled={otp.length < 4 || otp.length > 6 || isLoading}
+          disabled={otp.length !== 4 || isLoading}
           loading={isLoading}
           fullWidth
         />

@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   Image,
+  Animated,
 } from 'react-native';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -38,6 +39,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(user?.profile_image || null);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -289,12 +291,18 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         onProfilePress={() => {}}
         onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={handleLogout}
+        scrollY={scrollY}
       />
 
-      <ScrollView 
+      <Animated.ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={styles.scrollContent}
-        contentInsetAdjustmentBehavior="never">
+        contentInsetAdjustmentBehavior="never"
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true}
+        )}
+        scrollEventThrottle={16}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             {profileImage ? (
@@ -516,7 +524,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -524,7 +532,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA',
   },
   loadingContainer: {
     flex: 1,
@@ -537,7 +545,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.lg,
-    paddingTop: 0,
+    paddingTop: spacing.md,
   },
   profileHeader: {
     alignItems: 'center',

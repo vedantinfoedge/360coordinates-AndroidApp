@@ -7,7 +7,6 @@ import {
   Animated,
   Image,
   TextInput,
-  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -38,6 +37,8 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerHeight = insets.top + 70;
 
   useEffect(() => {
     // Entrance animations
@@ -188,32 +189,37 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
 
   return (
     <View style={styles.container}>
-      {/* Fixed Background Banner Image */}
-      <View style={[styles.bannerBackground, {top: insets.top + 60}]}>
-        <Image
-          source={require('../../assets/Banner.jpeg')}
-          style={styles.bannerImage}
-          resizeMode="cover"
-        />
-        {/* Semi-transparent overlay for better content visibility */}
-        <View style={styles.bannerOverlay} />
-      </View>
-      
       <BuyerHeader
-        onSupportPress={() => {}}
+        onSupportPress={() => {
+          (navigation as any).navigate('MainTabs', {
+            screen: 'Support',
+          });
+        }}
         onSignInPress={() => {
           (navigation as any).navigate('Auth', {
             screen: 'Login',
           });
         }}
+        onSignUpPress={() => {
+          (navigation as any).navigate('Auth', {
+            screen: 'Register',
+          });
+        }}
         showProfile={false}
         showLogout={false}
         showSignIn={true}
+        showSignUp={true}
+        scrollY={scrollY}
       />
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        contentContainerStyle={[styles.scrollContent, {paddingTop: headerHeight}]}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true},
+        )}
+        scrollEventThrottle={16}>
         <Animated.View
           style={[
             styles.content,
@@ -222,9 +228,19 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
               transform: [{translateY: slideUpAnim}, {scale: scaleAnim}],
             },
           ]}>
+          {/* Welcome Section - Hide when role selection is shown */}
+          {!showRoleSelection && (
+            <View style={styles.welcomeSection}>
+              <Text style={styles.welcomeText}>Welcome</Text>
+              <Text style={styles.welcomeSubtext}>
+                Find your dream property in India
+              </Text>
+            </View>
+          )}
+
           {/* Listing Type Toggle Buttons - Hide when role selection is shown */}
           {!showRoleSelection && (
-            <View style={[styles.toggleSection, {marginTop: insets.top + 70}]}>
+            <View style={styles.toggleSection}>
               <TouchableOpacity
                 style={[styles.toggleButton, listingType === 'all' && styles.toggleButtonActive]}
                 onPress={() => setListingType('all')}>
@@ -395,7 +411,7 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
             )}
           </View>
         </Animated.View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -403,69 +419,53 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  bannerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    width: '100%',
-    height: '100%',
-    zIndex: 0,
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'transparent',
-  },
-  bannerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: '#FAFAFA',
   },
   scrollView: {
     flex: 1,
-    zIndex: 1,
   },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: spacing.xl,
-    backgroundColor: 'transparent',
+    backgroundColor: '#FAFAFA',
   },
   content: {
     width: '100%',
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
+    paddingHorizontal: spacing.lg,
+    backgroundColor: '#FAFAFA',
+  },
+  welcomeSection: {
+    marginBottom: spacing.sm,
+  },
+  welcomeText: {
+    ...typography.h1,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  welcomeSubtext: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
   searchSection: {
     width: '100%',
-    paddingHorizontal: spacing.sm,
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   searchContainer: {
     position: 'relative',
-    width: '100%',
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.xxl,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   searchIcon: {
     fontSize: 20,
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
-    marginLeft: spacing.md,
+    marginLeft: spacing.sm,
   },
   searchButtonText: {
     ...typography.body,
@@ -501,82 +501,77 @@ const styles = StyleSheet.create({
   },
   toggleSection: {
     flexDirection: 'row',
-    paddingLeft: spacing.xxl,
-    paddingRight: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
+    paddingBottom: spacing.md,
     gap: spacing.xs,
-    justifyContent: 'center',
+    width: '100%',
+    justifyContent: 'space-between',
   },
   toggleButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 24,
+    backgroundColor: colors.accentLighter || colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 70,
+    minHeight: 40,
   },
   toggleButtonActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   toggleButtonText: {
-    ...typography.caption,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '900',
     fontSize: 14,
+    textAlign: 'center',
   },
   toggleButtonTextActive: {
     color: colors.surface,
   },
   backButton: {
     alignSelf: 'flex-start',
-    padding: spacing.md,
     marginBottom: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: 12,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   backButtonText: {
     ...typography.body,
-    color: colors.text,
-    fontWeight: '700',
+    color: colors.primary,
+    fontWeight: '600',
     fontSize: 16,
   },
   optionsSection: {
     width: '100%',
     gap: spacing.lg,
+    marginTop: spacing.md,
   },
   optionsSectionWithPadding: {
     paddingTop: spacing.xl,
+    marginTop: 0,
   },
   optionCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    borderRadius: 14,
+    padding: spacing.lg,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.border,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.1,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
     overflow: 'hidden',
   },
   optionImageContainer: {
     width: '100%',
-    height: 180,
-    borderRadius: borderRadius.lg,
+    height: 160,
+    borderRadius: 12,
     marginBottom: spacing.md,
     overflow: 'hidden',
     backgroundColor: colors.surfaceSecondary,
@@ -584,10 +579,10 @@ const styles = StyleSheet.create({
   optionImage: {
     width: '100%',
     height: '100%',
-    borderRadius: borderRadius.lg,
+    borderRadius: 12,
   },
   optionTitle: {
-    ...typography.h2,
+    ...typography.h3,
     color: colors.text,
     fontWeight: '700',
     marginBottom: spacing.xs,
@@ -596,6 +591,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+    fontSize: 14,
   },
 });
 

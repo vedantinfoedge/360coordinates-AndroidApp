@@ -1,9 +1,10 @@
-import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import React, {useRef} from 'react';
+import {View, Text, StyleSheet, Animated} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
+import {colors, spacing} from '../../theme';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -11,13 +12,16 @@ type Props = {
 
 const CityFilteredBuyScreen: React.FC<Props> = ({navigation}) => {
   const {logout, user, isAuthenticated} = useAuth();
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerHeight = insets.top + 70;
   
   // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
   const isGuest = !isLoggedIn;
   
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <BuyerHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
@@ -36,29 +40,43 @@ const CityFilteredBuyScreen: React.FC<Props> = ({navigation}) => {
         showProfile={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
+        scrollY={scrollY}
+        headerHeight={headerHeight}
       />
-      <View style={styles.content}>
+      <Animated.ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, {paddingTop: insets.top + spacing.md}]}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true},
+        )}
+        scrollEventThrottle={16}>
         <Text style={styles.title}>City Filtered Buy</Text>
-      </View>
-    </SafeAreaView>
+      </Animated.ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingBottom: spacing.xl,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: colors.text,
   },
 });
 
 export default CityFilteredBuyScreen;
-

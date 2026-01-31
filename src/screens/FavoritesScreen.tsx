@@ -58,14 +58,18 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    loadFavorites();
-  }, []);
+    if (isLoggedIn) {
+      loadFavorites();
+    }
+  }, [isLoggedIn]);
 
   // Reload favorites when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      loadFavorites(1, false);
-    }, [])
+      if (isLoggedIn) {
+        loadFavorites(1, false);
+      }
+    }, [isLoggedIn])
   );
 
   const loadFavorites = async (pageNum: number = 1, append: boolean = false) => {
@@ -158,8 +162,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
 
   const handleShareProperty = async (property: Property) => {
     try {
-      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
-      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nView more: ${shareUrl}`;
+      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
       
       await Share.share({
         message: shareMessage,
@@ -175,10 +178,13 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
 
   const renderProperty = ({item}: {item: Property}) => {
     const propertyType = item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy';
-    
+    const images = item.images?.length
+      ? item.images.map((url: string) => fixImageUrl(url)).filter(Boolean)
+      : undefined;
     return (
       <PropertyCard
         image={fixImageUrl(item.cover_image || item.images?.[0])}
+        images={images}
         name={item.title}
         location={item.location || item.city || 'Location not specified'}
         price={formatters.price(item.price, propertyType === 'rent')}

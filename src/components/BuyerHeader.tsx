@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,13 @@ import {
   Modal,
   Image,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, spacing, typography, borderRadius} from '../theme';
+
+const HEADER_HEIGHT = 64;
 
 interface BuyerHeaderProps {
   onProfilePress?: () => void;
@@ -17,10 +21,15 @@ interface BuyerHeaderProps {
   onLogoutPress?: () => void;
   onSignInPress?: () => void;
   onSignUpPress?: () => void;
+  onAddPropertyPress?: () => void; // Switch to seller dashboard to add property
   showProfile?: boolean;
   showLogout?: boolean;
   showSignIn?: boolean;
   showSignUp?: boolean;
+  /** When provided, header shows on scroll down and hides at top */
+  scrollY?: InstanceType<typeof Animated.Value>;
+  /** Header height (optional, for consistency) */
+  headerHeight?: number;
 }
 
 const BuyerHeader: React.FC<BuyerHeaderProps> = ({
@@ -29,13 +38,48 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
   onLogoutPress,
   onSignInPress,
   onSignUpPress,
+  onAddPropertyPress,
   showProfile = false,
   showLogout = false,
   showSignIn = false,
   showSignUp = false,
+  scrollY,
+  headerHeight: _headerHeight, // Unused but accepted for consistency
 }) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const insets = useSafeAreaInsets();
+  const slideAnim = useRef(new Animated.Value(-300)).current;
+
+  // Use Animated.diffClamp for scroll direction-based hiding (same as SellerHeader)
+  const clampedScrollY = scrollY
+    ? Animated.diffClamp(scrollY, 0, HEADER_HEIGHT + insets.top)
+    : new Animated.Value(0);
+
+  // Header animation: starts hidden (translateY negative), shows when scrolling down
+  const headerTranslateY = clampedScrollY.interpolate({
+    inputRange: [0, HEADER_HEIGHT + insets.top],
+    outputRange: [-(HEADER_HEIGHT + insets.top), 0], // Hidden -> Visible
+    extrapolate: 'clamp',
+  });
+  
+  // Slide animation for menu
+  useEffect(() => {
+    if (menuVisible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 40,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: -300,
+        duration: 200,
+        easing: Easing.ease,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [menuVisible]);
 
   // Determine if user is logged in based on props
   const isLoggedIn = Boolean(showLogout && onLogoutPress);
@@ -73,21 +117,8 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
       });
     }
     
-    // Add Login and Sign Up for guest users
+    // Add Sign Up and Login for guest users (Sign Up first, then Login)
     if (!isLoggedIn) {
-      if (showSignInFinal && onSignInPress) {
-        items.push({
-          label: 'Login',
-          onPress: () => {
-            console.log('[BuyerHeader] Login pressed');
-            setMenuVisible(false);
-            // Small delay to ensure modal closes before navigation
-            setTimeout(() => {
-              onSignInPress();
-            }, 100);
-          },
-        });
-      }
       if (showSignUpFinal && onSignUpPress) {
         items.push({
           label: 'Sign Up',
@@ -97,6 +128,19 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
             // Small delay to ensure modal closes before navigation
             setTimeout(() => {
               onSignUpPress();
+            }, 100);
+          },
+        });
+      }
+      if (showSignInFinal && onSignInPress) {
+        items.push({
+          label: 'Login',
+          onPress: () => {
+            console.log('[BuyerHeader] Login pressed');
+            setMenuVisible(false);
+            // Small delay to ensure modal closes before navigation
+            setTimeout(() => {
+              onSignInPress();
             }, 100);
           },
         });
@@ -141,9 +185,29 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
     console.log('  - menuItems:', menuItems.map(item => item.label));
   }, [showProfile, showLogout, showSignIn, showSignUp, showProfileFinal, showLogoutFinal, showSignInFinal, showSignUpFinal, isLoggedIn, menuItems, onSignInPress, onSignUpPress, onLogoutPress]);
 
+  // Get icon for menu item
+  const getMenuIcon = (label: string): string => {
+    switch (label) {
+      case 'View Profile': return '👤';
+      case 'Support': return '💬';
+      case 'Sign Up': return '✨';
+      case 'Login': return '🔑';
+      case 'Logout': return '🚪';
+      default: return '•';
+    }
+  };
+
   return (
-    <View style={[styles.safeArea, styles.stickyHeader]}>
-      <View style={[styles.header, {paddingTop: insets.top}]}>
+    <Animated.View 
+      style={[
+        styles.safeArea, 
+        styles.stickyHeader, 
+        {
+          paddingTop: insets.top,
+          transform: scrollY ? [{translateY: headerTranslateY}] : [],
+        }
+      ]}>
+      <View style={styles.header}>
         {/* Logo */}
         <View style={styles.logoContainer}>
           <Image
@@ -153,16 +217,30 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
           />
         </View>
 
-        {/* Hamburger Menu */}
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => setMenuVisible(true)}>
-          <View style={styles.hamburger}>
-            <View style={styles.hamburgerLine} />
-            <View style={styles.hamburgerLine} />
-            <View style={styles.hamburgerLine} />
-          </View>
-        </TouchableOpacity>
+        {/* Right side buttons container */}
+        <View style={styles.rightButtons}>
+          {/* Add Property Button - Only show when callback is provided (logged in users) */}
+          {onAddPropertyPress && (
+            <TouchableOpacity
+              style={styles.addPropertyButton}
+              onPress={onAddPropertyPress}
+              activeOpacity={0.7}>
+              <Text style={styles.addPropertyText}>+ Add</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Hamburger Menu */}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setMenuVisible(true)}
+            activeOpacity={0.7}>
+            <View style={styles.hamburger}>
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* Dropdown Menu Modal */}
         <Modal
@@ -174,70 +252,106 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => setMenuVisible(false)}>
-            <View style={styles.menuContainer} onStartShouldSetResponder={() => true}>
+            <Animated.View 
+              style={[
+                styles.menuContainer, 
+                {transform: [{translateX: slideAnim}]}
+              ]} 
+              onStartShouldSetResponder={() => true}>
               {menuItems.map((item, index) => (
                 <React.Fragment key={item.label}>
                   {index > 0 && <View style={styles.menuDivider} />}
                   <TouchableOpacity
                     style={styles.menuItem}
                     onPress={item.onPress}>
+                    <Text style={styles.menuItemIcon}>{getMenuIcon(item.label)}</Text>
                     <Text style={item.isLogout ? [styles.menuItemText, styles.logoutText] : styles.menuItemText}>
                       {item.label}
                     </Text>
                   </TouchableOpacity>
                 </React.Fragment>
               ))}
-            </View>
+            </Animated.View>
           </TouchableOpacity>
         </Modal>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#022b5f', // Navbar bg color
+    backgroundColor: colors.background, // Clean off-white
     zIndex: 1000,
-    ...Platform.select({
-      android: {
-        elevation: 4,
-      },
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: {width: 0, height: 2},
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-      },
-    }),
-  },
-  stickyHeader: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    width: '100%',
+    ...Platform.select({
+      android: {
+        elevation: 8,
+      },
+      ios: {
+        shadowColor: colors.secondary,
+        shadowOffset: {width: 0, height: 4},
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+    }),
+  },
+  stickyHeader: {
+    // For absolute positioning
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    minHeight: 60,
-    backgroundColor: '#022b5f', // Navbar bg color
-    borderBottomWidth: 0,
+    minHeight: HEADER_HEIGHT,
+    backgroundColor: colors.background, // Clean off-white
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(29, 36, 43, 0.08)',
   },
   logoContainer: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'flex-start',
+    marginLeft: -spacing.xxxl-spacing.md,
   },
   logoImage: {
-    width: 140,
-    height: 40,
+    width: 220,
+    height: 66,
+  },
+  rightButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  addPropertyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.secondary, // Dark navy blue
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.sm,
+    shadowColor: colors.secondary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addPropertyText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.surface, // White text
+    letterSpacing: 0.3,
   },
   menuButton: {
-    padding: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: 'rgba(29, 36, 43, 0.08)',
   },
   hamburger: {
     width: 24,
@@ -246,42 +360,56 @@ const styles = StyleSheet.create({
   },
   hamburgerLine: {
     width: '100%',
-    height: 2,
-    backgroundColor: colors.surface, // White color for visibility on purple background
-    borderRadius: 1,
+    height: 2.5,
+    backgroundColor: colors.secondary, // Dark navy blue
+    borderRadius: 2,
+  },
+  hamburgerLineActive: {
+    backgroundColor: colors.primary,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: 60,
+    paddingTop: 70,
     paddingRight: spacing.md,
   },
   menuContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    minWidth: 180,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    minWidth: 200,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+    overflow: 'hidden',
   },
   menuItem: {
-    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    gap: 12,
+  },
+  menuItemIcon: {
+    fontSize: 18,
   },
   menuItemText: {
-    ...typography.body,
+    fontSize: 16,
+    fontWeight: '500',
     color: colors.text,
+    letterSpacing: 0.1,
   },
   logoutText: {
-    color: colors.error,
+    color: '#EF4444',
+    fontWeight: '600',
   },
   menuDivider: {
     height: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.sm,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 0,
   },
 });
 

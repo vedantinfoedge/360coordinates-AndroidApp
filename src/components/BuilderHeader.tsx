@@ -116,17 +116,17 @@ const BuilderHeader: React.FC<BuilderHeaderProps> = ({
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#022b5f', // Navbar bg color
+    backgroundColor: colors.background, // Clean off-white
     zIndex: 1000,
     ...Platform.select({
       android: {
-        elevation: 4,
+        elevation: 8,
       },
       ios: {
-        shadowColor: '#000',
-        shadowOffset: {width: 0, height: 2},
+        shadowColor: colors.secondary,
+        shadowOffset: {width: 0, height: 4},
         shadowOpacity: 0.15,
-        shadowRadius: 4,
+        shadowRadius: 12,
       },
     }),
   },
@@ -137,22 +137,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     minHeight: 70,
-    backgroundColor: '#022b5f', // Navbar bg color
-    borderBottomWidth: 0,
+    backgroundColor: colors.background, // Clean off-white
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(29, 36, 43, 0.08)',
   },
   logoContainer: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'flex-start',
+    marginLeft: -spacing.md,
   },
   logoImage: {
-    width: 140,
-    height: 40,
+    width: 220,
+    height: 66,
   },
   menuButton: {
-    padding: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: 'rgba(29, 36, 43, 0.08)',
   },
   hamburger: {
     width: 24,
@@ -161,9 +166,9 @@ const styles = StyleSheet.create({
   },
   hamburgerLine: {
     width: '100%',
-    height: 2,
-    backgroundColor: colors.surface,
-    borderRadius: 1,
+    height: 2.5,
+    backgroundColor: colors.secondary, // Dark navy blue
+    borderRadius: 2,
   },
   modalOverlay: {
     flex: 1,

@@ -14,6 +14,8 @@ export const authService = {
     phoneVerificationToken?: string;
     emailOtp?: string; // Backend OTP fallback
     phoneOtp?: string; // Backend OTP fallback
+    phoneVerificationMethod?: string; // e.g. 'msg91' for MSG91 REST mobile flow
+    phoneVerified?: boolean; // flag from app indicating MSG91-backed verification
   }) => {
     // Map to backend expected format
     const registerData: any = {
@@ -38,6 +40,14 @@ export const authService = {
     }
     if (!userData.phoneVerificationToken && userData.phoneOtp) {
       registerData.phoneOtp = userData.phoneOtp;
+    }
+
+    // Add MSG91 REST metadata (mobile flow trusts MSG91 via backend proxy)
+    if (userData.phoneVerificationMethod) {
+      registerData.phoneVerificationMethod = userData.phoneVerificationMethod;
+    }
+    if (typeof userData.phoneVerified === 'boolean') {
+      registerData.phoneVerified = userData.phoneVerified;
     }
     
     const response = await api.post(API_ENDPOINTS.REGISTER, registerData);

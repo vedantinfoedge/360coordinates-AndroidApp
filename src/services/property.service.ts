@@ -159,50 +159,26 @@ export const propertyService = {
     
     // Fix image URLs in response
     if (response && response.success && response.data) {
-      const property = fixPropertyImages(response.data.property || response.data);
+      // Don't use fixPropertyImages - it might modify images incorrectly
+      // Just get the raw property data
+      const rawProperty = response.data.property || response.data;
       
-      // Process images array - Backend returns array of string URLs
-      // Format: ["https://...", "https://...", ...]
-      let images: string[] = [];
-      
-      // Check response.data.images first (if backend returns it at top level)
-      if (response.data.images && Array.isArray(response.data.images)) {
-        images = response.data.images
-          .map((img: any) => {
-            if (typeof img === 'string') {
-              // Backend already provides full URLs, but we'll normalize them
-              const trimmed = img.trim();
-              return trimmed && trimmed !== '' && trimmed !== 'null' ? fixImageUrl(trimmed) : null;
-            }
-            return null;
-          })
-          .filter((url: string | null): url is string => url !== null && url !== '' && url !== 'https://via.placeholder.com/400x300?text=No+Image');
-      }
-      
-      // Check property.images (main location - backend returns images here)
-      if (property.images && Array.isArray(property.images) && images.length === 0) {
-        images = property.images
-          .map((img: any) => {
-            if (typeof img === 'string') {
-              // Backend already provides full URLs
-              const trimmed = img.trim();
-              return trimmed && trimmed !== '' && trimmed !== 'null' ? fixImageUrl(trimmed) : null;
-            } else if (img && typeof img === 'object') {
-              // Handle object format (fallback)
-              const url = img.image_url || img.url || img.path || img.image || '';
-              return url ? fixImageUrl(url) : null;
-            }
-            return null;
-          })
-          .filter((url: string | null): url is string => url !== null && url !== '' && url !== 'https://via.placeholder.com/400x300?text=No+Image');
-      }
-      
-      console.log('[PropertyService] Processed images:', {
-        count: images.length,
-        firstImage: images[0],
-        allImages: images,
+      console.log('[PropertyService] Raw property images:', {
+        images: rawProperty.images,
+        imagesType: typeof rawProperty.images,
+        imagesIsArray: Array.isArray(rawProperty.images),
+        imagesLength: Array.isArray(rawProperty.images) ? rawProperty.images.length : 0,
       });
       
+      // Fix cover_image URL only
+      const property = {
+        ...rawProperty,
+        cover_image: fixImageUrl(rawProperty.cover_image),
+      };
+      
+      // Keep images array as-is (will be processed in the screen component)
+      // Don't process images here - let the screen component handle it
+    
       // Fix owner/seller data
       const owner = response.data.owner || response.data.seller || {};
       if (owner) {
@@ -226,6 +202,8 @@ export const propertyService = {
           ...response.data,
           property: {
             ...propertyWithOwner,
+            // Keep original images array - don't modify it here
+            images: rawProperty.images, // Use original images array
             // Fix numeric fields
             latitude: property.latitude ? parseFloat(property.latitude) : null,
             longitude: property.longitude ? parseFloat(property.longitude) : null,
@@ -233,7 +211,6 @@ export const propertyService = {
             area: parseFloat(property.area || '0'),
             carpet_area: parseFloat(property.carpet_area || '0'),
           },
-          images, // Array of string URLs
         },
       };
     }

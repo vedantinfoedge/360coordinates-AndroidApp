@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  Animated,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -60,6 +61,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [propertyFilter, setPropertyFilter] = useState<number | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadInquiries();
@@ -393,6 +395,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
         onLogoutPress={logout}
+        scrollY={scrollY}
       />
       
       {/* Search and Filter Bar */}
@@ -478,12 +481,17 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
               </Text>
             </View>
           ) : (
-            <FlatList
+            <Animated.FlatList
               data={filteredInquiries}
               renderItem={renderInquiry}
               keyExtractor={item => String(item.id)}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
+              onScroll={Animated.event(
+                [{nativeEvent: {contentOffset: {y: scrollY}}}],
+                {useNativeDriver: true}
+              )}
+              scrollEventThrottle={16}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -502,15 +510,18 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA',
   },
   centerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    marginTop: spacing.md,
   },
   listContent: {
-    padding: spacing.md,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
   },
   inquiryCard: {
     backgroundColor: colors.surface,
@@ -603,6 +614,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     padding: spacing.md,
+    marginTop: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

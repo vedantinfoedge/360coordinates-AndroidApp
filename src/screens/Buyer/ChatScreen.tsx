@@ -75,6 +75,8 @@ interface ChatListItem {
 const ChatScreen: React.FC<Props> = ({navigation}) => {
   const {logout, user, isAuthenticated} = useAuth();
   const insets = useSafeAreaInsets();
+  const headerHeight = insets.top + 70;
+  const scrollY = useRef(new Animated.Value(0)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(30)).current;
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
@@ -593,7 +595,7 @@ const ChatScreen: React.FC<Props> = ({navigation}) => {
             {
               opacity: fadeAnim,
               transform: [{translateY: slideAnim}],
-              paddingTop: insets.top + 70,
+              paddingTop: insets.top + spacing.md,
             },
           ]}>
           <View style={styles.loginContent}>
@@ -682,14 +684,21 @@ const ChatScreen: React.FC<Props> = ({navigation}) => {
         showProfile={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
+        scrollY={scrollY}
+        headerHeight={headerHeight}
       />
       {chatList.length > 0 ? (
-        <FlatList
+        <Animated.FlatList
           data={chatList}
           renderItem={renderChatItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
+          keyExtractor={(item: any) => item.id}
+          contentContainerStyle={[styles.listContent, {paddingTop: insets.top + spacing.md}]}
           showsVerticalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{nativeEvent: {contentOffset: {y: scrollY}}}],
+            {useNativeDriver: true},
+          )}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

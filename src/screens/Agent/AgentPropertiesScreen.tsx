@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useEffect} from 'react';
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
@@ -52,6 +53,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   // Check if property can be edited (within 24 hours)
   const canEditProperty = (property: any): boolean => {
@@ -430,12 +432,18 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support')}
         onLogoutPress={logout}
+        scrollY={scrollY}
       />
-      <FlatList
+      <Animated.FlatList
         data={properties}
         renderItem={renderProperty}
         keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.listContent}
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {y: scrollY}}}],
+          {useNativeDriver: true}
+        )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -472,7 +480,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA',
   },
   loadingContainer: {
     flex: 1,
@@ -485,7 +493,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   listContent: {
-    padding: spacing.md,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
   },
   propertyCard: {
     backgroundColor: colors.surface,

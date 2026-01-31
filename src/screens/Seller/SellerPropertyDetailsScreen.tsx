@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  Platform,
   ActivityIndicator,
   Alert,
   Share,
@@ -17,7 +18,7 @@ import {RouteProp} from '@react-navigation/native';
 import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {propertyService} from '../../services/property.service';
-import {fixImageUrl, isValidImageUrl} from '../../utils/imageHelper';
+import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
 import SellerHeader from '../../components/SellerHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
@@ -36,13 +37,10 @@ type Props = {
 };
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
+// Calculate image carousel width accounting for container margins
+const IMAGE_CAROUSEL_WIDTH = SCREEN_WIDTH - (spacing.md * 2);
 
-// Property image type (matches website format)
-interface PropertyImage {
-  id: number;
-  url: string;
-  alt: string;
-}
+// PropertyImage type is imported from imageHelper
 
 const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
@@ -51,7 +49,8 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
-  const imageScrollViewRef = useRef<ScrollView>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageScrollViewRef = useRef<any>(null);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set()); // Track failed image IDs
 
   useEffect(() => {
@@ -64,6 +63,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       setCurrentImageIndex(0);
       setFailedImages(new Set()); // Reset failed images when property changes
       setTimeout(() => {
+        // @ts-ignore
         imageScrollViewRef.current?.scrollTo({
           x: 0,
           animated: false,
@@ -103,59 +103,16 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       if (responseData && responseData.success && responseData.data) {
         const propData = responseData.data.property || responseData.data;
         
-        // Convert array of strings to array of objects (like website)
-        let propertyImages: PropertyImage[] = [];
+        // ✅ Use helper function to validate and process images (EXACTLY like website)
+        let propertyImages: PropertyImage[] = validateAndProcessPropertyImages(
+          propData.images,
+          propData.title || 'Property',
+          propData.cover_image
+        );
         
-        // Primary: Extract from images array and convert to objects
-        if (propData.images && Array.isArray(propData.images) && propData.images.length > 0) {
-          propertyImages = propData.images
-            .map((img: any, idx: number) => {
-              if (typeof img === 'string') {
-                const trimmed = img.trim();
-                if (trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') {
-                  const fixedUrl = fixImageUrl(trimmed);
-                  if (fixedUrl && isValidImageUrl(fixedUrl) && !fixedUrl.includes('placeholder')) {
-                    return {
-                      id: idx + 1,
-                      url: fixedUrl,
-                      alt: propData.title || `Property image ${idx + 1}`
-                    };
-                  }
-                }
-              } else if (typeof img === 'object' && img !== null) {
-                const url = img.url || img.image_url || img.src || img.path || img.image || '';
-                if (url && typeof url === 'string') {
-                  const fixedUrl = fixImageUrl(url.trim());
-                  if (fixedUrl && isValidImageUrl(fixedUrl)) {
-                    return {
-                      id: idx + 1,
-                      url: fixedUrl,
-                      alt: propData.title || `Property image ${idx + 1}`
-                    };
-                  }
-                }
-              }
-              return null;
-            })
-            .filter((img: PropertyImage | null): img is PropertyImage => {
-              if (!img || !img.url || img.url.length === 0) return false;
-              return isValidImageUrl(img.url);
-            });
-        }
+        console.log(`[SellerPropertyDetails] Processed ${propertyImages.length} valid images from ${propData.images?.length || 0} total`);
         
-        // Fallback: Use cover_image if no images array found
-        if (propertyImages.length === 0 && propData.cover_image) {
-          const coverImageUrl = fixImageUrl(propData.cover_image);
-          if (coverImageUrl && isValidImageUrl(coverImageUrl) && !coverImageUrl.includes('placeholder')) {
-            propertyImages = [{
-              id: 1,
-              url: coverImageUrl,
-              alt: propData.title || 'Property image'
-            }];
-          }
-        }
-        
-        // Final fallback: Placeholder
+        // Final fallback: Placeholder (only if absolutely no images)
         if (propertyImages.length === 0) {
           propertyImages = [{
             id: 1,
@@ -207,11 +164,10 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     if (!property) return;
     
     try {
-      const shareUrl = `https://demo1.indiapropertys.com/property/${property.id}`;
       const priceText = property.price 
         ? `₹${parseFloat(property.price).toLocaleString('en-IN')}${property.status === 'rent' ? '/month' : ''}`
         : 'Price not available';
-      const shareMessage = `Check out this property!\n\n${property.title || 'Property'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nView more details: ${shareUrl}`;
+      const shareMessage = `Check out this property!\n\n${property.title || 'Property'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nVisit us: https://360coordinates.com`;
       
       await Share.share({
         message: shareMessage,
@@ -243,14 +199,16 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   }
 
   // Get property images - already converted to objects
+  // Get property images - already converted to objects in loadPropertyDetails
+  // Use all images that have a valid URL (don't filter out - they're already processed)
   const propertyImages: PropertyImage[] = property.images && Array.isArray(property.images) && property.images.length > 0
     ? property.images.filter((img: any): img is PropertyImage => {
+        // Only filter out null/undefined or empty URLs
         return img && 
                typeof img === 'object' && 
                img.url && 
                typeof img.url === 'string' &&
-               img.url.trim() !== '' &&
-               img.url.startsWith('http');
+               img.url.trim() !== '';
       })
     : [];
   
@@ -298,17 +256,17 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={event => {
+                onMomentumScrollEnd={(event: any) => {
                   const index = Math.round(
-                    event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
+                    event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
                   );
                   if (index >= 0 && index < propertyImages.length) {
                     setCurrentImageIndex(index);
                   }
                 }}
-                onScroll={event => {
+                onScroll={(event: any) => {
                   const index = Math.round(
-                    event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
+                    event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
                   );
                   if (index >= 0 && index < propertyImages.length && index !== currentImageIndex) {
                     setCurrentImageIndex(index);
@@ -318,10 +276,10 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 style={styles.imageCarousel}
                 contentContainerStyle={{
                   ...styles.imageCarouselContent,
-                  width: SCREEN_WIDTH * propertyImages.length,
+                  width: IMAGE_CAROUSEL_WIDTH * propertyImages.length,
                 }}
                 decelerationRate="fast"
-                snapToInterval={SCREEN_WIDTH}
+                snapToInterval={IMAGE_CAROUSEL_WIDTH}
                 snapToAlignment="center">
                 {propertyImages.map((image: PropertyImage, index: number) => (
                   <TouchableOpacity
@@ -361,17 +319,17 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 ))}
               </ScrollView>
               
-              {/* Image Counter */}
-              {propertyImages.length > 1 && (
+              {/* Image Counter - Hidden per user request */}
+              {/* {propertyImages.length > 1 && (
                 <View style={styles.imageCounter}>
                   <Text style={styles.imageCounterText}>
                     {currentImageIndex + 1} / {propertyImages.length}
                   </Text>
                 </View>
-              )}
+              )} */}
           
-              {/* Navigation Arrows */}
-              {propertyImages.length > 1 && (
+              {/* Navigation Arrows - Hidden per user request */}
+              {/* {propertyImages.length > 1 && (
                 <>
                   <TouchableOpacity
                     style={[styles.carouselNavButton, styles.carouselNavButtonLeft]}
@@ -380,8 +338,9 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                         ? currentImageIndex - 1 
                         : propertyImages.length - 1;
                       setCurrentImageIndex(newIndex);
+                      // @ts-ignore
                       imageScrollViewRef.current?.scrollTo({
-                        x: newIndex * SCREEN_WIDTH,
+                        x: newIndex * IMAGE_CAROUSEL_WIDTH,
                         animated: true,
                       });
                     }}
@@ -395,8 +354,9 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                         ? currentImageIndex + 1 
                         : 0;
                       setCurrentImageIndex(newIndex);
+                      // @ts-ignore
                       imageScrollViewRef.current?.scrollTo({
-                        x: newIndex * SCREEN_WIDTH,
+                        x: newIndex * IMAGE_CAROUSEL_WIDTH,
                         animated: true,
                       });
                     }}
@@ -404,7 +364,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                     <Text style={styles.carouselNavButtonText}>›</Text>
                   </TouchableOpacity>
                 </>
-              )}
+              )} */}
 
               {/* Image Indicators/Dots */}
               {propertyImages.length > 1 && (
@@ -414,8 +374,9 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       key={index}
                       onPress={() => {
                         setCurrentImageIndex(index);
+                        // @ts-ignore
                         imageScrollViewRef.current?.scrollTo({
-                          x: index * SCREEN_WIDTH,
+                          x: index * IMAGE_CAROUSEL_WIDTH,
                           animated: true,
                         });
                       }}
@@ -430,11 +391,18 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                   ))}
                 </View>
               )}
+              
+              {/* Swipe Gesture Hint */}
+              {propertyImages.length > 1 && (
+                <View style={styles.swipeHint}>
+                  <Text style={styles.swipeHintText}>← Swipe to view more →</Text>
+                </View>
+              )}
             </>
           ) : (
             <View style={styles.imageContainer}>
               <Image
-                source={require('../../assets/logo.jpeg')}
+                source={require('../../assets/logo.png')}
                 style={styles.image}
                 resizeMode="cover"
               />
@@ -446,49 +414,58 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         {/* Title and Price */}
         <View style={styles.headerSection}>
           <Text style={styles.title}>{capitalize(property.title || property.property_title || 'Property Title')}</Text>
-          <Text style={styles.location}>📍 {property.location || property.city || property.address || 'Location not specified'}</Text>
+          <View style={styles.locationContainer}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <Text style={styles.location}>{property.location || property.city || property.address || 'Location not specified'}</Text>
+          </View>
           <Text style={styles.price}>{formattedPrice}</Text>
         </View>
 
         {/* Quick Info */}
         <View style={styles.quickInfo}>
-          {property.bedrooms && (
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>🛏️</Text>
-              <Text style={styles.infoText}>{property.bedrooms} Beds</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoIcon}>🛏</Text>
             </View>
-          )}
-          {property.bathrooms && (
-            <View style={styles.infoItem}>
+            <Text style={styles.infoText}>{property.bedrooms || 'N/A'} Beds</Text>
+          </View>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>🚿</Text>
-              <Text style={styles.infoText}>{property.bathrooms} Baths</Text>
             </View>
-          )}
-          {property.area && (
-            <View style={styles.infoItem}>
+            <Text style={styles.infoText}>{property.bathrooms || 'N/A'} Baths</Text>
+          </View>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>📐</Text>
-              <Text style={styles.infoText}>
-                {typeof property.area === 'number' ? `${property.area} sq ft` : property.area}
-              </Text>
             </View>
-          )}
-          {property.floor && (
-            <View style={styles.infoItem}>
+            <Text style={styles.infoText}>
+              {property.area ? (typeof property.area === 'number' ? `${property.area} sq ft` : property.area) : 'N/A'}
+            </Text>
+          </View>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>🏢</Text>
-              <Text style={styles.infoText}>{property.floor}</Text>
             </View>
-          )}
+            <Text style={styles.infoText}>{property.floor || 'N/A'}</Text>
+          </View>
         </View>
 
         {/* Description */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About this property</Text>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionIcon}>📝</Text>
+            <Text style={styles.sectionTitle}>About this property</Text>
+          </View>
           <Text style={styles.description}>{property.description || 'No description available'}</Text>
         </View>
 
         {/* Property Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Property Details</Text>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionIcon}>🏠</Text>
+            <Text style={styles.sectionTitle}>Property Details</Text>
+          </View>
           <View style={styles.detailsGrid}>
             {property.age && (
               <View style={styles.detailItem}>
@@ -532,7 +509,10 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         {/* Amenities */}
         {amenities.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Amenities</Text>
+            <View style={styles.sectionTitleContainer}>
+              <Text style={styles.sectionIcon}>✨</Text>
+              <Text style={styles.sectionTitle}>Amenities</Text>
+            </View>
             <View style={styles.amenitiesGrid}>
               {amenities.map((amenity: string, index: number) => (
                 <View key={index} style={styles.amenityItem}>
@@ -546,7 +526,10 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
         {/* Location */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location</Text>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionIcon}>📍</Text>
+            <Text style={styles.sectionTitle}>Location</Text>
+          </View>
           <Text style={styles.address}>
             {property.address || property.fullAddress || property.location || property.city || 'Address not available'}
           </Text>
@@ -599,21 +582,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   imageCarouselContainer: {
-    height: 300,
+    height: 450,
     position: 'relative',
+    paddingTop: spacing.md,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xl + spacing.xl, // Extra space to show top rounded corners below header
+    backgroundColor: colors.surfaceSecondary,
   },
   imageCarousel: {
-    height: 300,
+    height: 410,
+    borderRadius: borderRadius.xl,
   },
   imageCarouselContent: {
     alignItems: 'center',
   },
   imageContainer: {
-    width: SCREEN_WIDTH,
-    height: 300,
+    width: IMAGE_CAROUSEL_WIDTH,
+    height: 410,
+    borderRadius: borderRadius.xl,
+    paddingTop: spacing.md,
+    overflow: 'hidden',
   },
   carouselNavButton: {
     position: 'absolute',
@@ -641,6 +634,7 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+    borderRadius: borderRadius.xl,
   },
   imagePlaceholder: {
     width: '100%',
@@ -670,14 +664,35 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   indicatorActive: {
     backgroundColor: colors.surface,
-    width: 24,
+    width: 32,
+  },
+  swipeHint: {
+    position: 'absolute',
+    bottom: spacing.lg + spacing.md,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  swipeHintText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 12,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 2,
   },
   imageCounter: {
     position: 'absolute',
@@ -725,65 +740,115 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: colors.surface,
-    padding: spacing.lg,
+    padding: spacing.xl,
+    paddingTop: spacing.xl + spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   title: {
-    ...typography.h1,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: 28,
     fontWeight: '700',
+    color: colors.secondary, // Dark Charcoal #1D242B
+    marginBottom: spacing.sm,
+    lineHeight: 36,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  locationIcon: {
+    fontSize: 16,
   },
   location: {
-    ...typography.body,
+    fontSize: 16,
+    fontWeight: '500',
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    flex: 1,
   },
   price: {
-    ...typography.h2,
-    color: colors.accent,
+    fontSize: 32,
     fontWeight: '700',
+    color: colors.primary, // Blue #0077C0
+    marginTop: spacing.xs,
   },
   quickInfo: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    justifyContent: 'space-around',
+    gap: spacing.md,
   },
-  infoItem: {
+  infoCard: {
+    flex: 1,
     alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    minHeight: 100,
+    justifyContent: 'center',
     gap: spacing.xs,
   },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + '15', // 15% opacity purple
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
   infoIcon: {
-    fontSize: 24,
+    fontSize: 20,
   },
   infoText: {
     ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 12,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   section: {
     backgroundColor: colors.surface,
-    padding: spacing.lg,
-    marginTop: spacing.md,
+    padding: spacing.xl,
+    marginTop: spacing.lg,
+    marginHorizontal: spacing.md,
+    borderRadius: borderRadius.xl,
     borderTopWidth: 1,
     borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
     borderColor: colors.border,
   },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary + '30',
+    gap: spacing.sm,
+  },
+  sectionIcon: {
+    fontSize: 20,
+  },
   sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.md,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.secondary, // Navy
   },
   description: {
     ...typography.body,
     color: colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: 25.6, // 1.6 * 16px
+    fontSize: 16,
   },
   detailsGrid: {
     flexDirection: 'row',
@@ -791,18 +856,38 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   detailItem: {
-    width: '48%',
-    marginBottom: spacing.md,
+    width: '47%',
+    padding: spacing.lg,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...Platform.select({
+      android: {
+        elevation: 2,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 1},
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+    }),
   },
   detailLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   detailValue: {
     ...typography.body,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
   amenitiesGrid: {
     flexDirection: 'row',
@@ -812,22 +897,32 @@ const styles = StyleSheet.create({
   amenityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '48%',
-    gap: spacing.xs,
+    width: '47%',
+    backgroundColor: colors.surfaceSecondary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
   },
   amenityIcon: {
     fontSize: 16,
-    color: colors.success,
+    color: colors.primary, // Purple checkmark
+    fontWeight: 'bold',
   },
   amenityText: {
     ...typography.body,
-    color: colors.textSecondary,
-    flex: 1,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '500',
   },
   address: {
     ...typography.body,
     color: colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: 25.6, // 1.6 * 16px
+    fontSize: 16,
     marginBottom: spacing.xs,
   },
   coordinates: {
@@ -842,20 +937,44 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.surface,
-    borderTopWidth: 1,
+    borderTopWidth: 2,
     borderTopColor: colors.border,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+    paddingBottom: spacing.md,
     flexDirection: 'row',
     gap: spacing.md,
+    ...Platform.select({
+      android: {
+        elevation: 8,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: -2},
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+    }),
   },
   editButton: {
     flex: 1,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    backgroundColor: colors.primary, // Purple background
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 52,
+    ...Platform.select({
+      android: {
+        elevation: 6,
+      },
+      ios: {
+        shadowColor: colors.primary,
+        shadowOffset: {width: 0, height: 4},
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+      },
+    }),
   },
   editButtonText: {
     ...typography.body,

@@ -273,7 +273,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({receiverId, receiverName = 'User
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
         {loading && messages.length === 0 ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color="#0077C0" />
             <Text style={styles.loadingText}>Loading messages...</Text>
           </View>
         ) : (
@@ -332,7 +332,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({receiverId, receiverName = 'User
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FAFAFA',
   },
   header: {
     backgroundColor: '#FFFFFF',
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   sentBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0077C0',
     borderBottomRightRadius: 4,
   },
   receivedBubble: {
@@ -426,10 +426,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000000',
     marginRight: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FAFAFA',
   },
   sendButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0077C0',
     borderRadius: 20,
     paddingHorizontal: 20,
     paddingVertical: 10,

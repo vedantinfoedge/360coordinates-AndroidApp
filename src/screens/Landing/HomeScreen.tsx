@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Animated,
+  Share,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -72,6 +73,10 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  
+  // Header animation values
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerHeight = insets.top + 70;
 
   useEffect(() => {
     loadDashboardData();
@@ -203,8 +208,26 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     } as never);
   };
 
+  const handleShareProperty = async (property: Property) => {
+    try {
+      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
+      await Share.share({
+        message: shareMessage,
+        title: property.title,
+      });
+    } catch (error: any) {
+      if (error.message !== 'User did not share') {
+        console.error('Error sharing property:', error);
+        CustomAlert.alert('Error', 'Failed to share property. Please try again.');
+      }
+    }
+  };
+
   const renderPropertyCard = ({item, index}: {item: Property; index: number}) => {
     const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+    const images = item.images?.length
+      ? item.images.map((url: string) => fixImageUrl(url)).filter(Boolean)
+      : undefined;
     return (
       <Animated.View
         style={{
@@ -213,11 +236,13 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         }}>
         <PropertyCard
           image={imageUrl || undefined}
+          images={images}
           name={item.title}
           location={item.location}
           price={formatters.price(item.price, item.status === 'rent')}
           type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
           onPress={() => handlePropertyPress(item.id)}
+          onSharePress={() => handleShareProperty(item)}
           isFavorite={false}
           property={item}
         />
@@ -260,6 +285,8 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         showProfile={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
+        scrollY={scrollY}
+        headerHeight={headerHeight}
       />
       <Animated.View
         style={[
@@ -269,16 +296,23 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
             transform: [{translateY: slideAnim}],
           },
         ]}>
-        <ScrollView
+        <Animated.ScrollView
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + 70}]}
+          contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + spacing.md}]}
           showsVerticalScrollIndicator={false}
+          onScroll={(event: {nativeEvent: {contentOffset: {y: number}}}) => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            scrollY.setValue(offsetY);
+          }}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }>
           {/* Welcome Section */}
           <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeText}>Welcome</Text>
+            <Text style={styles.welcomeText}>
+              Welcome{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''} ❤️
+            </Text>
             <Text style={styles.welcomeSubtext}>
               Find your dream property in India
             </Text>
@@ -438,7 +472,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
               renderItem={renderCityCard}
             />
       </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </Animated.View>
     </View>
   );
@@ -447,7 +481,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FAFAFA',
   },
   content: {
     flex: 1,
@@ -457,27 +491,33 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: spacing.xl,
-    backgroundColor: colors.background,
+    paddingBottom: spacing.xxl,
+    backgroundColor: '#FAFAFA',
   },
+  // Welcome Section - Modern, spacious design
   welcomeSection: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
   },
   welcomeText: {
-    ...typography.h1,
-    color: colors.text,
+    fontSize: 28,
     fontWeight: '700',
-    marginBottom: spacing.xs,
+    color: colors.text,
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   welcomeSubtext: {
-    ...typography.body,
+    fontSize: 16,
+    fontWeight: '400',
     color: colors.textSecondary,
+    lineHeight: 24,
   },
+  // Search Section - Airbnb-inspired search bar
   searchSection: {
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
+    marginTop: spacing.sm,
   },
   searchContainer: {
     position: 'relative',
@@ -485,166 +525,200 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
   searchIcon: {
-    fontSize: 20,
-    marginRight: spacing.sm,
+    fontSize: 18,
+    marginRight: 12,
   },
   searchInputWrapper: {
     flex: 1,
   },
   searchInput: {
-    ...typography.body,
+    fontSize: 16,
+    fontWeight: '400',
     color: colors.text,
     padding: 0,
+    lineHeight: 22,
   },
   searchButton: {
     backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.md,
-    marginLeft: spacing.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginLeft: 12,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   searchButtonText: {
-    ...typography.body,
-    color: colors.surface,
+    fontSize: 15,
     fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
   locationSuggestionsContainer: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
-    marginTop: spacing.xs,
+    marginTop: 8,
     zIndex: 1000,
   },
+  // Toggle Section - Pill-shaped buttons
   toggleSection: {
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
+    paddingBottom: spacing.md,
+    gap: 10,
   },
   toggleButton: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 44,
   },
   toggleButtonActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   toggleButtonText: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
     fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    letterSpacing: 0.1,
   },
   toggleButtonTextActive: {
-    color: colors.surface,
+    color: '#FFFFFF',
   },
+  // Section Styling - More breathing room
   section: {
-    marginTop: spacing.xl,
+    marginTop: spacing.xl + 8,
     marginBottom: spacing.md,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: 20,
     fontWeight: '700',
+    color: colors.text,
+    letterSpacing: -0.3,
+    lineHeight: 28,
+    flex: 1,
+    paddingRight: spacing.md,
   },
   sectionSubtitle: {
-    ...typography.caption,
+    fontSize: 14,
+    fontWeight: '400',
     color: colors.textSecondary,
-    marginTop: spacing.xs,
+    marginTop: 4,
+    lineHeight: 20,
   },
   seeAllText: {
-    ...typography.body,
-    color: colors.primary,
+    fontSize: 15,
     fontWeight: '600',
+    color: colors.primary,
+    paddingVertical: 4,
   },
+  // Properties List - Better spacing
   propertiesList: {
     paddingLeft: spacing.lg,
+    paddingRight: spacing.sm,
     gap: spacing.md,
   },
+  // Cities Section - Modern card design
   citiesList: {
     paddingLeft: spacing.lg,
-    gap: spacing.md,
+    paddingRight: spacing.sm,
   },
   cityCard: {
-    width: 100,
+    width: 90,
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: 14,
   },
   cityImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.surface,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    marginBottom: 10,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-  },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 3,
+    borderWidth: 2,
+    borderColor: '#E3F6FF',
   },
   cityImage: {
     width: '100%',
     height: '100%',
-    borderRadius: borderRadius.lg,
   },
   cityName: {
-    ...typography.body,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.text,
-    fontWeight: '500',
     textAlign: 'center',
+    lineHeight: 18,
   },
+  // Loading & Empty States
   loadingContainer: {
-    padding: spacing.xl,
+    padding: spacing.xxl,
     alignItems: 'center',
   },
   loadingText: {
-    ...typography.body,
+    fontSize: 15,
+    fontWeight: '500',
     color: colors.textSecondary,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
   },
   emptyContainer: {
-    padding: spacing.xl,
+    padding: spacing.xxl,
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: spacing.lg,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   emptyText: {
-    ...typography.body,
+    fontSize: 15,
+    fontWeight: '500',
     color: colors.textSecondary,
   },
 });

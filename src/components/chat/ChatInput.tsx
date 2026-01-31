@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
   sendButton: {
     marginLeft: 8,
     padding: 12,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#0077C0',
     borderRadius: 8,
   },
   sendIcon: {
