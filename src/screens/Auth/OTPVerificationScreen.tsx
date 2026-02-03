@@ -50,6 +50,9 @@ const OTPVerificationScreen: React.FC = () => {
   const [canResend, setCanResend] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // #region agent log - removed unused debugLog
+  // #endregion
+
   // Log OTP verification screen details when component mounts
   useEffect(() => {
     console.log('[OTP Verification] Screen loaded:', {
@@ -429,6 +432,9 @@ const OTPVerificationScreen: React.FC = () => {
                 // For registration flow, navigate back with token
                 if (isRegistrationFlow) {
                   console.log('[OTP Verification] Registration flow - returning to RegisterScreen with SDK token');
+                  // #region agent log
+                  console.log('[DEBUG][NAV] Navigating back to Register with phoneVerified=true, method=msg91-sdk');
+                  // #endregion
                   
                   // Build JSON payload for backend as phoneVerificationToken (same format as widget)
                   const msg91PayloadForBackend = JSON.stringify({
@@ -653,16 +659,21 @@ const OTPVerificationScreen: React.FC = () => {
       }
       
       // Default: Use verifyOTP from AuthContext (fallback to backend)
-      // Only if userId is available (not registration flow)
-      if (userId && !isRegistrationFlow) {
+      // Handle different scenarios:
+      // 1. Post-registration OTP verification (userId exists, type='register')
+      // 2. Login/forgot password OTP verification (userId exists, type!='register')
+      // 3. Phone verification before registration (no userId, type='register')
+      
+      if (userId) {
+        // userId exists - verify OTP with backend and log user in
+        console.log('[OTP Verification] Verifying OTP with backend, userId:', userId);
         await verifyOTP(userId, otp, params.phone);
         
         // If we reach here, verification was successful and user is logged in
-        // For forgot password flow, navigate to reset password
         if (params.type === 'forgotPassword') {
           navigation.navigate('ResetPassword', {otp} as never);
         } else {
-          // For login flow, show success and navigate to selected role's dashboard
+          // For registration or login flow, show success and navigate to dashboard
           CustomAlert.alert(
             'Success',
             'OTP verified successfully! You are now logged in.',
@@ -678,8 +689,8 @@ const OTPVerificationScreen: React.FC = () => {
           );
         }
       } else if (isRegistrationFlow) {
-        // For registration flow without userId, mark as verified and navigate back with params
-        console.log('[OTP Verification] Registration flow - phone verified via backend fallback');
+        // For phone verification flow (no userId) - mark as verified and navigate back with params
+        console.log('[OTP Verification] Phone verification flow - phone verified via backend fallback');
         
         // Format phone for navigation (12 digits: 91XXXXXXXXXX)
         let phoneNumber = params.phone?.replace(/^\+/, '') || '';

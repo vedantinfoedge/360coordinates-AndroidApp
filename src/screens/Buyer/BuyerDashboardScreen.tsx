@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -107,6 +107,17 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerHeight = insets.top + 70;
+  
+  // Smooth marquee auto-scroll refs
+  const carouselScrollRef = useRef<ScrollView>(null);
+  const scrollPosition = useRef(0);
+  const animationRef = useRef<number | null>(null);
+  const isUserScrolling = useRef(false);
+  const lastTimestamp = useRef<number>(0);
+  const SCROLL_SPEED = 0.5; // pixels per frame (adjust for speed)
+  const CARD_WIDTH = 300;
+  const CARD_MARGIN = 16;
+  const ITEM_WIDTH = CARD_WIDTH + CARD_MARGIN;
 
   // Check user type access
   useEffect(() => {
@@ -148,6 +159,78 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       };
     }
   }, [user, listingType]); // Reload when listing type changes
+
+  // Smooth marquee animation using requestAnimationFrame
+  const startSmoothScroll = useCallback(() => {
+    if (properties.length <= 1) return;
+    
+    const totalWidth = properties.length * ITEM_WIDTH;
+    
+    const animate = (timestamp: number) => {
+      if (!lastTimestamp.current) {
+        lastTimestamp.current = timestamp;
+      }
+      
+      const deltaTime = timestamp - lastTimestamp.current;
+      lastTimestamp.current = timestamp;
+      
+      // Only scroll if user is not interacting
+      if (!isUserScrolling.current && carouselScrollRef.current) {
+        // Move based on time delta for consistent speed across devices
+        scrollPosition.current += SCROLL_SPEED * (deltaTime / 16.67); // Normalize to 60fps
+        
+        // Reset to beginning when we've scrolled past half (seamless loop)
+        if (scrollPosition.current >= totalWidth) {
+          scrollPosition.current = 0;
+        }
+        
+        carouselScrollRef.current.scrollTo({
+          x: scrollPosition.current,
+          animated: false,
+        });
+      }
+      
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    
+    animationRef.current = requestAnimationFrame(animate);
+  }, [properties.length]);
+  
+  // Start/stop smooth scroll animation
+  useEffect(() => {
+    if (properties.length > 1) {
+      startSmoothScroll();
+    }
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+  }, [properties.length, startSmoothScroll]);
+  
+  // Handle user scroll interaction
+  const handleScrollBeginDrag = useCallback(() => {
+    isUserScrolling.current = true;
+  }, []);
+  
+  const handleScrollEndDrag = useCallback((event: any) => {
+    // Update scroll position to where user left off
+    scrollPosition.current = event.nativeEvent.contentOffset.x;
+    
+    // Resume auto-scroll after a short delay
+    setTimeout(() => {
+      isUserScrolling.current = false;
+    }, 2000); // 2 second pause after user interaction
+  }, []);
+  
+  // Create duplicated data for seamless infinite scroll
+  const getMarqueeData = useCallback(() => {
+    if (properties.length === 0) return [];
+    // Duplicate the data for seamless looping
+    return [...properties, ...properties];
+  }, [properties]);
 
   const loadDashboardData = async (showLoading: boolean = true) => {
     try {
@@ -305,8 +388,13 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleCityPress = (cityName: string) => {
+    // Navigate to SearchResults with city name as both location and city params
+    // This ensures proper filtering by city
     navigation.navigate('SearchResults', {
+      query: cityName,
       location: cityName,
+      city: cityName,
+      searchQuery: cityName,
     } as never);
   };
 
@@ -595,15 +683,45 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.loadingText}>Loading properties...</Text>
             </View>
           ) : properties.length > 0 ? (
-            <FlatList
-              data={properties}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-              keyExtractor={(item: Property) => String(item.id)}
-              contentContainerStyle={styles.propertiesList}
-              renderItem={renderPropertyCard}
-              ItemSeparatorComponent={() => <View style={styles.propertySeparator} />}
-            />
+            <ScrollView
+              ref={carouselScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={16}
+              decelerationRate="fast"
+              contentContainerStyle={styles.carouselList}
+              onScrollBeginDrag={handleScrollBeginDrag}
+              onScrollEndDrag={handleScrollEndDrag}
+              onMomentumScrollEnd={(event) => {
+                scrollPosition.current = event.nativeEvent.contentOffset.x;
+              }}>
+              {getMarqueeData().map((item: Property, index: number) => {
+                const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+                const images: string[] | undefined = item.images?.length
+                  ? item.images
+                      .map((url: string) => fixImageUrl(url))
+                      .filter((url): url is string => Boolean(url))
+                  : undefined;
+                return (
+                  <View key={`${item.id}-${index}`} style={styles.carouselCard}>
+                    <PropertyCard
+                      image={imageUrl || undefined}
+                      images={images}
+                      name={item.title}
+                      location={item.location}
+                      price={formatters.price(item.price, item.status === 'rent')}
+                      type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
+                      onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+                      onFavoritePress={() => handleToggleFavorite(item.id)}
+                      onSharePress={() => handleShareProperty(item)}
+                      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+                      property={item}
+                      style={styles.carouselPropertyCard}
+                    />
+                  </View>
+                );
+              })}
+            </ScrollView>
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No properties found</Text>
@@ -803,6 +921,17 @@ const styles = StyleSheet.create({
   },
   propertySeparator: {
     height: 22,
+  },
+  carouselList: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  carouselCard: {
+    width: 300,
+    marginRight: spacing.md,
+  },
+  carouselPropertyCard: {
+    width: '100%',
   },
   citiesList: {
     paddingLeft: spacing.lg,

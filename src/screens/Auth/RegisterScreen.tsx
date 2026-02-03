@@ -56,6 +56,15 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const [widgetPhoneIdentifier, setWidgetPhoneIdentifier] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // #region agent log
+  const renderCount = useRef(0);
+  renderCount.current++;
+  console.log('[DEBUG][RENDER] RegisterScreen render #' + renderCount.current + ', phoneVerified=' + phoneVerified);
+  // #endregion
+
+  // Ref to track if we've already processed OTP verification params
+  const hasProcessedOtpParams = useRef(false);
+
   // Animation values
   const logoScale = useRef(new Animated.Value(0.3)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -163,6 +172,9 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     }, 600);
 
     // Pulse animation for verify button
+    // #region agent log
+    console.log('[DEBUG][ANIM] Starting pulse animation loop');
+    // #endregion
     const pulseAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(verifyButtonPulse, {
@@ -181,13 +193,26 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     );
     pulseAnimation.start();
 
-    return () => pulseAnimation.stop();
+    return () => {
+      // #region agent log
+      console.log('[DEBUG][ANIM] Stopping pulse animation loop');
+      // #endregion
+      pulseAnimation.stop();
+    };
   }, []);
 
   // Handle return from OTP verification screen
   useFocusEffect(
     React.useCallback(() => {
       const params = route.params as any;
+      // #region agent log
+      console.log('[DEBUG][FOCUS] useFocusEffect triggered, paramsKeys=' + (params ? Object.keys(params).join(',') : 'none') + ', phoneVerified=' + params?.phoneVerified + ', alreadyProcessed=' + hasProcessedOtpParams.current);
+      // #endregion
+      
+      // Skip if we've already processed OTP params to prevent re-render loops
+      if (hasProcessedOtpParams.current && params?.phoneVerified === undefined) {
+        return;
+      }
       
       if (params?.name !== undefined) setName(params.name);
       if (params?.email !== undefined) setEmail(params.email);
@@ -205,22 +230,37 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       if (params?.selectedRole !== undefined) setSelectedRole(params.selectedRole);
       
       if (params?.phoneVerified === true) {
+        // #region agent log
+        console.log('[DEBUG][FOCUS] phoneVerified=true detected, will update multiple states');
+        // #endregion
+        hasProcessedOtpParams.current = true;
         setPhoneVerified(true);
         if (params.phoneToken) setPhoneToken(params.phoneToken);
         if (params.phoneMethod) setPhoneMethod(params.phoneMethod);
         if (params.verifiedOtp) setVerifiedOtp(params.verifiedOtp);
-        navigation.setParams({
-          phoneVerified: undefined,
-          phoneToken: undefined,
-          phoneMethod: undefined,
-          verifiedOtp: undefined,
-          phone: undefined,
-          name: undefined,
-          email: undefined,
-          selectedRole: undefined,
-        } as any);
+        // Also read phoneMsg91Token from params (passed from OTPVerificationScreen for SDK flow)
+        if (params.phoneMsg91Token) setPhoneMsg91Token(params.phoneMsg91Token);
+        // If phoneToken is provided but not phoneMsg91Token, use phoneToken as phoneMsg91Token for SDK methods
+        if (!params.phoneMsg91Token && params.phoneToken && (params.phoneMethod === 'msg91-sdk' || params.phoneMethod === 'msg91-widget')) {
+          setPhoneMsg91Token(params.phoneToken);
+        }
+        // Use InteractionManager to defer params clearing to avoid blocking UI
+        const {InteractionManager} = require('react-native');
+        InteractionManager.runAfterInteractions(() => {
+          navigation.setParams({
+            phoneVerified: undefined,
+            phoneToken: undefined,
+            phoneMethod: undefined,
+            verifiedOtp: undefined,
+            phoneMsg91Token: undefined,
+            phone: undefined,
+            name: undefined,
+            email: undefined,
+            selectedRole: undefined,
+          } as any);
+        });
       }
-    }, [route.params, navigation])
+    }, [navigation]) // Removed route.params from dependencies to prevent re-render loop
   );
 
   const extractWidgetToken = (payload: any): string | null => {
@@ -347,6 +387,12 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       CustomAlert.alert('Error', 'Please fill all fields');
       return;
     }
+    // Validate name starts with capital letter
+    const trimmedName = name.trim();
+    if (!/^[A-Z]/.test(trimmedName)) {
+      CustomAlert.alert('Error', 'Name must start with a capital letter');
+      return;
+    }
     if (!selectedRole) {
       CustomAlert.alert('Error', 'Please select a role');
       return;
@@ -381,15 +427,31 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       let phoneVerificationMethodToSend: string | undefined;
       let phoneVerifiedFlagToSend: boolean | undefined;
 
-      if ((phoneMethod === 'msg91-widget' || phoneMethod === 'msg91-sdk') && phoneMsg91Token) {
-        phoneVerificationTokenToSend = phoneMsg91Token;
+      // Handle different verification methods with proper fallbacks
+      if ((phoneMethod === 'msg91-widget' || phoneMethod === 'msg91-sdk')) {
+        // For MSG91 SDK/widget methods, use msg91Token or phoneToken
+        phoneVerificationTokenToSend = phoneMsg91Token || phoneToken || undefined;
+        phoneVerificationMethodToSend = 'msg91';
+        phoneVerifiedFlagToSend = true;
       } else if (phoneMethod === 'backend' && verifiedOtp) {
+        // Backend verification - use the verified OTP
         phoneOtpToSend = verifiedOtp;
+        phoneVerificationMethodToSend = 'backend';
       } else if (phoneToken) {
+        // Fallback - use phoneToken if available
         phoneVerificationTokenToSend = phoneToken;
+      } else if (verifiedOtp) {
+        // Last resort fallback - use verifiedOtp
+        phoneOtpToSend = verifiedOtp;
       }
 
-      if (!phoneVerificationTokenToSend && !phoneOtpToSend) {
+      // If phone is verified but no token/otp available, send phoneVerified flag
+      if (!phoneVerificationTokenToSend && !phoneOtpToSend && phoneVerified) {
+        phoneVerifiedFlagToSend = true;
+        phoneVerificationMethodToSend = phoneMethod || 'msg91';
+      }
+
+      if (!phoneVerificationTokenToSend && !phoneOtpToSend && !phoneVerifiedFlagToSend) {
         CustomAlert.alert('Error', 'Phone verification details missing. Please verify again.');
         setIsLoading(false);
         return;
@@ -486,13 +548,21 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const completedFields = [selectedRole, name, email, phone, phoneVerified, password, confirmPassword, agreedToTerms].filter(Boolean).length;
 
   // Animate progress bar when fields change
+  // Use InteractionManager to defer animation and prevent blocking input
   useEffect(() => {
-    Animated.timing(progressWidth, {
-      toValue: (completedFields / 8) * 100,
-      duration: 300,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: false,
-    }).start();
+    // #region agent log
+    console.log('[DEBUG][PROGRESS] Progress animation triggered, completedFields=' + completedFields + ', phoneVerified=' + phoneVerified);
+    // #endregion
+    const {InteractionManager} = require('react-native');
+    const handle = InteractionManager.runAfterInteractions(() => {
+      Animated.timing(progressWidth, {
+        toValue: (completedFields / 8) * 100,
+        duration: 300,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => handle.cancel();
   }, [completedFields]);
 
   // Button press animation
@@ -630,7 +700,17 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter your full name"
                   placeholderTextColor={colors.textSecondary}
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(text: string) => {
+                    // #region agent log
+                    console.log('[DEBUG][INPUT] Name changed, length=' + text.length + ', phoneVerified=' + phoneVerified);
+                    // #endregion
+                    // Auto-capitalize first letter of each word
+                    const capitalizedText = text
+                      .split(' ')
+                      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+                      .join(' ');
+                    setName(capitalizedText);
+                  }}
                   autoCapitalize="words"
                   autoCorrect={false}
                 />
@@ -706,7 +786,12 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                     placeholder="Min 6 characters"
                     placeholderTextColor={colors.textSecondary}
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={(text: string) => {
+                      // #region agent log
+                      console.log('[DEBUG][INPUT] Password changed, length=' + text.length + ', phoneVerified=' + phoneVerified);
+                      // #endregion
+                      setPassword(text);
+                    }}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -741,19 +826,29 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
               </View>
 
               {/* Terms Checkbox */}
-              <TouchableOpacity
-                style={styles.termsContainer}
-                onPress={() => setAgreedToTerms(!agreedToTerms)}>
-                <View style={[styles.termsCheckbox, agreedToTerms && styles.termsCheckboxChecked]}>
-                  {agreedToTerms && <Text style={styles.termsCheckmark}>✓</Text>}
-                </View>
+              <View style={styles.termsContainer}>
+                <TouchableOpacity
+                  style={styles.termsCheckboxTouchable}
+                  onPress={() => setAgreedToTerms(!agreedToTerms)}>
+                  <View style={[styles.termsCheckbox, agreedToTerms && styles.termsCheckboxChecked]}>
+                    {agreedToTerms && <Text style={styles.termsCheckmark}>✓</Text>}
+                  </View>
+                </TouchableOpacity>
                 <Text style={styles.termsText}>
                   I agree to the{' '}
-                  <Text style={styles.termsLink}>Terms & Conditions</Text>
+                  <Text
+                    style={styles.termsLink}
+                    onPress={() => (navigation as any).getParent()?.navigate('TermsConditions')}>
+                    Terms & Conditions
+                  </Text>
                   {' '}and{' '}
-                  <Text style={styles.termsLink}>Privacy Policy</Text>
+                  <Text
+                    style={styles.termsLink}
+                    onPress={() => (navigation as any).getParent()?.navigate('PrivacyPolicy')}>
+                    Privacy Policy
+                  </Text>
                 </Text>
-              </TouchableOpacity>
+              </View>
 
               {/* Register Button with animation */}
               <Animated.View style={{transform: [{scale: buttonScale}]}}>
@@ -1012,6 +1107,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.lg,
   },
+  termsCheckboxTouchable: {
+    marginRight: spacing.sm,
+    marginTop: 2,
+  },
   termsCheckbox: {
     width: 22,
     height: 22,
@@ -1020,8 +1119,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
-    marginTop: 2,
   },
   termsCheckboxChecked: {
     backgroundColor: colors.primary,

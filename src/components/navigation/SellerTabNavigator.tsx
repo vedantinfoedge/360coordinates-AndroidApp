@@ -12,6 +12,7 @@ import SellerSupportScreen from '../../screens/Seller/SellerSupportScreen';
 import SubscriptionScreen from '../../screens/Seller/SubscriptionScreen';
 import {colors, spacing} from '../../theme';
 import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
+import TabBarIcon from './TabBarIcon';
 
 export type SellerTabParamList = {
   Dashboard: undefined;
@@ -86,8 +87,8 @@ const SellerTabNavigator = () => {
         options={{
           title: 'Dashboard',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>🏠</Text>
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="dashboard" color={color} focused={focused} size={24} />
           ),
         }}
       />
@@ -95,9 +96,9 @@ const SellerTabNavigator = () => {
         name="MyProperties"
         component={SellerPropertiesScreen}
         options={{
-          title: 'My Properties',
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>📋</Text>
+          title: 'Properties',
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="properties" color={color} focused={focused} size={24} />
           ),
         }}
       />
@@ -105,18 +106,18 @@ const SellerTabNavigator = () => {
         name="Chat"
         component={ChatNavigator}
         options={{
-          title: 'Chat',
+          title: 'Inbox',
           headerShown: false,
-          tabBarIcon: ({color}) => (
+          tabBarIcon: ({color, focused}) => (
             <View style={{position: 'relative', alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
+              <TabBarIcon name="chat" color={color} focused={focused} size={24} />
               {unreadCount > 0 && (
                 <View
                   style={{
                     position: 'absolute',
                     top: -4,
-                    right: -8,
-                    backgroundColor: '#FF3B30',
+                    right: -10,
+                    backgroundColor: '#FF385C',
                     borderRadius: 10,
                     minWidth: 18,
                     height: 18,
@@ -146,8 +147,8 @@ const SellerTabNavigator = () => {
         options={{
           title: 'Profile',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>👤</Text>
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="profile" color={color} focused={focused} size={24} />
           ),
         }}
       />

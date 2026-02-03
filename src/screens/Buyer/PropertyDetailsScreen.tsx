@@ -1069,12 +1069,51 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           <Text style={styles.sectionTitle}>Amenities</Text>
           <View style={styles.amenitiesGrid}>
             {amenities.length > 0 ? (
-              amenities.map((amenity: string, index: number) => (
-                <View key={index} style={styles.amenityItem}>
-                  <Text style={styles.amenityIcon}>✓</Text>
-                  <Text style={styles.amenityText}>{capitalizeAmenity(amenity)}</Text>
-                </View>
-              ))
+              amenities.map((amenity: string, index: number) => {
+                // Map amenity names to relevant icons
+                const getAmenityIcon = (name: string): string => {
+                  const lowerName = name.toLowerCase();
+                  if (lowerName.includes('parking') || lowerName.includes('car')) return '🚗';
+                  if (lowerName.includes('gym') || lowerName.includes('fitness')) return '💪';
+                  if (lowerName.includes('pool') || lowerName.includes('swimming')) return '🏊';
+                  if (lowerName.includes('garden') || lowerName.includes('park')) return '🌳';
+                  if (lowerName.includes('lift') || lowerName.includes('elevator')) return '🛗';
+                  if (lowerName.includes('security') || lowerName.includes('guard')) return '🛡️';
+                  if (lowerName.includes('wifi') || lowerName.includes('internet')) return '📶';
+                  if (lowerName.includes('ac') || lowerName.includes('air condition')) return '❄️';
+                  if (lowerName.includes('power') || lowerName.includes('backup') || lowerName.includes('generator')) return '⚡';
+                  if (lowerName.includes('water') || lowerName.includes('supply')) return '💧';
+                  if (lowerName.includes('cctv') || lowerName.includes('camera')) return '📹';
+                  if (lowerName.includes('club') || lowerName.includes('community')) return '🏛️';
+                  if (lowerName.includes('play') || lowerName.includes('children')) return '🎮';
+                  if (lowerName.includes('balcony') || lowerName.includes('terrace')) return '🏠';
+                  if (lowerName.includes('modular') || lowerName.includes('kitchen')) return '🍳';
+                  if (lowerName.includes('wardrobe') || lowerName.includes('closet')) return '🚪';
+                  if (lowerName.includes('fire') || lowerName.includes('safety')) return '🔥';
+                  if (lowerName.includes('intercom')) return '📞';
+                  if (lowerName.includes('gas') || lowerName.includes('pipeline')) return '🔥';
+                  if (lowerName.includes('rain') || lowerName.includes('harvest')) return '🌧️';
+                  if (lowerName.includes('solar')) return '☀️';
+                  if (lowerName.includes('servant') || lowerName.includes('maid')) return '🧹';
+                  if (lowerName.includes('visitor')) return '👥';
+                  if (lowerName.includes('sport') || lowerName.includes('court')) return '🎾';
+                  if (lowerName.includes('jogging') || lowerName.includes('track')) return '🏃';
+                  if (lowerName.includes('laundry')) return '🧺';
+                  if (lowerName.includes('pet')) return '🐕';
+                  if (lowerName.includes('furnished')) return '🛋️';
+                  if (lowerName.includes('vastu')) return '🧭';
+                  return '✓';
+                };
+                
+                return (
+                  <View key={index} style={styles.amenityItem}>
+                    <View style={styles.amenityIconContainer}>
+                      <Text style={styles.amenityIcon}>{getAmenityIcon(amenity)}</Text>
+                    </View>
+                    <Text style={styles.amenityText}>{capitalizeAmenity(amenity)}</Text>
+                  </View>
+                );
+              })
             ) : (
               <Text style={styles.amenityText}>No amenities listed</Text>
             )}
@@ -1690,18 +1729,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '47%',
     backgroundColor: colors.surfaceSecondary,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.borderLight,
     gap: spacing.sm,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    minHeight: 50,
+  },
+  amenityIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   amenityIcon: {
     fontSize: 16,
-    color: colors.primary, // Purple checkmark
-    fontWeight: 'bold',
   },
   amenityText: {
     ...typography.body,

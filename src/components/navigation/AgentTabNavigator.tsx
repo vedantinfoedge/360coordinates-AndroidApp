@@ -13,6 +13,7 @@ import AgentSupportScreen from '../../screens/Agent/AgentSupportScreen';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import {colors} from '../../theme';
 import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
+import TabBarIcon from './TabBarIcon';
 
 export type AgentTabParamList = {
   Dashboard: undefined;
@@ -88,8 +89,8 @@ const AgentTabNavigator = () => {
         options={{
           title: 'Dashboard',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>🏠</Text>
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="dashboard" color={color} focused={focused} size={24} />
           ),
         }}
       />
@@ -98,8 +99,8 @@ const AgentTabNavigator = () => {
         component={AgentPropertiesScreen}
         options={{
           title: 'Listings',
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>📋</Text>
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="properties" color={color} focused={focused} size={24} />
           ),
         }}
       />
@@ -107,18 +108,18 @@ const AgentTabNavigator = () => {
         name="Chat"
         component={ChatNavigator}
         options={{
-          title: 'Chat',
+          title: 'Inbox',
           headerShown: false,
-          tabBarIcon: ({color}) => (
+          tabBarIcon: ({color, focused}) => (
             <View style={{position: 'relative', alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
+              <TabBarIcon name="chat" color={color} focused={focused} size={24} />
               {unreadCount > 0 && (
                 <View
                   style={{
                     position: 'absolute',
                     top: -4,
-                    right: -8,
-                    backgroundColor: '#FF3B30',
+                    right: -10,
+                    backgroundColor: '#FF385C',
                     borderRadius: 10,
                     minWidth: 18,
                     height: 18,
@@ -148,8 +149,8 @@ const AgentTabNavigator = () => {
         options={{
           title: 'Profile',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>👤</Text>
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="profile" color={color} focused={focused} size={24} />
           ),
         }}
       />

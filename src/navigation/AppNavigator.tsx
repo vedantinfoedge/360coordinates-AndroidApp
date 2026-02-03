@@ -13,6 +13,9 @@ import SplashScreen from '../screens/Auth/SplashScreen';
 import InitialScreen from '../screens/Landing/InitialScreen';
 import SellSelectionScreen from '../screens/Landing/SellSelectionScreen';
 import MainTabNavigator from '../components/navigation/MainTabNavigator';
+import TermsConditionsScreen from '../screens/Landing/TermsConditionsScreen';
+import PrivacyPolicyScreen from '../screens/Landing/PrivacyPolicyScreen';
+import {colors} from '../theme';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -25,6 +28,8 @@ export type RootStackParamList = {
   Agent: undefined;
   Builder: undefined;
   Admin: undefined;
+  TermsConditions: undefined;
+  PrivacyPolicy: undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -160,6 +165,26 @@ const AppNavigator = () => {
         <RootStack.Screen name="Agent" component={AgentNavigator} />
         <RootStack.Screen name="Builder" component={BuilderNavigator} />
         <RootStack.Screen name="Admin" component={AdminNavigator} />
+        <RootStack.Screen
+          name="TermsConditions"
+          component={TermsConditionsScreen}
+          options={{
+            headerShown: true,
+            title: 'Terms & Conditions',
+            headerStyle: {backgroundColor: colors.primary},
+            headerTintColor: colors.surface,
+          }}
+        />
+        <RootStack.Screen
+          name="PrivacyPolicy"
+          component={PrivacyPolicyScreen}
+          options={{
+            headerShown: true,
+            title: 'Privacy Policy',
+            headerStyle: {backgroundColor: colors.primary},
+            headerTintColor: colors.surface,
+          }}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );

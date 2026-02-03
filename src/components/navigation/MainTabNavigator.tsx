@@ -1,7 +1,7 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {colors} from '../../theme';
-import {Text} from 'react-native';
+import {Text, View} from 'react-native';
 import HomeScreen from '../../screens/Landing/HomeScreen';
 import SearchNavigator from '../../navigation/SearchNavigator';
 import ChatNavigator from '../../navigation/ChatNavigator';
@@ -9,6 +9,7 @@ import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
 import FavoritesScreen from '../../screens/FavoritesScreen';
 import SupportScreen from '../../screens/Buyer/SupportScreen';
 import RecentlyViewedScreen from '../../screens/Buyer/RecentlyViewedScreen';
+import TabBarIcon from './TabBarIcon';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -70,9 +71,9 @@ const MainTabNavigator = () => {
         name="Home"
         component={HomeScreen}
         options={{
-          title: 'Home',
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>🏠</Text>
+          title: 'Explore',
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="home" color={color} focused={focused} size={24} />
           ),
         }}
       />
@@ -81,8 +82,8 @@ const MainTabNavigator = () => {
         component={SearchNavigator}
         options={{
           title: 'Search',
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>🔍</Text>
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="search" color={color} focused={focused} size={24} />
           ),
         }}
       />
@@ -90,9 +91,9 @@ const MainTabNavigator = () => {
         name="Chat"
         component={ChatNavigator}
         options={{
-          title: 'Chat',
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>💬</Text>
+          title: 'Inbox',
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="chat" color={color} focused={focused} size={24} />
           ),
         }}
       />
@@ -101,8 +102,8 @@ const MainTabNavigator = () => {
         component={BuyerProfileScreen}
         options={{
           title: 'Profile',
-          tabBarIcon: ({color}) => (
-            <Text style={{color, fontSize: 20, textAlign: 'center'}}>👤</Text>
+          tabBarIcon: ({color, focused}) => (
+            <TabBarIcon name="profile" color={color} focused={focused} size={24} />
           ),
         }}
       />

@@ -315,12 +315,27 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                               (initialLocation && initialLocation.trim()) || 
                               '';
       
+      // Get city from route params (for top cities search)
+      const cityFromRoute = (routeParams.city || '').trim();
+      
       // PART B: Implement correct fetch logic
       if (currentLocation) {
         // CASE B: Location has value - fetch properties filtered by location
         searchParams.location = currentLocation;
         console.log('[SearchResultsScreen] Fetching properties filtered by location:', currentLocation);
-      } else {
+      }
+      
+      // Also add city param if available (for better filtering when clicking on top cities)
+      if (cityFromRoute) {
+        searchParams.city = cityFromRoute;
+        // If location is empty but city is provided, use city as location
+        if (!currentLocation) {
+          searchParams.location = cityFromRoute;
+        }
+        console.log('[SearchResultsScreen] Adding city filter:', cityFromRoute);
+      }
+      
+      if (!currentLocation && !cityFromRoute) {
         // CASE A: Location is empty - fetch ALL properties (unfiltered)
         // Don't add location param - API will return all properties
         console.log('[SearchResultsScreen] Location is empty - fetching ALL properties (unfiltered)');

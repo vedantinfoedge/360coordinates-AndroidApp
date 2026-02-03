@@ -10,6 +10,7 @@ import {
   Image,
   Platform,
   Animated,
+  Modal,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
@@ -63,11 +64,13 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(user?.profile_image || null);
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [formData, setFormData] = useState({
     name: userData.full_name || '',
     phone: userData.phone || '',
     email: userData.email || '',
     address: userData.address || '',
+    alternateMobile: '',
   });
 
   const [originalData, setOriginalData] = useState({
@@ -121,16 +124,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const showImagePicker = () => {
-    CustomAlert.alert(
-      'Select Profile Image',
-      'Choose an option',
-      [
-        {text: 'Camera', onPress: () => handleImagePicker('camera')},
-        {text: 'Gallery', onPress: () => handleImagePicker('gallery')},
-        {text: 'Cancel', style: 'cancel'},
-      ],
-      {cancelable: true},
-    );
+    setShowImagePickerModal(true);
   };
 
   const handleImagePicker = (source: 'camera' | 'gallery') => {
@@ -408,6 +402,28 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
+              <Text style={styles.labelIcon}>📱</Text>
+              <Text style={styles.label}>Alternate Mobile (Optional)</Text>
+            </View>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={formData.alternateMobile}
+                onChangeText={text => setFormData({...formData, alternateMobile: text})}
+                placeholder="Enter alternate mobile number"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
+            ) : (
+              <Text style={styles.value}>
+                {formData.alternateMobile || 'Not provided'}
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <View style={styles.labelContainer}>
               <Text style={styles.labelIcon}>📍</Text>
               <Text style={styles.label}>Address</Text>
             </View>
@@ -487,6 +503,51 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           </TouchableOpacity>
         </View>
       </Animated.ScrollView>
+
+      {/* Image Picker Modal */}
+      <Modal
+        visible={showImagePickerModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowImagePickerModal(false)}>
+        <TouchableOpacity
+          style={styles.imagePickerModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowImagePickerModal(false)}>
+          <View style={styles.imagePickerModalContent}>
+            <Text style={styles.imagePickerModalTitle}>Select Profile Image</Text>
+            <Text style={styles.imagePickerModalSubtitle}>Choose an option</Text>
+            
+            <View style={styles.imagePickerModalButtons}>
+              <TouchableOpacity
+                style={styles.imagePickerOptionButton}
+                onPress={() => {
+                  setShowImagePickerModal(false);
+                  setTimeout(() => handleImagePicker('camera'), 300);
+                }}>
+                <Text style={styles.imagePickerOptionIcon}>📷</Text>
+                <Text style={styles.imagePickerOptionText}>Camera</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.imagePickerOptionButton}
+                onPress={() => {
+                  setShowImagePickerModal(false);
+                  setTimeout(() => handleImagePicker('gallery'), 300);
+                }}>
+                <Text style={styles.imagePickerOptionIcon}>🖼️</Text>
+                <Text style={styles.imagePickerOptionText}>Gallery</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.imagePickerCancelButton}
+              onPress={() => setShowImagePickerModal(false)}>
+              <Text style={styles.imagePickerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -872,6 +933,79 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     lineHeight: 18,
+  },
+  imagePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePickerModalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    width: '80%',
+    maxWidth: 320,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  imagePickerModalTitle: {
+    ...typography.h2,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  imagePickerModalSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.xl,
+    textAlign: 'center',
+  },
+  imagePickerModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginBottom: spacing.lg,
+    width: '100%',
+  },
+  imagePickerOptionButton: {
+    flex: 1,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  imagePickerOptionIcon: {
+    fontSize: 32,
+    marginBottom: spacing.sm,
+  },
+  imagePickerOptionText: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  imagePickerCancelButton: {
+    width: '100%',
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: spacing.sm,
+  },
+  imagePickerCancelText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
 
