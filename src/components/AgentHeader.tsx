@@ -12,8 +12,9 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {verticalScale} from '../utils/responsive';
 
-const HEADER_HEIGHT = 64;
+const HEADER_HEIGHT = verticalScale(64);
 
 interface AgentHeaderProps {
   onProfilePress?: () => void;

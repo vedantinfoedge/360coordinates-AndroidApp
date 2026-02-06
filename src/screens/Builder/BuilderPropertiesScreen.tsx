@@ -228,7 +228,7 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
     return (
       <TouchableOpacity
         style={styles.propertyCard}
-        onPress={() => navigation.navigate('PropertyDetails', {propertyId: item.id})}>
+        onPress={() => navigation.getParent()?.navigate('PropertyDetails' as never, {propertyId: item.id} as never)}>
         {imageUrl ? (
           <Image
             source={{uri: imageUrl}}
@@ -296,7 +296,7 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
             style={styles.editButton}
             onPress={(e) => {
               e.stopPropagation();
-              navigation.navigate('EditProperty', {propertyId: item.id} as never);
+              navigation.getParent()?.navigate('EditProperty' as never, {propertyId: item.id} as never);
             }}>
             <Text style={styles.editButtonText}>✏️ Edit</Text>
           </TouchableOpacity>
@@ -310,8 +310,8 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
     return (
       <View style={styles.container}>
         <BuilderHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onProfilePress={() => navigation.navigate('Profile' as never)}
+          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.loadingContainer}>
@@ -325,8 +325,8 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
   return (
     <View style={styles.container}>
       <BuilderHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onProfilePress={() => navigation.navigate('Profile' as never)}
+        onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
         onLogoutPress={logout}
       />
       <FlatList
@@ -346,7 +346,7 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
             </Text>
             <TouchableOpacity
               style={styles.addButton}
-              onPress={() => navigation.navigate('AddProperty')}>
+              onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}>
               <Text style={styles.addButtonText}>Add Your First Project</Text>
             </TouchableOpacity>
           </View>
@@ -357,7 +357,7 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
       {properties.length > 0 && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => navigation.navigate('AddProperty')}
+          onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
           activeOpacity={0.8}>
           <Text style={styles.fabIcon}>+</Text>
           <Text style={styles.fabText}>New Project</Text>

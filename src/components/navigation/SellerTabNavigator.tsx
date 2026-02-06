@@ -1,200 +1,64 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {View, Text} from 'react-native';
+import {View} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {colors} from '../../theme';
 import SellerDashboardScreen from '../../screens/Seller/SellerDashboardScreen';
 import SellerPropertiesScreen from '../../screens/Seller/SellerPropertiesScreen';
-import ChatNavigator from '../../navigation/ChatNavigator';
 import SellerProfileScreen from '../../screens/Seller/SellerProfileScreen';
-import SellerPropertyDetailsScreen from '../../screens/Seller/SellerPropertyDetailsScreen';
-import AddPropertyScreen from '../../screens/Seller/AddPropertyScreen';
-import SellerInquiriesScreen from '../../screens/Seller/SellerInquiriesScreen';
-import SellerSupportScreen from '../../screens/Seller/SellerSupportScreen';
-import SubscriptionScreen from '../../screens/Seller/SubscriptionScreen';
-import {colors, spacing} from '../../theme';
-import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
-import TabBarIcon from './TabBarIcon';
+import ChatNavigator from '../../navigation/ChatNavigator';
+import SellerCustomTabBar from './SellerCustomTabBar';
 
 export type SellerTabParamList = {
-  Dashboard: undefined;
-  MyProperties: undefined;
+  Home: undefined;
+  AllListings: undefined;
+  Search: undefined;
   Chat: undefined;
   Profile: undefined;
-  PropertyDetails: {propertyId: string};
-  AddProperty: undefined;
-  Inquiries: undefined;
-  Support: undefined;
-  Subscription: undefined;
 };
 
 const Tab = createBottomTabNavigator<SellerTabParamList>();
 
+const TAB_BAR_HEIGHT = 56;
+
+function PlaceholderScreen() {
+  return <View style={{flex: 1}} />;
+}
+
 const SellerTabNavigator = () => {
-  const unreadCount = useUnreadChatCount();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
       screenOptions={{
-        headerShown: false, // Hide default header bar
-        headerStyle: {
-          backgroundColor: colors.primary,
-        },
-        headerTintColor: colors.surface,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarLabelPosition: 'below-icon',
+        headerShown: false,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: '#1976d2',
+        tabBarInactiveTintColor: '#757575',
         tabBarStyle: {
           backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          borderTopColor: '#e0e0e0',
           borderTopWidth: 1,
           paddingTop: 4,
-          paddingBottom: 20,
-          paddingHorizontal: 30,
-          height: 65,
+          paddingBottom: insets.bottom,
+          paddingHorizontal: 8,
+          height: TAB_BAR_HEIGHT + insets.bottom,
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: {width: 0, height: -2},
           shadowOpacity: 0.1,
           shadowRadius: 4,
         },
-        tabBarItemStyle: {
-          flex: 1,
-          paddingVertical: 2,
-          paddingHorizontal: 40,
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: 56,
-        },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-          marginTop: 0,
-          marginBottom: 0,
-          textAlign: 'center',
-        },
-        tabBarIconStyle: {
-          marginTop: 0,
-          marginBottom: 0,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-      }}>
-      <Tab.Screen
-        name="Dashboard"
-        component={SellerDashboardScreen}
-        options={{
-          title: 'Dashboard',
-          headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color, focused}) => (
-            <TabBarIcon name="dashboard" color={color} focused={focused} size={24} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="MyProperties"
-        component={SellerPropertiesScreen}
-        options={{
-          title: 'Properties',
-          tabBarIcon: ({color, focused}) => (
-            <TabBarIcon name="properties" color={color} focused={focused} size={24} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Chat"
-        component={ChatNavigator}
-        options={{
-          title: 'Inbox',
-          headerShown: false,
-          tabBarIcon: ({color, focused}) => (
-            <View style={{position: 'relative', alignItems: 'center', justifyContent: 'center'}}>
-              <TabBarIcon name="chat" color={color} focused={focused} size={24} />
-              {unreadCount > 0 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -10,
-                    backgroundColor: '#FF385C',
-                    borderRadius: 10,
-                    minWidth: 18,
-                    height: 18,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingHorizontal: 4,
-                    borderWidth: 2,
-                    borderColor: colors.surface,
-                  }}>
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 10,
-                      fontWeight: 'bold',
-                    }}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={SellerProfileScreen}
-        options={{
-          title: 'Profile',
-          headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color, focused}) => (
-            <TabBarIcon name="profile" color={color} focused={focused} size={24} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="PropertyDetails"
-        component={SellerPropertyDetailsScreen}
-        options={{
-          title: 'Property Details',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="AddProperty"
-        component={AddPropertyScreen}
-        options={{
-          title: 'Add Property',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="Inquiries"
-        component={SellerInquiriesScreen}
-        options={{
-          title: 'Inquiries',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="Support"
-        component={SellerSupportScreen}
-        options={{
-          title: 'Support',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="Subscription"
-        component={SubscriptionScreen}
-        options={{
-          title: 'Subscription',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
+        tabBarItemStyle: {minHeight: TAB_BAR_HEIGHT},
+      }}
+      tabBar={props => <SellerCustomTabBar {...props} />}>
+      <Tab.Screen name="Home" component={SellerDashboardScreen} options={{title: 'Home'}} />
+      <Tab.Screen name="AllListings" component={SellerPropertiesScreen} options={{title: 'All Listings'}} />
+      <Tab.Screen name="Search" component={PlaceholderScreen} options={{title: ''}} />
+      <Tab.Screen name="Chat" component={ChatNavigator} options={{title: 'Chat'}} />
+      <Tab.Screen name="Profile" component={SellerProfileScreen} options={{title: 'Profile'}} />
     </Tab.Navigator>
   );
 };
 
 export default SellerTabNavigator;
-

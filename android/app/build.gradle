@@ -83,14 +83,14 @@ android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
-
+ 
     namespace "com.propertyapp"
     defaultConfig {
         applicationId "Indiapropertys.com"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.2"
+        versionCode 7
+        versionName "1.5"
     }
     
     // Enable cleartext traffic for development (Metro bundler)

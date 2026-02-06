@@ -18,10 +18,9 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
+import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
@@ -33,7 +32,7 @@ import {formatters} from '../../utils/formatters';
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 type SellerDashboardScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<SellerTabParamList, 'Dashboard'>,
+  NativeStackNavigationProp<SellerStackParamList, 'Dashboard'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -664,18 +663,20 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   // Initial load on mount and auto-refresh setup
   useEffect(() => {
     if (user && user.user_type === 'seller') {
-      // Wait for navigation to complete, then load data
-      const task = InteractionManager.runAfterInteractions(() => {
-        loadDashboardData(true, true); // Force initial load
+      // Defer first fetch by one frame so Seller screen paints immediately when switching from Buyer
+      const rafId = requestAnimationFrame(() => {
+        InteractionManager.runAfterInteractions(() => {
+          loadDashboardData(true, true);
+        });
       });
-      
-      // Auto-refresh every 60 seconds (increased from 30s to reduce API calls)
-      refreshIntervalRef.current = setInterval(() => {
-        loadDashboardData(false, true); // Force refresh on interval
+
+      const interval = setInterval(() => {
+        loadDashboardData(false, true);
       }, 60000);
+      refreshIntervalRef.current = interval;
 
       return () => {
-        task.cancel();
+        cancelAnimationFrame(rafId);
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
           refreshIntervalRef.current = null;
@@ -1057,7 +1058,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             label="Total Properties"
             badge={`${stats.active_properties} Active`}
             badgeColor="#D1FAE5"
-            onPress={() => navigation.navigate('MyProperties')}
+            onPress={() => navigation.navigate('AllListings')}
             delay={0}
           />
 
@@ -1133,7 +1134,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             icon="✏"
             title="Manage Properties"
             description="Edit, update or remove listings"
-            onPress={() => navigation.navigate('MyProperties')}
+            onPress={() => navigation.navigate('AllListings')}
             delay={100}
           />
 
@@ -1164,7 +1165,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.sectionTitle}>Your Properties</Text>
             </View>
             <AnimatedSeeAllButton
-              onPress={() => navigation.navigate('MyProperties')}>
+              onPress={() => navigation.navigate('AllListings')}>
               <Text style={styles.viewAllText}>View All</Text>
               <Text style={styles.viewAllArrow}>›</Text>
             </AnimatedSeeAllButton>

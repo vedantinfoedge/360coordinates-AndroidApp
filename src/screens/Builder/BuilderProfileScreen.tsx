@@ -11,9 +11,8 @@ import {
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {BuilderTabParamList} from '../../components/navigation/BuilderTabNavigator';
+import {BuilderStackParamList} from '../../navigation/BuilderNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import BuilderHeader from '../../components/BuilderHeader';
@@ -23,7 +22,7 @@ import {fixImageUrl} from '../../utils/imageHelper';
 import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuilderTabParamList, 'Profile'>,
+  NativeStackNavigationProp<BuilderStackParamList, 'Profile'>,
   NativeStackNavigationProp<any>
 >;
 
@@ -246,7 +245,7 @@ const BuilderProfileScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.container}>
         <BuilderHeader
           onProfilePress={() => {}}
-          onSupportPress={() => navigation.navigate('Support' as never)}
+          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
           onLogoutPress={handleLogout}
         />
         <View style={styles.loadingContainer}>
@@ -260,7 +259,7 @@ const BuilderProfileScreen: React.FC<Props> = ({navigation}) => {
     <View style={styles.container}>
       <BuilderHeader
         onProfilePress={() => {}}
-        onSupportPress={() => navigation.navigate('Support' as never)}
+        onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
         onLogoutPress={handleLogout}
       />
       <ScrollView 

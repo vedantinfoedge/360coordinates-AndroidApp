@@ -15,12 +15,12 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {scale, verticalScale, moderateScale} from '../../utils/responsive';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
@@ -32,7 +32,7 @@ import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 
 type DashboardScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuyerTabParamList, 'Home'>,
+  NativeStackNavigationProp<BuyerStackParamList, 'Home'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -98,6 +98,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   }, [user, token, isAuthenticated, isLoggedIn, isGuest]);
   const [listingType, setListingType] = useState<ListingType>('all');
   const [properties, setProperties] = useState<Property[]>([]);
+  const [upcomingProjects, setUpcomingProjects] = useState<Property[]>([]);
+  const [buyNewHomeProperties, setBuyNewHomeProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
@@ -106,17 +108,17 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
-  const headerHeight = insets.top + 70;
+  const headerHeight = insets.top + verticalScale(70);
   
   // Smooth marquee auto-scroll refs
-  const carouselScrollRef = useRef<ScrollView>(null);
+  const carouselScrollRef = useRef<any>(null);
   const scrollPosition = useRef(0);
   const animationRef = useRef<number | null>(null);
   const isUserScrolling = useRef(false);
   const lastTimestamp = useRef<number>(0);
-  const SCROLL_SPEED = 0.5; // pixels per frame (adjust for speed)
-  const CARD_WIDTH = 300;
-  const CARD_MARGIN = 16;
+  const SCROLL_SPEED = 0.5;
+  const CARD_WIDTH = scale(300);
+  const CARD_MARGIN = scale(16);
   const ITEM_WIDTH = CARD_WIDTH + CARD_MARGIN;
 
   // Check user type access
@@ -143,13 +145,13 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   }, [user, navigation]);
 
   useEffect(() => {
-    // Only load data if user is not an agent
-    if (user && user.user_type !== 'agent') {
+    // Load data for guest or non-agent users (skip only for agent)
+    if (!user || user.user_type !== 'agent') {
       loadDashboardData();
-    
+
       // Auto-refresh every 10 seconds for all data
       refreshIntervalRef.current = setInterval(() => {
-        loadDashboardData(false); // Silent refresh
+        loadDashboardData(false);
       }, 10000);
 
       return () => {
@@ -158,7 +160,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         }
       };
     }
-  }, [user, listingType]); // Reload when listing type changes
+  }, [user, listingType]);
 
   // Smooth marquee animation using requestAnimationFrame
   const startSmoothScroll = useCallback(() => {
@@ -257,24 +259,33 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
       if (propertiesResponse.success && propertiesResponse.data) {
         let filteredProperties = propertiesResponse.data.properties || [];
-        
+
         // Additional filter for PG/Hostel - ensure property_type matches
         if (listingType === 'pg') {
           filteredProperties = filteredProperties.filter((prop: any) => {
             const propType = (prop.property_type || prop.type || '').toLowerCase();
-            return propType.includes('pg') || 
-                   propType.includes('hostel') || 
+            return propType.includes('pg') ||
+                   propType.includes('hostel') ||
                    propType === 'pg-hostel' ||
                    prop.status === 'pg';
           });
         }
-        
+
         setProperties(filteredProperties);
-        // Extract favorite IDs
-        const favorites = filteredProperties
+        const favorites = (filteredProperties as Property[])
           .filter(p => p.is_favorite)
           .map(p => p.id);
         setFavoriteIds(new Set(favorites));
+      }
+
+      // Fetch extra data for Upcoming Projects and Buy New Home sections (all statuses, larger set)
+      const allResponse = await buyerService.getProperties({limit: 50});
+      if (allResponse.success && allResponse.data?.properties) {
+        const allList = allResponse.data.properties as Property[];
+        const upcoming = allList.filter(p => p.project_type === 'upcoming').slice(0, 15);
+        const forSale = allList.filter(p => p.status === 'sale').slice(0, 15);
+        setUpcomingProjects(upcoming);
+        setBuyNewHomeProperties(forSale);
       }
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
@@ -692,7 +703,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               contentContainerStyle={styles.carouselList}
               onScrollBeginDrag={handleScrollBeginDrag}
               onScrollEndDrag={handleScrollEndDrag}
-              onMomentumScrollEnd={(event) => {
+              onMomentumScrollEnd={(event: {nativeEvent: {contentOffset: {x: number}}}) => {
                 scrollPosition.current = event.nativeEvent.contentOffset.x;
               }}>
               {getMarqueeData().map((item: Property, index: number) => {
@@ -729,6 +740,125 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           )}
         </View>
 
+        {/* Upcoming Projects Section (by Agent/Builder) */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Upcoming Projects</Text>
+              <Text style={styles.sectionSubtitle}>
+                New projects from Agents & Builders
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                navigation.navigate('SearchResults', {
+                  query: '',
+                  location: '',
+                  listingType: 'all',
+                } as never);
+              }}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {upcomingProjects.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselList}>
+              {upcomingProjects.map((item: Property) => {
+                const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+                const images: string[] | undefined = item.images?.length
+                  ? item.images
+                      .map((url: string) => fixImageUrl(url))
+                      .filter((url): url is string => Boolean(url))
+                  : undefined;
+                return (
+                  <View key={item.id} style={styles.carouselCard}>
+                    <PropertyCard
+                      image={imageUrl || undefined}
+                      images={images}
+                      name={item.title}
+                      location={item.location}
+                      price={formatters.price(item.price, item.status === 'rent')}
+                      type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
+                      onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+                      onFavoritePress={() => handleToggleFavorite(item.id)}
+                      onSharePress={() => handleShareProperty(item)}
+                      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+                      property={item}
+                      style={styles.carouselPropertyCard}
+                    />
+                  </View>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No upcoming projects at the moment</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Buy New Home — Flats & Apartments for Sale */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Buy New Home</Text>
+              <Text style={styles.sectionSubtitle}>
+                Flats & apartments for sale
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                navigation.navigate('SearchResults', {
+                  query: '',
+                  location: '',
+                  listingType: 'buy',
+                  status: 'sale',
+                } as never);
+              }}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {buyNewHomeProperties.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselList}>
+              {buyNewHomeProperties.map((item: Property) => {
+                const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+                const images: string[] | undefined = item.images?.length
+                  ? item.images
+                      .map((url: string) => fixImageUrl(url))
+                      .filter((url): url is string => Boolean(url))
+                  : undefined;
+                return (
+                  <View key={item.id} style={styles.carouselCard}>
+                    <PropertyCard
+                      image={imageUrl || undefined}
+                      images={images}
+                      name={item.title}
+                      location={item.location}
+                      price={formatters.price(item.price, false)}
+                      type="buy"
+                      onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+                      onFavoritePress={() => handleToggleFavorite(item.id)}
+                      onSharePress={() => handleShareProperty(item)}
+                      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+                      property={item}
+                      style={styles.carouselPropertyCard}
+                    />
+                  </View>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No properties for sale at the moment</Text>
+            </View>
+          )}
+        </View>
+
         {/* Top Cities Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -761,7 +891,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: verticalScale(spacing.xxl * 3),
     backgroundColor: '#FAFAFA',
   },
   welcomeSection: {
@@ -790,7 +920,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: scale(12),
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     shadowColor: '#000',
@@ -800,7 +930,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchIcon: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     marginRight: spacing.sm,
   },
   searchInputWrapper: {
@@ -840,13 +970,13 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: verticalScale(12),
     paddingHorizontal: spacing.md,
     borderRadius: 9999,
     backgroundColor: colors.accentLighter || colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+    minHeight: verticalScale(44),
   },
   toggleButtonActive: {
     backgroundColor: colors.primary,
@@ -855,7 +985,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: moderateScale(14),
   },
   toggleButtonTextActive: {
     color: colors.surface,
@@ -865,11 +995,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: scale(12),
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     marginTop: spacing.sm,
-    minHeight: 44,
+    minHeight: verticalScale(44),
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.06,
@@ -877,7 +1007,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   mapSearchIcon: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     marginRight: spacing.xs,
   },
   mapSearchText: {
@@ -886,7 +1016,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   section: {
-    marginTop: 28,
+    marginTop: verticalScale(28),
     marginBottom: spacing.lg,
   },
   sectionHeader: {
@@ -920,14 +1050,14 @@ const styles = StyleSheet.create({
     marginRight: 0,
   },
   propertySeparator: {
-    height: 22,
+    height: verticalScale(22),
   },
   carouselList: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
   carouselCard: {
-    width: 300,
+    width: scale(300),
     marginRight: spacing.md,
   },
   carouselPropertyCard: {
@@ -938,16 +1068,16 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   cityCard: {
-    width: 100,
+    width: scale(100),
     alignItems: 'center',
     marginRight: spacing.lg,
     paddingTop: spacing.xxl,
     paddingHorizontal: spacing.md,
   },
   cityImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 14,
+    width: scale(100),
+    height: scale(100),
+    borderRadius: scale(14),
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
@@ -962,7 +1092,7 @@ const styles = StyleSheet.create({
   cityImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 14,
+    borderRadius: scale(14),
   },
   cityName: {
     ...typography.body,
@@ -988,7 +1118,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   errorIcon: {
-    fontSize: 64,
+    fontSize: moderateScale(64),
     marginBottom: spacing.md,
   },
   errorTitle: {

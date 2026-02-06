@@ -214,7 +214,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
         return;
       }
       
-      if (params?.name !== undefined) setName(params.name);
+      if (params?.name !== undefined) setName(String(params.name).toUpperCase());
       if (params?.email !== undefined) setEmail(params.email);
       if (params?.phone !== undefined) {
         const rawPhone = String(params.phone ?? '');
@@ -228,6 +228,11 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
         setPhone(phoneToRestore);
       }
       if (params?.selectedRole !== undefined) setSelectedRole(params.selectedRole);
+      // Arc menu FAB passes role: 'agent' | 'builder' | 'seller' -> map to UserRole
+      if (params?.role !== undefined) {
+        const r = (params.role as string).toLowerCase();
+        setSelectedRole(r === 'seller' ? 'seller' : 'agent');
+      }
       
       if (params?.phoneVerified === true) {
         // #region agent log
@@ -387,10 +392,10 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       CustomAlert.alert('Error', 'Please fill all fields');
       return;
     }
-    // Validate name starts with capital letter
-    const trimmedName = name.trim();
-    if (!/^[A-Z]/.test(trimmedName)) {
-      CustomAlert.alert('Error', 'Name must start with a capital letter');
+    // Name is stored in uppercase; ensure non-empty
+    const trimmedName = name.trim().toUpperCase();
+    if (!trimmedName) {
+      CustomAlert.alert('Error', 'Please enter your full name');
       return;
     }
     if (!selectedRole) {
@@ -409,7 +414,9 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       CustomAlert.alert('Error', 'Passwords do not match');
       return;
     }
-    if (!phoneVerified) {
+    // Check phone verification - but don't show error if we're returning from OTP verification
+    // The OTP verification screen already shows success message
+    if (!phoneVerified && !phoneToken && !phoneMsg91Token && !verifiedOtp) {
       CustomAlert.alert('Error', 'Please verify your phone number');
       return;
     }
@@ -461,7 +468,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       const formattedPhone = phoneDigits.length === 10 ? '+91' + phoneDigits : '+91' + phoneDigits.slice(-10);
 
       const response = await register(
-        name, email, formattedPhone, password, selectedRole,
+        trimmedName, email, formattedPhone, password, selectedRole,
         undefined, phoneVerificationTokenToSend, phoneOtpToSend,
         phoneVerificationMethodToSend, phoneVerifiedFlagToSend,
       );
@@ -480,7 +487,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
           await AsyncStorage.setItem('@target_dashboard', targetDashboard);
           await AsyncStorage.setItem('@user_dashboard_preference', targetDashboard);
           
-          CustomAlert.alert('Success', `Welcome, ${name}!`, [
+          CustomAlert.alert('Success', `Welcome, ${trimmedName}!`, [
             {
               text: 'OK',
               onPress: () => {
@@ -515,10 +522,10 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
             reqId: phoneReqId || undefined,
             method: phoneMethod || undefined,
             formData: {
-              name,
+              name: trimmedName,
               email,
               phone: formattedPhoneForNav,
-              selectedRole: selectedRole, // Pass the selected role for navigation after OTP
+              selectedRole: selectedRole,
             },
           });
         }
@@ -696,22 +703,14 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Full Name</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, {textTransform: 'uppercase'}]}
                   placeholder="Enter your full name"
                   placeholderTextColor={colors.textSecondary}
                   value={name}
                   onChangeText={(text: string) => {
-                    // #region agent log
-                    console.log('[DEBUG][INPUT] Name changed, length=' + text.length + ', phoneVerified=' + phoneVerified);
-                    // #endregion
-                    // Auto-capitalize first letter of each word
-                    const capitalizedText = text
-                      .split(' ')
-                      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-                      .join(' ');
-                    setName(capitalizedText);
+                    setName(text.toUpperCase());
                   }}
-                  autoCapitalize="words"
+                  autoCapitalize="characters"
                   autoCorrect={false}
                 />
               </View>

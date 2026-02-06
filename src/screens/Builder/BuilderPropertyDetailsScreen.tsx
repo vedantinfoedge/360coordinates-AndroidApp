@@ -14,7 +14,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
-import {BuilderTabParamList} from '../../components/navigation/BuilderTabNavigator';
+import {BuilderStackParamList} from '../../navigation/BuilderNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {propertyService} from '../../services/property.service';
 import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
@@ -25,11 +25,11 @@ import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters'
 import CustomAlert from '../../utils/alertHelper';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
-  BuilderTabParamList,
+  BuilderStackParamList,
   'PropertyDetails'
 >;
 
-type PropertyDetailsScreenRouteProp = RouteProp<BuilderTabParamList, 'PropertyDetails'>;
+type PropertyDetailsScreenRouteProp = RouteProp<BuilderStackParamList, 'PropertyDetails'>;
 
 type Props = {
   navigation: PropertyDetailsScreenNavigationProp;
@@ -149,8 +149,8 @@ const BuilderPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     return (
       <View style={styles.container}>
         <BuilderHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onProfilePress={() => navigation.navigate('BuilderTabs' as never, {screen: 'Profile'} as never)}
+          onSupportPress={() => navigation.navigate('Support' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.loadingContainer}>
@@ -185,8 +185,8 @@ const BuilderPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   return (
     <View style={styles.container}>
       <BuilderHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onProfilePress={() => navigation.navigate('BuilderTabs' as never, {screen: 'Profile'} as never)}
+        onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={logout}
       />
 

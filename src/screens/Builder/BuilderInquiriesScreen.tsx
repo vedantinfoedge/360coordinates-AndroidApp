@@ -91,8 +91,8 @@ const BuilderInquiriesScreen: React.FC<Props> = ({navigation}) => {
   return (
     <View style={styles.container}>
       <AgentHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onProfilePress={() => navigation.navigate('BuilderTabs' as never, {screen: 'Profile'} as never)}
+        onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={logout}
       />
       <FlatList

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
-import {BuilderTabParamList} from '../../components/navigation/BuilderTabNavigator';
+import {BuilderStackParamList} from '../../navigation/BuilderNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import BuilderHeader from '../../components/BuilderHeader';
@@ -20,11 +20,11 @@ import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type EditPropertyScreenNavigationProp = NativeStackNavigationProp<
-  BuilderTabParamList,
+  BuilderStackParamList,
   'EditProperty'
 >;
 
-type EditPropertyScreenRouteProp = RouteProp<BuilderTabParamList, 'EditProperty'>;
+type EditPropertyScreenRouteProp = RouteProp<BuilderStackParamList, 'EditProperty'>;
 
 type Props = {
   navigation: EditPropertyScreenNavigationProp;
@@ -149,8 +149,8 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
     return (
       <View style={styles.container}>
         <BuilderHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onProfilePress={() => navigation.navigate('BuilderTabs' as never, {screen: 'Profile'} as never)}
+          onSupportPress={() => navigation.navigate('Support' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.loadingContainer}>
@@ -165,8 +165,8 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
     return (
       <View style={styles.container}>
         <BuilderHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onProfilePress={() => navigation.navigate('BuilderTabs' as never, {screen: 'Profile'} as never)}
+          onSupportPress={() => navigation.navigate('Support' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.emptyContainer}>
@@ -179,8 +179,8 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
   return (
     <View style={styles.container}>
       <BuilderHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onProfilePress={() => navigation.navigate('BuilderTabs' as never, {screen: 'Profile'} as never)}
+        onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={logout}
       />
       

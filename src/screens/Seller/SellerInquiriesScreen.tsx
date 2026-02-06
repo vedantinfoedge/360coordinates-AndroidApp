@@ -13,10 +13,9 @@ import {
   Animated,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
+import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
@@ -27,7 +26,7 @@ import CustomAlert from '../../utils/alertHelper';
 import {formatters, capitalize} from '../../utils/formatters';
 
 type SellerInquiriesScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<SellerTabParamList>,
+  NativeStackNavigationProp<SellerStackParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 

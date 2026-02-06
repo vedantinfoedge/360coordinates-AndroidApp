@@ -11,16 +11,15 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuilderTabParamList} from '../../components/navigation/BuilderTabNavigator';
+import {BuilderStackParamList} from '../../navigation/BuilderNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import AgentHeader from '../../components/AgentHeader';
 import {useAuth} from '../../context/AuthContext';
 
 type SupportScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuilderTabParamList>,
+  NativeStackNavigationProp<BuilderStackParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -133,7 +132,7 @@ const BuilderSupportScreen: React.FC<Props> = ({navigation}) => {
   return (
     <View style={styles.container}>
       <AgentHeader
-        onProfilePress={() => navigation.navigate('Profile')}
+        onProfilePress={() => navigation.navigate('BuilderTabs' as never, {screen: 'Profile'} as never)}
         onSupportPress={() => {
           // Already on support page
         }}

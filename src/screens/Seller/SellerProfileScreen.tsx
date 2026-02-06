@@ -14,10 +14,9 @@ import {
 import {launchImageLibrary, launchCamera, MediaType, ImagePickerResponse} from 'react-native-image-picker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
+import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
@@ -30,7 +29,7 @@ import {validation} from '../../utils/validation';
 import {formatters} from '../../utils/formatters';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<SellerTabParamList, 'Profile'>,
+  NativeStackNavigationProp<SellerStackParamList, 'Profile'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -788,7 +787,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('MyProperties')}
+            onPress={() => navigation.navigate('AllListings')}
             activeOpacity={0.7}>
             <Text style={styles.menuIcon}>🏘️</Text>
             <Text style={styles.menuText}>My Properties</Text>

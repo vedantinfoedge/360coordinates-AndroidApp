@@ -10,10 +10,9 @@ import {
   Share,
 } from 'react-native';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../navigation/AppNavigator';
-import {BuyerTabParamList} from '../components/navigation/BuyerTabNavigator';
+import {BuyerStackParamList} from '../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../theme';
 import {buyerService} from '../services/buyer.service';
 import {fixImageUrl} from '../utils/imageHelper';
@@ -24,7 +23,7 @@ import {useAuth} from '../context/AuthContext';
 import CustomAlert from '../utils/alertHelper';
 
 type FavoritesScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuyerTabParamList, 'Favorites'>,
+  NativeStackNavigationProp<BuyerStackParamList, 'Favorites'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 

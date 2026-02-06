@@ -15,7 +15,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
-import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
+import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {propertyService} from '../../services/property.service';
 import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
@@ -25,11 +25,11 @@ import ImageGallery from '../../components/common/ImageGallery';
 import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
-  SellerTabParamList,
+  SellerStackParamList,
   'PropertyDetails'
 >;
 
-type PropertyDetailsScreenRouteProp = RouteProp<SellerTabParamList, 'PropertyDetails'>;
+type PropertyDetailsScreenRouteProp = RouteProp<SellerStackParamList, 'PropertyDetails'>;
 
 type Props = {
   navigation: PropertyDetailsScreenNavigationProp;

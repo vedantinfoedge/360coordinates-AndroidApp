@@ -8,18 +8,17 @@ import {
   Animated,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
+import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import {sellerService, DashboardStats} from '../../services/seller.service';
 
 type SubscriptionScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<SellerTabParamList, 'Subscription'>,
+  NativeStackNavigationProp<SellerStackParamList, 'Subscription'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 

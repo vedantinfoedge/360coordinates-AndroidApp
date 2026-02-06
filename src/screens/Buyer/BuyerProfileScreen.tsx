@@ -15,17 +15,16 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuyerTabParamList, 'Profile'>,
+  NativeStackNavigationProp<BuyerStackParamList, 'Profile'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 

@@ -133,11 +133,11 @@ const AppNavigator = () => {
                 }
               });
           } else if (!isAuthenticated) {
-            // For unauthenticated users, show Initial screen (can browse as buyer)
-            console.log('[AppNavigator] User not authenticated, navigating to Initial');
+            // Guest user: open Buyer screen directly to browse properties
+            console.log('[AppNavigator] User not authenticated, navigating to Buyer (guest)');
             navigationRef.current?.reset({
               index: 0,
-              routes: [{name: 'Initial'}],
+              routes: [{name: 'Buyer'}],
             });
           }
         }
@@ -146,8 +146,8 @@ const AppNavigator = () => {
       // Determine initial route
       let initialRoute: keyof RootStackParamList = 'Splash';
       if (!isLoading) {
-        // Always start with Initial screen for new workflow
-        initialRoute = 'Initial';
+        // Guest users go directly to Buyer screen (no Initial screen)
+        initialRoute = 'Buyer';
       }
 
   return (

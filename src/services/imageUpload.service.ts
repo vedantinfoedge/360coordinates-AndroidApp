@@ -1,11 +1,11 @@
 /**
  * Image Upload Service with Moderation
- * Flow: Upload to Firebase → Send Firebase URL to backend → Backend moderates
- * 
- * This service handles the complete flow:
- * 1. Upload image to Firebase Storage
- * 2. Send Firebase URL to backend moderation API
- * 3. Return moderation result
+ * Storage workflow: Device → Firebase Storage → backend receives URL for moderation only; images stored in Firebase.
+ *
+ * This service:
+ * 1. Uploads image to Firebase Storage (images live in Firebase only)
+ * 2. Sends Firebase URL to backend moderation API (backend does not store the file)
+ * 3. Returns moderation result
  */
 
 import {uploadPropertyImageToFirebase} from './firebaseStorageProperty.service';
@@ -35,7 +35,7 @@ const getAuthToken = async (): Promise<string | null> => {
 
 /**
  * Upload image with moderation
- * Flow: Upload to Firebase → Send Firebase URL to backend → Backend moderates
+ * Workflow: Upload to Firebase → send Firebase URL to backend for moderation only; images stored in Firebase.
  * 
  * @param imageUri - Local image URI
  * @param propertyId - Property ID (0 or null for validation-only)

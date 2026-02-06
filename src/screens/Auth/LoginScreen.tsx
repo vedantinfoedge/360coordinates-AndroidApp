@@ -18,6 +18,7 @@ import {useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AuthStackParamList} from '../../navigation/AuthNavigator';
 import {colors, spacing} from '../../theme';
+import {scale, verticalScale, moderateScale} from '../../utils/responsive';
 import {useAuth, UserRole} from '../../context/AuthContext';
 
 // Storage keys for Remember Me feature
@@ -615,11 +616,11 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: spacing.lg,
-    paddingBottom: 40,
+    paddingBottom: verticalScale(40),
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: scale(20),
     padding: spacing.lg,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 4},
@@ -628,14 +629,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   title: {
-    fontSize: 24,
+    fontSize: moderateScale(24),
     fontWeight: '700',
     color: colors.secondary,
     textAlign: 'center',
     marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
@@ -648,7 +649,7 @@ const styles = StyleSheet.create({
   },
   roleButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: scale(12),
     borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -660,11 +661,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   roleIcon: {
-    fontSize: 20,
-    marginBottom: 4,
+    fontSize: moderateScale(20),
+    marginBottom: scale(4),
   },
   roleButtonText: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     color: colors.text,
     fontWeight: '600',
     textAlign: 'center',
@@ -677,16 +678,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: colors.text,
     fontWeight: '600',
     marginBottom: spacing.xs,
   },
   input: {
     backgroundColor: '#F5F5F5',
-    borderRadius: 12,
+    borderRadius: scale(12),
     padding: spacing.md,
-    fontSize: 16,
+    fontSize: moderateScale(16),
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
@@ -695,21 +696,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
-    borderRadius: 12,
+    borderRadius: scale(12),
     borderWidth: 1,
     borderColor: colors.border,
   },
   passwordInput: {
     flex: 1,
     padding: spacing.md,
-    fontSize: 16,
+    fontSize: moderateScale(16),
     color: colors.text,
   },
   eyeButton: {
     padding: spacing.md,
   },
   eyeIcon: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
   },
   optionsRow: {
     flexDirection: 'row',
@@ -722,11 +723,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: scale(20),
+    height: scale(20),
     borderWidth: 2,
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: scale(4),
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.xs,
@@ -737,22 +738,22 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color: colors.surface,
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontWeight: 'bold',
   },
   checkboxLabel: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: colors.text,
   },
   forgotPassword: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: colors.primary,
     fontWeight: '600',
   },
   signInButton: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: scale(12),
+    paddingVertical: verticalScale(16),
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
@@ -762,7 +763,7 @@ const styles = StyleSheet.create({
   signInButtonText: {
     color: colors.surface,
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: moderateScale(16),
   },
   registerContainer: {
     flexDirection: 'row',
@@ -770,11 +771,11 @@ const styles = StyleSheet.create({
   },
   registerText: {
     color: colors.textSecondary,
-    fontSize: 14,
+    fontSize: moderateScale(14),
   },
   registerLink: {
     color: colors.primary,
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: '700',
   },
 });

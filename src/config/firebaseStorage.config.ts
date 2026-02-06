@@ -1,11 +1,10 @@
 /**
  * Firebase Storage Configuration
- * Feature flag to enable/disable Firebase Storage for property images
+ * Property image workflow: Device → Firebase Storage → backend receives URL for moderation only; images stored in Firebase.
  */
 
-// Set to true to use Firebase Storage (upload to Firebase → backend moderation)
-// Set to false to use existing backend storage flow
-export const USE_FIREBASE_STORAGE = true; // Enabled - uploads to Firebase Storage
+// Set to true to use Firebase Storage (required for correct workflow: upload to Firebase, backend gets URL for moderation)
+export const USE_FIREBASE_STORAGE = true;
 
 // Firebase Storage settings
 export const FIREBASE_STORAGE_CONFIG = {

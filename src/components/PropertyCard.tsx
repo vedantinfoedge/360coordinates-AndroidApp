@@ -1,6 +1,7 @@
 import React, {useState, useEffect, useRef, useMemo} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Image, Animated, ScrollView} from 'react-native';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {scale, verticalScale, moderateScale} from '../utils/responsive';
 import CustomAlert from '../utils/alertHelper';
 import {capitalize} from '../utils/formatters';
 
@@ -316,8 +317,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   );
 };
 
-// Modern Airbnb-inspired card styling
-const CARD_RADIUS = 16;
+// Modern Airbnb-inspired card styling (responsive)
+const CARD_RADIUS = scale(16);
 const CARD_SHADOW = {
   shadowColor: '#000',
   shadowOffset: {width: 0, height: 4},
@@ -328,7 +329,7 @@ const CARD_SHADOW = {
 
 const styles = StyleSheet.create({
   card: {
-    width: 300,
+    width: scale(300),
     backgroundColor: colors.surface,
     borderRadius: CARD_RADIUS,
     marginRight: spacing.lg,
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-    height: 200,
+    height: verticalScale(200),
     overflow: 'hidden',
     backgroundColor: colors.surfaceSecondary,
   },
@@ -360,26 +361,26 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    width: 44,
-    minWidth: 44,
+    width: scale(44),
+    minWidth: scale(44),
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 11,
   },
   navArrowLeft: {
-    left: 4,
+    left: scale(4),
   },
   navArrowRight: {
-    right: 4,
+    right: scale(4),
   },
   navArrowText: {
-    fontSize: 24,
+    fontSize: moderateScale(24),
     fontWeight: '500',
     color: '#222',
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
     textAlign: 'center',
     lineHeight: 30,
     shadowColor: '#000',
@@ -393,26 +394,26 @@ const styles = StyleSheet.create({
   },
   dotsContainer: {
     position: 'absolute',
-    bottom: 12,
+    bottom: verticalScale(12),
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: scale(6),
     zIndex: 10,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: scale(6),
+    height: scale(6),
+    borderRadius: scale(3),
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   dotActive: {
     backgroundColor: '#FFFFFF',
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: scale(7),
+    height: scale(7),
+    borderRadius: scale(4),
   },
   imagePlaceholder: {
     width: '100%',
@@ -427,18 +428,18 @@ const styles = StyleSheet.create({
   },
   actionsOverlay: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
+    top: verticalScale(12),
+    left: scale(12),
+    right: scale(12),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     zIndex: 20,
   },
   actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -458,15 +459,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionIcon: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
   },
   badge: {
     position: 'absolute',
-    bottom: 12,
-    left: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
+    bottom: verticalScale(12),
+    left: scale(12),
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(5),
+    borderRadius: scale(6),
     zIndex: 5,
     pointerEvents: 'none',
   },
@@ -480,48 +481,48 @@ const styles = StyleSheet.create({
     backgroundColor: '#F59E0B',
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   infoContainer: {
-    padding: 16,
-    paddingTop: 14,
+    padding: scale(16),
+    paddingTop: verticalScale(14),
   },
   name: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: '600',
     color: colors.text,
-    lineHeight: 22,
-    marginBottom: 4,
+    lineHeight: moderateScale(22),
+    marginBottom: scale(4),
   },
   location: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: '400',
     color: colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 8,
+    lineHeight: moderateScale(20),
+    marginBottom: scale(8),
   },
   price: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: '700',
     color: colors.primary,
-    marginBottom: 14,
+    marginBottom: verticalScale(14),
     letterSpacing: -0.3,
   },
   viewDetailsButton: {
     backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: scale(10),
+    paddingVertical: verticalScale(12),
     paddingHorizontal: spacing.md,
     alignItems: 'center',
-    minHeight: 44,
+    minHeight: verticalScale(44),
     justifyContent: 'center',
   },
   viewDetailsText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.2,

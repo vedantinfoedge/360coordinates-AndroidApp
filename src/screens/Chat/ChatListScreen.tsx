@@ -11,10 +11,9 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import BuyerHeader from '../../components/BuyerHeader';
@@ -33,7 +32,7 @@ import {Image} from 'react-native';
 type ChatListScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<ChatStackParamList, 'ChatList'>,
   CompositeNavigationProp<
-    BottomTabNavigationProp<BuyerTabParamList>,
+    NativeStackNavigationProp<BuyerStackParamList>,
     NativeStackNavigationProp<RootStackParamList>
   >
 >;
@@ -355,6 +354,9 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     try {
       const db = firestore();
       if (!db) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatListScreen.tsx:setupChatRoomsListener',message:'Firestore null',data:{userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.warn('[ChatList] Firestore not available, using manual refresh');
         return null;
       }
@@ -464,6 +466,9 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
 
   const loadChatRooms = async () => {
     if (!user?.id || !user?.user_type) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatListScreen.tsx:loadChatRooms',message:'Skip load - no user',data:{hasUser:!!user?.id,hasUserType:!!user?.user_type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.warn('[ChatList] Cannot load chat rooms - missing user or user type');
       setChatList([]);
       setLoading(false);
@@ -473,6 +478,9 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     try {
       setLoading(true);
       const currentUserType = user.user_type;
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatListScreen.tsx:loadChatRooms',message:'loadChatRooms start',data:{userId:user.id,userType:currentUserType},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.log('[ChatList] Loading chat rooms for user type:', currentUserType, {
         userId: user.id,
       });
@@ -494,13 +502,22 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
       
       if (response && (response.success || response.data) && response.data) {
         const chatRooms = Array.isArray(response.data) ? response.data : [];
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatListScreen.tsx:loadChatRooms',message:'loadChatRooms response',data:{success:response?.success,roomCount:chatRooms.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.log('[ChatList] Processing', chatRooms.length, 'chat rooms');
         await processChatRooms(chatRooms as ChatRoom[]);
       } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatListScreen.tsx:loadChatRooms',message:'loadChatRooms no data',data:{hasResponse:!!response,success:response?.success},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.warn('[ChatList] No chat rooms in response, setting empty list');
         setChatList([]);
       }
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatListScreen.tsx:loadChatRooms',message:'loadChatRooms error',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.error('[ChatList] Error loading chat rooms:', error);
       setChatList([]);
     } finally {
@@ -1365,33 +1382,46 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     );
   }
 
+  // Import SellerHeader for agents/sellers
+  const SellerHeader = user?.user_type === 'seller' || user?.user_type === 'agent'
+    ? require('../../components/SellerHeader').default
+    : null;
+
   return (
     <View style={styles.container}>
-      <BuyerHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={isLoggedIn ? logout : undefined}
-        onSignInPress={
-          isGuest
-            ? () =>
-                (navigation as any).navigate('Auth', {
-                  screen: 'Login',
-                  params: {returnTo: 'Chats'},
-                })
-            : undefined
-        }
-        onSignUpPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
-            : undefined
-        }
-        showLogout={isLoggedIn}
-        showProfile={isLoggedIn}
-        showSignIn={isGuest}
-        showSignUp={isGuest}
-        scrollY={scrollY}
-        headerHeight={headerHeight}
-      />
+      {(user?.user_type === 'seller' || user?.user_type === 'agent') && SellerHeader ? (
+        <SellerHeader
+          onProfilePress={() => navigation.navigate('Profile')}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={isLoggedIn ? logout : undefined}
+        />
+      ) : (
+        <BuyerHeader
+          onProfilePress={() => navigation.navigate('Profile')}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={isLoggedIn ? logout : undefined}
+          onSignInPress={
+            isGuest
+              ? () =>
+                  (navigation as any).navigate('Auth', {
+                    screen: 'Login',
+                    params: {returnTo: 'Chats'},
+                  })
+              : undefined
+          }
+          onSignUpPress={
+            isGuest
+              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+              : undefined
+          }
+          showLogout={isLoggedIn}
+          showProfile={isLoggedIn}
+          showSignIn={isGuest}
+          showSignUp={isGuest}
+          scrollY={scrollY}
+          headerHeight={headerHeight}
+        />
+      )}
       {chatList.length > 0 ? (
         <Animated.FlatList
           data={chatList}

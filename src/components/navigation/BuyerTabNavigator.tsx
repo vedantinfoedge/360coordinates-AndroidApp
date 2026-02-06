@@ -1,7 +1,7 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {View, Text} from 'react-native';
-import {getFocusedRouteNameFromRoute} from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import BuyerDashboardScreen from '../../screens/Buyer/BuyerDashboardScreen';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
@@ -12,13 +12,20 @@ import PropertyMapScreen from '../../screens/Buyer/PropertyMapScreen';
 import SupportScreen from '../../screens/Buyer/SupportScreen';
 import FavoritesScreen from '../../screens/FavoritesScreen';
 import RecentlyViewedScreen from '../../screens/Buyer/RecentlyViewedScreen';
-import {colors, spacing} from '../../theme';
-import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
-import TabBarIcon from './TabBarIcon';
+import AddTabScreen from '../../screens/Buyer/AddTabScreen';
+import {ArcFABProvider} from '../../context/ArcFABContext';
+import BuyerCustomTabBar from './BuyerCustomTabBar';
+import BuyerArcFABMenu from './BuyerArcFABMenu';
+import {colors} from '../../theme';
+
+const tabIcon = (char: string, color: string) => (
+  <Text style={{fontSize: 20, fontWeight: '600', color}}>{char}</Text>
+);
 
 export type BuyerTabParamList = {
   Home: undefined;
   Search: undefined;
+  Add: undefined;
   Chats: undefined;
   Profile: undefined;
   Chat: undefined;
@@ -34,68 +41,49 @@ export type BuyerTabParamList = {
 
 const Tab = createBottomTabNavigator<BuyerTabParamList>();
 
+// Report styling: 56pt bar, safe area bottom, #e0e0e0 top border, focused #1976d2 / unfocused #757575
+const TAB_BAR_HEIGHT = 56;
+const FOCUSED_COLOR = '#1976d2';
+const UNFOCUSED_COLOR = '#757575';
+
 const BuyerTabNavigator = () => {
-  const unreadCount = useUnreadChatCount();
+  const insets = useSafeAreaInsets();
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false, // Hide default header bar
-        headerStyle: {
-          backgroundColor: colors.primary,
-        },
-        headerTintColor: colors.surface,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarLabelPosition: 'below-icon',
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          paddingTop: 4,
-          paddingBottom: 20,
-          paddingHorizontal: 30,
-          height: 65,
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: -2},
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-        },
-        tabBarItemStyle: {
-          flex: 1,
-          paddingVertical: 2,
-          paddingHorizontal: 40,
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: 56,
-        },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-          marginTop: 0,
-          marginBottom: 0,
-          textAlign: 'center',
-        },
-        tabBarIconStyle: {
-          marginTop: 0,
-          marginBottom: 0,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-      }}>
+    <ArcFABProvider>
+      <View style={{flex: 1}}>
+        <Tab.Navigator
+          screenOptions={{
+            headerShown: false,
+            tabBarShowLabel: true,
+            tabBarActiveTintColor: FOCUSED_COLOR,
+            tabBarInactiveTintColor: UNFOCUSED_COLOR,
+            tabBarStyle: {
+              backgroundColor: colors.surface,
+              borderTopColor: '#e0e0e0',
+              borderTopWidth: 1,
+              paddingTop: 4,
+              paddingBottom: insets.bottom,
+              paddingHorizontal: 8,
+              height: TAB_BAR_HEIGHT + insets.bottom,
+              elevation: 8,
+              shadowColor: '#000',
+              shadowOffset: {width: 0, height: -2},
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+            },
+            tabBarItemStyle: {
+              minHeight: TAB_BAR_HEIGHT,
+            },
+          }}
+          tabBar={props => <BuyerCustomTabBar {...props} />}>
       <Tab.Screen
         name="Home"
         component={BuyerDashboardScreen}
         options={{
           title: 'Explore',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color, focused}) => (
-            <TabBarIcon name="home" color={color} focused={focused} size={24} />
-          ),
+          tabBarIcon: ({color}) => tabIcon('H', color),
         }}
       />
       <Tab.Screen
@@ -112,12 +100,21 @@ const BuyerTabNavigator = () => {
           area: '',
           status: '',
           listingType: 'all', // Show all properties by default
-        }}
+        } as any}
         options={{
           title: 'Search',
           headerShown: false,
-          tabBarIcon: ({color, focused}) => (
-            <TabBarIcon name="search" color={color} focused={focused} size={24} />
+          tabBarIcon: ({color}) => tabIcon('S', color),
+        }}
+      />
+      <Tab.Screen
+        name="Add"
+        component={AddTabScreen}
+        options={{
+          title: 'Add',
+          headerShown: false,
+          tabBarIcon: ({color}) => (
+            <Text style={{fontSize: 24, fontWeight: '600', color}}>+</Text>
           ),
         }}
       />
@@ -125,49 +122,10 @@ const BuyerTabNavigator = () => {
         name="Chats"
         component={ChatNavigator}
         options={{
-          title: 'Inbox',
+          title: 'Chat',
           headerShown: false,
-          // Reset Chat stack to ChatList when tab is blurred (navigated away from)
-          unmountOnBlur: true,
-          tabBarIcon: ({color, focused}) => (
-            <View style={{position: 'relative', alignItems: 'center', justifyContent: 'center'}}>
-              <TabBarIcon name="chat" color={color} focused={focused} size={24} />
-              {unreadCount > 0 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -10,
-                    backgroundColor: '#FF385C',
-                    borderRadius: 10,
-                    minWidth: 18,
-                    height: 18,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingHorizontal: 4,
-                    borderWidth: 2,
-                    borderColor: colors.surface,
-                  }}>
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 10,
-                      fontWeight: 'bold',
-                    }}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
+          tabBarIcon: ({color}) => tabIcon('C', color),
         }}
-        listeners={({navigation}) => ({
-          // Reset to ChatList when Chats tab is pressed
-          tabPress: (e) => {
-            // Navigate to ChatList when tab is pressed
-            navigation.navigate('Chats', {screen: 'ChatList'});
-          },
-        })}
       />
       <Tab.Screen
         name="Profile"
@@ -175,9 +133,7 @@ const BuyerTabNavigator = () => {
         options={{
           title: 'Profile',
           headerShown: false, // Hide default header for custom header
-          tabBarIcon: ({color, focused}) => (
-            <TabBarIcon name="profile" color={color} focused={focused} size={24} />
-          ),
+          tabBarIcon: ({color}) => tabIcon('P', color),
         }}
       />
       <Tab.Screen
@@ -187,8 +143,6 @@ const BuyerTabNavigator = () => {
           title: 'Chat',
           headerShown: false,
           tabBarButton: () => null, // Hide from tab bar
-          // Reset Chat stack when navigated away
-          unmountOnBlur: true,
         }}
       />
       <Tab.Screen
@@ -257,9 +211,11 @@ const BuyerTabNavigator = () => {
           tabBarButton: () => null, // Hide from tab bar
         }}
       />
-    </Tab.Navigator>
+        </Tab.Navigator>
+        <BuyerArcFABMenu />
+      </View>
+    </ArcFABProvider>
   );
 };
 
 export default BuyerTabNavigator;
-

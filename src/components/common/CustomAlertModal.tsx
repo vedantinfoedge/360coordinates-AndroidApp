@@ -99,7 +99,9 @@ const CustomAlertModal: React.FC<CustomAlertModalProps> = ({
       visible={visible}
       transparent={true}
       animationType="none"
-      onRequestClose={onClose}>
+      onRequestClose={onClose}
+      statusBarTranslucent
+      presentationStyle="overFullScreen">
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
@@ -150,6 +152,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.md,
+    zIndex: 99999,
+    elevation: 99999,
   },
   modalContainer: {
     width: '100%',

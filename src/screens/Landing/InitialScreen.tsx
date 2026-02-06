@@ -13,6 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {verticalScale} from '../../utils/responsive';
 import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import {useAuth} from '../../context/AuthContext';
@@ -38,7 +39,7 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
   const slideUpAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
-  const headerHeight = insets.top + 70;
+  const headerHeight = insets.top + verticalScale(70);
 
   useEffect(() => {
     // Entrance animations

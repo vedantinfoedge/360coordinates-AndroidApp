@@ -1,20 +1,19 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import AdminTabNavigator from '../components/navigation/AdminTabNavigator';
+import AdminDashboardScreen from '../screens/Admin/AdminDashboardScreen';
+import AdminUsersScreen from '../screens/Admin/AdminUsersScreen';
+import AdminPropertiesScreen from '../screens/Admin/AdminPropertiesScreen';
 
-export type AdminStackParamList = {
-  AdminTabs: undefined;
-};
-
-const Stack = createNativeStackNavigator<AdminStackParamList>();
+const Stack = createNativeStackNavigator();
 
 const AdminNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
-      <Stack.Screen name="AdminTabs" component={AdminTabNavigator} />
+    <Stack.Navigator screenOptions={{headerShown: false}} initialRouteName="Dashboard">
+      <Stack.Screen name="Dashboard" component={AdminDashboardScreen} />
+      <Stack.Screen name="Users" component={AdminUsersScreen} />
+      <Stack.Screen name="Properties" component={AdminPropertiesScreen} />
     </Stack.Navigator>
   );
 };
 
 export default AdminNavigator;
-

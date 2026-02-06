@@ -537,13 +537,18 @@ export const chatService = {
     try {
       // Try Firebase first
       if (!userId) {
-        // Try to get from auth context or return empty
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'chat.service.ts:getConversations',message:'No userId',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.warn('[ChatService] No userId provided for getConversations');
         return { success: true, data: [] };
       }
 
       const db = getFirestore();
       if (!db) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'chat.service.ts:getConversations',message:'Firestore null',data:{userId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.warn('[ChatService] Firestore not available - returning empty list');
         return { success: true, data: [] };
       }
@@ -586,9 +591,15 @@ export const chatService = {
         return bTime - aTime; // Most recent first
       });
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'chat.service.ts:getConversations',message:'getConversations exit',data:{userId,roomCount:chatRooms.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.log('[ChatService] Fetched', chatRooms.length, 'chat rooms from Firebase');
       return { success: true, data: chatRooms };
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'chat.service.ts:getConversations',message:'getConversations error',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.error('[ChatService] Error getting conversations from Firebase:', error);
       // Return empty array - no backend API fallback
       return { success: true, data: [] };

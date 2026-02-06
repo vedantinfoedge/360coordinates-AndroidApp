@@ -17,10 +17,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {verticalScale, moderateScale, scale} from '../../utils/responsive';
 import {propertyService} from '../../services/property.service';
 import {favoriteService} from '../../services/favorite.service';
 import CustomAlert from '../../utils/alertHelper';
@@ -47,7 +47,7 @@ try {
   console.warn('[PropertyDetails] WebView not available:', error);
 }
 
-type PropertyDetailsScreenNavigationProp = BottomTabNavigationProp<BuyerTabParamList, 'PropertyDetails'>;
+type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<BuyerStackParamList, 'PropertyDetails'>;
 
 type Props = {
   navigation: PropertyDetailsScreenNavigationProp;
@@ -70,7 +70,7 @@ const INTERACTION_STORAGE_KEY = 'interaction_remaining';
 
 const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
-  const headerHeight = insets.top + 70;
+  const headerHeight = insets.top + verticalScale(70);
   const scrollY = useRef(new Animated.Value(0)).current;
   const {logout, user, isAuthenticated} = useAuth();
   const [property, setProperty] = useState<any>(null);
@@ -530,16 +530,18 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         propertyId: propId,
         propertyTitle: propTitle,
       });
-      
-      // Navigate to chat WITHOUT passing owner name/contact details
-      // Owner details should only be visible via "Show Owner Details" action
-      (navigation as any).navigate('Chat', {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyDetailsScreen.tsx:handleChatWithOwner',message:'Navigate to Chat',data:{targetTab:'Chats',screen:'ChatConversation',userId:Number(sellerId),propertyId:Number(propId),propertyTitle:propTitle},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
+      // #endregion
+      // Navigate to the visible Chats tab (not the hidden Chat tab) so the conversation opens in the correct stack
+      (navigation as any).navigate('Chats', {
         screen: 'ChatConversation',
         params: {
           userId: Number(sellerId),
           userName: '', // Don't pass owner name - will show as "Property Owner"
           propertyId: Number(propId),
           propertyTitle: propTitle,
+          receiverRole: 'seller', // Property owner is seller; use 'agent' only when listing is by agent
         },
       });
     } finally {
@@ -1386,29 +1388,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100, // Space for sticky buttons
+    paddingBottom: verticalScale(100),
   },
   imageCarouselContainer: {
-    height: 450,
+    height: verticalScale(450),
     position: 'relative',
     paddingTop: spacing.md,
     borderRadius: borderRadius.xl,
     overflow: 'hidden',
     marginHorizontal: spacing.md,
-    marginTop: spacing.xl + spacing.xl, // Extra space to show top rounded corners below header
+    marginTop: spacing.xl + spacing.xl,
     backgroundColor: colors.surfaceSecondary,
   },
   imageCarousel: {
-    height: 410,
+    height: verticalScale(410),
     borderRadius: borderRadius.xl,
   },
   imageCarouselContent: {
     alignItems: 'center',
-    // Width will be set dynamically: SCREEN_WIDTH * propertyImages.length
   },
   imageContainer: {
-    width: IMAGE_CAROUSEL_WIDTH, // Account for container margins
-    height: 410,
+    width: IMAGE_CAROUSEL_WIDTH,
+    height: verticalScale(410),
     borderRadius: borderRadius.xl,
     paddingTop: spacing.md,
     overflow: 'hidden',
@@ -1416,10 +1417,10 @@ const styles = StyleSheet.create({
   carouselNavButton: {
     position: 'absolute',
     top: '50%',
-    marginTop: -24,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    marginTop: verticalScale(-24),
+    width: scale(48),
+    height: scale(48),
+    borderRadius: scale(24),
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1443,8 +1444,8 @@ const styles = StyleSheet.create({
     right: spacing.md,
   },
   carouselNavButtonText: {
-    fontSize: 28,
-    color: colors.primary, // Purple arrows
+    fontSize: moderateScale(28),
+    color: colors.primary,
     fontWeight: 'bold',
   },
   image: {
@@ -1464,14 +1465,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   indicatorActive: {
     backgroundColor: colors.surface,
-    width: 24,
+    width: scale(24),
   },
   imageCounter: {
     position: 'absolute',

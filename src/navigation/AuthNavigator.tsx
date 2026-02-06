@@ -11,7 +11,7 @@ import {colors} from '../theme';
 export type AuthStackParamList = {
   Onboarding: undefined;
   Login: {returnTo?: string; propertyId?: string; autoShowContact?: boolean; userType?: string; targetDashboard?: string; requireAuth?: boolean} | undefined;
-  Register: undefined;
+  Register: {role?: 'agent' | 'builder' | 'seller'} | undefined;
   ForgotPassword: undefined;
   OTPVerification: {userId?: number; user_id?: number; phone?: string; email?: string; type?: 'register' | 'forgotPassword'; reqId?: string; method?: 'msg91-sdk' | 'msg91-rest' | 'backend' | 'msg91-widget'};
   ResetPassword: {otp: string};

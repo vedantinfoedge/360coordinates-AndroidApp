@@ -13,10 +13,9 @@ import {
   Animated,
 } from 'react-native';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
+import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
@@ -27,7 +26,7 @@ import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type AgentInquiriesScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<AgentTabParamList>,
+  NativeStackNavigationProp<AgentStackParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -321,14 +320,17 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
       buyerName = 'Buyer';
     }
     
-    navigation.navigate('Chat' as any, {
-      screen: 'ChatConversation',
+    navigation.navigate('AgentTabs' as any, {
+      screen: 'Chat',
       params: {
-        userId: Number(buyerId),
-        userName: buyerName, // Ensure this is always a name, never an ID
-        propertyId: Number(propertyId),
-        propertyTitle: propertyTitle,
-        receiverRole: 'agent', // Agent is the receiver role in this context
+        screen: 'ChatConversation',
+        params: {
+          userId: Number(buyerId),
+          userName: buyerName,
+          propertyId: Number(propertyId),
+          propertyTitle: propertyTitle,
+          receiverRole: 'agent',
+        },
       },
     });
   };
@@ -377,7 +379,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
     return (
       <View style={styles.container}>
         <AgentHeader
-          onProfilePress={() => navigation.navigate('Profile')}
+          onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
           onSupportPress={() => navigation.navigate('Support')}
           onLogoutPress={logout}
         />
@@ -392,7 +394,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
   return (
     <View style={styles.container}>
       <AgentHeader
-        onProfilePress={() => navigation.navigate('Profile')}
+        onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
         onSupportPress={() => navigation.navigate('Support')}
         onLogoutPress={logout}
         scrollY={scrollY}

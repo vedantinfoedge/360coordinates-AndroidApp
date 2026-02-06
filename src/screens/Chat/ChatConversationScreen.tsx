@@ -13,11 +13,10 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
@@ -29,7 +28,7 @@ import firestore from '@react-native-firebase/firestore';
 type ChatConversationScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<ChatStackParamList, 'ChatConversation'>,
   CompositeNavigationProp<
-    BottomTabNavigationProp<BuyerTabParamList>,
+    NativeStackNavigationProp<BuyerStackParamList>,
     NativeStackNavigationProp<RootStackParamList>
   >
 >;
@@ -55,7 +54,11 @@ interface Message {
 const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const {conversationId, userId, userName, propertyId, propertyTitle, receiverRole} = route.params || {};
   const {logout, user} = useAuth();
-  
+  // #region agent log
+  React.useEffect(() => {
+    fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:mount',message:'Route params',data:{conversationId,userId,userName,propertyId,propertyTitle,receiverRole,hasUser:!!user?.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,E'})}).catch(()=>{});
+  }, []);
+  // #endregion
   console.log('[ChatConversation] Route params:', {
     conversationId,
     userId,
@@ -431,7 +434,9 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       if (firebaseRoomId) {
         try {
           setActualConversationId(firebaseRoomId);
-          
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:initializeConversation',message:'actualConversationId set',data:{firebaseRoomId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
           // Try to fetch buyer name from Firebase chat room if not provided or is default
           if (!userName || !userName.trim() || userName === 'Buyer' || userName === 'Property Owner') {
             try {
@@ -525,6 +530,9 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         setLoading(false);
         return null;
       } else if (!actualConversationId && !backendChatRoomId) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:initializeConversation',message:'Init failed - missing params',data:{userId,propertyId,conversationId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         CustomAlert.alert('Error', 'Unable to initialize conversation. Missing required parameters.');
         setLoading(false);
         return null;
@@ -533,6 +541,9 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       setLoading(false);
       return null;
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:initializeConversation',message:'Init error',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       console.error('[Chat] Error initializing conversation:', {
         message: error?.message,
         code: error?.code,
@@ -619,7 +630,9 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleSend = async () => {
     if (!inputText.trim() || sending || !user?.id) return;
-    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:handleSend',message:'handleSend entry',data:{hasActualConversationId:!!actualConversationId,actualConversationId,textLen:inputText.trim().length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
+    // #endregion
     const messageText = inputText.trim();
     setInputText('');
     setSending(true);
@@ -644,7 +657,9 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         senderRole,
         messageText,
       );
-      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:handleSend',message:'sendChatMessage result',data:{firebaseSuccess},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       if (!firebaseSuccess) {
         CustomAlert.alert(
           'Cannot Send Message',
@@ -653,6 +668,9 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         setInputText(messageText); // Restore text
       }
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:handleSend',message:'send error',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       console.error('Error sending message:', error);
       CustomAlert.alert('Error', error.message || 'Failed to send message. Please try again.');
       setInputText(messageText); // Restore text

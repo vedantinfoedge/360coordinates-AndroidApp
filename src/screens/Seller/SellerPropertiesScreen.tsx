@@ -335,13 +335,19 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         errorMessage = error.message;
       }
       
-      // Show detailed error for debugging
       console.error('[SellerProperties] Final error message:', errorMessage);
-      
+
+      const status = error?.response?.status || error?.status;
+      const is403 = status === 403;
+      const isAccessDenied = (errorMessage || '').toLowerCase().includes('access denied') || (errorMessage || '').toLowerCase().includes('forbidden');
+      if (is403 || isAccessDenied) {
+        errorMessage = "You don't have permission to view seller properties. Please ensure you're logged in as a seller, or try logging out and signing in again.";
+      }
+
       if (showLoading) {
         CustomAlert.alert(
-          'Error Loading Properties', 
-          errorMessage + '\n\nPlease try refreshing or contact support if the issue persists.',
+          'Error Loading Properties',
+          errorMessage + (is403 || isAccessDenied ? '' : '\n\nPlease try refreshing or contact support if the issue persists.'),
           [
             {text: 'Retry', onPress: () => loadMyProperties(true)},
             {text: 'OK', style: 'cancel'}

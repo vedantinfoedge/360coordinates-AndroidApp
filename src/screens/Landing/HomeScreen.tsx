@@ -15,9 +15,10 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {MainStackParamList} from '../../navigation/MainStackNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {scale, verticalScale, moderateScale} from '../../utils/responsive';
 import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
@@ -27,10 +28,7 @@ import CustomAlert from '../../utils/alertHelper';
 import {formatters} from '../../utils/formatters';
 import {useAuth} from '../../context/AuthContext';
 
-type HomeScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<any, 'Home'>,
-  NativeStackNavigationProp<any>
->;
+type HomeScreenNavigationProp = NativeStackNavigationProp<MainStackParamList, 'Home'>;
 
 type Props = {
   navigation: HomeScreenNavigationProp;
@@ -64,6 +62,8 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   const isGuest = !isLoggedIn;
   const [listingType, setListingType] = useState<ListingType>('all');
   const [properties, setProperties] = useState<Property[]>([]);
+  const [upcomingProjects, setUpcomingProjects] = useState<Property[]>([]);
+  const [buyNewHomeProperties, setBuyNewHomeProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,7 +76,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   
   // Header animation values
   const scrollY = useRef(new Animated.Value(0)).current;
-  const headerHeight = insets.top + 70;
+  const headerHeight = insets.top + verticalScale(70);
   
   // Smooth marquee auto-scroll refs
   const carouselScrollRef = useRef<ScrollView>(null);
@@ -84,9 +84,9 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   const animationRef = useRef<number | null>(null);
   const isUserScrolling = useRef(false);
   const lastTimestamp = useRef<number>(0);
-  const SCROLL_SPEED = 0.5; // pixels per frame (adjust for speed)
-  const CARD_WIDTH = 280;
-  const CARD_MARGIN = 16;
+  const SCROLL_SPEED = 0.5;
+  const CARD_WIDTH = scale(280);
+  const CARD_MARGIN = scale(16);
   const ITEM_WIDTH = CARD_WIDTH + CARD_MARGIN;
 
   useEffect(() => {
@@ -217,6 +217,13 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         }
         
         setProperties(filteredProperties);
+      }
+
+      const allResponse = await buyerService.getProperties({limit: 50});
+      if (allResponse.success && allResponse.data?.properties) {
+        const allList = allResponse.data.properties as Property[];
+        setUpcomingProjects(allList.filter(p => p.project_type === 'upcoming').slice(0, 15));
+        setBuyNewHomeProperties(allList.filter(p => p.status === 'sale').slice(0, 15));
       }
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
@@ -467,8 +474,26 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                   />
                 </View>
               )}
-        </View>
-      </View>
+            </View>
+            <TouchableOpacity
+              style={styles.mapSearchButton}
+              onPress={() => {
+                try {
+                  navigation.navigate('Search' as never, {
+                    screen: 'PropertyMap',
+                    params: {
+                      listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
+                    },
+                  } as never);
+                } catch (err: any) {
+                  console.error('Error navigating to map:', err);
+                  CustomAlert.alert('Error', 'Map is not available.');
+                }
+              }}>
+              <Text style={styles.mapSearchIcon}>🗺️</Text>
+              <Text style={styles.mapSearchText}>Search on Map</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Explore Properties Section */}
           <View style={styles.section}>
@@ -575,6 +600,116 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
             )}
           </View>
 
+          {/* Upcoming Projects Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Upcoming Projects</Text>
+                <Text style={styles.sectionSubtitle}>
+                  New projects from Agents & Builders
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  navigation.navigate('Search' as never, {
+                    screen: 'SearchResults',
+                    params: {query: '', location: '', listingType: 'all'},
+                  } as never);
+                }}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            {upcomingProjects.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.propertiesList}>
+                {upcomingProjects.map((item: Property) => {
+                  const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+                  const images = item.images?.length
+                    ? (item.images.map((url: string) => fixImageUrl(url)).filter((u): u is string => Boolean(u)) as string[])
+                    : undefined;
+                  return (
+                    <View key={item.id} style={styles.carouselCard}>
+                      <PropertyCard
+                        image={imageUrl || undefined}
+                        images={images}
+                        name={item.title}
+                        location={item.location}
+                        price={formatters.price(item.price, item.status === 'rent')}
+                        type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
+                        onPress={() => handlePropertyPress(item.id)}
+                        onSharePress={() => handleShareProperty(item)}
+                        isFavorite={false}
+                        property={item}
+                        style={styles.carouselPropertyCard}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No upcoming projects at the moment</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Buy New Home Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Buy New Home</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Flats & apartments for sale
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  navigation.navigate('Search' as never, {
+                    screen: 'SearchResults',
+                    params: {query: '', location: '', listingType: 'buy', status: 'sale'},
+                  } as never);
+                }}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            {buyNewHomeProperties.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.propertiesList}>
+                {buyNewHomeProperties.map((item: Property) => {
+                  const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+                  const images = item.images?.length
+                    ? (item.images.map((url: string) => fixImageUrl(url)).filter((u): u is string => Boolean(u)) as string[])
+                    : undefined;
+                  return (
+                    <View key={item.id} style={styles.carouselCard}>
+                      <PropertyCard
+                        image={imageUrl || undefined}
+                        images={images}
+                        name={item.title}
+                        location={item.location}
+                        price={formatters.price(item.price, false)}
+                        type="buy"
+                        onPress={() => handlePropertyPress(item.id)}
+                        onSharePress={() => handleShareProperty(item)}
+                        isFavorite={false}
+                        property={item}
+                        style={styles.carouselPropertyCard}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No properties for sale at the moment</Text>
+              </View>
+            )}
+          </View>
+
           {/* Top Cities Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -620,17 +755,17 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   welcomeText: {
-    fontSize: 28,
+    fontSize: moderateScale(28),
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 6,
+    marginBottom: scale(6),
     letterSpacing: -0.5,
   },
   welcomeSubtext: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: '400',
     color: colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: moderateScale(24),
   },
   // Search Section - Airbnb-inspired search bar
   searchSection: {
@@ -645,9 +780,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: scale(16),
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(14),
     borderWidth: 1,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
@@ -657,25 +792,25 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchIcon: {
-    fontSize: 18,
-    marginRight: 12,
+    fontSize: moderateScale(18),
+    marginRight: scale(12),
   },
   searchInputWrapper: {
     flex: 1,
   },
   searchInput: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: '400',
     color: colors.text,
     padding: 0,
-    lineHeight: 22,
+    lineHeight: moderateScale(22),
   },
   searchButton: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginLeft: 12,
+    paddingHorizontal: scale(20),
+    paddingVertical: verticalScale(10),
+    borderRadius: scale(12),
+    marginLeft: scale(12),
     shadowColor: colors.primary,
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
@@ -683,7 +818,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchButtonText: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.2,
@@ -693,8 +828,35 @@ const styles = StyleSheet.create({
     top: '100%',
     left: 0,
     right: 0,
-    marginTop: 8,
+    marginTop: scale(8),
     zIndex: 1000,
+  },
+  mapSearchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: scale(12),
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    minHeight: verticalScale(44),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  mapSearchIcon: {
+    fontSize: moderateScale(18),
+    marginRight: spacing.xs,
+  },
+  mapSearchText: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: colors.text,
   },
   // Toggle Section - Pill-shaped buttons
   toggleSection: {
@@ -702,19 +864,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
-    gap: 10,
+    gap: scale(10),
   },
   toggleButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 24,
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(16),
+    borderRadius: scale(24),
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+    minHeight: verticalScale(44),
   },
   toggleButtonActive: {
     backgroundColor: colors.primary,
@@ -726,7 +888,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   toggleButtonText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: '600',
     color: colors.textSecondary,
     letterSpacing: 0.1,
@@ -736,7 +898,7 @@ const styles = StyleSheet.create({
   },
   // Section Styling - More breathing room
   section: {
-    marginTop: spacing.xl + 8,
+    marginTop: spacing.xl + scale(8),
     marginBottom: spacing.md,
   },
   sectionHeader: {
@@ -747,36 +909,35 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: '700',
     color: colors.text,
     letterSpacing: -0.3,
-    lineHeight: 28,
+    lineHeight: moderateScale(28),
     flex: 1,
     paddingRight: spacing.md,
   },
   sectionSubtitle: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: '400',
     color: colors.textSecondary,
-    marginTop: 4,
-    lineHeight: 20,
+    marginTop: scale(4),
+    lineHeight: moderateScale(20),
   },
   seeAllText: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: '600',
     color: colors.primary,
-    paddingVertical: 4,
+    paddingVertical: scale(4),
   },
   // Properties List - Better spacing
   propertiesList: {
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.sm,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
   carouselCard: {
-    width: 280,
-    marginRight: 16,
+    width: scale(280),
+    marginRight: scale(16),
   },
   carouselPropertyCard: {
     width: '100%',
@@ -787,18 +948,18 @@ const styles = StyleSheet.create({
     paddingRight: spacing.sm,
   },
   cityCard: {
-    width: 90,
+    width: scale(90),
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: scale(14),
   },
   cityImageContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: scale(80),
+    height: scale(80),
+    borderRadius: scale(40),
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: verticalScale(10),
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 3},
@@ -813,11 +974,11 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   cityName: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     fontWeight: '600',
     color: colors.text,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: moderateScale(18),
   },
   // Loading & Empty States
   loadingContainer: {
@@ -825,7 +986,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: '500',
     color: colors.textSecondary,
     marginTop: spacing.md,
@@ -835,7 +996,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     marginHorizontal: spacing.lg,
-    borderRadius: 16,
+    borderRadius: scale(16),
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.04,
@@ -843,7 +1004,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   emptyText: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: '500',
     color: colors.textSecondary,
   },

@@ -12,10 +12,9 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import PropertyCard from '../../components/PropertyCard';
 import BuyerHeader from '../../components/BuyerHeader';
@@ -26,7 +25,7 @@ import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type AllPropertiesScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuyerTabParamList>,
+  NativeStackNavigationProp<BuyerStackParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 

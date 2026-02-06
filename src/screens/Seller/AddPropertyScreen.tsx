@@ -12,21 +12,19 @@ import {
   PermissionsAndroid,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
-import CustomAlert from '../../utils/alertHelper';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, RouteProp} from '@react-navigation/native';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerTabParamList} from '../../components/navigation/SellerTabNavigator';
+import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
-import {moderationService} from '../../services/moderation.service';
 import {sellerService} from '../../services/seller.service';
 import {uploadPropertyImageWithModeration} from '../../services/imageUpload.service';
 import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
@@ -49,7 +47,7 @@ import {formatters} from '../../utils/formatters';
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 type AddPropertyScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<SellerTabParamList, 'AddProperty'>,
+  NativeStackNavigationProp<SellerStackParamList, 'AddProperty'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -61,7 +59,7 @@ type PropertyStatus = 'sale' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const {user} = useAuth(); // Get user for userId
-  const route = useRoute<RouteProp<SellerTabParamList, 'AddProperty'>>();
+  const route = useRoute<RouteProp<SellerStackParamList, 'AddProperty'>>();
   const routeParams = (route.params as any) || {};
   const isEditMode = !!routeParams.propertyId;
   const isLimitedEdit = !!routeParams.isLimitedEdit;
@@ -103,8 +101,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [priceNegotiable, setPriceNegotiable] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [maintenance, setMaintenance] = useState('');
+  const [availableForBachelors, setAvailableForBachelors] = useState(false);
   const [checkingLimit, setCheckingLimit] = useState(true);
   const [loadingProperty, setLoadingProperty] = useState(isEditMode);
+
+  const showError = (title: string, message: string) => {
+    Alert.alert(title, message, [{text: 'OK'}]);
+  };
 
   const totalSteps = 5;
 
@@ -146,17 +149,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           const limit = limits[planType] || limits['free'];
           
           if (limit > 0 && currentCount >= limit) {
-            CustomAlert.alert(
+            Alert.alert(
               'Property Limit Reached',
               `Property limit reached. You can list up to ${limit} properties in your current plan.`,
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    navigation.goBack();
-                  },
-                },
-              ],
+              [{text: 'OK', onPress: () => navigation.goBack()}],
               {cancelable: false}
             );
           }
@@ -215,6 +211,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           setPriceNegotiable(propData.price_negotiable || false);
           setDepositAmount(propData.deposit_amount ? String(propData.deposit_amount) : '');
           setMaintenance(propData.maintenance_charges ? String(propData.maintenance_charges) : '');
+          setAvailableForBachelors(propData.available_for_bachelors || false);
           setSelectedAmenities(propData.amenities ? (Array.isArray(propData.amenities) ? propData.amenities : []) : []);
           
           // Load existing images
@@ -235,13 +232,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             setPhotos(existingImages);
           }
         } else {
-          CustomAlert.alert('Error', 'Failed to load property details');
-          navigation.goBack();
+          Alert.alert('Error', 'Failed to load property details', [{text: 'OK', onPress: () => navigation.goBack()}]);
         }
       } catch (error: any) {
         console.error('Error loading property:', error);
-        CustomAlert.alert('Error', error.message || 'Failed to load property details');
-        navigation.goBack();
+        Alert.alert('Error', error.message || 'Failed to load property details', [{text: 'OK', onPress: () => navigation.goBack()}]);
       } finally {
         setLoadingProperty(false);
       }
@@ -296,16 +291,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const requestCameraPermission = async () => {
     if (Platform.OS === 'android') {
       try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-          {
-            title: 'Image Picker Permission',
-            message: 'App needs access to your photos',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          },
-        );
+        const apiLevel = Platform.Version;
+        const permission = (apiLevel >= 33
+          ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+          : (PermissionsAndroid.PERMISSIONS as any).READ_EXTERNAL_STORAGE) || PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES;
+        const granted = await PermissionsAndroid.request(permission, {
+          title: 'Image Picker Permission',
+          message: 'App needs access to your photos to upload property images',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        });
         return granted === PermissionsAndroid.RESULTS.GRANTED;
       } catch (err) {
         console.warn(err);
@@ -318,30 +314,30 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const handleImagePicker = async () => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
-      CustomAlert.alert('Permission Denied', 'Please grant photo access permission');
+      Alert.alert('Permission Denied', 'Please grant photo access in Settings to upload property images.', [{text: 'OK'}]);
       return;
     }
 
     if (photos.length >= 10) {
-      CustomAlert.alert('Limit Reached', 'You can upload maximum 10 photos');
+      showError('Limit Reached', 'You can upload maximum 10 photos');
       return;
     }
 
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.8 as const,
+      quality: 0.6 as const,
       selectionLimit: 10 - photos.length,
-      // Option 2: Collect base64 to send directly to add.php (backend handles conversion)
       includeBase64: true,
     };
 
-    launchImageLibrary(options, async (response: ImagePickerResponse) => {
+    launchImageLibrary(options, (response: ImagePickerResponse) => {
       if (response.didCancel) {
         return;
       }
 
       if (response.errorCode) {
-        CustomAlert.alert('Error', response.errorMessage || 'Failed to pick image');
+        const msg = response.errorMessage || response.errorCode === 'permission' ? 'Photo access denied. Please allow access in Settings.' : 'Failed to pick image';
+        Alert.alert('Error', msg, [{text: 'OK'}]);
         return;
       }
 
@@ -349,14 +345,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         const maxPhotos = 10;
         const remainingSlots = maxPhotos - photos.length;
         const assetsToAdd = response.assets.slice(0, remainingSlots);
-        
+
         if (photos.length + assetsToAdd.length > maxPhotos) {
-          CustomAlert.alert('Limit Reached', 'You can upload maximum 10 photos');
+          showError('Limit Reached', 'You can upload maximum 10 photos');
           return;
         }
 
-        // Add images with "checking" status and validate with Google Vision API
-        // Collect base64 for Option 2: Send base64 directly to add.php (backend converts to files)
+        try {
         const newPhotos = assetsToAdd.map(asset => {
           // Format base64 as data URI for backend compatibility
           // Extract image type from URI if asset.type is not available
@@ -391,93 +386,81 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         
         const updatedPhotos = [...photos, ...newPhotos];
         setPhotos(updatedPhotos);
-        
-        // Process moderation for each image
-        // Upload images - use Firebase Storage if enabled, otherwise use backend storage
-        newPhotos.forEach((img, index) => {
-          if (img.uri) {
-            // Check if Firebase Storage is enabled and available
-            const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
-            const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
-            
-            if (firebaseEnabled && firebaseAvailable) {
-              // Firebase Storage flow: Upload to Firebase → Backend moderation
-              console.log('[AddProperty] Using Firebase Storage for upload', {
+
+        const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
+        const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
+
+        if (!firebaseEnabled || !firebaseAvailable) {
+          const message = !user?.id
+            ? 'You must be signed in to upload images.'
+            : !firebaseAvailable
+            ? 'Firebase Storage is not available. Please rebuild the app to enable image uploads.'
+            : 'Firebase Storage is required for property images. Please enable it and rebuild the app.';
+          Alert.alert('Image Upload Unavailable', message, [{text: 'OK'}]);
+          setPhotos(prev => {
+            const updated = [...prev];
+            newPhotos.forEach((_, index) => {
+              const imgIndex = prev.length - newPhotos.length + index;
+              if (updated[imgIndex]) {
+                updated[imgIndex] = {
+                  ...updated[imgIndex],
+                  moderationStatus: 'REJECTED' as const,
+                  moderationReason: message,
+                };
+              }
+            });
+            return updated;
+          });
+        } else {
+          newPhotos.forEach((img, index) => {
+            if (img.uri) {
+              console.log('[AddProperty] Firebase Storage flow: Device → Firebase → backend URL for moderation', {
                 imageIndex: index,
-                imageUri: img.uri.substring(0, 50),
                 userId: user.id,
                 propertyId: isEditMode ? propertyId : null,
               });
               uploadPropertyImageWithModeration(
                 img.uri,
-                isEditMode ? propertyId : null, // propertyId or null for new properties
+                isEditMode ? propertyId : null,
                 user.id,
                 (progress) => {
                   console.log(`[AddProperty] Upload progress ${index + 1}: ${Math.round(progress)}%`);
                 }
               )
                 .then(result => {
-                  console.log('[AddProperty] Firebase upload result received:', {
+                  console.log('[AddProperty] Firebase upload result:', {
                     moderationStatus: result.moderationStatus,
                     hasFirebaseUrl: !!result.firebaseUrl,
-                    firebaseUrl: result.firebaseUrl?.substring(0, 80),
                   });
-                  
                   setPhotos(prev => {
                     const updated = [...prev];
                     const imgIndex = prev.length - newPhotos.length + index;
                     if (updated[imgIndex]) {
-                      // Map moderation status from backend to local format
-                      let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
-                      
-                      // Normalize status to uppercase for comparison
                       const status = String(result.moderationStatus || '').toUpperCase();
-                      
-                      if (status === 'SAFE' || status === 'APPROVED') {
-                        moderationStatus = 'APPROVED';
-                      } else if (status === 'REJECTED' || status === 'UNSAFE') {
-                        moderationStatus = 'REJECTED';
-                      } else if (status === 'PENDING' || status === 'NEEDS_REVIEW') {
-                        moderationStatus = 'PENDING';
-                      } else {
-                        // Default to PENDING if status is unknown but upload succeeded
-                        console.warn('[AddProperty] Unknown moderation status, defaulting to PENDING:', result.moderationStatus);
-                        moderationStatus = 'PENDING';
-                      }
-                      
-                      // Ensure Firebase URL is set
+                      let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
+                      if (status === 'SAFE' || status === 'APPROVED') moderationStatus = 'APPROVED';
+                      else if (status === 'REJECTED' || status === 'UNSAFE') moderationStatus = 'REJECTED';
+                      else if (status === 'PENDING' || status === 'NEEDS_REVIEW') moderationStatus = 'PENDING';
+                      else moderationStatus = 'PENDING';
                       const firebaseUrl = result.firebaseUrl || result.imageUrl || '';
-                      
-                      if (!firebaseUrl) {
-                        console.error('[AddProperty] Firebase URL missing in result:', result);
-                      }
-                      
+                      if (!firebaseUrl) console.error('[AddProperty] Firebase URL missing in result:', result);
                       updated[imgIndex] = {
                         ...updated[imgIndex],
                         moderationStatus,
                         moderationReason: result.moderationReason || undefined,
-                        imageUrl: firebaseUrl, // Firebase URL - always set if available
+                        imageUrl: firebaseUrl,
                       };
-                      
-                      console.log('[AddProperty] Photo state updated:', {
-                        index: imgIndex,
-                        moderationStatus,
-                        hasImageUrl: !!updated[imgIndex].imageUrl,
-                        imageUrl: updated[imgIndex].imageUrl?.substring(0, 50) + '...',
-                      });
                     }
                     return updated;
                   });
-                  
-                  // Show alerts based on moderation status
                   if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
-                    CustomAlert.alert(
+                    Alert.alert(
                       'Image Rejected',
                       result.moderationReason || 'Image does not meet our guidelines. Please upload property images only.',
                       [{text: 'OK'}]
                     );
                   } else if (result.moderationStatus === 'PENDING' || result.moderationStatus === 'NEEDS_REVIEW') {
-                    CustomAlert.alert(
+                    Alert.alert(
                       'Image Under Review',
                       'Your image is being reviewed and will be visible after approval.',
                       [{text: 'OK'}]
@@ -498,108 +481,21 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     }
                     return updated;
                   });
-                  
-                  // Provide helpful error message
                   let errorMessage = error.message || 'Failed to upload image to Firebase.';
                   if (errorMessage.includes('not available') || errorMessage.includes('not installed')) {
                     errorMessage = 'Firebase Storage is not available. Please rebuild the app.';
                   }
-                  
-                  CustomAlert.alert(
-                    'Upload Failed',
-                    errorMessage,
-                    [{text: 'OK'}]
-                  );
-                });
-            } else if (firebaseEnabled && !firebaseAvailable) {
-              // Firebase enabled but not available - fallback with warning
-              console.warn('[AddProperty] Firebase Storage enabled but not available, falling back to backend storage');
-              CustomAlert.alert(
-                'Firebase Storage Unavailable',
-                'Firebase Storage is not available. Using backend storage instead. Please rebuild the app to enable Firebase Storage.',
-                [{text: 'OK'}]
-              );
-              // Fall through to backend storage
-            }
-            
-            if (!firebaseEnabled || !firebaseAvailable) {
-              // Fallback to backend storage flow
-              console.log('[AddProperty] Using backend storage (Firebase disabled or not available)');
-              moderationService.uploadWithModeration(img.uri, 0, true) // true = validation-only (no property_id needed)
-                .then(result => {
-                  setPhotos(prev => {
-                    const updated = [...prev];
-                    const imgIndex = prev.length - newPhotos.length + index;
-                    if (updated[imgIndex]) {
-                      let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
-                      
-                      if (result.status === 'approved' || result.moderation_status === 'SAFE') {
-                        moderationStatus = 'APPROVED';
-                      } else if (result.status === 'rejected' || result.moderation_status === 'REJECTED' || result.moderation_status === 'UNSAFE') {
-                        moderationStatus = 'REJECTED';
-                      } else if (result.status === 'pending' || result.moderation_status === 'PENDING' || String(result.moderation_status) === 'NEEDS_REVIEW') {
-                        moderationStatus = 'PENDING';
-                      }
-                      
-                      updated[imgIndex] = {
-                        ...updated[imgIndex],
-                        moderationStatus,
-                        moderationReason: result.moderation_reason,
-                        imageUrl: result.image_url || undefined, // May be undefined in validation-only mode
-                      };
-                      
-                      // Log moderation result for debugging
-                      console.log('[AddProperty] Image moderation result:', {
-                        index: imgIndex,
-                        status: moderationStatus,
-                        hasImageUrl: !!result.image_url,
-                        imageUrl: result.image_url?.substring(0, 50) + '...',
-                        hasBase64: !!updated[imgIndex].base64,
-                      });
-                      
-                      // Show alert for rejected images
-                      if (moderationStatus === 'REJECTED') {
-                        CustomAlert.alert(
-                          'Image Rejected',
-                          result.moderation_reason || 'Image does not meet our guidelines. Please upload property images only.',
-                          [{text: 'OK'}]
-                        );
-                      } else if (moderationStatus === 'PENDING') {
-                        CustomAlert.alert(
-                          'Image Under Review',
-                          'Your image is being reviewed and will be visible after approval.',
-                          [{text: 'OK'}]
-                        );
-                      }
-                    }
-                    return updated;
-                  });
-                })
-                .catch(error => {
-                  console.error('[AddProperty] Moderation error:', error);
-                  setPhotos(prev => {
-                    const updated = [...prev];
-                    const imgIndex = prev.length - newPhotos.length + index;
-                    if (updated[imgIndex]) {
-                      updated[imgIndex] = {
-                        ...updated[imgIndex],
-                        moderationStatus: 'REJECTED' as const,
-                        moderationReason: error.message || 'Failed to verify image',
-                      };
-                    }
-                    return updated;
-                  });
-                  CustomAlert.alert(
-                    'Upload Failed',
-                    error.message || 'Failed to upload image. Please try again.',
-                    [{text: 'OK'}]
-                  );
+                  Alert.alert('Upload Failed', errorMessage, [{text: 'OK'}]);
                 });
             }
-          }
-        });
-        
-        console.log('[AddProperty] Added', newPhotos.length, 'images (validating with Google Vision API)');
+          });
+        }
+
+        console.log('[AddProperty] Added', newPhotos.length, 'images (Device → Firebase Storage → backend URL for moderation)');
+        } catch (err) {
+          console.error('[AddProperty] Image processing error:', err);
+          Alert.alert('Error', 'Failed to process images. Please try again.', [{text: 'OK'}]);
+        }
       }
     });
   };
@@ -608,117 +504,110 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     // Validation based on guide specifications
     if (currentStep === 1) {
       if (!propertyTitle.trim()) {
-        CustomAlert.alert('Error', 'Please enter property title');
+        showError('Error', 'Please enter property title');
         return;
       }
       const titleLength = propertyTitle.trim().length;
       if (titleLength < 1 || titleLength > 200) {
-        CustomAlert.alert('Error', 'Title must be between 1 and 200 characters');
+        showError('Error', 'Title must be between 1 and 200 characters');
         return;
       }
       if (!propertyType) {
-        CustomAlert.alert('Error', 'Please select property type');
+        showError('Error', 'Please select property type');
         return;
       }
     }
     if (currentStep === 2) {
       if (!location.trim()) {
-        CustomAlert.alert('Error', 'Please enter location');
+        showError('Error', 'Please enter location');
         return;
       }
       if (location.trim().length < 3) {
-        CustomAlert.alert('Error', 'Location must be at least 3 characters');
+        showError('Error', 'Location must be at least 3 characters');
         return;
       }
-      // State is optional according to backend spec, but we'll keep it required for app UX
-      // Backend allows null state, but app requires it for better data quality
       if (!state.trim()) {
-        CustomAlert.alert('Error', 'Please enter state');
+        showError('Error', 'Please enter state');
         return;
       }
       if (fieldVisibility.showFacing && !facing) {
-        CustomAlert.alert('Error', 'Please select facing direction');
+        showError('Error', 'Please select facing direction');
         return;
       }
-      // Handle upcoming projects - bedrooms/bathrooms are optional (handled via project_type field, not property_type)
       if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment') {
-        CustomAlert.alert('Error', 'Please select number of bedrooms');
+        showError('Error', 'Please select number of bedrooms');
         return;
       }
       if (fieldVisibility.bathroomsRequired && bathrooms === null) {
-        CustomAlert.alert('Error', 'Please select number of bathrooms');
+        showError('Error', 'Please select number of bathrooms');
         return;
       }
       if (!builtUpArea.trim()) {
-        CustomAlert.alert('Error', `Please enter ${fieldVisibility.areaLabel.toLowerCase()}`);
+        showError('Error', `Please enter ${fieldVisibility.areaLabel.toLowerCase()}`);
         return;
       }
       const areaValue = parseFloat(builtUpArea);
       if (isNaN(areaValue) || areaValue <= 0) {
-        CustomAlert.alert('Error', `${fieldVisibility.areaLabel} must be a positive number`);
+        showError('Error', `${fieldVisibility.areaLabel} must be a positive number`);
         return;
       }
-      // Validate carpet area if provided - must be <= built-up area
       if (carpetArea.trim()) {
         const carpetValue = parseFloat(carpetArea);
         if (isNaN(carpetValue) || carpetValue <= 0) {
-          CustomAlert.alert('Error', 'Carpet area must be a positive number');
+          showError('Error', 'Carpet area must be a positive number');
           return;
         }
         if (carpetValue > areaValue) {
-          CustomAlert.alert('Error', 'Carpet area cannot be greater than built-up area');
+          showError('Error', 'Carpet area cannot be greater than built-up area');
           return;
         }
       }
-      // Validate floor if provided and total_floors exists
       if (floor.trim() && totalFloors.trim()) {
         const floorNum = parseInt(floor);
         const totalFloorsNum = parseInt(totalFloors);
         if (!isNaN(floorNum) && !isNaN(totalFloorsNum) && floorNum > totalFloorsNum) {
-          CustomAlert.alert('Error', 'Floor number cannot be greater than total floors');
+          showError('Error', 'Floor number cannot be greater than total floors');
           return;
         }
       }
       if (fieldVisibility.showFurnishing && !furnishing) {
-        CustomAlert.alert('Error', 'Please select furnishing status');
+        showError('Error', 'Please select furnishing status');
         return;
       }
     }
     if (currentStep === 3) {
       if (!description.trim()) {
-        CustomAlert.alert('Error', 'Please enter property description');
+        showError('Error', 'Please enter property description');
         return;
       }
       if (description.trim().length < 100) {
-        CustomAlert.alert('Error', 'Description must be at least 100 characters');
+        showError('Error', 'Description must be at least 100 characters');
         return;
       }
       if (description.trim().length > 1000) {
-        CustomAlert.alert('Error', 'Description cannot exceed 1000 characters');
+        showError('Error', 'Description cannot exceed 1000 characters');
         return;
       }
-      // Check for mobile numbers (Indian format: 10 digits, may have +91)
       const mobileRegex = /(\+91[\s-]?)?[6-9]\d{9}/g;
       if (mobileRegex.test(description)) {
-        CustomAlert.alert('Error', 'Description cannot contain mobile numbers');
+        showError('Error', 'Description cannot contain mobile numbers');
         return;
       }
-      // Check for email addresses
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
       if (emailRegex.test(description)) {
-        CustomAlert.alert('Error', 'Description cannot contain email addresses');
+        showError('Error', 'Description cannot contain email addresses');
         return;
       }
     }
     if (currentStep === 5) {
       if (!expectedPrice.trim()) {
-        CustomAlert.alert('Error', propertyStatus === 'sale' ? 'Please enter expected price' : 'Please enter monthly rent');
+        showError('Error', propertyStatus === 'sale' ? 'Please enter expected price' : 'Please enter monthly rent');
         return;
       }
       const priceValue = parseFloat(expectedPrice.replace(/[^0-9.]/g, ''));
       const priceCheck = validation.validatePrice(priceValue, propertyStatus);
       if (!priceCheck.valid) {
-        CustomAlert.alert('Error', priceCheck.message || 'Invalid price');
+        showError('Error', priceCheck.message || 'Invalid price');
         return;
       }
 
@@ -726,7 +615,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         const depositValue = parseFloat(depositAmount.replace(/[^0-9.]/g, ''));
         const depositCheck = validation.validateDeposit(depositValue, priceValue);
         if (!depositCheck.valid) {
-          CustomAlert.alert('Error', depositCheck.message || 'Invalid security deposit');
+          showError('Error', depositCheck.message || 'Invalid security deposit');
           return;
         }
       }
@@ -734,7 +623,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       if (maintenance.trim().length > 0) {
         const maintenanceValue = parseFloat(maintenance.replace(/[^0-9.]/g, ''));
         if (isNaN(maintenanceValue) || maintenanceValue <= 0) {
-          CustomAlert.alert('Error', 'Maintenance must be a positive amount');
+          showError('Error', 'Maintenance must be a positive amount');
           return;
         }
       }
@@ -823,7 +712,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           valid: validImages.length,
         });
         
-        CustomAlert.alert('No Valid Images', errorMessage, [{text: 'OK'}]);
+        showError('No Valid Images', errorMessage);
         setIsSubmitting(false);
         return;
       }
@@ -831,7 +720,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       // Check if any images are still being validated
       const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
       if (checkingImages.length > 0) {
-        CustomAlert.alert(
+        Alert.alert(
           'Images Still Validating',
           `Please wait for ${checkingImages.length} image(s) to be validated before submitting.`,
           [{text: 'OK'}]
@@ -893,11 +782,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             imageUrl: p.imageUrl?.substring(0, 50),
           })),
         });
-        CustomAlert.alert(
-          'Image Data Missing',
-          'Approved images are missing image data. Please try removing and re-uploading the images.',
-          [{text: 'OK'}]
-        );
+        showError('Image Data Missing', 'Approved images are missing image data. Please try removing and re-uploading the images.');
         setIsSubmitting(false);
         return;
       }
@@ -932,6 +817,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         price_negotiable: priceNegotiable,
         deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : null,
         maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
+        available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel' || propertyType === 'Studio Apartment') ? availableForBachelors : undefined,
         amenities: selectedAmenities,
         // Send Firebase URLs if available, otherwise send base64 strings
         // Backend will handle both: Firebase URLs are already stored, base64 will be converted
@@ -975,28 +861,27 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           }
         }
         
-        // Show success popup with 24-hour edit notice
-        CustomAlert.alert(
-          '🎉 Property Published!', 
-          `Your property has been listed successfully!${imageCount > 0 ? `\n\n📸 ${imageCount} image(s) uploaded.` : ''}\n\n⏰ Important: You can fully edit your property for the next 24 hours.\n\nAfter 24 hours, you will only be able to change:\n• Title\n• Price\n• Location`, 
+        Alert.alert(
+          '🎉 Property Published!',
+          `Your property has been listed successfully!${imageCount > 0 ? `\n\n📸 ${imageCount} image(s) uploaded.` : ''}\n\n⏰ Important: You can fully edit your property for the next 24 hours.\n\nAfter 24 hours, you will only be able to change:\n• Title\n• Price\n• Location`,
           [{text: 'Got it!', onPress: () => navigation.goBack()}]
         );
       } else {
         const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
         console.error('[AddProperty] Property creation failed:', errorMessage);
         console.error('[AddProperty] Full error response:', JSON.stringify(response, null, 2));
-        CustomAlert.alert('Error', errorMessage);
+        showError('Error', errorMessage);
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      CustomAlert.alert('Error', error.response?.data?.message || 'Failed to create property. Please try again.');
+      showError('Error', error.response?.data?.message || 'Failed to create property. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    CustomAlert.alert(
+    Alert.alert(
       'Cancel Listing',
       'Are you sure you want to cancel? Your progress will be lost.',
       [
@@ -1116,6 +1001,24 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 ))}
               </View>
             </View>
+
+            {/* Available for Bachelors - Basic Info step, only for rent + Apartment / PG / Studio */}
+            {propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel' || propertyType === 'Studio Apartment') && (
+              <View style={styles.inputContainer}>
+                <TouchableOpacity
+                  style={styles.checkboxContainer}
+                  onPress={() => setAvailableForBachelors(!availableForBachelors)}>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      availableForBachelors && styles.checkboxChecked,
+                    ]}>
+                    {availableForBachelors && <Text style={styles.checkboxCheck}>✓</Text>}
+                  </View>
+                  <Text style={styles.checkboxLabel}>Available for bachelors</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         );
 
@@ -1420,10 +1323,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.label}>Floor Number</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g., 5 or Ground"
+                  placeholder="e.g., 5"
                   placeholderTextColor={colors.textSecondary}
                   value={floor}
-                  onChangeText={setFloor}
+                  onChangeText={(text) => setFloor(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
                 />
               </View>
             )}
@@ -1436,8 +1340,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Total floors in building"
                   placeholderTextColor={colors.textSecondary}
                   value={totalFloors}
-                  onChangeText={setTotalFloors}
-                  keyboardType="numeric"
+                  onChangeText={(text) => setTotalFloors(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
                 />
               </View>
             )}
@@ -1912,6 +1816,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
+    elevation: 1000,
   },
   modalContainer: {
     width: '95%',
@@ -1925,6 +1831,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 10,
+    zIndex: 1001,
+    elevation: 1001,
   },
   safeArea: {
     flex: 1,

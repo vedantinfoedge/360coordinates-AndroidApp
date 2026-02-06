@@ -87,7 +87,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     }
     
     // Navigate to AddProperty screen with edit params
-    (navigation as any).navigate('AddProperty', {
+    (navigation.getParent() as any)?.navigate('AddProperty', {
       propertyId: String(propertyId),
       isLimitedEdit: limitedEdit,
       createdAt: property.created_at || property.created_date || property.date_created,
@@ -322,7 +322,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     return (
       <TouchableOpacity
         style={styles.propertyCard}
-        onPress={() => navigation.navigate('PropertyDetails', {propertyId: item.id})}>
+        onPress={() => navigation.getParent()?.navigate('PropertyDetails' as never, {propertyId: item.id} as never)}>
         {imageUrl ? (
           <Image
             source={{uri: imageUrl}}
@@ -415,7 +415,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.container}>
         <AgentHeader
           onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.loadingContainer}>
@@ -430,19 +430,14 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     <View style={styles.container}>
       <AgentHeader
         onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
         onLogoutPress={logout}
-        scrollY={scrollY}
       />
       <Animated.FlatList
         data={properties}
         renderItem={renderProperty}
         keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.listContent}
-        onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true}
-        )}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -456,7 +451,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
             </Text>
             <TouchableOpacity
               style={styles.addButton}
-              onPress={() => navigation.navigate('AddProperty')}>
+              onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}>
               <Text style={styles.addButtonText}>Add Your First Property</Text>
             </TouchableOpacity>
           </View>
@@ -467,7 +462,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
       {properties.length > 0 && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => navigation.navigate('AddProperty')}
+          onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
           activeOpacity={0.8}>
           <Text style={styles.fabIcon}>+</Text>
           <Text style={styles.fabText}>New Property</Text>

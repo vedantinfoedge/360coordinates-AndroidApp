@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
-import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
+import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
@@ -20,11 +20,11 @@ import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type EditPropertyScreenNavigationProp = NativeStackNavigationProp<
-  AgentTabParamList,
+  AgentStackParamList,
   'EditProperty'
 >;
 
-type EditPropertyScreenRouteProp = RouteProp<AgentTabParamList, 'EditProperty'>;
+type EditPropertyScreenRouteProp = RouteProp<AgentStackParamList, 'EditProperty'>;
 
 type Props = {
   navigation: EditPropertyScreenNavigationProp;
@@ -149,8 +149,8 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
     return (
       <View style={styles.container}>
         <AgentHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
+          onSupportPress={() => navigation.navigate('Support' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.loadingContainer}>
@@ -165,8 +165,8 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
     return (
       <View style={styles.container}>
         <AgentHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
+          onSupportPress={() => navigation.navigate('Support' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.emptyContainer}>
@@ -179,8 +179,8 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
   return (
     <View style={styles.container}>
       <AgentHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
+        onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={logout}
       />
       

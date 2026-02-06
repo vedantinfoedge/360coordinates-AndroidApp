@@ -13,7 +13,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
-import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
+import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {propertyService} from '../../services/property.service';
 import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
@@ -24,11 +24,11 @@ import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters'
 import CustomAlert from '../../utils/alertHelper';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
-  AgentTabParamList,
+  AgentStackParamList,
   'PropertyDetails'
 >;
 
-type PropertyDetailsScreenRouteProp = RouteProp<AgentTabParamList, 'PropertyDetails'>;
+type PropertyDetailsScreenRouteProp = RouteProp<AgentStackParamList, 'PropertyDetails'>;
 
 type Props = {
   navigation: PropertyDetailsScreenNavigationProp;
@@ -161,8 +161,8 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     return (
       <View style={styles.container}>
         <AgentHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
+          onSupportPress={() => navigation.navigate('Support' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.loadingContainer}>
@@ -195,8 +195,8 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   return (
     <View style={styles.container}>
       <AgentHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
+        onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={logout}
       />
 

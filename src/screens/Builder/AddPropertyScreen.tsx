@@ -14,12 +14,14 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
-import {BuilderTabParamList} from '../../components/navigation/BuilderTabNavigator';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {BuilderStackParamList} from '../../navigation/BuilderNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
-import {moderationService} from '../../services/moderation.service';
+import {uploadPropertyImageWithModeration} from '../../services/imageUpload.service';
+import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
+import {isFirebaseStorageAvailable} from '../../services/firebaseStorageProperty.service';
 import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import {extractStateFromContext} from '../../utils/geocoding';
@@ -27,8 +29,8 @@ import {useAuth} from '../../context/AuthContext';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
-type AddPropertyScreenNavigationProp = BottomTabNavigationProp<
-  BuilderTabParamList,
+type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
+  BuilderStackParamList,
   'AddProperty'
 >;
 
@@ -282,44 +284,82 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         }));
         
         setProjectImages(prev => [...prev, ...newImages]);
-        
-        // Process moderation for each image
-        newImages.forEach((img, index) => {
-          if (img.uri) {
-            moderationService.uploadWithModeration(img.uri)
-              .then(result => {
-                setProjectImages(prev => {
-                  const updated = [...prev];
-                  const imgIndex = prev.length - newImages.length + index;
-                  if (updated[imgIndex]) {
-                    updated[imgIndex] = {
-                      ...updated[imgIndex],
-                      moderationStatus: result.status === 'approved' ? 'APPROVED' : 
-                                       result.status === 'rejected' ? 'REJECTED' : 'PENDING',
-                      moderationReason: result.moderation_reason,
-                      imageUrl: result.image_url,
-                    };
+
+        // Storage workflow: Device → Firebase Storage → backend receives URL for moderation only; images stored in Firebase
+        const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
+        const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
+
+        if (!firebaseEnabled || !firebaseAvailable) {
+          const message = !user?.id
+            ? 'You must be signed in to upload images.'
+            : !firebaseAvailable
+            ? 'Firebase Storage is not available. Please rebuild the app to enable image uploads.'
+            : 'Firebase Storage is required for property images. Please enable it and rebuild the app.';
+          CustomAlert.alert('Image Upload Unavailable', message, [{text: 'OK'}]);
+          setProjectImages(prev => {
+            const updated = [...prev];
+            newImages.forEach((_, index) => {
+              const imgIndex = prev.length - newImages.length + index;
+              if (updated[imgIndex]) {
+                updated[imgIndex] = {
+                  ...updated[imgIndex],
+                  moderationStatus: 'REJECTED' as const,
+                  moderationReason: message,
+                };
+              }
+            });
+            return updated;
+          });
+        } else {
+          newImages.forEach((img, index) => {
+            if (img.uri) {
+              uploadPropertyImageWithModeration(img.uri, null, user!.id)
+                .then(result => {
+                  setProjectImages(prev => {
+                    const updated = [...prev];
+                    const imgIndex = prev.length - newImages.length + index;
+                    if (updated[imgIndex]) {
+                      const status = String(result.moderationStatus || '').toUpperCase();
+                      const moderationStatus = status === 'SAFE' || status === 'APPROVED' ? 'APPROVED' : status === 'REJECTED' || status === 'UNSAFE' ? 'REJECTED' : 'PENDING';
+                      const firebaseUrl = result.firebaseUrl || result.imageUrl || '';
+                      updated[imgIndex] = {
+                        ...updated[imgIndex],
+                        moderationStatus: moderationStatus as 'APPROVED' | 'REJECTED' | 'PENDING',
+                        moderationReason: result.moderationReason || undefined,
+                        imageUrl: firebaseUrl,
+                      };
+                    }
+                    return updated;
+                  });
+                  if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
+                    CustomAlert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.', [{text: 'OK'}]);
+                  } else if (result.moderationStatus === 'PENDING' || result.moderationStatus === 'NEEDS_REVIEW') {
+                    CustomAlert.alert('Image Under Review', 'Your image is being reviewed and will be visible after approval.', [{text: 'OK'}]);
                   }
-                  return updated;
-                });
-              })
-              .catch(error => {
-                console.error('Moderation error:', error);
-                setProjectImages(prev => {
-                  const updated = [...prev];
-                  const imgIndex = prev.length - newImages.length + index;
-                  if (updated[imgIndex]) {
-                    updated[imgIndex] = {
-                      ...updated[imgIndex],
-                      moderationStatus: 'REJECTED' as const,
-                      moderationReason: 'Failed to process image',
-                    };
+                })
+                .catch(error => {
+                  console.error('[AddProperty] Firebase upload error:', error);
+                  setProjectImages(prev => {
+                    const updated = [...prev];
+                    const imgIndex = prev.length - newImages.length + index;
+                    if (updated[imgIndex]) {
+                      updated[imgIndex] = {
+                        ...updated[imgIndex],
+                        moderationStatus: 'REJECTED' as const,
+                        moderationReason: error.message || 'Failed to upload image',
+                      };
+                    }
+                    return updated;
+                  });
+                  let errorMessage = error.message || 'Failed to upload image to Firebase.';
+                  if (errorMessage.includes('not available') || errorMessage.includes('not installed')) {
+                    errorMessage = 'Firebase Storage is not available. Please rebuild the app.';
                   }
-                  return updated;
+                  CustomAlert.alert('Upload Failed', errorMessage, [{text: 'OK'}]);
                 });
-              });
-          }
-        });
+            }
+          });
+        }
       }
     });
   };

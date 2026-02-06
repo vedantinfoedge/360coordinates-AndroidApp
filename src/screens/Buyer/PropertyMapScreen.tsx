@@ -2,17 +2,16 @@ import React from 'react';
 import {View, StyleSheet, Text, TouchableOpacity} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerTabParamList} from '../../components/navigation/BuyerTabNavigator';
+import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import BuyerHeader from '../../components/BuyerHeader';
 import PropertyMapView from '../../components/map/PropertyMapView';
 import {useAuth} from '../../context/AuthContext';
 
 type PropertyMapScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuyerTabParamList>,
+  NativeStackNavigationProp<BuyerStackParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 

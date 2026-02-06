@@ -22,7 +22,7 @@ type Props = {
 
 const AdminInquiriesScreen: React.FC<Props> = ({navigation}) => {
   const {logout} = useAuth();
-  const ADMIN_WEB_URL = 'https://demo1.indiapropertys.com/admin/inquiries';
+  const ADMIN_WEB_URL = 'https://360coordinates.com/admin/inquiries';
 
   const handleOpenAdminDashboard = async () => {
     try {

@@ -12,6 +12,9 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {verticalScale} from '../utils/responsive';
+
+const HEADER_HEIGHT = verticalScale(48);
 
 interface SellerHeaderProps {
   onProfilePress?: () => void;
@@ -22,8 +25,6 @@ interface SellerHeaderProps {
   subscriptionDays?: number;
   scrollY?: InstanceType<typeof Animated.Value>; // For hide/show on scroll
 }
-
-const HEADER_HEIGHT = 48;
 
 const SellerHeader: React.FC<SellerHeaderProps> = ({
   onProfilePress,

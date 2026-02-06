@@ -15,9 +15,8 @@ import {
   InteractionManager,
 } from 'react-native';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {BuilderTabParamList} from '../../components/navigation/BuilderTabNavigator';
+import {BuilderStackParamList} from '../../navigation/BuilderNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import BuilderHeader from '../../components/BuilderHeader';
@@ -29,7 +28,7 @@ import CustomAlert from '../../utils/alertHelper';
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 type BuilderDashboardScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<BuilderTabParamList, 'Dashboard'>,
+  NativeStackNavigationProp<BuilderStackParamList, 'Dashboard'>,
   NativeStackNavigationProp<any>
 >;
 
@@ -356,7 +355,7 @@ const AnimatedInquiryCard = React.memo(({
       }}>
       <TouchableOpacity
         style={styles.inquiryCard}
-        onPress={() => navigation.navigate('Inquiries', {inquiryId: item.id} as never)}
+        onPress={() => navigation.getParent()?.navigate('Inquiries' as never, {inquiryId: item.id} as never)}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.8}>
@@ -463,7 +462,7 @@ const AnimatedProjectCard = React.memo(({
       }}>
       <TouchableOpacity 
         style={styles.projectCard} 
-        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+        onPress={() => navigation.getParent()?.navigate('PropertyDetails' as never, {propertyId: String(item.id)} as never)}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.9}>
@@ -717,8 +716,8 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
     return (
       <View style={styles.container}>
         <BuilderHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onProfilePress={() => navigation.navigate('Profile' as never)}
+          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -749,8 +748,8 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
   return (
     <View style={styles.container}>
       <BuilderHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onProfilePress={() => navigation.navigate('Profile' as never)}
+        onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
         onLogoutPress={async () => {
           await logout();
         }}
@@ -786,7 +785,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
                 </Text>
               </View>
               <AnimatedAddProjectButton
-                onPress={() => navigation.navigate('AddProperty')}
+                onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
               />
             </View>
           </View>
@@ -803,7 +802,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
               label="Total Projects"
               badge={`${stats.active_properties} Active`}
               badgeColor="#D1FAE5"
-              onPress={() => navigation.navigate('Projects')}
+              onPress={() => navigation.navigate('Listings' as never)}
               delay={0}
             />
 
@@ -826,7 +825,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
               label="Total Inquiries"
               badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
               badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F3F4F6'}
-              onPress={() => navigation.navigate('Inquiries')}
+              onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}
               delay={200}
             />
 
@@ -848,7 +847,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
               icon="➕"
               title="Add New Project"
               description="Create a new construction project"
-              onPress={() => navigation.navigate('AddProperty')}
+              onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
               delay={0}
             />
 
@@ -856,7 +855,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
               icon="✏"
               title="Manage Projects"
               description="Edit, update or remove projects"
-              onPress={() => navigation.navigate('Projects')}
+              onPress={() => navigation.navigate('Listings' as never)}
               delay={100}
             />
 
@@ -864,7 +863,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
               icon="💬"
               title="View Inquiries"
               description="Respond to buyer inquiries"
-              onPress={() => navigation.navigate('Inquiries')}
+              onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}
               delay={200}
             />
 
@@ -872,7 +871,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
               icon="👤"
               title="Update Profile"
               description="Manage your account settings"
-              onPress={() => navigation.navigate('Profile')}
+              onPress={() => navigation.navigate('Profile' as never)}
               delay={300}
             />
           </View>
@@ -887,7 +886,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.sectionTitle}>Your Projects</Text>
               </View>
               <AnimatedSeeAllButton
-                onPress={() => navigation.navigate('Projects')}>
+                onPress={() => navigation.navigate('Listings' as never)}>
                 <Text style={styles.viewAllText}>View All</Text>
                 <Text style={styles.viewAllArrow}>›</Text>
               </AnimatedSeeAllButton>
@@ -913,7 +912,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
                 </Text>
                 <TouchableOpacity
                   style={styles.emptyStateButton}
-                  onPress={() => navigation.navigate('AddProperty')}
+                  onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
                   activeOpacity={0.8}>
                   <Text style={styles.emptyStateButtonText}>+ Add Project</Text>
                 </TouchableOpacity>
@@ -940,7 +939,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
                 </View>
               </View>
               <AnimatedSeeAllButton
-                onPress={() => navigation.navigate('Inquiries')}>
+                onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}>
                 <Text style={styles.viewAllText}>View All</Text>
                 <Text style={styles.viewAllArrow}>›</Text>
               </AnimatedSeeAllButton>

@@ -47,7 +47,7 @@ export const compressImage = async (
  * Handles various URL formats from backend
  * 
  * Backend may return:
- * - Full URL: "https://demo1.indiapropertys.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
+ * - Full URL: "https://360coordinates.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
  * - Relative path: "uploads/properties/111/img_1767328756_69574bf41e6d4.jpeg"
  * - Relative path with slash: "/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
  * - Properties path: "properties/74/img_1704067200_65a1b2c3d4e5f.jpg" (from moderation API)

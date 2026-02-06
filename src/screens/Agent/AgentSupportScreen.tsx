@@ -12,16 +12,15 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
+import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import AgentHeader from '../../components/AgentHeader';
 import {useAuth} from '../../context/AuthContext';
 
 type SupportScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<AgentTabParamList>,
+  NativeStackNavigationProp<AgentStackParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -135,7 +134,7 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
   return (
     <View style={styles.container}>
       <AgentHeader
-        onProfilePress={() => navigation.navigate('Profile')}
+        onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
         onSupportPress={() => {
           // Already on support page
         }}

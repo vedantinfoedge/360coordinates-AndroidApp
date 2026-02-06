@@ -2,7 +2,7 @@
 <network-security-config>
     <!-- Allow HTTPS connections to production API -->
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">demo1.indiapropertys.com</domain>
+        <domain includeSubdomains="true">360coordinates.com</domain>
         <trust-anchors>
             <!-- Trust system certificates -->
             <certificates src="system" />

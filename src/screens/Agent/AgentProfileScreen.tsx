@@ -12,10 +12,9 @@ import {
 } from 'react-native';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
+import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
@@ -25,7 +24,7 @@ import {fixImageUrl} from '../../utils/imageHelper';
 import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<AgentTabParamList, 'Profile'>,
+  NativeStackNavigationProp<AgentStackParamList, 'Profile'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -275,7 +274,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.container}>
         <AgentHeader
           onProfilePress={() => {}}
-          onSupportPress={() => navigation.navigate('Support' as never)}
+          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
           onLogoutPress={handleLogout}
         />
         <View style={styles.loadingContainer}>
@@ -289,7 +288,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
     <View style={styles.container}>
       <AgentHeader
         onProfilePress={() => {}}
-        onSupportPress={() => navigation.navigate('Support' as never)}
+        onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
         onLogoutPress={handleLogout}
         scrollY={scrollY}
       />
@@ -451,13 +450,13 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>License Number *</Text>
+              <Text style={styles.label}>RERA id *</Text>
               {isEditing ? (
                 <TextInput
                   style={styles.input}
                   value={formData.license_number}
                   onChangeText={text => setFormData({...formData, license_number: text})}
-                  placeholder="Enter license number"
+                  placeholder="Enter RERA id"
                 />
               ) : (
                 <Text style={styles.value}>{formData.license_number || 'Not set'}</Text>
@@ -500,7 +499,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Inquiries')}>
+            onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}>
             <Text style={styles.menuIcon}>💬</Text>
             <Text style={styles.menuText}>My Inquiries</Text>
             <Text style={styles.menuArrow}>→</Text>
@@ -510,7 +509,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Support' as never)}>
+            onPress={() => navigation.getParent()?.navigate('Support' as never)}>
             <Text style={styles.menuIcon}>🆘</Text>
             <Text style={styles.menuText}>Support</Text>
             <Text style={styles.menuArrow}>→</Text>

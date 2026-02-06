@@ -81,7 +81,7 @@ export const moderationService = {
    * Upload image with automatic moderation (as per Google Vision API documentation)
    * 
    * Image URL Format (from backend):
-   * - Full URL: "https://demo1.indiapropertys.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
+   * - Full URL: "https://360coordinates.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
    * - Relative path: "properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
    * 
    * Filename pattern: img_{timestamp}_{uniqid}.{extension}
@@ -247,7 +247,7 @@ export const moderationService = {
 
         // Extract image URL - check multiple possible locations
         // Backend might return URL in different places depending on validate_only flag
-        // Format: image_url = "https://demo1.indiapropertys.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
+        // Format: image_url = "https://360coordinates.com/backend/uploads/properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
         //         relative_path = "properties/74/img_1704067200_65a1b2c3d4e5f.jpg"
         let imageUrl = moderationData.image_url || 
                       moderationData.relative_path || 

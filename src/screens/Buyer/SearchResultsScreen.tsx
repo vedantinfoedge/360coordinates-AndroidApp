@@ -16,10 +16,8 @@ import {
 } from 'react-native';
 import RangeSlider from '../../components/common/RangeSlider';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import {useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
 import {SearchStackParamList} from '../../navigation/SearchNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import PropertyCard from '../../components/PropertyCard';
@@ -32,10 +30,7 @@ import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 
-type SearchResultsScreenNavigationProp = CompositeNavigationProp<
-  NativeStackNavigationProp<SearchStackParamList, 'SearchResults'>,
-  BottomTabNavigationProp<any, 'Search'>
->;
+type SearchResultsScreenNavigationProp = NativeStackNavigationProp<SearchStackParamList, 'SearchResults'>;
 
 type Props = {
   navigation: SearchResultsScreenNavigationProp;

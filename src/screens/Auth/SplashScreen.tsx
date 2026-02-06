@@ -12,9 +12,11 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, typography, spacing} from '../../theme';
+import {verticalScale, moderateScale} from '../../utils/responsive';
 import {useAuth} from '../../context/AuthContext';
 
-const {width, height} = Dimensions.get('window');
+const Gradient = LinearGradient as React.ComponentType<any>;
+const {width} = Dimensions.get('window');
 
 type SplashScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -39,9 +41,8 @@ const SplashScreen: React.FC = () => {
                 (navigation as any).replace('Auth');
               }
             } else {
-              // Check if user has seen onboarding
-              // For now, navigate to Auth (we'll add onboarding later)
-              (navigation as any).replace('Auth');
+              // Guest user: open Buyer screen directly to browse properties
+              (navigation as any).replace('Buyer');
             }
           }, 2500);
 
@@ -50,20 +51,21 @@ const SplashScreen: React.FC = () => {
   }, [navigation, isAuthenticated, user, isLoading]);
 
   return (
-    <LinearGradient
+    <Gradient
       colors={[colors.primary, colors.secondary]}
       style={styles.container}>
-      <View style={styles.content}>
-        <Image
-          source={require('../../assets/logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.appName}>360Coordinates</Text>
-        <Text style={styles.tagline}>Find Your Dream Property in India</Text>
+      <View style={styles.wrapper}>
+        <View style={styles.content}>
+          <Image
+            source={require('../../assets/loadinglogo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.tagline}>Find Your Dream Property in India</Text>
+        </View>
+        <ActivityIndicator size="large" color={colors.surface} style={styles.loader} />
       </View>
-      <ActivityIndicator size="large" color={colors.surface} style={styles.loader} />
-    </LinearGradient>
+    </Gradient>
   );
 };
 
@@ -88,15 +90,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
+  wrapper: {
+    flex: 1,
+    width: '100%',
+  },
   tagline: {
     ...typography.body,
+    fontSize: moderateScale(20),
+    lineHeight: moderateScale(28),
     color: colors.surface,
     opacity: 0.9,
     textAlign: 'center',
   },
   loader: {
     position: 'absolute',
-    bottom: spacing.xxl * 2,
+    bottom: verticalScale(spacing.xxl * 2),
   },
 });
 

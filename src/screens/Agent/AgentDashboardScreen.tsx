@@ -15,10 +15,9 @@ import {
   InteractionManager,
 } from 'react-native';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
+import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
@@ -30,7 +29,7 @@ import CustomAlert from '../../utils/alertHelper';
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 type AgentDashboardScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<AgentTabParamList, 'Dashboard'>,
+  NativeStackNavigationProp<AgentStackParamList, 'Dashboard'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -356,7 +355,7 @@ const AnimatedInquiryCard = React.memo(({
       }}>
       <TouchableOpacity
         style={styles.inquiryCard}
-        onPress={() => navigation.navigate('Inquiries', {inquiryId: item.id} as never)}
+        onPress={() => navigation.getParent()?.navigate('Inquiries' as never, {inquiryId: item.id} as never)}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.8}>
@@ -778,7 +777,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.container}>
         <AgentHeader
           onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -799,7 +798,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.container}>
         <AgentHeader
           onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
+          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -831,7 +830,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
     <View style={styles.container}>
       <AgentHeader
         onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
+        onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
         onLogoutPress={async () => {
           await logout();
         }}
@@ -915,7 +914,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
               label="Total Inquiries"
               badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
               badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F3F4F6'}
-              onPress={() => navigation.navigate('Inquiries')}
+              onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}
               delay={200}
             />
 
@@ -937,7 +936,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
               icon="➕"
               title="Add New Property"
               description="List a new property for sale or rent"
-              onPress={() => navigation.navigate('AddProperty')}
+              onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
               delay={0}
             />
 
@@ -953,7 +952,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
               icon="💬"
               title="View Inquiries"
               description="Respond to buyer inquiries"
-              onPress={() => navigation.navigate('Inquiries')}
+              onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}
               delay={200}
             />
 
@@ -1002,7 +1001,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
                 </Text>
                 <TouchableOpacity
                   style={styles.emptyStateButton}
-                  onPress={() => navigation.navigate('AddProperty')}
+                  onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
                   activeOpacity={0.8}>
                   <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
                 </TouchableOpacity>
@@ -1029,7 +1028,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
                 </View>
               </View>
               <AnimatedSeeAllButton
-                onPress={() => navigation.navigate('Inquiries')}>
+                onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}>
                 <Text style={styles.viewAllText}>View All</Text>
                 <Text style={styles.viewAllArrow}>›</Text>
               </AnimatedSeeAllButton>

@@ -1,8 +1,6 @@
 /**
  * Firebase Storage Service for Property Images
- * Matches the specification: Upload to Firebase Storage first, then send URL to backend
- * 
- * Flow: Image → Firebase Storage → Backend Moderation
+ * Workflow: Device → Firebase Storage → backend receives URL for moderation only; images stored in Firebase.
  */
 
 import storage from '@react-native-firebase/storage';
