@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Modal,
   Image,
   Platform,
   PermissionsAndroid,
@@ -1817,23 +1818,35 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   // Show loading while checking property limit or loading property data
   if (checkingLimit || loadingProperty) {
     return (
-      <View style={styles.screenContainer}>
-        <SafeAreaView edges={['top', 'bottom', 'left', 'right']}>
-          <View style={[styles.safeArea, styles.loadingContainer]}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>
-              {loadingProperty ? 'Loading property details...' : 'Checking property limit...'}
-            </Text>
+      <Modal visible={true} animationType="fade" transparent={true} onRequestClose={handleClose}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <SafeAreaView edges={['top', 'bottom', 'left', 'right']}>
+              <View style={[styles.safeArea, styles.loadingContainer]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>
+                  {loadingProperty ? 'Loading property details...' : 'Checking property limit...'}
+                </Text>
+              </View>
+            </SafeAreaView>
           </View>
-        </SafeAreaView>
-      </View>
+        </View>
+      </Modal>
     );
   }
 
   return (
-    <View style={styles.screenContainer}>
-      <SafeAreaView edges={['top', 'bottom', 'left', 'right']}>
-        <View style={styles.safeArea}>
+    <Modal
+      visible={true}
+      animationType="slide"
+      transparent={true}
+      presentationStyle="overFullScreen"
+      statusBarTranslucent={true}
+      onRequestClose={handleClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <SafeAreaView edges={['top', 'bottom', 'left', 'right']}>
+            <View style={styles.safeArea}>
             {/* Restricted edit banner for older listings */}
             {isEditMode && isLimitedEdit && (
               <View style={styles.limitedBanner}>
@@ -1896,8 +1909,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             <ScrollView
               style={styles.content}
               contentContainerStyle={styles.contentContainer}
-              showsVerticalScrollIndicator={true}
-              keyboardShouldPersistTaps="handled">
+              showsVerticalScrollIndicator={false}>
               {renderStepContent()}
             </ScrollView>
 
@@ -1942,15 +1954,31 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </TouchableOpacity>
             </View>
             </View>
-        </SafeAreaView>
-    </View>
+          </SafeAreaView>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  screenContainer: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  modalContainer: {
+    width: '95%',
+    maxWidth: 600,
+    height: '90%',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    zIndex: 10000,
+    elevation: 10000,
   },
   safeArea: {
     flex: 1,
