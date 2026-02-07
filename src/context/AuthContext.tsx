@@ -33,6 +33,7 @@ interface AuthContextType {
   verifyOTP: (userId: number, otp: string) => Promise<void>;
   resendOTP: (userId: number) => Promise<void>;
   logout: () => Promise<void>;
+  switchRole: (targetRole: 'buyer' | 'seller') => Promise<void>;
   isAuthenticated: boolean;
   setUser: (user: User | null) => void;
 }
@@ -232,51 +233,108 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     phoneVerificationMethod?: string,
     phoneVerifiedFlag?: boolean,
   ) => {
-    const response: any = await authService.register({
-      fullName: name,
-      email,
-      phone,
-      password,
-      userType: role,
-      emailVerificationToken: emailToken,
-      phoneVerificationToken: phoneToken,
-      phoneOtp: phoneOtp, // Pass OTP if no token available (backend verification)
-      phoneVerificationMethod: phoneVerificationMethod,
-      phoneVerified: phoneVerifiedFlag,
-    });
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:224',message:'AuthContext.register entry',data:{name,email,phone,role,hasEmailToken:!!emailToken,hasPhoneToken:!!phoneToken,hasPhoneOtp:!!phoneOtp,phoneVerificationMethod,phoneVerified:phoneVerifiedFlag},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     
-    if (response && response.success) {
-      // Check if backend returns token and user (auto-login like website)
-      if (response.data?.token && response.data?.user) {
-        // Auto-login after registration (matching website workflow)
-        const userData = response.data.user;
-        const normalizedUserType = (userData.user_type || role).toLowerCase() as UserRole;
-        
-        const userObj = {
-          id: userData.id || userData.user_id,
-          full_name: userData.full_name || userData.name || name,
-          email: userData.email || email,
-          phone: userData.phone || phone,
-          user_type: normalizedUserType,
-          profile_image: userData.profile_image || null,
-          address: userData.address || '',
-        };
-        
-        // Save token and user (auto-login)
-        await AsyncStorage.setItem(TOKEN_STORAGE_KEY, response.data.token);
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userObj));
-        setUser(userObj);
-        
-        console.log('[AuthContext] Auto-logged in after registration');
-      } else {
-        // Legacy flow: Registration returns user_id, OTP verification needed
-        // This is for backward compatibility
-        console.log('[AuthContext] Registration successful, OTP verification required');
-      }
+    try {
+      console.log('[AuthContext] Starting registration:', {email, phone, role});
       
-      return response;
-    } else {
-      throw new Error(response?.message || 'Registration failed');
+      const response: any = await authService.register({
+        fullName: name,
+        email,
+        phone,
+        password,
+        userType: role,
+        emailVerificationToken: emailToken,
+        phoneVerificationToken: phoneToken,
+        phoneOtp: phoneOtp, // Pass OTP if no token available (backend verification)
+        phoneVerificationMethod: phoneVerificationMethod,
+        phoneVerified: phoneVerifiedFlag,
+      });
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:252',message:'AuthContext.register - after authService call',data:{success:response?.success,hasToken:!!response?.data?.token,hasUser:!!response?.data?.user,hasUserId:!!response?.data?.user_id,message:response?.message,status:response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      
+      console.log('[AuthContext] Registration response received:', {
+        success: response?.success,
+        hasToken: !!response?.data?.token,
+        hasUser: !!response?.data?.user,
+        hasUserId: !!response?.data?.user_id,
+        message: response?.message,
+      });
+      
+      if (response && response.success) {
+        // Check if backend returns token and user (auto-login like website)
+        if (response.data?.token && response.data?.user) {
+          // Auto-login after registration (matching website workflow)
+          const userData = response.data.user;
+          const normalizedUserType = (userData.user_type || role).toLowerCase() as UserRole;
+          
+          const userObj = {
+            id: userData.id || userData.user_id,
+            full_name: userData.full_name || userData.name || name,
+            email: userData.email || email,
+            phone: userData.phone || phone,
+            user_type: normalizedUserType,
+            profile_image: userData.profile_image || null,
+            address: userData.address || '',
+          };
+          
+          // Save token and user (auto-login)
+          await AsyncStorage.setItem(TOKEN_STORAGE_KEY, response.data.token);
+          await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userObj));
+          setUser(userObj);
+          
+          console.log('[AuthContext] Auto-logged in after registration');
+        } else {
+          // Legacy flow: Registration returns user_id, OTP verification needed
+          // This is for backward compatibility
+          console.log('[AuthContext] Registration successful, OTP verification required');
+        }
+        
+        return response;
+      } else {
+        // Registration failed - extract error message
+        const errorMessage = response?.message || response?.error?.message || response?.error || 'Registration failed. Please check your information and try again.';
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:290',message:'AuthContext.register - response.success is false',data:{success:response?.success,message:errorMessage,status:response?.status,hasError:!!response?.error,errorMessage:response?.error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
+        console.error('[AuthContext] Registration failed:', {
+          success: response?.success,
+          message: errorMessage,
+          status: response?.status,
+        });
+        
+        const error: any = new Error(errorMessage);
+        error.status = response?.status || 400;
+        error.response = response;
+        throw error;
+      }
+    } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:303',message:'AuthContext.register - catch block',data:{message:error?.message,status:error?.status,hasResponse:!!error?.response,networkError:!error?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      console.error('[AuthContext] Registration error:', {
+        message: error.message,
+        status: error.status,
+        error: error.error,
+      });
+      
+      // Re-throw with better error structure
+      if (error.status) {
+        throw error; // Already formatted
+      } else {
+        // Network or unexpected error
+        const formattedError: any = new Error(error.message || 'Registration failed. Please check your internet connection and try again.');
+        formattedError.status = error.status || 500;
+        formattedError.error = error;
+        throw formattedError;
+      }
     }
   };
 
@@ -326,6 +384,64 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     await AsyncStorage.removeItem('@target_dashboard');
   };
 
+  const switchRole = async (targetRole: 'buyer' | 'seller') => {
+    try {
+      console.log('[AuthContext] Switching role to:', targetRole);
+      
+      // Don't allow agents to switch roles
+      if (user?.user_type === 'agent') {
+        throw new Error('Agents cannot switch roles. You are locked to the Agent/Builder dashboard.');
+      }
+      
+      // Call the API to switch role
+      const response: any = await authService.switchRole(targetRole);
+      
+      if (response && response.success) {
+        // Extract user data from response
+        const userData = response.data?.user || response.data;
+        
+        if (userData) {
+          // Normalize user_type to lowercase
+          const rawUserType = userData.user_type || userData.role || targetRole;
+          const normalizedUserType = rawUserType.toLowerCase().trim() as UserRole;
+          
+          console.log('[AuthContext] Role switch successful, new user_type:', normalizedUserType);
+          
+          const userObj = {
+            id: userData.id || userData.user_id || user?.id || 0,
+            full_name: userData.full_name || userData.name || user?.full_name || '',
+            email: userData.email || user?.email || '',
+            phone: userData.phone || user?.phone || '',
+            user_type: normalizedUserType,
+            profile_image: userData.profile_image || user?.profile_image || null,
+            address: userData.address || user?.address || '',
+          };
+          
+          // Update user state
+          setUser(userObj);
+          
+          // Update AsyncStorage (token is already updated by authService.switchRole)
+          await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userObj));
+          
+          // Update dashboard preference
+          await AsyncStorage.setItem('@target_dashboard', targetRole);
+          await AsyncStorage.setItem('@user_dashboard_preference', targetRole);
+          
+          console.log('[AuthContext] Role switch completed successfully');
+        } else {
+          throw new Error('Role switch failed: No user data in response');
+        }
+      } else {
+        throw new Error(response?.message || 'Role switch failed');
+      }
+    } catch (error: any) {
+      console.error('[AuthContext] Error switching role:', error);
+      
+      // Re-throw error so caller can handle it
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -336,6 +452,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
         verifyOTP,
         resendOTP,
         logout,
+        switchRole,
         isAuthenticated: !!user,
         setUser,
       }}>

@@ -56,11 +56,15 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // Check if property can be edited (within 24 hours)
+  // Uses MySQL DATETIME format parser: "YYYY-MM-DD HH:MM:SS"
   const canEditProperty = (property: any): boolean => {
     const createdAt = property.created_at || property.created_date || property.date_created;
     if (!createdAt) return true; // Allow if no date available
     
-    const createdDate = new Date(createdAt);
+    // Parse MySQL DATETIME format: "YYYY-MM-DD HH:MM:SS"
+    const createdDate = formatters.parseMySQLDateTime(String(createdAt));
+    if (!createdDate) return true; // Allow if parsing fails
+    
     const now = new Date();
     const diffMs = now.getTime() - createdDate.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);

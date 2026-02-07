@@ -10,7 +10,8 @@
     "start": "react-native start",
     "start:reset": "react-native start --reset-cache",
     "test": "jest",
-    "distribute:debug": "node scripts/distribute-apk-debug.js"
+    "distribute:debug": "node scripts/distribute-apk-debug.js",
+    "android:bundle": "cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@msg91comm/sendotp-react-native": "^1.0.0",

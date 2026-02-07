@@ -55,6 +55,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
     address: '',
     whatsapp_number: '',
     alternate_mobile: '',
+    gst_number: '',
     facebook: '',
     instagram: '',
     linkedin: '',
@@ -88,6 +89,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         address: (user as any).address || '',
         whatsapp_number: (user as any).whatsapp_number || '',
         alternate_mobile: (user as any).alternate_mobile || '',
+        gst_number: (user as any).gst_number || '',
         facebook: (user as any).social_links?.facebook || '',
         instagram: (user as any).social_links?.instagram || '',
         linkedin: (user as any).social_links?.linkedin || '',
@@ -130,6 +132,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
           address: profile.address || '',
           whatsapp_number: profile.whatsapp_number || '',
           alternate_mobile: profile.alternate_mobile || '',
+          gst_number: profile.gst_number || '',
           facebook: socialLinks.facebook || '',
           instagram: socialLinks.instagram || '',
           linkedin: socialLinks.linkedin || '',
@@ -203,6 +206,16 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
     // Address validation (optional, max 500 chars)
     if (formData.address && formData.address.length > 500) {
       newErrors.address = 'Address must be less than 500 characters';
+    }
+
+    // GST number validation (optional, valid GST format if provided)
+    if (formData.gst_number && formData.gst_number.trim()) {
+      const gstTrimmed = formData.gst_number.trim().toUpperCase();
+      // Indian GSTIN: 15 chars, 2 digits + 10 alphanumeric + 3 chars
+      const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (gstTrimmed.length !== 15 || !gstRegex.test(gstTrimmed)) {
+        newErrors.gst_number = 'Please enter a valid 15-character GST number';
+      }
     }
     
     // Social links URL validation (optional)
@@ -289,6 +302,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         address: formData.address?.trim() || null,
         whatsapp_number: normalizePhone(formData.whatsapp_number),
         alternate_mobile: normalizePhone(formData.alternate_mobile),
+        gst_number: formData.gst_number?.trim() || null,
         social_links: {
           facebook: validateUrl(formData.facebook),
           instagram: validateUrl(formData.instagram),
@@ -680,6 +694,29 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.errorText}>{errors.alternate_mobile}</Text>
               )}
               <Text style={styles.hintText}>Optional - Indian phone number</Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>GST Number</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  !isEditing && styles.inputDisabled,
+                  errors.gst_number && styles.inputError,
+                ]}
+                value={formData.gst_number}
+                onChangeText={(text: string) => {
+                  setFormData({...formData, gst_number: text.toUpperCase()});
+                  if (errors.gst_number) setErrors({...errors, gst_number: ''});
+                }}
+                editable={isEditing}
+                placeholder="22AAAAA0000A1Z5"
+                autoCapitalize="characters"
+              />
+              {errors.gst_number && (
+                <Text style={styles.errorText}>{errors.gst_number}</Text>
+              )}
+              <Text style={styles.hintText}>Optional - 15 character GSTIN</Text>
             </View>
 
             <View style={styles.inputContainer}>

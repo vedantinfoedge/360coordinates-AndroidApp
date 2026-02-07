@@ -27,7 +27,7 @@ import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import {extractStateFromContext} from '../../utils/geocoding';
 import {useAuth} from '../../context/AuthContext';
 import {formatters} from '../../utils/formatters';
-import CustomAlert from '../../utils/alertHelper';
+import {Alert} from 'react-native';
 
 type AddProjectScreenNavigationProp = NativeStackNavigationProp<
   AgentStackParamList,
@@ -478,7 +478,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         .filter((url): url is string => url !== undefined);
 
       if (approvedImages.length < 2) {
-        CustomAlert.alert('Error', 'Please upload at least 2 approved images');
+        Alert.alert('Error', 'Please upload at least 2 approved images', [{text: 'OK'}]);
         setIsSubmitting(false);
         return;
       }
@@ -538,25 +538,56 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       const response: any = await propertyService.createProperty(propertyData, 'agent');
       
       if (response && response.success) {
-        CustomAlert.alert(
+        Alert.alert(
           'Success',
           'Upcoming project published successfully! It is now visible to buyers.',
           [{text: 'OK', onPress: () => navigation.goBack()}]
         );
       } else {
-        const errorMessage = response?.message || response?.error?.message || 'Failed to create project';
-        CustomAlert.alert('Error', errorMessage);
+        let errorMessage = 'Failed to create project';
+        // Check multiple possible error message locations
+        if (response?.message) {
+          errorMessage = response.message;
+        } else if (response?.error) {
+          if (typeof response.error === 'string') {
+            errorMessage = response.error;
+          } else if (response.error?.message) {
+            errorMessage = response.error.message;
+          }
+        } else if (response?.data?.message) {
+          errorMessage = response.data.message;
+        } else if (response?.data?.error) {
+          errorMessage = typeof response.data.error === 'string' ? response.data.error : response.data.error?.message || errorMessage;
+        } else if (typeof response === 'string') {
+          errorMessage = response;
+        }
+        console.error('[AddProject] Property creation failed:', errorMessage);
+        console.error('[AddProject] Full error response:', JSON.stringify(response, null, 2));
+        Alert.alert('Error', errorMessage, [{text: 'OK'}]);
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      CustomAlert.alert('Error', error.response?.data?.message || 'Failed to create project. Please try again.');
+      let errorMessage = 'Failed to create project. Please try again.';
+      // Check multiple possible error message locations
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.error) {
+        errorMessage = typeof error.response.data.error === 'string' ? error.response.data.error : error.response.data.error?.message || errorMessage;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = typeof error.error === 'string' ? error.error : error.error?.message || errorMessage;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      Alert.alert('Error', errorMessage, [{text: 'OK'}]);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    CustomAlert.alert(
+    Alert.alert(
       'Cancel Project',
       'Are you sure you want to cancel? Your progress will be lost.',
       [
@@ -1640,6 +1671,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       visible={true}
       animationType="slide"
       transparent={true}
+      presentationStyle="overFullScreen"
+      statusBarTranslucent={true}
       onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
@@ -1827,10 +1860,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   stepCircleCompleted: {
-    backgroundColor: '#43A047',
+    backgroundColor: '#0077C0',
   },
   stepCircleActive: {
-    backgroundColor: colors.accent,
+    backgroundColor: '#0077C0',
   },
   stepIcon: {
     fontSize: 18,
@@ -1847,11 +1880,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepLabelCompleted: {
-    color: '#43A047',
+    color: '#0077C0',
     fontWeight: '600',
   },
   stepLabelActive: {
-    color: colors.accent,
+    color: '#0077C0',
     fontWeight: '700',
   },
   content: {
@@ -1931,9 +1964,9 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   typeButtonActive: {
-    borderColor: colors.accent,
+    borderColor: '#0077C0',
     borderWidth: 2,
-    backgroundColor: colors.accent + '20',
+    backgroundColor: '#0077C020',
   },
   typeButtonIcon: {
     fontSize: 32,
@@ -1946,7 +1979,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   typeButtonTextActive: {
-    color: colors.accent,
+    color: '#0077C0',
     fontWeight: '600',
   },
   locationInputContainer: {
@@ -1957,7 +1990,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent,
+    backgroundColor: '#0077C0',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     gap: spacing.xs,
@@ -2016,7 +2049,7 @@ const styles = StyleSheet.create({
   },
   editButtonText: {
     ...typography.caption,
-    color: colors.accent,
+    color: '#0077C0',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -2057,7 +2090,7 @@ const styles = StyleSheet.create({
   },
   priceDisplay: {
     ...typography.caption,
-    color: colors.accent,
+    color: '#0077C0',
     fontSize: 12,
     marginTop: spacing.xs,
     fontWeight: '600',
@@ -2075,16 +2108,16 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   configButtonActive: {
-    borderColor: colors.accent,
+    borderColor: '#0077C0',
     borderWidth: 2,
-    backgroundColor: colors.accent + '20',
+    backgroundColor: '#0077C020',
   },
   checkmark: {
     position: 'absolute',
     top: 4,
     right: 4,
     fontSize: 16,
-    color: colors.accent,
+    color: '#0077C0',
     fontWeight: 'bold',
   },
   configButtonText: {
@@ -2094,7 +2127,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   configButtonTextActive: {
-    color: colors.accent,
+    color: '#0077C0',
     fontWeight: '600',
   },
   amenitiesGrid: {
@@ -2116,9 +2149,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   amenityButtonActive: {
-    borderColor: colors.accent,
+    borderColor: '#0077C0',
     borderWidth: 2,
-    backgroundColor: colors.accent + '20',
+    backgroundColor: '#0077C020',
   },
   amenityIcon: {
     fontSize: 24,
@@ -2129,7 +2162,7 @@ const styles = StyleSheet.create({
     top: 4,
     right: 4,
     fontSize: 16,
-    color: colors.accent,
+    color: '#0077C0',
     fontWeight: 'bold',
   },
   amenityText: {
@@ -2139,11 +2172,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   amenityTextActive: {
-    color: colors.accent,
+    color: '#0077C0',
     fontWeight: '600',
   },
   uploadButton: {
-    backgroundColor: colors.accent,
+    backgroundColor: '#0077C0',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
@@ -2370,7 +2403,7 @@ const styles = StyleSheet.create({
   nextButton: {
     flex: 1,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.accent,
+    backgroundColor: '#0077C0',
   },
   nextButtonDisabled: {
     backgroundColor: colors.border,

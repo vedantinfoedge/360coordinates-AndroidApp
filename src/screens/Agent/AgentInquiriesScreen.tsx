@@ -37,18 +37,18 @@ type Props = {
 interface Inquiry {
   id: string | number;
   property_id: string | number;
-  buyer_id?: string | number;
+  buyer_id?: string | number | null;
   property_title?: string;
   buyer_name: string;
   buyer_email?: string;
   buyer_phone?: string;
   message: string;
-  status: 'new' | 'read' | 'replied' | 'contacted' | 'interested' | 'not_interested' | 'closed';
+  status: 'new' | 'contacted' | 'viewed' | 'interested' | 'not_interested' | 'closed';
   created_at: string;
   property_image?: string;
 }
 
-type StatusFilter = 'all' | 'new' | 'read' | 'replied' | 'contacted' | 'interested' | 'not_interested' | 'closed';
+type StatusFilter = 'all' | 'new' | 'contacted' | 'viewed' | 'interested' | 'not_interested' | 'closed';
 
 const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
   const {logout} = useAuth();
@@ -121,10 +121,15 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
             isBuyerNameAnId: inq.buyer_name ? isLikelyId(inq.buyer_name) : false,
           });
           
+          // Handle null buyer_id (guest inquiries)
+          const buyerId = inq.buyer_id !== null && inq.buyer_id !== undefined 
+            ? (inq.buyer_id || inq.buyer?.id || inq.user_id)
+            : null;
+          
           return {
             id: inq.id || inq.inquiry_id,
             property_id: inq.property_id,
-            buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id || inq.buyer_id,
+            buyer_id: buyerId, // Can be null for guest inquiries
             property_title: inq.property_title || inq.property?.title || 'Property',
             buyer_name: buyerName,
             buyer_email: inq.buyer_email || inq.email || inq.buyer?.email,
@@ -178,10 +183,15 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
               // Final fallback
               buyerName = buyerName || 'Buyer';
               
+              // Handle null buyer_id (guest inquiries)
+              const buyerId = inq.buyer_id !== null && inq.buyer_id !== undefined 
+                ? (inq.buyer_id || inq.buyer?.id || inq.user_id)
+                : null;
+              
               return {
                 id: inq.id || inq.inquiry_id,
                 property_id: inq.property_id,
-                buyer_id: inq.buyer_id || inq.buyer?.id || inq.user_id || inq.buyer_id,
+                buyer_id: buyerId, // Can be null for guest inquiries
                 property_title: inq.property_title || inq.property?.title || 'Property',
                 buyer_name: buyerName,
                 buyer_email: inq.buyer_email || inq.buyer?.email,
@@ -247,39 +257,42 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
     loadInquiries();
   };
 
-  const handleMarkAsRead = async (inquiryId: string | number) => {
+  const handleMarkAsViewed = async (inquiryId: string | number) => {
     try {
-      const response = await sellerService.updateInquiryStatus(inquiryId, 'read');
+      // Backend requires: 'new', 'contacted', 'viewed', 'interested', 'not_interested', 'closed'
+      const response = await sellerService.updateInquiryStatus(inquiryId, 'viewed');
       if (response && response.success) {
         loadInquiries(); // Reload to update status
       }
     } catch (error) {
-      console.error('Error marking inquiry as read:', error);
-      // Try fallback
-      try {
-        const fallbackResponse = await inquiryService.markAsRead(inquiryId);
-        if (fallbackResponse.success) {
-          loadInquiries();
-        }
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-      }
+      console.error('Error marking inquiry as viewed:', error);
+      CustomAlert.alert('Error', 'Failed to update inquiry status');
     }
   };
 
   const handleReply = async (inquiry: Inquiry) => {
-    // Mark inquiry as read when opening chat
+    // Mark inquiry as viewed when opening chat
     if (inquiry.id && inquiry.status === 'new') {
       try {
-        await handleMarkAsRead(inquiry.id);
+        await handleMarkAsViewed(inquiry.id);
       } catch (error) {
-        console.error('[AgentInquiries] Error marking inquiry as read:', error);
+        console.error('[AgentInquiries] Error marking inquiry as viewed:', error);
         // Continue anyway - don't block navigation
       }
     }
     
+    // Handle guest inquiries (null buyer_id)
+    if (!inquiry.buyer_id) {
+      CustomAlert.alert(
+        'Guest Inquiry',
+        'This inquiry is from a guest user. Chat functionality is not available for guest inquiries.',
+        [{text: 'OK'}]
+      );
+      return;
+    }
+    
     // Navigate to chat conversation with the buyer
-    const buyerId = inquiry.buyer_id || inquiry.id || inquiry.property_id;
+    const buyerId = inquiry.buyer_id;
     
     // Helper function to check if a value is likely an ID (numeric string or number)
     const isLikelyId = (value: any): boolean => {
@@ -338,7 +351,11 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
   const renderInquiry = ({item}: {item: Inquiry}) => (
     <TouchableOpacity
       style={styles.inquiryCard}
-      onPress={() => handleMarkAsRead(item.id)}>
+      onPress={() => {
+        if (item.status === 'new') {
+          handleMarkAsViewed(item.id);
+        }
+      }}>
       <View style={styles.inquiryHeader}>
         <View style={styles.inquiryInfo}>
           <Text style={styles.buyerName}>{item.buyer_name}</Text>
@@ -437,7 +454,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.filterSection}>
               <Text style={styles.filterLabel}>Status</Text>
               <View style={styles.filterOptions}>
-                {(['all', 'new', 'read', 'replied', 'contacted', 'interested', 'not_interested', 'closed'] as StatusFilter[]).map(status => (
+                {(['all', 'new', 'contacted', 'viewed', 'interested', 'not_interested', 'closed'] as StatusFilter[]).map(status => (
                   <TouchableOpacity
                     key={status}
                     style={[

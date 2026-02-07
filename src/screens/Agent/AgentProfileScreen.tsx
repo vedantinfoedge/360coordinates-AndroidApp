@@ -21,6 +21,7 @@ import AgentHeader from '../../components/AgentHeader';
 import {userService} from '../../services/user.service';
 import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
@@ -150,23 +151,79 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
   const handleSave = async () => {
     try {
       setSaving(true);
+      
+      // Validation: full_name (2-50 chars, letters/spaces only)
+      const fullName = formData.full_name?.trim() || '';
+      if (fullName && (fullName.length < 2 || fullName.length > 50)) {
+        CustomAlert.alert('Validation Error', 'Full name must be between 2 and 50 characters');
+        setSaving(false);
+        return;
+      }
+      if (fullName && !/^[a-zA-Z\s]+$/.test(fullName)) {
+        CustomAlert.alert('Validation Error', 'Full name can only contain letters and spaces');
+        setSaving(false);
+        return;
+      }
+      
+      // Validation: company_name (2-100 chars, optional for agents)
+      const companyName = formData.company_name?.trim() || '';
+      if (companyName && (companyName.length < 2 || companyName.length > 100)) {
+        CustomAlert.alert('Validation Error', 'Company name must be between 2 and 100 characters');
+        setSaving(false);
+        return;
+      }
+      
+      // Validation: address (max 500 chars)
+      const address = formData.address?.trim() || '';
+      if (address && address.length > 500) {
+        CustomAlert.alert('Validation Error', 'Address cannot exceed 500 characters');
+        setSaving(false);
+        return;
+      }
+      
+      // Validation: website URL format
+      const website = formData.website?.trim() || '';
+      if (website && !formatters.validateWebsiteUrl(website)) {
+        CustomAlert.alert('Validation Error', 'Please enter a valid website URL (e.g., example.com or https://example.com)');
+        setSaving(false);
+        return;
+      }
+      
+      // Normalize phone numbers: extract digits only, validate 10-15 digits
+      const whatsappNumber = formData.whatsapp_number?.trim() || '';
+      const normalizedWhatsApp = formatters.normalizePhoneNumber(whatsappNumber);
+      if (whatsappNumber && !formatters.validatePhoneNumber(whatsappNumber)) {
+        CustomAlert.alert('Validation Error', 'WhatsApp number must be 10-15 digits');
+        setSaving(false);
+        return;
+      }
+      
+      const alternateMobile = formData.alternate_mobile?.trim() || '';
+      const normalizedAlternate = formatters.normalizePhoneNumber(alternateMobile);
+      if (alternateMobile && !formatters.validatePhoneNumber(alternateMobile)) {
+        CustomAlert.alert('Validation Error', 'Alternate mobile number must be 10-15 digits');
+        setSaving(false);
+        return;
+      }
+      
       // Build payload to match website seller profile update API
       // Method: PUT /seller/profile/update.php
       // Fields: full_name, address, company_name, license_number, website, gst_number (optional)
       // Notes: 
       // - Email and phone are not sent (cannot be changed)
       // - Empty strings are sent to clear optional fields
-      // - All string fields are trimmed before sending
+      // - Phone numbers are normalized (digits only)
       const updateData = {
-        full_name: formData.full_name?.trim() || '',
-        address: formData.address?.trim() || '',
-        company_name: formData.company_name?.trim() || '',
+        full_name: fullName,
+        address: address,
+        company_name: companyName,
         license_number: formData.license_number?.trim() || '',
-        website: formData.website?.trim() || '',
+        website: website,
         gst_number: formData.gst_number?.trim() || '',
         // Extra optional fields supported by backend for mobile/app:
-        whatsapp_number: formData.whatsapp_number?.trim() || '',
-        alternate_mobile: formData.alternate_mobile?.trim() || '',
+        // Phone numbers stored as digits only (no formatting)
+        whatsapp_number: normalizedWhatsApp || '',
+        alternate_mobile: normalizedAlternate || '',
       };
 
       const response: any = await sellerService.updateProfile(updateData);

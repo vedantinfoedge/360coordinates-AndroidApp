@@ -38,16 +38,17 @@ interface Inquiry {
   id: string | number;
   property_id: string | number;
   property_title?: string;
+  buyer_id?: number | null;
   buyer_name: string;
   buyer_email?: string;
   buyer_phone?: string;
   message: string;
-  status: 'new' | 'read' | 'replied' | 'contacted' | 'interested' | 'not_interested' | 'closed';
+  status: 'new' | 'contacted' | 'viewed' | 'interested' | 'not_interested' | 'closed';
   created_at: string;
   property_image?: string;
 }
 
-type StatusFilter = 'all' | 'new' | 'read' | 'replied' | 'contacted' | 'interested' | 'not_interested' | 'closed';
+type StatusFilter = 'all' | 'new' | 'contacted' | 'viewed' | 'interested' | 'not_interested' | 'closed';
 
 const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
   const {logout} = useAuth();
@@ -79,18 +80,24 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
       if (response && response.success) {
         const inquiriesData = response.data?.inquiries || response.data || [];
         
-        const formattedInquiries = inquiriesData.map((inq: any) => ({
-          id: inq.id || inq.inquiry_id,
-          property_id: inq.property_id,
-          property_title: inq.property_title || inq.property?.title || 'Property',
-          buyer_name: inq.buyer_name || inq.name || inq.buyer?.full_name || 'Buyer',
-          buyer_email: inq.buyer_email || inq.email || inq.buyer?.email,
-          buyer_phone: inq.buyer_phone || inq.mobile || inq.buyer?.phone,
-          message: inq.message || '',
-          status: inq.status || 'new',
-          created_at: inq.created_at || inq.created_date || '',
-          property_image: fixImageUrl(inq.property_image || inq.property?.cover_image || ''),
-        }));
+        const formattedInquiries = inquiriesData.map((inq: any) => {
+          // Normalize status: backend allows new, contacted, viewed, interested, not_interested, closed
+          let status = inq.status || 'new';
+          if (status === 'read' || status === 'replied') status = 'viewed';
+          return {
+            id: inq.id || inq.inquiry_id,
+            property_id: inq.property_id,
+            property_title: inq.property_title || inq.property?.title || 'Property',
+            buyer_id: inq.buyer_id ?? null,
+            buyer_name: inq.buyer_name || inq.name || inq.buyer?.full_name || 'Guest',
+            buyer_email: inq.buyer_email || inq.email || inq.buyer?.email,
+            buyer_phone: inq.buyer_phone || inq.mobile || inq.buyer?.phone,
+            message: inq.message || '',
+            status,
+            created_at: inq.created_at || inq.created_date || '',
+            property_image: fixImageUrl(inq.property_image || inq.property?.cover_image || ''),
+          };
+        });
         
         setAllInquiries(formattedInquiries);
         setInquiries(formattedInquiries);
@@ -105,18 +112,23 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
         const fallbackResponse = await inquiryService.getInbox();
         if (fallbackResponse && fallbackResponse.success) {
           const inquiriesData = fallbackResponse.data?.inquiries || fallbackResponse.data || [];
-          const formattedInquiries = inquiriesData.map((inq: any) => ({
-            id: inq.id || inq.inquiry_id,
-            property_id: inq.property_id,
-            property_title: inq.property_title || inq.property?.title || 'Property',
-            buyer_name: inq.buyer_name || inq.buyer?.full_name || inq.name || 'Buyer',
-            buyer_email: inq.buyer_email || inq.buyer?.email,
-            buyer_phone: inq.buyer_phone || inq.buyer?.phone,
-            message: inq.message || '',
-            status: inq.status || 'new',
-            created_at: inq.created_at || inq.created_date || '',
-            property_image: fixImageUrl(inq.property_image || inq.property?.cover_image || ''),
-          }));
+          const formattedInquiries = inquiriesData.map((inq: any) => {
+            let status = inq.status || 'new';
+            if (status === 'read' || status === 'replied') status = 'viewed';
+            return {
+              id: inq.id || inq.inquiry_id,
+              property_id: inq.property_id,
+              property_title: inq.property_title || inq.property?.title || 'Property',
+              buyer_id: inq.buyer_id ?? null,
+              buyer_name: inq.buyer_name || inq.buyer?.full_name || inq.name || 'Guest',
+              buyer_email: inq.buyer_email || inq.buyer?.email,
+              buyer_phone: inq.buyer_phone || inq.buyer?.phone,
+              message: inq.message || '',
+              status,
+              created_at: inq.created_at || inq.created_date || '',
+              property_image: fixImageUrl(inq.property_image || inq.property?.cover_image || ''),
+            };
+          });
           setAllInquiries(formattedInquiries);
           setInquiries(formattedInquiries);
         } else {
@@ -173,9 +185,9 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
     loadInquiries();
   };
 
-  const handleMarkAsRead = async (inquiryId: string | number) => {
+  const handleMarkAsViewed = async (inquiryId: string | number) => {
     try {
-      const response = await sellerService.updateInquiryStatus(inquiryId, 'read');
+      const response = await sellerService.updateInquiryStatus(inquiryId, 'viewed');
       if (response && response.success) {
         loadInquiries(); // Reload to update status
       }
@@ -219,7 +231,7 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
     return (
       <TouchableOpacity
         style={styles.inquiryCard}
-        onPress={() => handleMarkAsRead(item.id)}
+        onPress={() => handleMarkAsViewed(item.id)}
         activeOpacity={0.9}>
         <View style={styles.inquiryHeader}>
           <View style={styles.inquiryHeaderLeft}>
@@ -338,7 +350,7 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.filterSection}>
               <Text style={styles.filterLabel}>Status</Text>
               <View style={styles.filterOptions}>
-                {(['all', 'new', 'read', 'replied', 'contacted', 'interested', 'not_interested', 'closed'] as StatusFilter[]).map(status => (
+                {(['all', 'new', 'contacted', 'viewed', 'interested', 'not_interested', 'closed'] as StatusFilter[]).map(status => (
                   <TouchableOpacity
                     key={status}
                     style={[

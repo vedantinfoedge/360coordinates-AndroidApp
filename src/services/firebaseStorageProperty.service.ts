@@ -26,12 +26,27 @@ export interface FirebaseUploadResult {
 export const isFirebaseStorageAvailable = (): boolean => {
   try {
     const storageInstance = storage();
-    return storageInstance !== null;
+    if (!storageInstance) {
+      console.warn('[FirebaseStorage] Storage instance is null');
+      return false;
+    }
+    // Try to create a test reference to verify it's working
+    try {
+      const testRef = storageInstance.ref('test/connection-check');
+      console.log('[FirebaseStorage] ✅ Firebase Storage is available and initialized');
+      return true;
+    } catch (refError: any) {
+      console.error('[FirebaseStorage] ❌ Failed to create storage reference:', refError);
+      return false;
+    }
   } catch (error: any) {
     const errorMessage = error?.message || String(error);
+    console.error('[FirebaseStorage] ❌ Firebase Storage check failed:', errorMessage);
     if (errorMessage.includes('not installed natively') || 
-        errorMessage.includes('native module')) {
+        errorMessage.includes('native module') ||
+        errorMessage.includes('not found')) {
       console.warn('[FirebaseStorage] Firebase Storage native module not linked. Rebuild required.');
+      console.warn('[FirebaseStorage] Run: cd android && ./gradlew clean && cd .. && npm run android');
     }
     return false;
   }
@@ -93,20 +108,34 @@ export const uploadPropertyImageToFirebase = async (
     }
 
     // Upload file with progress tracking
-    console.log('🔥 Firebase Upload: Uploading file to Firebase...');
+    console.log('🔥 Firebase Upload: Uploading file to Firebase...', {
+      fileUri: fileUri.substring(0, 100),
+      storagePath,
+    });
+    
     const uploadTask = storageRef.putFile(fileUri);
 
     // Track upload progress if callback provided
     if (onProgress) {
       uploadTask.on('state_changed', snapshot => {
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        console.log(`🔥 Firebase Upload Progress: ${Math.round(progress)}%`);
         onProgress(progress);
       });
     }
 
     // Wait for upload to complete
-    await uploadTask;
-    console.log('✅ Firebase Upload: File uploaded successfully');
+    try {
+      await uploadTask;
+      console.log('✅ Firebase Upload: File uploaded successfully to:', storagePath);
+    } catch (uploadError: any) {
+      console.error('❌ Firebase Upload Task Error:', {
+        code: uploadError?.code,
+        message: uploadError?.message,
+        storagePath,
+      });
+      throw uploadError;
+    }
 
     // Get download URL
     console.log('🔥 Firebase Upload: Getting download URL...');

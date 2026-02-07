@@ -117,14 +117,16 @@ export const sellerService = {
   },
 
   // Update inquiry status
+  // Endpoint: PUT /api/seller/inquiries/updateStatus.php?id={id}
+  // Backend expects: id as query parameter, status in body
   updateInquiryStatus: async (
     inquiryId: number | string,
     status: string,
   ) => {
-    const response = await api.put(API_ENDPOINTS.SELLER_INQUIRY_UPDATE_STATUS, {
-      inquiry_id: inquiryId,
-      status,
-    });
+    const response = await api.put(
+      `${API_ENDPOINTS.SELLER_INQUIRY_UPDATE_STATUS}?id=${inquiryId}`,
+      { status },
+    );
     return response;
   },
 
@@ -142,14 +144,14 @@ export const sellerService = {
 
   /**
    * Update property (seller/agent).
-   * Matches website: PUT /seller/properties/update.php
+   * Matches website: PUT /api/seller/properties/update.php?id={id}
    * Backend: requireUserType(['seller', 'agent']), checks ownership.
    */
   updateProperty: async (propertyId: string | number, propertyData: any) => {
-    const response = await api.put(API_ENDPOINTS.SELLER_PROPERTIES_UPDATE, {
-      property_id: propertyId,
-      ...propertyData,
-    });
+    const response = await api.put(
+      `${API_ENDPOINTS.SELLER_PROPERTIES_UPDATE}?id=${propertyId}`,
+      propertyData
+    );
     return response;
   },
 };

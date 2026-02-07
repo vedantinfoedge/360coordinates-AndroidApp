@@ -27,6 +27,7 @@ import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {sellerService} from '../../services/seller.service';
 import {uploadPropertyImageWithModeration} from '../../services/imageUpload.service';
+import {formatters} from '../../utils/formatters';
 import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
 import {isFirebaseStorageAvailable} from '../../services/firebaseStorageProperty.service';
 import {useAuth} from '../../context/AuthContext';
@@ -144,10 +145,21 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   };
 
   // Check if property is older than 24 hours
+  // Uses MySQL DATETIME format parser: "YYYY-MM-DD HH:MM:SS"
   const isPropertyOlderThan24Hours = (createdAtDate?: string | Date): boolean => {
     if (!createdAtDate) return false;
     const now = new Date();
-    const created = typeof createdAtDate === 'string' ? new Date(createdAtDate) : createdAtDate;
+    let created: Date;
+    
+    if (typeof createdAtDate === 'string') {
+      // Parse MySQL DATETIME format: "YYYY-MM-DD HH:MM:SS"
+      const parsed = formatters.parseMySQLDateTime(createdAtDate);
+      if (!parsed) return false;
+      created = parsed;
+    } else {
+      created = createdAtDate;
+    }
+    
     const hoursSinceCreation = (now.getTime() - created.getTime()) / (1000 * 60 * 60);
     return hoursSinceCreation >= 24;
   };
@@ -422,8 +434,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         showError('Error', 'Please select property type');
         return;
       }
-      if (propertyTitle.length > 255) {
-        showError('Error', 'Title must be less than 255 characters');
+      if (propertyTitle.length > 200) {
+        showError('Error', 'Title must be between 1 and 200 characters');
+        return;
+      }
+      if (propertyTitle.length < 1) {
+        showError('Error', 'Title is required (1-200 characters)');
         return;
       }
     }
@@ -451,6 +467,32 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       if (!builtUpArea.trim()) {
         showError('Error', `Please enter ${fieldVisibility.areaLabel}`);
         return;
+      }
+      const areaValue = parseFloat(builtUpArea.replace(/[^0-9.]/g, ''));
+      if (isNaN(areaValue) || areaValue <= 0) {
+        showError('Error', `${fieldVisibility.areaLabel} must be a positive number`);
+        return;
+      }
+      // Validate carpet_area <= area
+      if (carpetArea.trim()) {
+        const carpetValue = parseFloat(carpetArea.replace(/[^0-9.]/g, ''));
+        if (isNaN(carpetValue) || carpetValue <= 0) {
+          showError('Error', 'Carpet area must be a positive number');
+          return;
+        }
+        if (carpetValue > areaValue) {
+          showError('Error', 'Carpet area cannot be greater than built-up area');
+          return;
+        }
+      }
+      // Validate floor <= total_floors (if both provided)
+      if (floor.trim() && totalFloors.trim()) {
+        const floorNum = parseInt(floor);
+        const totalFloorsNum = parseInt(totalFloors);
+        if (!isNaN(floorNum) && !isNaN(totalFloorsNum) && floorNum > totalFloorsNum) {
+          showError('Error', 'Floor number cannot be greater than total floors');
+          return;
+        }
       }
     }
     if (currentStep === 3) {
@@ -597,7 +639,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         // Build update data based on 24-hour restriction
         const updateData: any = {};
         
-        // Always allowed fields
+        // Always allowed fields (after 24 hours): title, price, price_negotiable, maintenance_charges, deposit_amount
         updateData.title = propertyTitle.trim();
         updateData.price = parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0;
         updateData.price_negotiable = priceNegotiable;
@@ -610,9 +652,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         }
         
         // Only include other fields if not in limited edit mode
+        // Location fields are explicitly blocked after 24 hours: location, latitude, longitude, state, additional_address
         if (!isLimitedEdit) {
           updateData.status = propertyStatus === 'sell' ? 'sale' : 'rent';
           updateData.property_type = propertyType;
+          // Location fields (explicitly blocked after 24 hours)
           updateData.location = location.trim();
           updateData.state = state.trim() || null;
           updateData.additional_address = additionalAddress.trim() || null;
@@ -710,7 +754,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         console.log('[AddProperty] Total photos:', photos.length, 'Valid (approved/pending):', validImages.length, 'Base64 ready:', imageBase64Strings.length);
 
         // Property type is already in the correct format from guide
-        const propertyData = {
+        const propertyData: any = {
           title: propertyTitle.trim(),
           status: propertyStatus === 'sell' ? 'sale' : 'rent', // Map 'sell' to 'sale'
           property_type: propertyType, // Already in guide format (e.g., 'Apartment', 'Villa / Banglow')
@@ -734,6 +778,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           price_negotiable: priceNegotiable,
           maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
           amenities: selectedAmenities,
+          // Deposit amount (only for rent properties)
+          deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : undefined,
           // Available for bachelors (only for rent properties: flat, apartment, pg-hostel)
           available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'flat' || propertyType === 'apartment' || propertyType === 'pg-hostel') ? availableForBachelors : undefined,
           // Include images as base64 strings in the request
@@ -754,14 +800,44 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             [{text: 'OK', onPress: () => navigation.goBack()}]
           );
         } else {
-          const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
+          let errorMessage = 'Failed to create property';
+          // Check multiple possible error message locations
+          if (response?.message) {
+            errorMessage = response.message;
+          } else if (response?.error) {
+            if (typeof response.error === 'string') {
+              errorMessage = response.error;
+            } else if (response.error?.message) {
+              errorMessage = response.error.message;
+            }
+          } else if (response?.data?.message) {
+            errorMessage = response.data.message;
+          } else if (response?.data?.error) {
+            errorMessage = typeof response.data.error === 'string' ? response.data.error : response.data.error?.message || errorMessage;
+          } else if (typeof response === 'string') {
+            errorMessage = response;
+          }
           console.error('[AddProperty] Property creation failed:', errorMessage);
-          showError('Error', errorMessage);
+          console.error('[AddProperty] Full error response:', JSON.stringify(response, null, 2));
+          Alert.alert('Error', errorMessage, [{text: 'OK'}]);
         }
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      showError('Error', error.response?.data?.message || (isEditMode ? 'Failed to update property. Please try again.' : 'Failed to create property. Please try again.'));
+      let errorMessage = isEditMode ? 'Failed to update property. Please try again.' : 'Failed to create property. Please try again.';
+      // Check multiple possible error message locations
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.error) {
+        errorMessage = typeof error.response.data.error === 'string' ? error.response.data.error : error.response.data.error?.message || errorMessage;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = typeof error.error === 'string' ? error.error : error.error?.message || errorMessage;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      Alert.alert('Error', errorMessage, [{text: 'OK'}]);
     } finally {
       setIsSubmitting(false);
     }
@@ -1594,6 +1670,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         visible={true}
         animationType="fade"
         transparent={true}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent={true}
         onRequestClose={handleClose}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -1614,6 +1692,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       visible={true}
       animationType="slide"
       transparent={true}
+      presentationStyle="overFullScreen"
+      statusBarTranslucent={true}
       onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>

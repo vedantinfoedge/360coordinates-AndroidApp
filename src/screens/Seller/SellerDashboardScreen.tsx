@@ -55,7 +55,7 @@ interface RecentInquiry {
   id: number;
   property_id: number;
   property_title: string;
-  buyer_id: number;
+  buyer_id: number | null; // null for guest inquiries
   buyer_name: string;
   buyer_email: string;
   buyer_phone: string;
@@ -392,7 +392,8 @@ const AnimatedInquiryCard = React.memo(({
 });
 
 const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout} = useAuth();
+  const {user, logout, switchRole} = useAuth();
+  const [switchingRole, setSwitchingRole] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
@@ -541,8 +542,14 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           return isActive;
         }).length;
         
+        // Use views_count as primary field (backend standard), fallback to views or view_count
+        // IMPORTANT: views_count = unique users who viewed this property (1 view per user per property)
+        // This count updates when properties are fetched from backend, NOT in real-time.
+        // Dashboard auto-refreshes every 60 seconds, so views may appear to increase when refresh happens.
         const totalViews = properties.reduce((sum: number, prop: any) => {
-          return sum + (prop.views_count || prop.views || prop.view_count || 0);
+          // Priority: views_count > views > view_count
+          const propViews = prop.views_count ?? prop.views ?? prop.view_count ?? 0;
+          return sum + (typeof propViews === 'number' ? propViews : 0);
         }, 0);
         
         const totalInquiries = properties.reduce((sum: number, prop: any) => {
@@ -592,7 +599,9 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             price: parseFloat(prop.price || '0') || 0,
             status: (prop.status === 'rent' ? 'rent' : 'sale') as 'sale' | 'rent',
             cover_image: imageUrl || undefined,
-            views: prop.views || prop.view_count || prop.views_count || 0,
+            // Use views_count as primary (backend standard), fallback to views or view_count
+            // NOTE: Each user counts as 1 view per property, even with multiple clicks
+            views: prop.views_count ?? prop.views ?? prop.view_count ?? 0,
             inquiries: prop.inquiries || prop.inquiry_count || 0,
           };
         });
@@ -974,13 +983,27 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         onSupportPress={() => navigation.navigate('Support' as never)}
         onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
         onBuyPropertyPress={async () => {
-          // Set dashboard preference and navigate to Buyer dashboard
-          await AsyncStorage.setItem('@target_dashboard', 'buyer');
-          await AsyncStorage.setItem('@user_dashboard_preference', 'buyer');
-          (navigation as any).reset({
-            index: 0,
-            routes: [{name: 'MainTabs'}],
-          });
+          // Switch role to buyer and navigate to Buyer dashboard
+          if (switchingRole) return; // Prevent multiple clicks
+          
+          try {
+            setSwitchingRole(true);
+            await switchRole('buyer');
+            
+            // Navigate to Buyer dashboard after successful role switch
+            (navigation as any).reset({
+              index: 0,
+              routes: [{name: 'MainTabs'}],
+            });
+          } catch (error: any) {
+            console.error('[SellerDashboard] Error switching role:', error);
+            CustomAlert.alert(
+              'Role Switch Failed',
+              error?.message || 'Failed to switch to buyer dashboard. Please try again.',
+            );
+          } finally {
+            setSwitchingRole(false);
+          }
         }}
         onLogoutPress={async () => {
           await logout();
@@ -1019,15 +1042,23 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
               </View>
               <AnimatedAddPropertyButton
                 onPress={async () => {
-                  // Check property limit before navigating
+                  // Check property limit before navigating (free: 3, basic/pro/premium: 10)
                   try {
                     const statsResponse: any = await sellerService.getDashboardStats();
                     if (statsResponse && statsResponse.success && statsResponse.data) {
                       const currentCount = statsResponse.data.total_properties || 0;
-                      if (currentCount >= 3) {
+                      const planType = statsResponse.data.subscription?.plan_type || 'free';
+                      const limits: {[key: string]: number} = {
+                        free: 3,
+                        basic: 10,
+                        pro: 10,
+                        premium: 10,
+                      };
+                      const limit = limits[planType] || limits.free;
+                      if (limit > 0 && currentCount >= limit) {
                         CustomAlert.alert(
-                          'Property Limit Reached',
-                          'You have reached the maximum limit of 3 properties. You cannot add more properties.',
+                          'Property limit reached',
+                          `Property limit reached. You can list up to ${limit} properties in your current plan.`,
                           [{text: 'OK'}]
                         );
                         return;
@@ -1058,7 +1089,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             label="Total Properties"
             badge={`${stats.active_properties} Active`}
             badgeColor="#D1FAE5"
-            onPress={() => navigation.navigate('AllListings')}
+            onPress={() => navigation.navigate('MyProperties')}
             delay={0}
           />
 
@@ -1107,15 +1138,23 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             title="Add New Property"
             description="List a new property for sale or rent"
             onPress={async () => {
-              // Check property limit before navigating
+              // Check property limit before navigating (free: 3, basic/pro/premium: 10)
               try {
                 const statsResponse: any = await sellerService.getDashboardStats();
                 if (statsResponse && statsResponse.success && statsResponse.data) {
                   const currentCount = statsResponse.data.total_properties || 0;
-                  if (currentCount >= 3) {
+                  const planType = statsResponse.data.subscription?.plan_type || 'free';
+                  const limits: {[key: string]: number} = {
+                    free: 3,
+                    basic: 10,
+                    pro: 10,
+                    premium: 10,
+                  };
+                  const limit = limits[planType] || limits.free;
+                  if (limit > 0 && currentCount >= limit) {
                     CustomAlert.alert(
-                      'Property Limit Reached',
-                      'You have reached the maximum limit of 3 properties. You cannot add more properties.',
+                      'Property limit reached',
+                      `Property limit reached. You can list up to ${limit} properties in your current plan.`,
                       [{text: 'OK'}]
                     );
                     return;
@@ -1134,7 +1173,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             icon="✏"
             title="Manage Properties"
             description="Edit, update or remove listings"
-            onPress={() => navigation.navigate('AllListings')}
+            onPress={() => navigation.navigate('MyProperties')}
             delay={100}
           />
 
@@ -1165,7 +1204,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.sectionTitle}>Your Properties</Text>
             </View>
             <AnimatedSeeAllButton
-              onPress={() => navigation.navigate('AllListings')}>
+              onPress={() => navigation.navigate('MyProperties')}>
               <Text style={styles.viewAllText}>View All</Text>
               <Text style={styles.viewAllArrow}>›</Text>
             </AnimatedSeeAllButton>

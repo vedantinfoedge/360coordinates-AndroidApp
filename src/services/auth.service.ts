@@ -50,8 +50,52 @@ export const authService = {
       registerData.phoneVerified = userData.phoneVerified;
     }
     
-    const response = await api.post(API_ENDPOINTS.REGISTER, registerData);
-    return response;
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.service.ts:53',message:'authService.register entry - before API call',data:{endpoint:API_ENDPOINTS.REGISTER,fullName:userData.fullName,email:userData.email,phone:userData.phone,userType:userData.userType,hasEmailToken:!!userData.emailVerificationToken,hasPhoneToken:!!userData.phoneVerificationToken,hasPhoneOtp:!!userData.phoneOtp,phoneVerified:userData.phoneVerified,phoneVerificationMethod:userData.phoneVerificationMethod},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    
+    console.log('[AuthService] Registration request:', {
+      endpoint: API_ENDPOINTS.REGISTER,
+      data: {
+        fullName: userData.fullName,
+        email: userData.email,
+        phone: userData.phone,
+        userType: userData.userType,
+        hasEmailToken: !!userData.emailVerificationToken,
+        hasPhoneToken: !!userData.phoneVerificationToken,
+        hasPhoneOtp: !!userData.phoneOtp,
+        phoneVerified: userData.phoneVerified,
+        phoneVerificationMethod: userData.phoneVerificationMethod,
+      },
+    });
+    
+    try {
+      const response = await api.post(API_ENDPOINTS.REGISTER, registerData);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.service.ts:75',message:'authService.register - API response received',data:{success:response?.success,hasToken:!!response?.data?.token,hasUser:!!response?.data?.user,hasUserId:!!response?.data?.user_id,message:response?.message,status:response?.status,responseKeys:response?.data?Object.keys(response.data):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      
+      console.log('[AuthService] Registration response:', {
+        success: response?.success,
+        hasToken: !!response?.data?.token,
+        hasUser: !!response?.data?.user,
+        hasUserId: !!response?.data?.user_id,
+        message: response?.message,
+      });
+      return response;
+    } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.service.ts:85',message:'authService.register - API error caught',data:{status:error?.status,message:error?.message,hasResponse:!!error?.response,responseStatus:error?.response?.status,responseData:error?.response?.data,networkError:!error?.response},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      console.error('[AuthService] Registration API error:', {
+        status: error.status,
+        message: error.message,
+        error: error.error,
+      });
+      throw error;
+    }
   },
 
   // Login
@@ -359,6 +403,50 @@ export const authService = {
       await AsyncStorage.removeItem('@auth_token');
       await AsyncStorage.removeItem('@propertyapp_user');
       await AsyncStorage.removeItem('@refresh_token');
+    }
+  },
+
+  // Switch role between buyer and seller
+  // Endpoint: POST /api/auth/switch-role.php
+  // Request: { "targetRole": "buyer" | "seller" }
+  // Response: { "token": "...", "user": {...} }
+  // Note: Agents cannot switch roles (backend will return 403)
+  switchRole: async (targetRole: 'buyer' | 'seller') => {
+    try {
+      console.log('[AuthService] Switching role to:', targetRole);
+      
+      const response = await api.post(API_ENDPOINTS.SWITCH_ROLE, {
+        targetRole,
+      });
+      
+      console.log('[AuthService] Role switch response:', {
+        success: response?.success,
+        hasToken: !!response?.data?.token,
+        hasUser: !!response?.data?.user,
+      });
+      
+      // If successful, update token and user data
+      if (response && response.success && response.data?.token) {
+        await AsyncStorage.setItem('@auth_token', response.data.token);
+        if (response.data.user) {
+          await AsyncStorage.setItem(
+            '@propertyapp_user',
+            JSON.stringify(response.data.user),
+          );
+        }
+      }
+      
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Error switching role:', error);
+      
+      // Handle 403 errors - Agent cannot switch
+      if (error.status === 403) {
+        const errorMessage = error.message || 'Agents cannot switch roles.';
+        throw new Error(errorMessage);
+      }
+      
+      throw error;
     }
   },
 };

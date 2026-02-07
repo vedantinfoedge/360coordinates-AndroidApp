@@ -102,6 +102,34 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     loadPropertyDetails();
   }, [route.params.propertyId]);
 
+  // Record view when property details screen loads
+  // IMPORTANT: Backend handles unique user views - each user counts as 1 view per property
+  // even if they click "View Details" multiple times. User 'A' clicking 10 times = 1 view count.
+  useEffect(() => {
+    const recordPropertyView = async () => {
+      if (!user?.id || !route.params.propertyId) {
+        return; // Only record views for logged-in users
+      }
+
+      try {
+        // Record view interaction - backend ensures unique user views (one count per user per property)
+        // If user 'A' clicks "View Details" multiple times, backend counts it as 1 view only
+        await buyerService.recordInteraction(route.params.propertyId, 'view');
+        console.log('[PropertyDetails] View recorded for property:', route.params.propertyId, 'by user:', user.id);
+      } catch (error) {
+        // Silently fail - view tracking is not critical for app functionality
+        console.warn('[PropertyDetails] Failed to record view:', error);
+      }
+    };
+
+    // Record view after a short delay to ensure user actually viewed the page
+    const timer = setTimeout(() => {
+      recordPropertyView();
+    }, 1000); // 1 second delay to ensure user actually viewed the page
+
+    return () => clearTimeout(timer);
+  }, [route.params.propertyId, user?.id]);
+
   useEffect(() => {
     initializeInteractionState();
   }, []);

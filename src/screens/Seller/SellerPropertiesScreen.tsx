@@ -86,7 +86,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         
         if (limit > 0 && currentCount >= limit) {
           CustomAlert.alert(
-            'Property Limit Reached',
+            'Property limit reached',
             `Property limit reached. You can list up to ${limit} properties in your current plan.`,
             [{text: 'OK'}]
           );
@@ -97,7 +97,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         const defaultLimit = 3;
         if (allProperties.length >= defaultLimit) {
           CustomAlert.alert(
-            'Property Limit Reached',
+            'Property limit reached',
             `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
             [{text: 'OK'}]
           );
@@ -112,7 +112,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         const defaultLimit = 3;
         if (allProperties.length >= defaultLimit) {
           CustomAlert.alert(
-            'Property Limit Reached',
+            'Property limit reached',
             `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
             [{text: 'OK'}]
           );
@@ -125,7 +125,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       const defaultLimit = 3;
       if (allProperties.length >= defaultLimit) {
         CustomAlert.alert(
-          'Property Limit Reached',
+          'Property limit reached',
           `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
           [{text: 'OK'}]
         );

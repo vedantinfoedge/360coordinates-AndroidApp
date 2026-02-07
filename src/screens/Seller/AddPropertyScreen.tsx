@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Modal,
   Image,
   Platform,
   PermissionsAndroid,
@@ -150,7 +149,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           
           if (limit > 0 && currentCount >= limit) {
             Alert.alert(
-              'Property Limit Reached',
+              'Property limit reached',
               `Property limit reached. You can list up to ${limit} properties in your current plan.`,
               [{text: 'OK', onPress: () => navigation.goBack()}],
               {cancelable: false}
@@ -648,7 +647,124 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Collect valid images (approved or pending)
+      if (isEditMode && propertyId) {
+        // EDIT MODE: Update existing property via PUT /api/seller/properties/update.php
+        console.log('[AddProperty] Editing property ID:', propertyId);
+
+        // Collect existing image URLs (preserve URLs, filter blob/file)
+        const existingImageUrls = photos
+          .filter(p => p.imageUrl && !p.uri.startsWith('blob:') && !p.uri.startsWith('file:'))
+          .map(p => p.imageUrl!)
+          .filter((url): url is string => !!url && !url.startsWith('blob:'));
+
+        // New images (base64 or uploaded via moderation)
+        const newImages = photos.filter(p =>
+          p.base64 || (p.imageUrl && (p.uri.startsWith('file:') || p.uri.startsWith('blob:')))
+        );
+        const newImageBase64 = newImages
+          .map(p => {
+            if (p.base64) {
+              let base64 = p.base64.trim();
+              if (base64.startsWith('data:image/')) {
+                if (!base64.includes(';base64,')) return null;
+                return base64;
+              }
+              return `data:image/jpeg;base64,${base64}`;
+            }
+            return null;
+          })
+          .filter((base64): base64 is string => base64 !== null && base64 !== '');
+
+        const allImages = [...existingImageUrls, ...newImageBase64];
+
+        if (allImages.length === 0 && photos.length > 0) {
+          Alert.alert(
+            'No Valid Images',
+            'Please wait for images to be processed or upload new images.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
+        const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
+        if (checkingImages.length > 0) {
+          Alert.alert(
+            'Images Still Validating',
+            'Please wait for all images to be validated before submitting.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Build update data based on 24-hour restriction
+        // Allowed after 24h: title, price, price_negotiable, maintenance_charges, deposit_amount
+        // Restricted: location, latitude, longitude, state, additional_address, and all other fields
+        const updateData: any = {};
+        updateData.title = propertyTitle.trim();
+        updateData.price = parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0;
+        updateData.price_negotiable = priceNegotiable;
+        updateData.maintenance_charges = maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null;
+        if (propertyStatus === 'rent' && depositAmount) {
+          updateData.deposit_amount = parseFloat(depositAmount.replace(/[^0-9.]/g, '')) || null;
+        }
+        if (
+          propertyStatus === 'rent' &&
+          (propertyType === 'Apartment' || propertyType === 'PG / Hostel' || propertyType === 'Studio Apartment')
+        ) {
+          updateData.available_for_bachelors = availableForBachelors;
+        }
+
+        if (!isLimitedEdit) {
+          updateData.status = propertyStatus;
+          updateData.property_type = propertyType;
+          updateData.location = location.trim();
+          updateData.state = state.trim() || null;
+          updateData.additional_address = additionalAddress.trim() || null;
+          updateData.latitude = latitude || null;
+          updateData.longitude = longitude || null;
+          updateData.bedrooms = bedrooms?.toString() ?? (propertyType === 'Studio Apartment' ? '0' : null);
+          updateData.bathrooms = bathrooms?.toString() ?? null;
+          updateData.balconies = balconies?.toString() ?? null;
+          updateData.area = parseFloat(builtUpArea) || 0;
+          updateData.carpet_area = carpetArea ? parseFloat(carpetArea) : null;
+          updateData.floor = floor.trim() || null;
+          updateData.total_floors = totalFloors ? parseInt(totalFloors) : null;
+          updateData.facing = facing || null;
+          updateData.age = propertyAge || null;
+          updateData.furnishing = furnishing || null;
+          updateData.description = description.trim();
+          updateData.amenities = selectedAmenities;
+        }
+
+        if (!isLimitedEdit && allImages.length > 0) {
+          updateData.images = allImages;
+        }
+
+        console.log('[AddProperty] Updating property via seller/properties/update.php', {
+          ...updateData,
+          images: updateData.images ? `[${updateData.images.length} images]` : 'not sent',
+        });
+
+        const response: any = await sellerService.updateProperty(propertyId, updateData);
+
+        if (response && response.success) {
+          Alert.alert(
+            'Success',
+            'Property updated successfully!',
+            [{text: 'OK', onPress: () => navigation.goBack()}]
+          );
+        } else {
+          const errorMessage =
+            response?.message || response?.data?.message || response?.error?.message || 'Failed to update property';
+          showError('Error', errorMessage);
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
+      // CREATE MODE: Collect valid images (approved or pending)
       // Support both Firebase URLs and base64 data
       const validImages = photos.filter(
         p => {
@@ -867,14 +983,43 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           [{text: 'Got it!', onPress: () => navigation.goBack()}]
         );
       } else {
-        const errorMessage = response?.message || response?.error?.message || 'Failed to create property';
+        let errorMessage = 'Failed to create property';
+        // Check multiple possible error message locations
+        if (response?.message) {
+          errorMessage = response.message;
+        } else if (response?.error) {
+          if (typeof response.error === 'string') {
+            errorMessage = response.error;
+          } else if (response.error?.message) {
+            errorMessage = response.error.message;
+          }
+        } else if (response?.data?.message) {
+          errorMessage = response.data.message;
+        } else if (response?.data?.error) {
+          errorMessage = typeof response.data.error === 'string' ? response.data.error : response.data.error?.message || errorMessage;
+        } else if (typeof response === 'string') {
+          errorMessage = response;
+        }
         console.error('[AddProperty] Property creation failed:', errorMessage);
         console.error('[AddProperty] Full error response:', JSON.stringify(response, null, 2));
-        showError('Error', errorMessage);
+        Alert.alert('Error', errorMessage, [{text: 'OK'}]);
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      showError('Error', error.response?.data?.message || 'Failed to create property. Please try again.');
+      let errorMessage = 'Failed to create property. Please try again.';
+      // Check multiple possible error message locations
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.error) {
+        errorMessage = typeof error.response.data.error === 'string' ? error.response.data.error : error.response.data.error?.message || errorMessage;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = typeof error.error === 'string' ? error.error : error.error?.message || errorMessage;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      Alert.alert('Error', errorMessage, [{text: 'OK'}]);
     } finally {
       setIsSubmitting(false);
     }
@@ -907,7 +1052,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., Spacious 3BHK Apartment with Sea View"
+                placeholder="e.g., 3BHK Apartment with Sea View"
                 placeholderTextColor={colors.textSecondary}
                 value={propertyTitle}
                 onChangeText={setPropertyTitle}
@@ -924,6 +1069,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.typeButton}
                   onPress={() => setPropertyStatus('sale')}>
                   {propertyStatus === 'sale' ? (
+                    // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
                       colors={['#0077C0', '#005A94']}
                       start={{x: 0, y: 0}}
@@ -944,6 +1090,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.typeButton}
                   onPress={() => setPropertyStatus('rent')}>
                   {propertyStatus === 'rent' ? (
+                    // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
                       colors={['#0077C0', '#005A94']}
                       start={{x: 0, y: 0}}
@@ -1080,6 +1227,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <TouchableOpacity 
                   style={styles.mapButton}
                   onPress={() => setLocationPickerVisible(true)}>
+                  {/* @ts-expect-error - LinearGradient works but TypeScript types are incorrect */}
                   <LinearGradient
                     colors={['#0077C0', '#005A94']}
                     start={{x: 0, y: 0}}
@@ -1326,7 +1474,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="e.g., 5"
                   placeholderTextColor={colors.textSecondary}
                   value={floor}
-                  onChangeText={(text) => setFloor(text.replace(/[^0-9]/g, ''))}
+                  onChangeText={(text: string) => setFloor(text.replace(/[^0-9]/g, ''))}
                   keyboardType="number-pad"
                 />
               </View>
@@ -1340,7 +1488,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Total floors in building"
                   placeholderTextColor={colors.textSecondary}
                   value={totalFloors}
-                  onChangeText={(text) => setTotalFloors(text.replace(/[^0-9]/g, ''))}
+                  onChangeText={(text: string) => setTotalFloors(text.replace(/[^0-9]/g, ''))}
                   keyboardType="number-pad"
                 />
               </View>
@@ -1669,36 +1817,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   // Show loading while checking property limit or loading property data
   if (checkingLimit || loadingProperty) {
     return (
-      <Modal
-        visible={true}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={handleClose}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <SafeAreaView style={styles.safeArea}>
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>
-                  {loadingProperty ? 'Loading property details...' : 'Checking property limit...'}
-                </Text>
-              </View>
-            </SafeAreaView>
+      <View style={styles.screenContainer}>
+        <SafeAreaView edges={['top', 'bottom', 'left', 'right']}>
+          <View style={[styles.safeArea, styles.loadingContainer]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>
+              {loadingProperty ? 'Loading property details...' : 'Checking property limit...'}
+            </Text>
           </View>
-        </View>
-      </Modal>
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <Modal
-      visible={true}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <SafeAreaView style={styles.safeArea}>
+    <View style={styles.screenContainer}>
+      <SafeAreaView edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.safeArea}>
             {/* Restricted edit banner for older listings */}
             {isEditMode && isLimitedEdit && (
               <View style={styles.limitedBanner}>
@@ -1761,7 +1896,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             <ScrollView
               style={styles.content}
               contentContainerStyle={styles.contentContainer}
-              showsVerticalScrollIndicator={false}>
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled">
               {renderStepContent()}
             </ScrollView>
 
@@ -1781,6 +1917,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 onPress={handleNext}
                 disabled={isSubmitting}>
                 {currentStep === totalSteps ? (
+                  // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                   <LinearGradient
                     colors={isSubmitting ? ['#CCCCCC', '#999999'] : ['#43A047', '#2E7D32']}
                     start={{x: 0, y: 0}}
@@ -1792,6 +1929,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     </Text>
                   </LinearGradient>
                 ) : (
+                  // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                   <LinearGradient
                     colors={['#0077C0', '#005A94']}
                     start={{x: 0, y: 0}}
@@ -1803,36 +1941,16 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 )}
               </TouchableOpacity>
             </View>
-          </SafeAreaView>
-        </View>
-      </View>
-    </Modal>
+            </View>
+        </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  screenContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-    elevation: 1000,
-  },
-  modalContainer: {
-    width: '95%',
-    maxWidth: 600,
-    height: '92%',
-    backgroundColor: '#FAFAFA', // Clean off-white
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 10,
-    zIndex: 1001,
-    elevation: 1001,
+    backgroundColor: '#FAFAFA',
   },
   safeArea: {
     flex: 1,
@@ -1940,12 +2058,13 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   stepContent: {
-    flex: 1,
     backgroundColor: colors.surface,
     borderRadius: 16,
     padding: spacing.lg,
+    marginBottom: spacing.lg,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.06,
@@ -2032,24 +2151,32 @@ const styles = StyleSheet.create({
   typeButtonsContainer: {
     flexDirection: 'row',
     gap: spacing.md,
+    minHeight: 60,
   },
   typeButton: {
     flex: 1,
+    minHeight: 48,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
   },
   typeButtonGradient: {
+    flex: 1,
+    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
+    minHeight: 48,
     gap: spacing.xs,
   },
   typeButtonUnselected: {
+    flex: 1,
+    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
+    minHeight: 48,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -2459,7 +2586,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 4,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md + 4,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',

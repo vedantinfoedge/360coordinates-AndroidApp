@@ -63,6 +63,12 @@ api.interceptors.response.use(
     return data;
   },
   async error => {
+    // #region agent log
+    if (error.config?.url?.includes('register.php')) {
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:65',message:'API interceptor - registration error',data:{status:error.response?.status,statusText:error.response?.statusText,message:error.message,url:error.config?.url,method:error.config?.method,hasResponse:!!error.response,hasRequest:!!error.request,networkError:!error.response&&!!error.request},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    }
+    // #endregion
+    
     // Log error with detailed information
     const errorDetails = {
       status: error.response?.status,
@@ -213,13 +219,21 @@ api.interceptors.response.use(
       errorMessage = error.message;
     }
 
-    return Promise.reject({
+    const rejectedError = {
       success: false,
       message: errorMessage,
       error: errorData,
       status: error.response?.status,
       response: error.response,
-    });
+    };
+    
+    // #region agent log
+    if (error.config?.url?.includes('register.php')) {
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:216',message:'API interceptor - formatted error to reject',data:{status:rejectedError.status,message:rejectedError.message,hasError:!!rejectedError.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    }
+    // #endregion
+    
+    return Promise.reject(rejectedError);
   },
 );
 

@@ -206,4 +206,29 @@ export const buyerService = {
     });
     return response;
   },
+
+  // Add to buyer history (buyer-only)
+  // Action types: 'viewed_owner_details', 'chat_with_owner'
+  // Upgrade logic: viewed_owner_details → chat_with_owner (no downgrade)
+  addHistory: async (
+    propertyId: number | string,
+    actionType: 'viewed_owner_details' | 'chat_with_owner',
+  ) => {
+    const response = await api.post(API_ENDPOINTS.BUYER_HISTORY_ADD, {
+      property_id: propertyId,
+      action_type: actionType,
+    });
+    return response;
+  },
+
+  // Get buyer history list (buyer-only)
+  getHistory: async (params?: {
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get(API_ENDPOINTS.BUYER_HISTORY_LIST, {
+      params,
+    });
+    return response;
+  },
 };

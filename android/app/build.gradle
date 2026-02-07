@@ -89,7 +89,7 @@ android {
         applicationId "Indiapropertys.com"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
+        versionCode 8
         versionName "1.5"
     }
     
@@ -105,7 +105,9 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file(keystoreProperties['storeFile'] ?: 'release.keystore')
+            // Use explicit path to ensure keystore is found
+            def keystoreFile = keystoreProperties['storeFile'] ?: 'release.keystore'
+            storeFile file(keystoreFile)
             storePassword keystoreProperties['storePassword'] ?: ''
             keyAlias keystoreProperties['keyAlias'] ?: ''
             keyPassword keystoreProperties['keyPassword'] ?: ''
@@ -142,13 +144,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.firebase:firebase-firestore'
     implementation 'com.google.firebase:firebase-messaging'
-    
-    // Add other Firebase products as needed:
-    // https://firebase.google.com/docs/android/setup#available-libraries
-    // implementation 'com.google.firebase:firebase-auth'
-    // Note: Firebase Storage is handled by @react-native-firebase/storage package
-    // No need to add it here as React Native Firebase manages native dependencies
-    // implementation 'com.google.firebase:firebase-storage'
+    implementation 'com.google.firebase:firebase-storage' // Required for @react-native-firebase/storage
 }
 
 // Google services Gradle plugin (for Firebase) - must be at the BOTTOM of the file

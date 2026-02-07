@@ -55,7 +55,20 @@ export const uploadPropertyImageWithModeration = async (
     let firebasePath: string | null = null;
 
     try {
-      console.log('[ImageUpload] Step 1: Uploading to Firebase Storage...');
+      console.log('[ImageUpload] Step 1: Uploading to Firebase Storage...', {
+        imageUri: imageUri.substring(0, 50),
+        userId,
+        propertyId,
+      });
+      
+      // Check Firebase Storage availability first
+      const {isFirebaseStorageAvailable} = await import('./firebaseStorageProperty.service');
+      if (!isFirebaseStorageAvailable()) {
+        const errorMsg = 'Firebase Storage is not available. Please rebuild the app: cd android && ./gradlew clean && cd .. && npm run android';
+        console.error('[ImageUpload] ❌', errorMsg);
+        throw new Error(errorMsg);
+      }
+      
       const firebaseResult = await uploadPropertyImageToFirebase(
         imageUri,
         userId,
@@ -64,10 +77,17 @@ export const uploadPropertyImageWithModeration = async (
       );
       firebaseUrl = firebaseResult.url;
       firebasePath = firebaseResult.path;
-      console.log('[ImageUpload] Image uploaded to Firebase:', firebaseUrl);
+      console.log('[ImageUpload] ✅ Image uploaded to Firebase:', {
+        url: firebaseUrl.substring(0, 80),
+        path: firebasePath,
+      });
     } catch (firebaseError: any) {
-      console.error('[ImageUpload] Firebase upload failed:', firebaseError);
-      throw new Error(`Firebase upload failed: ${firebaseError.message}`);
+      console.error('[ImageUpload] ❌ Firebase upload failed:', {
+        message: firebaseError.message,
+        code: firebaseError.code,
+        stack: firebaseError.stack,
+      });
+      throw new Error(`Firebase upload failed: ${firebaseError.message || 'Unknown error'}`);
     }
 
     // Step 2: Send Firebase URL to backend for moderation

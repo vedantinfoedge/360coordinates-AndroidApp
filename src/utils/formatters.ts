@@ -114,5 +114,48 @@ export const formatters = {
       return 0;
     }
   },
+  
+  // Parse MySQL DATETIME format: "YYYY-MM-DD HH:MM:SS"
+  parseMySQLDateTime: (dateString: string): Date | null => {
+    try {
+      if (!dateString) return null;
+      // MySQL DATETIME format: "YYYY-MM-DD HH:MM:SS"
+      // Convert to ISO format: "YYYY-MM-DDTHH:MM:SSZ"
+      const mysqlDateTime = dateString.replace(' ', 'T') + 'Z';
+      return new Date(mysqlDateTime);
+    } catch (error) {
+      console.error('Error parsing MySQL DATETIME:', error);
+      return null;
+    }
+  },
+  
+  // Normalize phone number: extract digits only
+  normalizePhoneNumber: (phone: string): string => {
+    if (!phone) return '';
+    // Extract digits only
+    return phone.replace(/\D/g, '');
+  },
+  
+  // Validate phone number: 10-15 digits
+  validatePhoneNumber: (phone: string): boolean => {
+    const normalized = formatters.normalizePhoneNumber(phone);
+    return normalized.length >= 10 && normalized.length <= 15;
+  },
+  
+  // Validate website URL format
+  validateWebsiteUrl: (url: string): boolean => {
+    if (!url || !url.trim()) return true; // Optional field
+    try {
+      // Add protocol if missing
+      let urlToValidate = url.trim();
+      if (!urlToValidate.match(/^https?:\/\//i)) {
+        urlToValidate = 'https://' + urlToValidate;
+      }
+      new URL(urlToValidate);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  },
 };
 

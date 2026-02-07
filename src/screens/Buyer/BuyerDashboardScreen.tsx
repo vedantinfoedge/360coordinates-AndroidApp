@@ -60,7 +60,8 @@ const TOP_CITIES: TopCity[] = [
 type ListingType = 'all' | 'sale' | 'rent' | 'pg';
 
 const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, isAuthenticated} = useAuth();
+  const {user, logout, isAuthenticated, switchRole} = useAuth();
+  const [switchingRole, setSwitchingRole] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
@@ -521,13 +522,27 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           (navigation as any).navigate('Auth', {screen: 'Register'});
         }}
         onAddPropertyPress={isLoggedIn ? async () => {
-          // Set dashboard preference and navigate to Seller dashboard
-          await AsyncStorage.setItem('@target_dashboard', 'seller');
-          await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
-          (navigation as any).reset({
-            index: 0,
-            routes: [{name: 'Seller'}],
-          });
+          // Switch role to seller and navigate to Seller dashboard
+          if (switchingRole) return; // Prevent multiple clicks
+          
+          try {
+            setSwitchingRole(true);
+            await switchRole('seller');
+            
+            // Navigate to Seller dashboard after successful role switch
+            (navigation as any).reset({
+              index: 0,
+              routes: [{name: 'Seller'}],
+            });
+          } catch (error: any) {
+            console.error('[BuyerDashboard] Error switching role:', error);
+            CustomAlert.alert(
+              'Role Switch Failed',
+              error?.message || 'Failed to switch to seller dashboard. Please try again.',
+            );
+          } finally {
+            setSwitchingRole(false);
+          }
         } : undefined}
         showProfile={isLoggedIn}
         showLogout={isLoggedIn}

@@ -388,6 +388,9 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleRegister = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RegisterScreen.tsx:390',message:'handleRegister entry',data:{hasName:!!name,hasEmail:!!email,hasPhone:!!phone,hasPassword:!!password,hasConfirmPassword:!!confirmPassword,selectedRole,phoneVerified,hasPhoneToken:!!phoneToken,hasPhoneMsg91Token:!!phoneMsg91Token,hasVerifiedOtp:!!verifiedOtp,phoneMethod},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     if (!name || !email || !phone || !password || !confirmPassword) {
       CustomAlert.alert('Error', 'Please fill all fields');
       return;
@@ -467,14 +470,37 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       const phoneDigits = phone.replace(/\D/g, '');
       const formattedPhone = phoneDigits.length === 10 ? '+91' + phoneDigits : '+91' + phoneDigits.slice(-10);
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RegisterScreen.tsx:468',message:'Before API call - request data prepared',data:{fullName:trimmedName,email,phone:formattedPhone,userType:selectedRole,hasPhoneToken:!!phoneVerificationTokenToSend,hasPhoneOtp:!!phoneOtpToSend,phoneVerified:phoneVerifiedFlagToSend,phoneVerificationMethod:phoneVerificationMethodToSend},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+
+      console.log('[RegisterScreen] Sending registration request:', {
+        fullName: trimmedName,
+        email,
+        phone: formattedPhone,
+        userType: selectedRole,
+        hasPhoneToken: !!phoneVerificationTokenToSend,
+        hasPhoneOtp: !!phoneOtpToSend,
+        phoneVerified: phoneVerifiedFlagToSend,
+      });
+
       const response = await register(
         trimmedName, email, formattedPhone, password, selectedRole,
         undefined, phoneVerificationTokenToSend, phoneOtpToSend,
         phoneVerificationMethodToSend, phoneVerifiedFlagToSend,
       );
       
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RegisterScreen.tsx:486',message:'After register() call - response received',data:{success:response?.success,hasToken:!!response?.data?.token,hasUser:!!response?.data?.user,hasUserId:!!response?.data?.user_id,message:response?.message,status:response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      
+      console.log('[RegisterScreen] Registration response:', JSON.stringify(response, null, 2));
+      
       if (response?.success) {
         if (response.data?.token && response.data?.user) {
+          // Auto-login flow: Backend returns token and user directly
+          console.log('[RegisterScreen] Auto-login flow: Token and user received');
+          
           // Set the dashboard preference based on selected role
           const dashboardMap: Record<string, string> = {
             'buyer': 'buyer',
@@ -514,6 +540,9 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
             },
           ]);
         } else if (response.data?.user_id) {
+          // OTP verification flow: Backend returns user_id, need to verify OTP
+          console.log('[RegisterScreen] OTP verification flow: user_id received:', response.data.user_id);
+          
           const formattedPhoneForNav = '91' + phone.replace(/\D/g, '').slice(-10);
           (navigation as any).navigate('OTPVerification', {
             userId: response.data.user_id,
@@ -528,10 +557,72 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
               selectedRole: selectedRole,
             },
           });
+        } else {
+          // Unexpected response structure - log and show error
+          console.error('[RegisterScreen] Unexpected response structure:', {
+            success: response.success,
+            hasToken: !!response.data?.token,
+            hasUser: !!response.data?.user,
+            hasUserId: !!response.data?.user_id,
+            dataKeys: response.data ? Object.keys(response.data) : [],
+            fullResponse: response,
+          });
+          
+          CustomAlert.alert(
+            'Registration Issue',
+            'Registration completed but received unexpected response. Please try logging in or contact support.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.navigate('Login');
+                },
+              },
+            ]
+          );
         }
+      } else {
+        // Registration failed - response.success is false
+        const errorMessage = response?.message || response?.error || 'Registration failed. Please try again.';
+        console.error('[RegisterScreen] Registration failed:', {
+          success: response?.success,
+          message: response?.message,
+          error: response?.error,
+          status: response?.status,
+        });
+        
+        CustomAlert.alert('Registration Failed', errorMessage);
       }
     } catch (error: any) {
-      CustomAlert.alert('Error', error.message || 'Registration failed.');
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RegisterScreen.tsx:533',message:'Catch block - error caught',data:{message:error?.message,status:error?.status,errorType:error?.constructor?.name,hasError:!!error?.error,errorMessage:error?.error?.message,networkError:!error?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      console.error('[RegisterScreen] Registration error caught:', {
+        message: error.message,
+        status: error.status,
+        error: error.error,
+        fullError: error,
+      });
+      
+      // Extract better error message
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.error?.message) {
+        errorMessage = error.error.message;
+      } else if (typeof error.error === 'string') {
+        errorMessage = error.error;
+      } else if (error.status === 400) {
+        errorMessage = 'Invalid registration data. Please check all fields and try again.';
+      } else if (error.status === 409) {
+        errorMessage = 'An account with this email or phone already exists. Please login instead.';
+      } else if (error.status === 500) {
+        errorMessage = 'Server error. Please try again in a few moments.';
+      }
+      
+      CustomAlert.alert('Registration Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
