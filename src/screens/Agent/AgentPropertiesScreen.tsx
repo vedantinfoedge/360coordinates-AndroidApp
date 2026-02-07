@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {verticalScale} from '../../utils/responsive';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
 import {sellerService} from '../../services/seller.service';
@@ -48,8 +50,11 @@ interface Property {
   date_created?: string;
 }
 
+const HEADER_HEIGHT = verticalScale(64);
+
 const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
+  const insets = useSafeAreaInsets();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -441,7 +446,10 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
         data={properties}
         renderItem={renderProperty}
         keyExtractor={item => String(item.id)}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          {paddingTop: insets.top + HEADER_HEIGHT + spacing.md},
+        ]}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -492,7 +500,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   listContent: {
-    paddingTop: spacing.md,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.xl,
   },
