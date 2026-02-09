@@ -11,7 +11,8 @@
     "start:reset": "react-native start --reset-cache",
     "test": "jest",
     "distribute:debug": "node scripts/distribute-apk-debug.js",
-    "android:bundle": "cd android && ./gradlew bundleRelease"
+    "android:bundle": "cd android && ./gradlew bundleRelease",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@msg91comm/sendotp-react-native": "^1.0.0",
@@ -42,6 +43,7 @@
     "react-native-webview": "^13.16.0"
   },
   "devDependencies": {
+    "patch-package": "^8.0.0",
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
