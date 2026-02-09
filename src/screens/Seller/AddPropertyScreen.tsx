@@ -1,4 +1,4 @@
-import React, {useState, useMemo, useEffect} from 'react';
+import React, {useState, useMemo, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,27 +13,30 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, RouteProp} from '@react-navigation/native';
-import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
+import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
-import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
 import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {sellerService} from '../../services/seller.service';
 import {uploadPropertyImageWithModeration} from '../../services/imageUpload.service';
+import {formatters} from '../../utils/formatters';
 import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
-import {useAuth} from '../../context/AuthContext';
 import {isFirebaseStorageAvailable} from '../../services/firebaseStorageProperty.service';
+import {useAuth} from '../../context/AuthContext';
+import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
-import LocationPicker from '../../components/map/LocationPicker';
 import {extractStateFromContext} from '../../utils/geocoding';
+import CustomAlert from '../../utils/alertHelper';
 import {
   GuidePropertyType,
   getPropertyTypeConfig,
@@ -41,36 +44,36 @@ import {
   PROPERTY_TYPES,
   AMENITIES_LIST,
 } from '../../utils/propertyTypeConfig';
-import {validation} from '../../utils/validation';
-import {formatters} from '../../utils/formatters';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
-
-type AddPropertyScreenNavigationProp = CompositeNavigationProp<
-  NativeStackNavigationProp<SellerStackParamList, 'AddProperty'>,
-  NativeStackNavigationProp<RootStackParamList>
+type AddPropertyScreenNavigationProp = NativeStackNavigationProp<
+  SellerStackParamList,
+  'AddProperty'
 >;
 
 type Props = {
   navigation: AddPropertyScreenNavigationProp;
 };
 
-type PropertyStatus = 'sale' | 'rent';
+type PropertyStatus = 'sell' | 'rent';
 
 const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
-  const {user} = useAuth(); // Get user for userId
+  const {user} = useAuth();
   const route = useRoute<RouteProp<SellerStackParamList, 'AddProperty'>>();
   const routeParams = (route.params as any) || {};
   const isEditMode = !!routeParams.propertyId;
   const isLimitedEdit = !!routeParams.isLimitedEdit;
   const propertyId = routeParams.propertyId;
+  const createdAt = routeParams.createdAt;
+  const [loadingProperty, setLoadingProperty] = useState(isEditMode);
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [propertyTitle, setPropertyTitle] = useState('');
-  const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sale');
+  const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sell');
   const [propertyType, setPropertyType] = useState<GuidePropertyType | ''>('');
   const [location, setLocation] = useState('');
-  const [locationSelected, setLocationSelected] = useState(false); // Track if location was selected from autosuggest
+  const [locationSelected, setLocationSelected] = useState(false);
   const [state, setState] = useState('');
+  const stateAutoFilledFromLocation = useRef(false);
   const [additionalAddress, setAdditionalAddress] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -87,163 +90,29 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [furnishing, setFurnishing] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<
-    Array<{
-      uri: string;
-      // NOTE: base64 is no longer sent to backend; kept only to avoid crashes
-      base64?: string;
-      moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking';
-      moderationReason?: string;
-      imageUrl?: string; // final URL from moderation/upload API
-    }>
-  >([]);
+  const [photos, setPhotos] = useState<Array<{uri: string; base64?: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
   const [expectedPrice, setExpectedPrice] = useState('');
   const [priceNegotiable, setPriceNegotiable] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [maintenance, setMaintenance] = useState('');
   const [availableForBachelors, setAvailableForBachelors] = useState(false);
-  const [checkingLimit, setCheckingLimit] = useState(true);
-  const [loadingProperty, setLoadingProperty] = useState(isEditMode);
+  const stepScrollViewRef = useRef<{scrollTo: (opts: {y: number; animated?: boolean}) => void} | null>(null);
 
   const showError = (title: string, message: string) => {
     Alert.alert(title, message, [{text: 'OK'}]);
   };
 
+  // Format price for suggestion below input (e.g. 2000 → "2k", 1500000 → "15L", 15000000 → "1.5Cr")
+  const formatPriceShort = (raw: string): string | null => {
+    const n = parseFloat(raw.replace(/[^0-9.]/g, ''));
+    if (isNaN(n) || n <= 0) return null;
+    if (n >= 1e7) return (n / 1e7).toFixed(1).replace(/\.0$/, '') + 'Cr';
+    if (n >= 1e5) return (n / 1e5).toFixed(1).replace(/\.0$/, '') + 'L';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return null;
+  };
+
   const totalSteps = 5;
-
-  // Check property limit on screen load (only for new properties)
-  // According to backend: Sellers have limits based on subscription (free=3, basic=10, pro=10, premium=10)
-  // Agents have unlimited properties
-  useEffect(() => {
-    if (isEditMode) {
-      // Skip limit check for edit mode
-      setCheckingLimit(false);
-      return;
-    }
-
-    const checkLimit = async () => {
-      try {
-        setCheckingLimit(true);
-        
-        // Agents have unlimited properties - skip check
-        if (user?.user_type === 'agent') {
-          setCheckingLimit(false);
-          return;
-        }
-
-        const statsResponse: any = await sellerService.getDashboardStats();
-        if (statsResponse && statsResponse.success && statsResponse.data) {
-          const currentCount = statsResponse.data.total_properties || 0;
-          
-          // Get subscription plan type (defaults to 'free' if no subscription)
-          const planType = statsResponse.data.subscription?.plan_type || 'free';
-          
-          // Property limits based on subscription plan
-          const limits: {[key: string]: number} = {
-            'free': 3,
-            'basic': 10,
-            'pro': 10,
-            'premium': 10,
-          };
-          
-          const limit = limits[planType] || limits['free'];
-          
-          if (limit > 0 && currentCount >= limit) {
-            Alert.alert(
-              'Property limit reached',
-              `Property limit reached. You can list up to ${limit} properties in your current plan.`,
-              [{text: 'OK', onPress: () => navigation.goBack()}],
-              {cancelable: false}
-            );
-          }
-        }
-      } catch (error: any) {
-        // If dashboard stats endpoint doesn't exist (404), allow to continue
-        // The backend will enforce the limit when creating the property
-        if (error?.status !== 404 && error?.response?.status !== 404) {
-          console.warn('[AddProperty] Error checking property limit:', error);
-        }
-        // Allow to continue if check fails (including 404)
-      } finally {
-        setCheckingLimit(false);
-      }
-    };
-
-    checkLimit();
-  }, [navigation, isEditMode, user]);
-
-  // Load property data when in edit mode
-  useEffect(() => {
-    const loadPropertyData = async () => {
-      if (!isEditMode || !propertyId) {
-        setLoadingProperty(false);
-        return;
-      }
-
-      try {
-        setLoadingProperty(true);
-        const response: any = await propertyService.getPropertyDetails(propertyId);
-        
-        if (response && response.success && response.data) {
-          const propData = response.data.property || response.data;
-          
-          // Populate form fields
-          setPropertyTitle(propData.title || propData.property_title || '');
-          setPropertyStatus(propData.status === 'rent' ? 'rent' : 'sale');
-          setPropertyType(propData.property_type || '');
-          setLocation(propData.location || '');
-          setState(propData.state || '');
-          setAdditionalAddress(propData.additional_address || '');
-          setLatitude(propData.latitude || null);
-          setLongitude(propData.longitude || null);
-          setBedrooms(propData.bedrooms ? parseInt(String(propData.bedrooms)) : null);
-          setBathrooms(propData.bathrooms ? parseInt(String(propData.bathrooms)) : null);
-          setBalconies(propData.balconies ? parseInt(String(propData.balconies)) : null);
-          setBuiltUpArea(propData.area ? String(propData.area) : '');
-          setCarpetArea(propData.carpet_area ? String(propData.carpet_area) : '');
-          setFloor(propData.floor || '');
-          setTotalFloors(propData.total_floors ? String(propData.total_floors) : '');
-          setFacing(propData.facing || '');
-          setPropertyAge(propData.age || '');
-          setFurnishing(propData.furnishing || '');
-          setDescription(propData.description || '');
-          setExpectedPrice(propData.price ? String(propData.price) : '');
-          setPriceNegotiable(propData.price_negotiable || false);
-          setDepositAmount(propData.deposit_amount ? String(propData.deposit_amount) : '');
-          setMaintenance(propData.maintenance_charges ? String(propData.maintenance_charges) : '');
-          setAvailableForBachelors(propData.available_for_bachelors || false);
-          setSelectedAmenities(propData.amenities ? (Array.isArray(propData.amenities) ? propData.amenities : []) : []);
-          
-          // Load existing images
-          if (propData.images && Array.isArray(propData.images) && propData.images.length > 0) {
-            const existingImages = propData.images.map((imgUrl: string) => ({
-              uri: imgUrl,
-              imageUrl: imgUrl,
-              moderationStatus: 'APPROVED' as const,
-            }));
-            setPhotos(existingImages);
-          } else if (propData.cover_image) {
-            // Fallback to cover_image if images array is not available
-            const existingImages = [{
-              uri: propData.cover_image,
-              imageUrl: propData.cover_image,
-              moderationStatus: 'APPROVED' as const,
-            }];
-            setPhotos(existingImages);
-          }
-        } else {
-          Alert.alert('Error', 'Failed to load property details', [{text: 'OK', onPress: () => navigation.goBack()}]);
-        }
-      } catch (error: any) {
-        console.error('Error loading property:', error);
-        Alert.alert('Error', error.message || 'Failed to load property details', [{text: 'OK', onPress: () => navigation.goBack()}]);
-      } finally {
-        setLoadingProperty(false);
-      }
-    };
-
-    loadPropertyData();
-  }, [isEditMode, propertyId, navigation]);
   const steps = [
     {id: 1, name: 'Basic Info', icon: '📝'},
     {id: 2, name: 'Property Details', icon: '🏠'},
@@ -273,7 +142,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     return getPropertyTypeConfig(propertyType);
   }, [propertyType]);
 
-  // Get available amenities based on property type (using guide utility)
+  // Get available amenities based on property type
   const availableAmenities = useMemo(() => {
     if (!propertyType) return AMENITIES_LIST;
     const allowedAmenityIds = getAvailableAmenitiesForPropertyType(propertyType);
@@ -288,10 +157,104 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     );
   };
 
+  // Check if property is older than 24 hours
+  // Uses MySQL DATETIME format parser: "YYYY-MM-DD HH:MM:SS"
+  const isPropertyOlderThan24Hours = (createdAtDate?: string | Date): boolean => {
+    if (!createdAtDate) return false;
+    const now = new Date();
+    let created: Date;
+    
+    if (typeof createdAtDate === 'string') {
+      // Parse MySQL DATETIME format: "YYYY-MM-DD HH:MM:SS"
+      const parsed = formatters.parseMySQLDateTime(createdAtDate);
+      if (!parsed) return false;
+      created = parsed;
+    } else {
+      created = createdAtDate;
+    }
+    
+    const hoursSinceCreation = (now.getTime() - created.getTime()) / (1000 * 60 * 60);
+    return hoursSinceCreation >= 24;
+  };
+
+  // Check if a field can be edited based on 24-hour restriction
+  const canEditField = (fieldName: string): boolean => {
+    if (!isEditMode || !isLimitedEdit) return true;
+    
+    // After 24 hours, only these fields can be edited
+    const editableFields = ['title', 'price', 'priceNegotiable', 'maintenanceCharges', 'depositAmount'];
+    return editableFields.includes(fieldName);
+  };
+
+  // Load property data when in edit mode
+  useEffect(() => {
+    const loadPropertyData = async () => {
+      if (!isEditMode || !propertyId) {
+        setLoadingProperty(false);
+        return;
+      }
+
+      try {
+        setLoadingProperty(true);
+        const response: any = await propertyService.getPropertyDetails(propertyId);
+        
+        if (response && response.success && response.data) {
+          const propData = response.data.property || response.data;
+          
+          // Populate form fields
+          setPropertyTitle(propData.title || propData.property_title || '');
+          setPropertyStatus(propData.status === 'rent' ? 'rent' : 'sell');
+          setPropertyType(propData.property_type || '');
+          setLocation(propData.location || '');
+          setState(propData.state || '');
+          setAdditionalAddress(propData.additional_address || '');
+          setLatitude(propData.latitude || null);
+          setLongitude(propData.longitude || null);
+          setBedrooms(propData.bedrooms ? parseInt(propData.bedrooms) : null);
+          setBathrooms(propData.bathrooms ? parseInt(propData.bathrooms) : null);
+          setBalconies(propData.balconies ? parseInt(propData.balconies) : null);
+          setBuiltUpArea(propData.area ? String(propData.area) : '');
+          setCarpetArea(propData.carpet_area ? String(propData.carpet_area) : '');
+          setFloor(propData.floor || '');
+          setTotalFloors(propData.total_floors ? String(propData.total_floors) : '');
+          setFacing(propData.facing || '');
+          setPropertyAge(propData.age || '');
+          setFurnishing(propData.furnishing || '');
+          setDescription(propData.description || '');
+          setExpectedPrice(propData.price ? String(propData.price) : '');
+          setPriceNegotiable(propData.price_negotiable || false);
+          setDepositAmount(propData.deposit_amount ? String(propData.deposit_amount) : '');
+          setMaintenance(propData.maintenance_charges ? String(propData.maintenance_charges) : '');
+          setAvailableForBachelors(propData.available_for_bachelors || false);
+          setSelectedAmenities(propData.amenities ? (Array.isArray(propData.amenities) ? propData.amenities : []) : []);
+          
+          // Load existing images
+          if (propData.images && Array.isArray(propData.images) && propData.images.length > 0) {
+            const existingImages = propData.images.map((imgUrl: string) => ({
+              uri: imgUrl,
+              imageUrl: imgUrl,
+              moderationStatus: 'APPROVED' as const,
+            }));
+            setPhotos(existingImages);
+          }
+        } else {
+          Alert.alert('Error', 'Failed to load property details', [{text: 'OK', onPress: () => navigation.goBack()}]);
+        }
+      } catch (error: any) {
+        console.error('Error loading property:', error);
+        Alert.alert('Error', error.message || 'Failed to load property details', [{text: 'OK', onPress: () => navigation.goBack()}]);
+      } finally {
+        setLoadingProperty(false);
+      }
+    };
+
+    loadPropertyData();
+  }, [isEditMode, propertyId, navigation]);
+
   const requestCameraPermission = async () => {
     if (Platform.OS === 'android') {
       try {
-        const apiLevel = Platform.Version;
+        const apiLevel = Platform.Version as number;
         const permission = (apiLevel >= 33
           ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
           : (PermissionsAndroid.PERMISSIONS as any).READ_EXTERNAL_STORAGE) || PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES;
@@ -310,6 +273,32 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     }
     return true;
   };
+
+  const requestCameraCapturePermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA, {
+          title: 'Camera Permission',
+          message: 'App needs camera access to take property photos',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        });
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Request camera and gallery permissions when user enters Photos step so they're prompted once before tapping Take photo / Gallery
+  useEffect(() => {
+    if (currentStep !== 4) return;
+    requestCameraPermission().catch(() => {});
+    requestCameraCapturePermission().catch(() => {});
+  }, [currentStep]);
 
   const handleImagePicker = async () => {
     const hasPermission = await requestCameraPermission();
@@ -353,8 +342,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
         try {
         const newPhotos = assetsToAdd.map(asset => {
-          // Format base64 as data URI for backend compatibility
-          // Extract image type from URI if asset.type is not available
           let imageType = asset.type || 'jpeg';
           if (!asset.type && asset.uri) {
             const uriLower = asset.uri.toLowerCase();
@@ -363,10 +350,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             else if (uriLower.includes('.webp')) imageType = 'webp';
           }
           
-          // Ensure base64 doesn't already include data URI prefix
           let base64Data = asset.base64;
           if (base64Data && base64Data.includes('data:image/')) {
-            // Extract just the base64 part if it's already formatted
             const parts = base64Data.split(',');
             base64Data = parts.length > 1 ? parts[1] : base64Data;
           }
@@ -377,16 +362,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           
           return {
             uri: asset.uri || '',
-            base64: base64String, // Store base64 for sending to add.php
+            base64: base64String,
             moderationStatus: 'checking' as const,
             moderationReason: undefined,
-            imageUrl: undefined, // May be set by moderation API, but we'll use base64 for submission
+            imageUrl: undefined,
           };
         });
         
         const updatedPhotos = [...photos, ...newPhotos];
         setPhotos(updatedPhotos);
 
+        // Storage workflow: Device → Firebase Storage → backend receives URL for moderation only; images stored in Firebase
         const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
         const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
 
@@ -414,36 +400,19 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         } else {
           newPhotos.forEach((img, index) => {
             if (img.uri) {
-              console.log('[AddProperty] Firebase Storage flow: Device → Firebase → backend URL for moderation', {
-                imageIndex: index,
-                userId: user.id,
-                propertyId: isEditMode ? propertyId : null,
-              });
-              uploadPropertyImageWithModeration(
-                img.uri,
-                isEditMode ? propertyId : null,
-                user.id,
-                (progress) => {
-                  console.log(`[AddProperty] Upload progress ${index + 1}: ${Math.round(progress)}%`);
-                }
-              )
+              const uploadPropertyId = isEditMode && propertyId ? (typeof propertyId === 'string' ? propertyId : String(propertyId)) : null;
+              uploadPropertyImageWithModeration(img.uri, uploadPropertyId, user!.id)
                 .then(result => {
-                  console.log('[AddProperty] Firebase upload result:', {
-                    moderationStatus: result.moderationStatus,
-                    hasFirebaseUrl: !!result.firebaseUrl,
-                  });
                   setPhotos(prev => {
                     const updated = [...prev];
                     const imgIndex = prev.length - newPhotos.length + index;
                     if (updated[imgIndex]) {
                       const status = String(result.moderationStatus || '').toUpperCase();
-                      let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'checking';
+                      let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'REJECTED';
                       if (status === 'SAFE' || status === 'APPROVED') moderationStatus = 'APPROVED';
                       else if (status === 'REJECTED' || status === 'UNSAFE') moderationStatus = 'REJECTED';
-                      else if (status === 'PENDING' || status === 'NEEDS_REVIEW') moderationStatus = 'PENDING';
-                      else moderationStatus = 'PENDING';
+                      else moderationStatus = 'APPROVED';
                       const firebaseUrl = result.firebaseUrl || result.imageUrl || '';
-                      if (!firebaseUrl) console.error('[AddProperty] Firebase URL missing in result:', result);
                       updated[imgIndex] = {
                         ...updated[imgIndex],
                         moderationStatus,
@@ -454,17 +423,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     return updated;
                   });
                   if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
-                    Alert.alert(
-                      'Image Rejected',
-                      result.moderationReason || 'Image does not meet our guidelines. Please upload property images only.',
-                      [{text: 'OK'}]
-                    );
-                  } else if (result.moderationStatus === 'PENDING' || result.moderationStatus === 'NEEDS_REVIEW') {
-                    Alert.alert(
-                      'Image Under Review',
-                      'Your image is being reviewed and will be visible after approval.',
-                      [{text: 'OK'}]
-                    );
+                    Alert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines. Please upload property images only.', [{text: 'OK'}]);
                   }
                 })
                 .catch(error => {
@@ -500,30 +459,117 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     });
   };
 
+  const handleCameraCapture = async () => {
+    if (photos.length >= 10) {
+      showError('Limit Reached', 'You can upload maximum 10 photos');
+      return;
+    }
+    const hasPermission = await requestCameraCapturePermission();
+    if (!hasPermission) {
+      Alert.alert('Permission Denied', 'Please grant camera access in Settings to take photos.', [{text: 'OK'}]);
+      return;
+    }
+    const options = {
+      mediaType: 'photo' as MediaType,
+      quality: 0.6 as const,
+      includeBase64: true,
+      saveToPhotos: false,
+    };
+    launchCamera(options, (response: ImagePickerResponse) => {
+      if (response.didCancel) return;
+      if (response.errorCode) {
+        const msg = response.errorMessage || response.errorCode === 'camera_unavailable' ? 'Camera not available' : 'Failed to take photo';
+        Alert.alert('Error', msg, [{text: 'OK'}]);
+        return;
+      }
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        let imageType = asset.type || 'jpeg';
+        if (!asset.type && asset.uri) {
+          const uriLower = asset.uri.toLowerCase();
+          if (uriLower.includes('.png')) imageType = 'png';
+          else if (uriLower.includes('.jpg') || uriLower.includes('.jpeg')) imageType = 'jpeg';
+          else if (uriLower.includes('.webp')) imageType = 'webp';
+        }
+        let base64Data = asset.base64;
+        if (base64Data && base64Data.includes('data:image/')) {
+          const parts = base64Data.split(',');
+          base64Data = parts.length > 1 ? parts[1] : base64Data;
+        }
+        const base64String = base64Data ? `data:image/${imageType};base64,${base64Data}` : undefined;
+        const newPhoto = {
+          uri: asset.uri || '',
+          base64: base64String,
+          moderationStatus: 'checking' as const,
+          moderationReason: undefined,
+          imageUrl: undefined,
+        };
+        const newPhotos = [newPhoto];
+        const updatedPhotos = [...photos, ...newPhotos];
+        setPhotos(updatedPhotos);
+        const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
+        const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
+        if (!firebaseEnabled || !firebaseAvailable) {
+          const message = !user?.id ? 'You must be signed in to upload images.' : !firebaseAvailable ? 'Firebase Storage is not available.' : 'Firebase Storage is required.';
+          Alert.alert('Image Upload Unavailable', message, [{text: 'OK'}]);
+          setPhotos(prev => prev.map((p, i) => (i === prev.length - 1 ? { ...p, moderationStatus: 'REJECTED' as const, moderationReason: message } : p)));
+          return;
+        }
+        const imgIndex = updatedPhotos.length - 1;
+        const uploadPropertyId = isEditMode && propertyId ? String(propertyId) : null;
+        uploadPropertyImageWithModeration(asset.uri || '', uploadPropertyId, user!.id)
+          .then(result => {
+            setPhotos(prev => {
+              const updated = [...prev];
+              if (updated[imgIndex]) {
+                const status = String(result.moderationStatus || '').toUpperCase();
+                let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'REJECTED';
+                if (status === 'SAFE' || status === 'APPROVED') moderationStatus = 'APPROVED';
+                else if (status === 'REJECTED' || status === 'UNSAFE') moderationStatus = 'REJECTED';
+                else moderationStatus = 'APPROVED';
+                updated[imgIndex] = { ...updated[imgIndex], moderationStatus, moderationReason: result.moderationReason ?? undefined, imageUrl: result.firebaseUrl || result.imageUrl || '' };
+              }
+              return updated;
+            });
+            if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
+              Alert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.', [{text: 'OK'}]);
+            }
+          })
+          .catch(error => {
+            setPhotos(prev => {
+              const updated = [...prev];
+              if (updated[imgIndex]) updated[imgIndex] = { ...updated[imgIndex], moderationStatus: 'REJECTED' as const, moderationReason: error.message };
+              return updated;
+            });
+            Alert.alert('Upload Failed', error.message || 'Failed to upload image.', [{text: 'OK'}]);
+          });
+      }
+    });
+  };
+
   const handleNext = () => {
-    // Validation based on guide specifications
+    // Validation
     if (currentStep === 1) {
       if (!propertyTitle.trim()) {
         showError('Error', 'Please enter property title');
-        return;
-      }
-      const titleLength = propertyTitle.trim().length;
-      if (titleLength < 1 || titleLength > 200) {
-        showError('Error', 'Title must be between 1 and 200 characters');
         return;
       }
       if (!propertyType) {
         showError('Error', 'Please select property type');
         return;
       }
+      if (propertyTitle.length > 200) {
+        showError('Error', 'Title must be between 1 and 200 characters');
+        return;
+      }
+      if (propertyTitle.length < 1) {
+        showError('Error', 'Title is required (1-200 characters)');
+        return;
+      }
     }
     if (currentStep === 2) {
       if (!location.trim()) {
         showError('Error', 'Please enter location');
-        return;
-      }
-      if (location.trim().length < 3) {
-        showError('Error', 'Location must be at least 3 characters');
         return;
       }
       if (!state.trim()) {
@@ -542,17 +588,26 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         showError('Error', 'Please select number of bathrooms');
         return;
       }
-      if (!builtUpArea.trim()) {
-        showError('Error', `Please enter ${fieldVisibility.areaLabel.toLowerCase()}`);
+      if (fieldVisibility.showAge && !propertyAge.trim()) {
+        showError('Error', 'Please select property age');
         return;
       }
-      const areaValue = parseFloat(builtUpArea);
+      if (fieldVisibility.showFurnishing && !furnishing.trim()) {
+        showError('Error', 'Please select furnishing status');
+        return;
+      }
+      if (!builtUpArea.trim()) {
+        showError('Error', `Please enter ${fieldVisibility.areaLabel}`);
+        return;
+      }
+      const areaValue = parseFloat(builtUpArea.replace(/[^0-9.]/g, ''));
       if (isNaN(areaValue) || areaValue <= 0) {
         showError('Error', `${fieldVisibility.areaLabel} must be a positive number`);
         return;
       }
+      // Validate carpet_area <= area
       if (carpetArea.trim()) {
-        const carpetValue = parseFloat(carpetArea);
+        const carpetValue = parseFloat(carpetArea.replace(/[^0-9.]/g, ''));
         if (isNaN(carpetValue) || carpetValue <= 0) {
           showError('Error', 'Carpet area must be a positive number');
           return;
@@ -562,6 +617,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           return;
         }
       }
+      // Validate floor <= total_floors (if both provided)
       if (floor.trim() && totalFloors.trim()) {
         const floorNum = parseInt(floor);
         const totalFloorsNum = parseInt(totalFloors);
@@ -570,22 +626,46 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           return;
         }
       }
-      if (fieldVisibility.showFurnishing && !furnishing) {
-        showError('Error', 'Please select furnishing status');
-        return;
-      }
     }
     if (currentStep === 3) {
+      if (selectedAmenities.length < 1) {
+        showError('Error', 'Please select at least one amenity');
+        return;
+      }
       if (!description.trim()) {
         showError('Error', 'Please enter property description');
         return;
       }
-      if (description.trim().length < 100) {
+      if (description.length < 100) {
         showError('Error', 'Description must be at least 100 characters');
         return;
       }
       if (description.trim().length > 1000) {
         showError('Error', 'Description cannot exceed 1000 characters');
+        return;
+      }
+    }
+    if (currentStep === 4) {
+      if (photos.length < 4) {
+        showError('Error', 'Please upload at least 4 images');
+        return;
+      }
+      const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
+      if (checkingImages.length > 0) {
+        showError('Error', 'Please wait for all images to be validated before proceeding');
+        return;
+      }
+      const rejectedImages = photos.filter(p => p.moderationStatus === 'REJECTED');
+      const approvedImagesStep4 = photos.filter(p => p.moderationStatus === 'APPROVED');
+      if (rejectedImages.length > 0) {
+        const msg = approvedImagesStep4.length > 0
+          ? `Some images are rejected. Remove ${rejectedImages.length} rejected image(s) to move forward. You have ${approvedImagesStep4.length} approved image(s).`
+          : `Please remove all rejected images and upload valid images to continue.`;
+        showError('Remove Rejected Images', msg);
+        return;
+      }
+      if (approvedImagesStep4.length < 4) {
+        showError('Error', 'Please ensure at least 4 images are approved');
         return;
       }
       const mobileRegex = /(\+91[\s-]?)?[6-9]\d{9}/g;
@@ -601,36 +681,19 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     }
     if (currentStep === 5) {
       if (!expectedPrice.trim()) {
-        showError('Error', propertyStatus === 'sale' ? 'Please enter expected price' : 'Please enter monthly rent');
+        showError('Error', propertyStatus === 'sell' ? 'Please enter expected price' : 'Please enter monthly rent');
         return;
       }
       const priceValue = parseFloat(expectedPrice.replace(/[^0-9.]/g, ''));
-      const priceCheck = validation.validatePrice(priceValue, propertyStatus);
-      if (!priceCheck.valid) {
-        showError('Error', priceCheck.message || 'Invalid price');
+      if (isNaN(priceValue) || priceValue <= 0) {
+        showError('Error', 'Price must be a positive number');
         return;
-      }
-
-      if (propertyStatus === 'rent' && depositAmount.trim().length > 0) {
-        const depositValue = parseFloat(depositAmount.replace(/[^0-9.]/g, ''));
-        const depositCheck = validation.validateDeposit(depositValue, priceValue);
-        if (!depositCheck.valid) {
-          showError('Error', depositCheck.message || 'Invalid security deposit');
-          return;
-        }
-      }
-
-      if (maintenance.trim().length > 0) {
-        const maintenanceValue = parseFloat(maintenance.replace(/[^0-9.]/g, ''));
-        if (isNaN(maintenanceValue) || maintenanceValue <= 0) {
-          showError('Error', 'Maintenance must be a positive amount');
-          return;
-        }
       }
     }
 
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
+      stepScrollViewRef.current?.scrollTo({ y: 0, animated: true });
     } else {
       handleSubmit();
     }
@@ -639,6 +702,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const handlePrevious = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      stepScrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }
   };
 
@@ -649,19 +713,22 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       setIsSubmitting(true);
 
       if (isEditMode && propertyId) {
-        // EDIT MODE: Update existing property via PUT /api/seller/properties/update.php
+        // EDIT MODE: Update existing property
         console.log('[AddProperty] Editing property ID:', propertyId);
-
-        // Collect existing image URLs (preserve URLs, filter blob/file)
+        
+        // For edit mode, collect images differently:
+        // - Existing images: preserve URLs (filter out blob URLs)
+        // - New images: include base64 or imageUrl from moderation
         const existingImageUrls = photos
           .filter(p => p.imageUrl && !p.uri.startsWith('blob:') && !p.uri.startsWith('file:'))
           .map(p => p.imageUrl!)
           .filter((url): url is string => !!url && !url.startsWith('blob:'));
-
-        // New images (base64 or uploaded via moderation)
-        const newImages = photos.filter(p =>
+        
+        // New images that were uploaded (have base64 or were uploaded via moderation)
+        const newImages = photos.filter(p => 
           p.base64 || (p.imageUrl && (p.uri.startsWith('file:') || p.uri.startsWith('blob:')))
         );
+        
         const newImageBase64 = newImages
           .map(p => {
             if (p.base64) {
@@ -675,13 +742,106 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             return null;
           })
           .filter((base64): base64 is string => base64 !== null && base64 !== '');
-
+        
+        // Combine existing URLs and new base64 images
         const allImages = [...existingImageUrls, ...newImageBase64];
-
+        
+        // Check if we have any images
         if (allImages.length === 0 && photos.length > 0) {
           Alert.alert(
             'No Valid Images',
             'Please wait for images to be processed or upload new images.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
+        if (checkingImages.length > 0) {
+          Alert.alert(
+            'Images Still Validating',
+            'Please wait for all images to be validated before submitting.',
+            [{text: 'OK'}]
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Build update data based on 24-hour restriction
+        const updateData: any = {};
+        
+        // Always allowed fields (after 24 hours): title, price, price_negotiable, maintenance_charges, deposit_amount
+        updateData.title = propertyTitle.trim();
+        updateData.price = parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0;
+        updateData.price_negotiable = priceNegotiable;
+        updateData.maintenance_charges = maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null;
+        if (propertyStatus === 'rent' && depositAmount) {
+          updateData.deposit_amount = parseFloat(depositAmount.replace(/[^0-9.]/g, ''));
+        }
+        if (propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel')) {
+          updateData.available_for_bachelors = availableForBachelors;
+        }
+        
+        // Only include other fields if not in limited edit mode
+        // Location fields are explicitly blocked after 24 hours: location, latitude, longitude, state, additional_address
+        if (!isLimitedEdit) {
+          updateData.status = propertyStatus === 'sell' ? 'sale' : 'rent';
+          updateData.property_type = propertyType;
+          // Location fields (explicitly blocked after 24 hours)
+          updateData.location = location.trim();
+          updateData.state = state.trim() || null;
+          updateData.additional_address = additionalAddress.trim() || null;
+          updateData.latitude = latitude || null;
+          updateData.longitude = longitude || null;
+          updateData.bedrooms = bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null);
+          updateData.bathrooms = bathrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null);
+          updateData.balconies = balconies?.toString() || (propertyType === 'Studio Apartment' ? '0' : null);
+          updateData.area = parseFloat(builtUpArea) || 0;
+          updateData.carpet_area = carpetArea ? parseFloat(carpetArea) : null;
+          updateData.floor = floor.trim() || null;
+          updateData.total_floors = totalFloors ? parseInt(totalFloors) : null;
+          updateData.facing = facing || null;
+          updateData.age = propertyAge || null;
+          updateData.furnishing = furnishing || null;
+          updateData.description = description.trim();
+          updateData.amenities = selectedAmenities;
+        }
+        
+        // Include images if any
+        if (allImages.length > 0) {
+          updateData.images = allImages;
+        }
+        
+        console.log('[AddProperty] Updating property with data:', {
+          ...updateData,
+          images: `[${allImages.length} images]`,
+        });
+
+        const response: any = await sellerService.updateProperty(propertyId, updateData);
+        
+        if (response && response.success) {
+          Alert.alert(
+            'Success',
+            'Property updated successfully!',
+            [{text: 'OK', onPress: () => navigation.goBack()}]
+          );
+        } else {
+          const errorMessage = response?.message || response?.error?.message || 'Failed to update property';
+          console.error('[AddProperty] Property update failed:', errorMessage);
+          showError('Error', errorMessage);
+        }
+      } else {
+        // CREATE MODE: Create new property
+        // Prefer Firebase URLs so backend stores references only; fallback to base64 when Firebase not used
+        const validImages = photos.filter(
+          p => p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING',
+        );
+
+        if (validImages.length < 4) {
+          Alert.alert(
+            'No Valid Images',
+            'Please upload at least 4 images that have been approved or are pending review.',
             [{text: 'OK'}]
           );
           setIsSubmitting(false);
@@ -699,315 +859,113 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           return;
         }
 
-        // Build update data based on 24-hour restriction
-        // Allowed after 24h: title, price, price_negotiable, maintenance_charges, deposit_amount
-        // Restricted: location, latitude, longitude, state, additional_address, and all other fields
-        const updateData: any = {};
-        updateData.title = propertyTitle.trim();
-        updateData.price = parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0;
-        updateData.price_negotiable = priceNegotiable;
-        updateData.maintenance_charges = maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null;
-        if (propertyStatus === 'rent' && depositAmount) {
-          updateData.deposit_amount = parseFloat(depositAmount.replace(/[^0-9.]/g, '')) || null;
+        let imagesPayload: string[] | undefined;
+        if (USE_FIREBASE_STORAGE) {
+          const imageUrls = validImages
+            .map(p => p.imageUrl)
+            .filter((url): url is string => !!url && (url.startsWith('http://') || url.startsWith('https://')));
+          if (imageUrls.length > 0) {
+            imagesPayload = imageUrls;
+            console.log('[AddProperty] Sending Firebase image URLs (images stay in Firebase):', imageUrls.length);
+          }
         }
-        if (
-          propertyStatus === 'rent' &&
-          (propertyType === 'Apartment' || propertyType === 'PG / Hostel' || propertyType === 'Studio Apartment')
-        ) {
-          updateData.available_for_bachelors = availableForBachelors;
-        }
-
-        if (!isLimitedEdit) {
-          updateData.status = propertyStatus;
-          updateData.property_type = propertyType;
-          updateData.location = location.trim();
-          updateData.state = state.trim() || null;
-          updateData.additional_address = additionalAddress.trim() || null;
-          updateData.latitude = latitude || null;
-          updateData.longitude = longitude || null;
-          updateData.bedrooms = bedrooms?.toString() ?? (propertyType === 'Studio Apartment' ? '0' : null);
-          updateData.bathrooms = bathrooms?.toString() ?? null;
-          updateData.balconies = balconies?.toString() ?? null;
-          updateData.area = parseFloat(builtUpArea) || 0;
-          updateData.carpet_area = carpetArea ? parseFloat(carpetArea) : null;
-          updateData.floor = floor.trim() || null;
-          updateData.total_floors = totalFloors ? parseInt(totalFloors) : null;
-          updateData.facing = facing || null;
-          updateData.age = propertyAge || null;
-          updateData.furnishing = furnishing || null;
-          updateData.description = description.trim();
-          updateData.amenities = selectedAmenities;
+        if (!imagesPayload) {
+          const imageBase64Strings = validImages
+            .map(p => {
+              if (!p.base64) return null;
+              let base64 = p.base64.trim();
+              if (base64.startsWith('data:image/')) {
+                if (!base64.includes(';base64,')) return null;
+                return base64;
+              }
+              return `data:image/jpeg;base64,${base64}`;
+            })
+            .filter((base64): base64 is string => base64 !== null && base64 !== '');
+          if (imageBase64Strings.length === 0) {
+            Alert.alert(
+              'Image Data Missing',
+              USE_FIREBASE_STORAGE
+                ? 'Please wait for images to finish uploading to Firebase, or try removing and re-adding them.'
+                : 'Approved images are missing image data. Please try removing and re-uploading the images.',
+              [{text: 'OK'}]
+            );
+            setIsSubmitting(false);
+            return;
+          }
+          imagesPayload = imageBase64Strings;
+          console.log('[AddProperty] Sending images as base64 (fallback):', imageBase64Strings.length);
         }
 
-        if (!isLimitedEdit && allImages.length > 0) {
-          updateData.images = allImages;
-        }
+        const imageCount = imagesPayload.length;
+        console.log('[AddProperty] Total photos:', photos.length, 'Valid (approved/pending):', validImages.length, 'Images to send:', imageCount);
 
-        console.log('[AddProperty] Updating property via seller/properties/update.php', {
-          ...updateData,
-          images: updateData.images ? `[${updateData.images.length} images]` : 'not sent',
-        });
+        // Property type is already in the correct format from guide
+        const propertyData: any = {
+          title: propertyTitle.trim(),
+          status: propertyStatus === 'sell' ? 'sale' : 'rent', // Map 'sell' to 'sale'
+          property_type: propertyType, // Already in guide format (e.g., 'Apartment', 'Villa / Banglow')
+          location: location.trim(),
+          state: state.trim() || null,
+          additional_address: additionalAddress.trim() || null,
+          latitude: latitude || null,
+          longitude: longitude || null,
+          bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+          bathrooms: bathrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+          balconies: balconies?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
+          area: parseFloat(builtUpArea) || 0,
+          carpet_area: carpetArea ? parseFloat(carpetArea) : null,
+          floor: floor.trim() || null,
+          total_floors: totalFloors ? parseInt(totalFloors) : null,
+          facing: facing || null,
+          age: propertyAge || null,
+          furnishing: furnishing || null,
+          description: description.trim(),
+          price: parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0,
+          price_negotiable: priceNegotiable,
+          maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
+          amenities: selectedAmenities,
+          deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : undefined,
+          available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel') ? availableForBachelors : undefined,
+          images: imagesPayload.length > 0 ? imagesPayload : undefined,
+        };
 
-        const response: any = await sellerService.updateProperty(propertyId, updateData);
+        console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
+        console.log('[AddProperty] Images:', imageCount, imagesPayload[0]?.startsWith('http') ? '(Firebase URLs)' : '(base64)');
 
+        const response: any = await propertyService.createProperty(propertyData, 'seller');
+        
         if (response && response.success) {
           Alert.alert(
-            'Success',
-            'Property updated successfully!',
+            'Success', 
+            `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
             [{text: 'OK', onPress: () => navigation.goBack()}]
           );
         } else {
-          const errorMessage =
-            response?.message || response?.data?.message || response?.error?.message || 'Failed to update property';
-          showError('Error', errorMessage);
-        }
-        setIsSubmitting(false);
-        return;
-      }
-
-      // CREATE MODE: Collect valid images (approved or pending)
-      // Support both Firebase URLs and base64 data
-      const validImages = photos.filter(
-        p => {
-          const isValidStatus = p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING';
-          const hasData = !!p.imageUrl || !!p.base64;
-          
-          if (!isValidStatus) {
-            console.log('[AddProperty] Image filtered out - invalid status:', {
-              status: p.moderationStatus,
-              hasImageUrl: !!p.imageUrl,
-              hasBase64: !!p.base64,
-            });
-          }
-          if (!hasData) {
-            console.log('[AddProperty] Image filtered out - no data:', {
-              status: p.moderationStatus,
-              hasImageUrl: !!p.imageUrl,
-              hasBase64: !!p.base64,
-            });
-          }
-          
-          return isValidStatus && hasData;
-        }
-      );
-      
-      // Debug logging
-      console.log('[AddProperty] All photos:', photos.map(p => ({
-        hasUri: !!p.uri,
-        moderationStatus: p.moderationStatus,
-        hasBase64: !!p.base64,
-        hasImageUrl: !!p.imageUrl,
-        imageUrl: p.imageUrl?.substring(0, 50) || 'none',
-        base64Length: p.base64?.length || 0,
-      })));
-      
-      console.log('[AddProperty] Valid images count:', validImages.length, 'out of', photos.length);
-      
-      // Check if we have any valid images
-      if (validImages.length === 0) {
-        const checkingCount = photos.filter(p => p.moderationStatus === 'checking').length;
-        const rejectedCount = photos.filter(p => p.moderationStatus === 'REJECTED').length;
-        const noDataCount = photos.filter(p => 
-          (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') && 
-          !p.imageUrl && !p.base64
-        ).length;
-        
-        let errorMessage = 'Please upload at least one image that has been approved or is pending review.';
-        if (checkingCount > 0) {
-          errorMessage = `Please wait for ${checkingCount} image(s) to finish validating before submitting.`;
-        } else if (noDataCount > 0) {
-          errorMessage = `${noDataCount} image(s) are missing data. Please remove and re-upload them.`;
-        } else if (rejectedCount === photos.length) {
-          errorMessage = 'All images were rejected. Please upload valid property images.';
-        }
-        
-        console.error('[AddProperty] No valid images:', {
-          total: photos.length,
-          checking: checkingCount,
-          rejected: rejectedCount,
-          noData: noDataCount,
-          valid: validImages.length,
-        });
-        
-        showError('No Valid Images', errorMessage);
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Check if any images are still being validated
-      const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
-      if (checkingImages.length > 0) {
-        Alert.alert(
-          'Images Still Validating',
-          `Please wait for ${checkingImages.length} image(s) to be validated before submitting.`,
-          [{text: 'OK'}]
-        );
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Separate Firebase URLs and base64 strings
-      const firebaseUrls: string[] = [];
-      const imageBase64Strings: string[] = [];
-      
-      validImages.forEach((p, idx) => {
-        if (p.imageUrl) {
-          // Firebase URL - send directly (preferred)
-          const url = p.imageUrl.trim();
-          if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-            firebaseUrls.push(url);
-            console.log(`[AddProperty] Image ${idx + 1}: Using Firebase URL`);
-          } else {
-            console.warn(`[AddProperty] Image ${idx + 1}: Invalid Firebase URL format:`, url.substring(0, 50));
-          }
-        } else if (p.base64) {
-          // Base64 data - format and include (fallback)
-          let base64 = p.base64.trim();
-          
-          // If it's already a data URI, validate format
-          if (base64.startsWith('data:image/')) {
-            // Check if it has the base64 part
-            if (!base64.includes(';base64,')) {
-              console.warn(`[AddProperty] Image ${idx + 1}: Invalid base64 format (missing ;base64,):`, base64.substring(0, 50));
-              return;
+          let errorMessage = 'Failed to create property';
+          // Check multiple possible error message locations
+          if (response?.message) {
+            errorMessage = response.message;
+          } else if (response?.error) {
+            if (typeof response.error === 'string') {
+              errorMessage = response.error;
+            } else if (response.error?.message) {
+              errorMessage = response.error.message;
             }
-            imageBase64Strings.push(base64);
-            console.log(`[AddProperty] Image ${idx + 1}: Using base64 data`);
-          } else {
-            // If it's raw base64, format it
-            console.warn(`[AddProperty] Image ${idx + 1}: Base64 missing data URI prefix, adding default format`);
-            imageBase64Strings.push(`data:image/jpeg;base64,${base64}`);
+          } else if (response?.data?.message) {
+            errorMessage = response.data.message;
+          } else if (response?.data?.error) {
+            errorMessage = typeof response.data.error === 'string' ? response.data.error : response.data.error?.message || errorMessage;
+          } else if (typeof response === 'string') {
+            errorMessage = response;
           }
-        } else {
-          console.error(`[AddProperty] Image ${idx + 1}: No imageUrl or base64 available!`, {
-            status: p.moderationStatus,
-            hasUri: !!p.uri,
-          });
+          console.error('[AddProperty] Property creation failed:', errorMessage);
+          console.error('[AddProperty] Full error response:', JSON.stringify(response, null, 2));
+          Alert.alert('Error', errorMessage, [{text: 'OK'}]);
         }
-      });
-      
-      // Check if we have any image data (Firebase URLs or base64)
-      if (firebaseUrls.length === 0 && imageBase64Strings.length === 0) {
-        console.error('[AddProperty] No image data available:', {
-          validImagesCount: validImages.length,
-          photosWithFirebaseUrl: validImages.filter(p => p.imageUrl).length,
-          photosWithBase64: validImages.filter(p => p.base64).length,
-          photoDetails: validImages.map(p => ({
-            status: p.moderationStatus,
-            hasImageUrl: !!p.imageUrl,
-            hasBase64: !!p.base64,
-            imageUrl: p.imageUrl?.substring(0, 50),
-          })),
-        });
-        showError('Image Data Missing', 'Approved images are missing image data. Please try removing and re-uploading the images.');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      console.log('[AddProperty] Total photos:', photos.length);
-      console.log('[AddProperty] Valid images (approved/pending):', validImages.length);
-      console.log('[AddProperty] Firebase URLs:', firebaseUrls.length);
-      console.log('[AddProperty] Base64 images:', imageBase64Strings.length);
-
-      // Property type is already in the correct format from guide
-      const propertyData = {
-        title: propertyTitle.trim(),
-        status: propertyStatus, // 'sale' or 'rent'
-        property_type: propertyType, // Already in guide format (e.g., 'Apartment', 'Villa / Banglow')
-        location: location.trim(),
-        state: state.trim(),
-        additional_address: additionalAddress.trim() || null,
-        latitude: latitude || null,
-        longitude: longitude || null,
-        bedrooms: bedrooms?.toString() || (propertyType === 'Studio Apartment' ? '0' : null),
-        bathrooms: bathrooms?.toString() || null,
-        balconies: balconies?.toString() || null,
-        area: parseFloat(builtUpArea) || 0,
-        carpet_area: carpetArea ? parseFloat(carpetArea) : null,
-        floor: floor.trim() || null,
-        total_floors: totalFloors ? parseInt(totalFloors) : null,
-        facing: facing || null,
-        age: propertyAge || null,
-        furnishing: furnishing || null,
-        description: description.trim(),
-        price: parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0,
-        price_negotiable: priceNegotiable,
-        deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : null,
-        maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
-        available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel' || propertyType === 'Studio Apartment') ? availableForBachelors : undefined,
-        amenities: selectedAmenities,
-        // Send Firebase URLs if available, otherwise send base64 strings
-        // Backend will handle both: Firebase URLs are already stored, base64 will be converted
-        images: firebaseUrls.length > 0 ? firebaseUrls : (imageBase64Strings.length > 0 ? imageBase64Strings : undefined),
-        // Also send a flag to indicate if using Firebase URLs
-        use_firebase_urls: firebaseUrls.length > 0,
-      };
-
-      console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
-      console.log('[AddProperty] Images included:', {
-        firebaseUrls: firebaseUrls.length,
-        base64: imageBase64Strings.length,
-        total: firebaseUrls.length + imageBase64Strings.length,
-        usingFirebase: firebaseUrls.length > 0,
-      });
-      console.log('[AddProperty] Property data:', JSON.stringify({
-        ...propertyData, 
-        images: firebaseUrls.length > 0 
-          ? `[${firebaseUrls.length} Firebase URLs]`
-          : `[${imageBase64Strings.length} base64 strings]`,
-        imagesPreview: firebaseUrls.length > 0
-          ? firebaseUrls.map(url => url.substring(0, 50) + '...')
-          : imageBase64Strings.map(b => b.substring(0, 50) + '...'),
-      }, null, 2));
-
-      // Create property with images included in request (as per guide)
-      // Use 'seller' userType to use correct endpoint
-      const response: any = await propertyService.createProperty(propertyData, 'seller');
-      
-      console.log('[AddProperty] Property creation response:', JSON.stringify(response, null, 2));
-      
-      if (response && response.success) {
-        // Property created successfully with images
-        const imageCount = firebaseUrls.length + imageBase64Strings.length;
-        const propertyData = response.data?.property || response.data;
-        
-        // Log returned property data to verify images were saved and backend conversion
-        if (propertyData) {
-          if (__DEV__) {
-            console.log('[AddProperty] ✅ Property created with ID:', propertyData.id || propertyData.property_id);
-          }
-        }
-        
-        Alert.alert(
-          '🎉 Property Published!',
-          `Your property has been listed successfully!${imageCount > 0 ? `\n\n📸 ${imageCount} image(s) uploaded.` : ''}\n\n⏰ Important: You can fully edit your property for the next 24 hours.\n\nAfter 24 hours, you will only be able to change:\n• Title\n• Price\n• Location`,
-          [{text: 'Got it!', onPress: () => navigation.goBack()}]
-        );
-      } else {
-        let errorMessage = 'Failed to create property';
-        // Check multiple possible error message locations
-        if (response?.message) {
-          errorMessage = response.message;
-        } else if (response?.error) {
-          if (typeof response.error === 'string') {
-            errorMessage = response.error;
-          } else if (response.error?.message) {
-            errorMessage = response.error.message;
-          }
-        } else if (response?.data?.message) {
-          errorMessage = response.data.message;
-        } else if (response?.data?.error) {
-          errorMessage = typeof response.data.error === 'string' ? response.data.error : response.data.error?.message || errorMessage;
-        } else if (typeof response === 'string') {
-          errorMessage = response;
-        }
-        console.error('[AddProperty] Property creation failed:', errorMessage);
-        console.error('[AddProperty] Full error response:', JSON.stringify(response, null, 2));
-        Alert.alert('Error', errorMessage, [{text: 'OK'}]);
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      let errorMessage = 'Failed to create property. Please try again.';
+      let errorMessage = isEditMode ? 'Failed to update property. Please try again.' : 'Failed to create property. Please try again.';
       // Check multiple possible error message locations
       if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
@@ -1053,7 +1011,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., 3BHK Apartment with Sea View"
+                placeholder="e.g., Spacious 3BHK Apartment with Sea View"
                 placeholderTextColor={colors.textSecondary}
                 value={propertyTitle}
                 onChangeText={setPropertyTitle}
@@ -1068,8 +1026,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.typeButtonsContainer}>
                 <TouchableOpacity
                   style={styles.typeButton}
-                  onPress={() => setPropertyStatus('sale')}>
-                  {propertyStatus === 'sale' ? (
+                  onPress={() => setPropertyStatus('sell')}>
+                  {propertyStatus === 'sell' ? (
                     // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
                       colors={['#0077C0', '#005A94']}
@@ -1137,35 +1095,29 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       setSelectedAmenities([]);
                     }}>
                     <Text style={styles.propertyTypeIcon}>{type.icon}</Text>
-                      <Text
-                        style={[
-                          styles.propertyTypeText,
-                          propertyType === type.value && styles.propertyTypeTextActive,
-                        ]}
-                        numberOfLines={2}>
-                        {type.label}
-                      </Text>
+                    <Text
+                      style={[
+                        styles.propertyTypeText,
+                        propertyType === type.value && styles.propertyTypeTextActive,
+                      ]}
+                      numberOfLines={2}>
+                      {type.label}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            {/* Available for Bachelors - Basic Info step, only for rent + Apartment / PG / Studio */}
             {propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel' || propertyType === 'Studio Apartment') && (
-              <View style={styles.inputContainer}>
-                <TouchableOpacity
-                  style={styles.checkboxContainer}
-                  onPress={() => setAvailableForBachelors(!availableForBachelors)}>
-                  <View
-                    style={[
-                      styles.checkbox,
-                      availableForBachelors && styles.checkboxChecked,
-                    ]}>
-                    {availableForBachelors && <Text style={styles.checkboxCheck}>✓</Text>}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Available for bachelors</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => setAvailableForBachelors(!availableForBachelors)}
+                activeOpacity={0.7}>
+                <View style={[styles.checkbox, availableForBachelors && styles.checkboxChecked]}>
+                  {availableForBachelors && <Text style={styles.checkboxCheck}>✓</Text>}
+                </View>
+                <Text style={styles.checkboxLabel}>Available for bachelors</Text>
+              </TouchableOpacity>
             )}
           </View>
         );
@@ -1215,6 +1167,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     // Extract state from context if available
                     const extractedState = extractStateFromContext(locationData.context);
                     if (extractedState) {
+                      stateAutoFilledFromLocation.current = true;
                       setState(extractedState);
                     }
                   }}
@@ -1249,6 +1202,27 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </View>
             </View>
 
+            <LocationPicker
+              visible={locationPickerVisible}
+              initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
+              onLocationSelect={(locationData) => {
+                setLatitude(locationData.latitude);
+                setLongitude(locationData.longitude);
+                if (locationData.address) {
+                  setLocation(locationData.address);
+                  setLocationSelected(true);
+                }
+                // Extract state from context if available
+                const extractedState = extractStateFromContext(locationData.context);
+                if (extractedState) {
+                  stateAutoFilledFromLocation.current = true;
+                  setState(extractedState);
+                }
+                setLocationPickerVisible(false);
+              }}
+              onClose={() => setLocationPickerVisible(false)}
+            />
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
                 State <Text style={styles.required}>*</Text>
@@ -1259,14 +1233,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter state"
                   placeholderTextColor={colors.textSecondary}
                   value={state}
-                  onChangeText={(text: string) => setState(text)}
+                  onChangeText={(text: string) => {
+                    stateAutoFilledFromLocation.current = false;
+                    setState(text);
+                  }}
                 />
                 <StateAutoSuggest
                   query={state}
                   onSelect={(stateData) => {
                     setState(stateData.name || stateData.placeName);
                   }}
-                  visible={state.length >= 2}
+                  visible={state.length >= 2 && !stateAutoFilledFromLocation.current}
                 />
               </View>
             </View>
@@ -1285,26 +1262,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               />
             </View>
 
-            <LocationPicker
-              visible={locationPickerVisible}
-              initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
-              onLocationSelect={(locationData) => {
-                setLatitude(locationData.latitude);
-                setLongitude(locationData.longitude);
-                if (locationData.address) {
-                  setLocation(locationData.address);
-                  setLocationSelected(true);
-                }
-                // Extract state from context if available
-                const extractedState = extractStateFromContext(locationData.context);
-                if (extractedState) {
-                  setState(extractedState);
-                }
-                setLocationPickerVisible(false);
-              }}
-              onClose={() => setLocationPickerVisible(false)}
-            />
-
             {fieldVisibility.showBedrooms && (
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>
@@ -1317,6 +1274,20 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 ) : (
                   <View style={styles.numberButtonsContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.numberButton,
+                        bedrooms === 0 && styles.numberButtonActive,
+                      ]}
+                      onPress={() => setBedrooms(0)}>
+                      <Text
+                        style={[
+                          styles.numberButtonText,
+                          bedrooms === 0 && styles.numberButtonTextActive,
+                        ]}>
+                        0
+                      </Text>
+                    </TouchableOpacity>
                     {[1, 2, 3, 4, 5].map(num => (
                       <TouchableOpacity
                         key={num}
@@ -1358,79 +1329,79 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.label}>
                   Bathrooms {fieldVisibility.bathroomsRequired && <Text style={styles.required}>*</Text>}
                 </Text>
-              <View style={styles.numberButtonsContainer}>
-                {[1, 2, 3, 4].map(num => (
+                <View style={styles.numberButtonsContainer}>
+                  {[1, 2, 3, 4].map(num => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[
+                        styles.numberButton,
+                        bathrooms === num && styles.numberButtonActive,
+                      ]}
+                      onPress={() => setBathrooms(num)}>
+                      <Text
+                        style={[
+                          styles.numberButtonText,
+                          bathrooms === num && styles.numberButtonTextActive,
+                        ]}>
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                   <TouchableOpacity
-                    key={num}
                     style={[
                       styles.numberButton,
-                      bathrooms === num && styles.numberButtonActive,
+                      bathrooms === 5 && styles.numberButtonActive,
                     ]}
-                    onPress={() => setBathrooms(num)}>
+                    onPress={() => setBathrooms(5)}>
                     <Text
                       style={[
                         styles.numberButtonText,
-                        bathrooms === num && styles.numberButtonTextActive,
+                        bathrooms === 5 && styles.numberButtonTextActive,
                       ]}>
-                      {num}
+                      4+
                     </Text>
                   </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.numberButton,
-                    bathrooms === 5 && styles.numberButtonActive,
-                  ]}
-                  onPress={() => setBathrooms(5)}>
-                  <Text
-                    style={[
-                      styles.numberButtonText,
-                      bathrooms === 5 && styles.numberButtonTextActive,
-                    ]}>
-                    4+
-                  </Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
             )}
 
             {fieldVisibility.showBalconies && (
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Balconies</Text>
-              <View style={styles.numberButtonsContainer}>
-                {[0, 1, 2, 3].map(num => (
+                <View style={styles.numberButtonsContainer}>
+                  {[0, 1, 2, 3].map(num => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[
+                        styles.numberButton,
+                        balconies === num && styles.numberButtonActive,
+                      ]}
+                      onPress={() => setBalconies(num)}>
+                      <Text
+                        style={[
+                          styles.numberButtonText,
+                          balconies === num && styles.numberButtonTextActive,
+                        ]}>
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                   <TouchableOpacity
-                    key={num}
                     style={[
                       styles.numberButton,
-                      balconies === num && styles.numberButtonActive,
+                      balconies === 4 && styles.numberButtonActive,
                     ]}
-                    onPress={() => setBalconies(num)}>
+                    onPress={() => setBalconies(4)}>
                     <Text
                       style={[
                         styles.numberButtonText,
-                        balconies === num && styles.numberButtonTextActive,
+                        balconies === 4 && styles.numberButtonTextActive,
                       ]}>
-                      {num}
+                      3+
                     </Text>
                   </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.numberButton,
-                    balconies === 4 && styles.numberButtonActive,
-                  ]}
-                  onPress={() => setBalconies(4)}>
-                  <Text
-                    style={[
-                      styles.numberButtonText,
-                      balconies === 4 && styles.numberButtonTextActive,
-                    ]}>
-                    3+
-                  </Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
             )}
 
             <View style={styles.inputContainer}>
@@ -1443,11 +1414,26 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder={fieldVisibility.areaLabel === 'Plot Area' ? 'Enter plot area' : 'Enter area'}
                   placeholderTextColor={colors.textSecondary}
                   value={builtUpArea}
-                  onChangeText={setBuiltUpArea}
+                  onChangeText={(text: string) => {
+                    // Validate plot area limit (3 lac = 300,000 sq ft)
+                    if (fieldVisibility.areaLabel === 'Plot Area') {
+                      const numValue = parseFloat(text.replace(/[^0-9.]/g, ''));
+                      if (!isNaN(numValue) && numValue > 300000) {
+                        showError('Error', 'Plot area cannot exceed 3 lac sq ft (300,000 sq ft)');
+                        return;
+                      }
+                    }
+                    setBuiltUpArea(text);
+                  }}
                   keyboardType="numeric"
                 />
                 <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
+              {fieldVisibility.areaLabel === 'Plot Area' && (
+                <Text style={styles.hintText}>
+                  Maximum: 3 lac sq ft (300,000 sq ft)
+                </Text>
+              )}
             </View>
 
             {fieldVisibility.showCarpetArea && (
@@ -1533,7 +1519,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Dropdown
                 label="Furnishing"
                 placeholder="Select furnishing status"
-                required={false}
                 options={[
                   {label: 'Unfurnished', value: 'Unfurnished'},
                   {label: 'Semi-Furnished', value: 'Semi-Furnished'},
@@ -1609,10 +1594,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
       case 4:
         return (
-          <View style={styles.stepContent} pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
+          <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Upload Photos</Text>
             <Text style={styles.stepSubtitle}>
-              Add up to 10 high-quality photos of your property
+              Add 4–10 high-quality photos of your property (minimum 4 required)
             </Text>
 
             <TouchableOpacity 
@@ -1625,26 +1610,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 Select up to {10 - photos.length} more photos
               </Text>
               <Text style={styles.photoUploadHint}>
-                Supports: JPG, PNG, WEBP (Max 5MB each)
+                Minimum 4 images required. Supports: JPG, PNG, WEBP (Max 5MB each)
               </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.photoCameraButton}
+              onPress={handleCameraCapture}
+              activeOpacity={0.7}>
+              <Text style={styles.photoUploadIcon}>📷</Text>
+              <Text style={styles.photoUploadText}>Take photo with camera</Text>
             </TouchableOpacity>
 
             {photos.length > 0 && (
               <View style={styles.photosPreview}>
                 {photos.map((photo, index) => {
-                  const statusColor = 
-                    photo.moderationStatus === 'APPROVED' ? '#4CAF50' :
-                    photo.moderationStatus === 'REJECTED' ? colors.error :
-                    photo.moderationStatus === 'PENDING' ? '#FF9800' :
-                    photo.moderationStatus === 'checking' ? colors.textSecondary :
-                    'transparent';
-                  
-                  const statusText = 
-                    photo.moderationStatus === 'APPROVED' ? '✓' :
-                    photo.moderationStatus === 'REJECTED' ? '✗' :
-                    photo.moderationStatus === 'PENDING' ? '⏳' :
-                    photo.moderationStatus === 'checking' ? '...' :
-                    '';
+                  const isApproved = photo.moderationStatus === 'APPROVED' || photo.moderationStatus === 'checking' || photo.moderationStatus === 'PENDING';
+                  const statusColor = isApproved ? '#4CAF50' : photo.moderationStatus === 'REJECTED' ? colors.error : 'transparent';
+                  const statusText = isApproved ? '✓' : photo.moderationStatus === 'REJECTED' ? '✗' : '';
                   
                   return (
                     <View key={index} style={styles.photoPreviewItem}>
@@ -1656,10 +1638,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       )}
                       {photo.moderationReason && photo.moderationStatus === 'REJECTED' && (
                         <View style={styles.reasonBadge}>
-                          <Text style={styles.reasonText} numberOfLines={1}>
+                          <Text style={styles.reasonText} numberOfLines={2}>
                             {photo.moderationReason}
                           </Text>
                         </View>
+                      )}
+                      {photo.moderationStatus === 'REJECTED' && (
+                        <TouchableOpacity
+                          style={styles.errorDetailsButton}
+                          onPress={() => {
+                            Alert.alert(
+                              'Image Rejected',
+                              photo.moderationReason || 'Image does not meet our guidelines. Please upload property images only.',
+                              [{text: 'OK'}]
+                            );
+                          }}>
+                          <Text style={styles.errorDetailsText}>View Details</Text>
+                        </TouchableOpacity>
                       )}
                       <TouchableOpacity
                         style={styles.photoRemoveButton}
@@ -1684,23 +1679,21 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                {propertyStatus === 'sale' ? 'Expected Price' : 'Monthly Rent'} <Text style={styles.required}>*</Text>
+                {propertyStatus === 'sell' ? 'Expected Price' : 'Monthly Rent'} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.priceInputContainer}>
                 <Text style={styles.currencySymbol}>₹</Text>
                 <TextInput
                   style={[styles.input, styles.priceInput]}
-                  placeholder={propertyStatus === 'sale' ? 'Enter expected price' : 'Enter monthly rent'}
+                  placeholder={propertyStatus === 'sell' ? 'Enter expected price' : 'Enter monthly rent'}
                   placeholderTextColor={colors.textSecondary}
                   value={expectedPrice}
                   onChangeText={setExpectedPrice}
                   keyboardType="numeric"
                 />
               </View>
-              {expectedPrice.trim().length > 0 && (
-                <Text style={styles.hintText}>
-                  {formatters.price(parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0, propertyStatus === 'rent')}
-                </Text>
+              {formatPriceShort(expectedPrice) && (
+                <Text style={styles.priceSuggestionText}>≈ ₹{formatPriceShort(expectedPrice)}</Text>
               )}
               <TouchableOpacity
                 style={styles.checkboxContainer}
@@ -1717,28 +1710,43 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             {propertyStatus === 'rent' && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Security Deposit</Text>
-                <View style={styles.priceInputContainer}>
-                  <Text style={styles.currencySymbol}>₹</Text>
-                  <TextInput
-                    style={[styles.input, styles.priceInput]}
-                    placeholder="Enter deposit amount"
-                    placeholderTextColor={colors.textSecondary}
-                    value={depositAmount}
-                    onChangeText={setDepositAmount}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <Text style={styles.hintText}>
-                  Typically 2-6 months of rent
-                </Text>
-                {depositAmount.trim().length > 0 && (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Security Deposit</Text>
+                  <View style={styles.priceInputContainer}>
+                    <Text style={styles.currencySymbol}>₹</Text>
+                    <TextInput
+                      style={[styles.input, styles.priceInput]}
+                      placeholder="Enter deposit amount"
+                      placeholderTextColor={colors.textSecondary}
+                      value={depositAmount}
+                      onChangeText={setDepositAmount}
+                      keyboardType="numeric"
+                    />
+                  </View>
                   <Text style={styles.hintText}>
-                    {formatters.price(parseFloat(depositAmount.replace(/[^0-9.]/g, '')) || 0, true)} deposit
+                    Typically 2-6 months of rent
                   </Text>
+                </View>
+                
+                {/* Available for Bachelors - Only for Apartment, PG / Hostel */}
+                {(propertyType === 'Apartment' || propertyType === 'PG / Hostel') && (
+                  <View style={styles.inputContainer}>
+                    <TouchableOpacity
+                      style={styles.checkboxContainer}
+                      onPress={() => setAvailableForBachelors(!availableForBachelors)}>
+                      <View
+                        style={[
+                          styles.checkbox,
+                          availableForBachelors && styles.checkboxChecked,
+                        ]}>
+                        {availableForBachelors && <Text style={styles.checkboxCheck}>✓</Text>}
+                      </View>
+                      <Text style={styles.checkboxLabel}>Available for bachelors</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
-              </View>
+              </>
             )}
 
             <View style={styles.inputContainer}>
@@ -1754,11 +1762,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   keyboardType="numeric"
                 />
               </View>
-              {maintenance.trim().length > 0 && (
-                <Text style={styles.hintText}>
-                  {formatters.price(parseFloat(maintenance.replace(/[^0-9.]/g, '')) || 0, true)} per month
-                </Text>
-              )}
             </View>
 
             <TouchableOpacity style={styles.summaryButton}>
@@ -1797,6 +1800,14 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.summaryLabel}>Photos:</Text>
                 <Text style={styles.summaryValue}>{photos.length} uploaded</Text>
               </View>
+              {propertyStatus === 'sell' && expectedPrice && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Expected Price:</Text>
+                  <Text style={styles.summaryValue}>
+                    {formatters.price(parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0, false)}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         );
@@ -1815,18 +1826,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     return 'pending';
   };
 
-  // Show loading while checking property limit or loading property data
-  if (checkingLimit || loadingProperty) {
+  // Show loading while loading property data
+  if (loadingProperty) {
     return (
-      <Modal visible={true} animationType="fade" transparent={true} onRequestClose={handleClose}>
+      <Modal
+        visible={true}
+        animationType="fade"
+        transparent={true}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent={true}
+        onRequestClose={handleClose}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <SafeAreaView edges={['top', 'bottom', 'left', 'right']}>
-              <View style={[styles.safeArea, styles.loadingContainer]}>
+            {/* @ts-expect-error SafeAreaView accepts style at runtime (types incomplete) */}
+            <SafeAreaView style={styles.safeArea}>
+              <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>
-                  {loadingProperty ? 'Loading property details...' : 'Checking property limit...'}
-                </Text>
+                <Text style={styles.loadingText}>Loading property details...</Text>
               </View>
             </SafeAreaView>
           </View>
@@ -1845,8 +1861,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <SafeAreaView edges={['top', 'bottom', 'left', 'right']}>
-            <View style={styles.safeArea}>
+          {/* @ts-expect-error SafeAreaView accepts style at runtime (types incomplete) */}
+          <SafeAreaView style={styles.safeArea}>
+            <KeyboardAvoidingView
+              style={styles.safeArea}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
             {/* Restricted edit banner for older listings */}
             {isEditMode && isLimitedEdit && (
               <View style={styles.limitedBanner}>
@@ -1859,18 +1879,32 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>List Your Property</Text>
+              <Text style={styles.headerTitle}>
+                {isEditMode ? 'Edit Property' : 'List Your Property'}
+              </Text>
               <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
 
             {/* Progress Steps */}
-            <View style={styles.progressContainer}>
-              {steps.map((step, index) => {
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.progressContainer}
+              contentContainerStyle={styles.progressContent}>
+              {steps.map((step) => {
                 const status = getStepStatus(step.id);
                 return (
-                  <View key={step.id} style={styles.stepItem}>
+                  <TouchableOpacity
+                    key={step.id}
+                    style={styles.stepItem}
+                    onPress={() => {
+                      if (status === 'completed' || status === 'active') {
+                        setCurrentStep(step.id);
+                      }
+                    }}
+                    disabled={status === 'pending'}>
                     <View
                       style={[
                         styles.stepCircle,
@@ -1888,28 +1922,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                         styles.stepLabel,
                         status === 'completed' && styles.stepLabelCompleted,
                         status === 'active' && styles.stepLabelActive,
-                      ]}>
+                      ]}
+                      numberOfLines={1}>
                       {step.name}
                     </Text>
-                    {index < steps.length - 1 && (
-                      <View
-                        style={[
-                          styles.stepLine,
-                          status === 'completed' && styles.stepLineCompleted,
-                          status === 'active' && styles.stepLineActive,
-                        ]}
-                      />
-                    )}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {/* Content */}
             <ScrollView
+              ref={stepScrollViewRef}
               style={styles.content}
               contentContainerStyle={styles.contentContainer}
-              showsVerticalScrollIndicator={false}>
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag">
               {renderStepContent()}
             </ScrollView>
 
@@ -1953,7 +1982,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 )}
               </TouchableOpacity>
             </View>
-            </View>
+            </KeyboardAvoidingView>
           </SafeAreaView>
         </View>
       </View>
@@ -1983,67 +2012,102 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.text,
+    marginTop: spacing.md,
+    fontSize: 16,
+  },
+  limitedBanner: {
+    backgroundColor: '#FFF3CD',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFC107',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    flexShrink: 0,
+  },
+  limitedBannerTitle: {
+    ...typography.h3,
+    color: '#856404',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  limitedBannerText: {
+    ...typography.body,
+    color: '#856404',
+    fontSize: 13,
+    lineHeight: 18,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    minHeight: 64,
-    backgroundColor: colors.surface,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    minHeight: 70,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: colors.border,
+    flexShrink: 0,
   },
   headerTitle: {
-    fontSize: 20,
-    color: '#1D242B', // Dark Charcoal
+    ...typography.h1,
+    fontSize: 24,
+    color: colors.text,
     fontWeight: '700',
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButtonText: {
-    fontSize: 18,
-    color: '#6B7280',
+    fontSize: 20,
+    color: colors.text,
     fontWeight: '600',
   },
   progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: colors.border,
+    maxHeight: 100,
+  },
+  progressContent: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
   },
   stepItem: {
-    flex: 1,
     alignItems: 'center',
-    position: 'relative',
+    minWidth: 60,
+    marginRight: spacing.sm,
   },
   stepCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
   stepCircleCompleted: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#43A047',
   },
   stepCircleActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#0077C0',
   },
   stepIcon: {
-    fontSize: 18,
+    fontSize: 20,
   },
   stepCheckmark: {
     fontSize: 20,
@@ -2053,98 +2117,72 @@ const styles = StyleSheet.create({
   stepLabel: {
     ...typography.caption,
     fontSize: 10,
-    color: '#9CA3AF',
+    lineHeight: 12,
+    color: colors.textSecondary,
     textAlign: 'center',
-    fontWeight: '500',
   },
   stepLabelCompleted: {
-    color: '#10B981',
+    color: '#43A047',
     fontWeight: '600',
   },
   stepLabelActive: {
-    color: colors.primary,
+    color: '#0077C0',
     fontWeight: '700',
-  },
-  stepLine: {
-    position: 'absolute',
-    top: 24,
-    left: '60%',
-    right: '-40%',
-    height: 2,
-    backgroundColor: '#E5E7EB',
-    zIndex: -1,
-  },
-  stepLineCompleted: {
-    backgroundColor: '#10B981',
-  },
-  stepLineActive: {
-    backgroundColor: colors.primary,
   },
   content: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
   },
   contentContainer: {
-    padding: spacing.lg,
+    padding: spacing.xl,
     paddingBottom: spacing.xxl,
+    flexGrow: 1,
   },
   stepContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingBottom: spacing.lg,
   },
   stepTitle: {
-    fontSize: 22,
-    color: '#1D242B', // Dark Charcoal
+    ...typography.h1,
+    fontSize: 24,
+    color: colors.text,
     marginBottom: spacing.xs,
     fontWeight: '700',
   },
   stepSubtitle: {
     ...typography.body,
-    color: '#6B7280',
+    color: colors.textSecondary,
     marginBottom: spacing.xl,
     fontSize: 14,
-    lineHeight: 22,
   },
   inputContainer: {
     marginBottom: spacing.lg,
   },
+  locationInputContainer: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  stateInputContainer: {
+    position: 'relative',
+    zIndex: 1,
+  },
   label: {
     ...typography.caption,
-    color: '#374151',
+    color: colors.text,
     marginBottom: spacing.sm,
     fontWeight: '600',
     fontSize: 14,
   },
   required: {
-    color: '#EF4444',
+    color: '#E53935',
   },
   input: {
-    backgroundColor: '#FAFAFA',
-    borderRadius: 10,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md - 2,
+    backgroundColor: '#F5F5F5',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
     ...typography.body,
     color: colors.text,
-    fontSize: 15,
-    minHeight: 50,
-    marginTop: spacing.xs,
-  },
-  inputFocused: {
-    borderWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
-  },
-  inputError: {
-    borderWidth: 1.5,
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   textArea: {
     height: 120,
@@ -2153,58 +2191,37 @@ const styles = StyleSheet.create({
   },
   charCount: {
     ...typography.caption,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     textAlign: 'right',
     marginTop: spacing.xs,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  charCountWarning: {
-    color: '#F59E0B',
-  },
-  charCountError: {
-    color: '#EF4444',
   },
   errorText: {
     ...typography.caption,
-    color: '#EF4444',
+    color: colors.error,
     fontSize: 12,
-    fontWeight: '500',
     marginTop: spacing.xs,
-  },
-  errorIcon: {
-    fontSize: 14,
-    marginRight: spacing.xs,
   },
   typeButtonsContainer: {
     flexDirection: 'row',
     gap: spacing.md,
-    minHeight: 60,
   },
   typeButton: {
     flex: 1,
-    minHeight: 48,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
   },
   typeButtonGradient: {
-    flex: 1,
-    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
-    minHeight: 48,
     gap: spacing.xs,
   },
   typeButtonUnselected: {
-    flex: 1,
-    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
-    minHeight: 48,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -2231,22 +2248,25 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginTop: spacing.sm,
-    gap: spacing.sm,
+    marginHorizontal: -spacing.xs / 2, // Negative margin for spacing
   },
   propertyTypeButton: {
-    width: '48%',
-    backgroundColor: '#FAFAFA',
-    borderRadius: 14,
+    width: '48%', // Two columns with space between
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 100,
-    marginBottom: spacing.xs,
+    marginHorizontal: spacing.xs / 2, // Half margin on each side
+    marginBottom: spacing.md,
   },
   propertyTypeButtonActive: {
+    borderColor: '#0077C0',
     borderWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: '#E3F6FF', // Light blue
+    backgroundColor: '#E3F6FF',
   },
   propertyTypeIcon: {
     fontSize: 32,
@@ -2254,13 +2274,13 @@ const styles = StyleSheet.create({
   },
   propertyTypeText: {
     ...typography.body,
-    color: '#374151',
-    fontSize: 13,
+    color: colors.text,
+    fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
   },
   propertyTypeTextActive: {
-    color: colors.primary,
+    color: '#0077C0',
     fontWeight: '600',
   },
   mapContainer: {
@@ -2304,26 +2324,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: spacing.xs,
   },
+  coordinateText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    fontFamily: 'monospace',
+    fontSize: 11,
+  },
   numberButtonsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
+  studioButton: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  studioButtonText: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+  },
   numberButton: {
-    width: 56,
-    height: 46,
-    backgroundColor: '#FAFAFA',
-    borderRadius: 10,
+    width: 60,
+    height: 50,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   numberButtonActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#0077C0',
+    borderColor: '#0077C0',
   },
   numberButtonText: {
     ...typography.body,
-    color: '#374151',
-    fontSize: 15,
+    color: colors.text,
+    fontSize: 16,
     fontWeight: '600',
   },
   numberButtonTextActive: {
@@ -2344,7 +2388,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   dropdown: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     borderWidth: 1,
@@ -2370,94 +2414,99 @@ const styles = StyleSheet.create({
   amenitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: spacing.md,
-    marginHorizontal: -spacing.xs, // Negative margin to account for item margins
+    marginTop: spacing.sm,
+    marginHorizontal: -spacing.xs,
   },
   amenityButton: {
-    width: '31%', // 3 columns with gaps
-    marginHorizontal: '1%',
-    marginBottom: spacing.sm,
-    backgroundColor: '#FAFAFA',
-    borderRadius: 14,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    width: '25%',
+    minWidth: 72,
+    maxWidth: 120,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 90,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    minHeight: 80,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   amenityButtonActive: {
+    borderColor: '#0077C0',
     borderWidth: 2,
-    borderColor: colors.primary,
     backgroundColor: '#E3F6FF',
   },
   amenityIcon: {
-    fontSize: 26,
-    marginBottom: spacing.xs + 2,
+    fontSize: 24,
+    marginBottom: spacing.xs,
   },
   amenityText: {
     ...typography.caption,
-    color: '#374151',
-    fontSize: 11,
+    color: colors.text,
+    fontSize: 12,
     textAlign: 'center',
-    fontWeight: '500',
-    lineHeight: 14,
   },
   amenityTextActive: {
-    color: colors.primary,
-    fontWeight: '700',
+    color: colors.text,
+    fontWeight: '600',
   },
   photoUploadArea: {
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderStyle: 'dashed',
-    borderRadius: 14,
-    padding: spacing.xl,
+    borderRadius: borderRadius.md,
+    padding: spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 160,
-    backgroundColor: '#F9F5FF', // Light purple tint
+    minHeight: 200,
+    backgroundColor: '#FAFAFA',
   },
   photoUploadIcon: {
-    fontSize: 40,
+    fontSize: 48,
     marginBottom: spacing.md,
   },
   photoUploadText: {
     ...typography.body,
-    color: '#1D242B', // Dark Charcoal
-    fontSize: 15,
+    color: colors.text,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: spacing.xs,
   },
   photoUploadSubtext: {
     ...typography.body,
-    color: '#6B7280',
-    fontSize: 13,
+    color: colors.text,
+    fontSize: 14,
     marginBottom: spacing.sm,
   },
   photoUploadHint: {
     ...typography.caption,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     fontSize: 12,
+  },
+  photoCameraButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: '#E8F4FD',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   photosPreview: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
   photoPreviewItem: {
     width: 100,
     height: 100,
-    borderRadius: 12,
+    borderRadius: borderRadius.md,
     overflow: 'hidden',
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   photoPreviewImage: {
     width: '100%',
@@ -2465,47 +2514,64 @@ const styles = StyleSheet.create({
   },
   moderationBadge: {
     position: 'absolute',
-    top: 6,
-    left: 6,
+    top: 4,
+    left: 4,
     paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-    minWidth: 24,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    minWidth: 60,
     alignItems: 'center',
   },
   moderationBadgeText: {
     ...typography.caption,
     color: colors.surface,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   reasonBadge: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 4,
   },
   reasonText: {
     ...typography.caption,
     color: colors.surface,
-    fontSize: 9,
+    fontSize: 8,
+  },
+  errorDetailsButton: {
+    position: 'absolute',
+    bottom: 24,
+    left: 4,
+    right: 4,
+    backgroundColor: colors.error,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  errorDetailsText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
   },
   photoRemoveButton: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   photoRemoveText: {
     color: colors.surface,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   priceInputContainer: {
@@ -2513,15 +2579,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
     borderRadius: borderRadius.md,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
     paddingLeft: spacing.md,
-    minHeight: 48,
-    marginTop: spacing.xs,
-  },
-  priceInputContainerFocused: {
-    borderColor: '#0077C0',
-    backgroundColor: colors.surface,
   },
   currencySymbol: {
     ...typography.body,
@@ -2534,6 +2594,12 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 0,
     backgroundColor: 'transparent',
+  },
+  priceSuggestionText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.xs,
   },
   checkboxContainer: {
     flexDirection: 'row',
@@ -2565,26 +2631,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   summaryButton: {
-    backgroundColor: '#E3F6FF', // Light blue
-    borderRadius: 10,
+    backgroundColor: '#E3F6FF',
+    borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
     marginBottom: spacing.md,
   },
   summaryButtonText: {
     ...typography.body,
-    color: colors.primary,
+    color: '#0077C0',
     fontSize: 14,
     fontWeight: '600',
   },
   listingSummary: {
-    backgroundColor: '#FAFAFA',
-    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
     padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   summaryTitle: {
-    fontSize: 16,
-    color: '#1D242B', // Dark Charcoal
+    ...typography.h3,
+    color: colors.text,
+    fontSize: 18,
     fontWeight: '700',
     marginBottom: spacing.md,
   },
@@ -2592,80 +2661,71 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   summaryLabel: {
     ...typography.body,
-    color: '#6B7280',
-    fontSize: 13,
+    color: colors.textSecondary,
+    fontSize: 14,
   },
   summaryValue: {
     ...typography.body,
-    color: '#374151',
-    fontSize: 13,
+    color: colors.text,
+    fontSize: 14,
     fontWeight: '600',
     flex: 1,
     textAlign: 'right',
   },
   footer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md + 4,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
     gap: spacing.md,
+    flexShrink: 0,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm + 4,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     gap: spacing.xs,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
   },
   backButtonIcon: {
     ...typography.body,
-    color: '#374151',
-    fontSize: 16,
+    color: colors.text,
+    fontSize: 18,
     fontWeight: '600',
   },
   backButtonText: {
     ...typography.body,
-    color: '#374151',
-    fontWeight: '500',
-    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 16,
   },
   cancelButton: {
-    paddingVertical: spacing.sm + 4,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 10,
-    backgroundColor: '#FEE2E2',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelButtonText: {
     ...typography.body,
-    color: '#DC2626',
+    color: colors.text,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 16,
   },
   nextButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: borderRadius.md,
     overflow: 'hidden',
-    minHeight: 50,
-    shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
   },
   disabledButton: {
     opacity: 0.6,
@@ -2674,8 +2734,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md + 2,
-    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    gap: spacing.xs,
   },
   nextButtonText: {
     ...typography.body,
@@ -2693,8 +2753,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md + 2,
-    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    gap: spacing.xs,
   },
   publishButtonIcon: {
     ...typography.body,
@@ -2708,49 +2768,296 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-  locationInputContainer: {
-    position: 'relative',
-    zIndex: 1,
+  buttonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
   },
-  stateInputContainer: {
-    position: 'relative',
-    zIndex: 1,
+  typeButtonActive: {
+    borderColor: colors.accent,
+    borderWidth: 2,
+    backgroundColor: colors.accent + '20',
   },
-  coordinateText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-    fontFamily: 'monospace',
-    fontSize: 11,
+  typeButtonTextActive: {
+    color: colors.accent,
+    fontWeight: '600',
   },
-  studioButton: {
+  configButton: {
+    width: '30%',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
+    minHeight: 50,
+    position: 'relative',
   },
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.md,
+  configButtonActive: {
+    borderColor: colors.accent,
+    borderWidth: 2,
+    backgroundColor: colors.accent + '20',
   },
-  studioButtonText: {
+  configButtonText: {
     ...typography.body,
     color: colors.text,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '500',
+  },
+  configButtonTextActive: {
+    color: colors.accent,
+    fontWeight: '600',
+  },
+  checkmark: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    fontSize: 16,
+    color: colors.accent,
+    fontWeight: 'bold',
+  },
+  amenityCheckmark: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    fontSize: 16,
+    color: colors.accent,
+    fontWeight: 'bold',
+  },
+  imageStatusOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  approvedOverlay: {
+    backgroundColor: 'rgba(76, 175, 80, 0.8)',
+  },
+  rejectedOverlay: {
+    backgroundColor: 'rgba(244, 67, 54, 0.8)',
+  },
+  imageStatusText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  removeAndRetryButton: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+  },
+  removeAndRetryText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  previewScroll: {
+    maxHeight: 400,
+  },
+  previewSection: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  previewSectionTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  previewLabel: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 13,
+    flex: 1,
+  },
+  previewValue: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  disabledInput: {
+    backgroundColor: colors.border + '40',
+    color: colors.textSecondary,
+  },
+  autoFilledInput: {
+    backgroundColor: colors.border + '40',
+  },
+  autoFilledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    gap: spacing.sm,
+  },
+  autoFilledBadgeText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  editButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  editButtonText: {
+    ...typography.caption,
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  coordinatesContainer: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  coordinatesText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  removeButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  removeButtonText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  priceDisplay: {
+    ...typography.caption,
+    color: colors.accent,
+    fontSize: 12,
+    marginTop: spacing.xs,
+    fontWeight: '600',
+  },
+  submitButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  submitButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  nextButtonDisabled: {
+    backgroundColor: colors.border,
+    opacity: 0.6,
+  },
+  imageItem: {
+    width: 100,
+    height: 100,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  projectImage: {
+    width: '100%',
+    height: '100%',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageText: {
+    color: colors.surface,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  imageUploadButton: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: 200,
+    backgroundColor: colors.surfaceSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    fontSize: 48,
+    marginBottom: spacing.sm,
+  },
+  imagePlaceholderLabel: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  uploadButton: {
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  uploadButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  imageCountText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginBottom: spacing.xs,
+  },
+  warningText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 12,
+    marginBottom: spacing.sm,
+  },
+  imagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
   hintText: {
     ...typography.caption,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: spacing.xs,
   },

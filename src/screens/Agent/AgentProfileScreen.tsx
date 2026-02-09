@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Image,
   Animated,
+  Modal,
+  Pressable,
 } from 'react-native';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -38,6 +40,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(user?.profile_image || null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -246,16 +249,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const showImagePicker = () => {
-    CustomAlert.alert(
-      'Select Profile Image',
-      'Choose an option',
-      [
-        {text: 'Camera', onPress: () => handleImagePicker('camera')},
-        {text: 'Gallery', onPress: () => handleImagePicker('gallery')},
-        {text: 'Cancel', style: 'cancel'},
-      ],
-      {cancelable: true},
-    );
+    setShowImagePickerModal(true);
   };
 
   const handleImagePicker = (source: 'camera' | 'gallery') => {
@@ -306,6 +300,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
       }
     };
 
+    setShowImagePickerModal(false);
     if (source === 'camera') {
       launchCamera(options, callback);
     } else {
@@ -343,6 +338,40 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
 
   return (
     <View style={styles.container}>
+      {/* Image Picker Modal with styled options */}
+      <Modal
+        visible={showImagePickerModal}
+        transparent
+        animationType="fade">
+        <Pressable style={styles.imagePickerOverlay} onPress={() => setShowImagePickerModal(false)}>
+          <View style={styles.imagePickerContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.imagePickerTitle}>Select Profile Image</Text>
+            <View style={styles.imagePickerButtons}>
+              <TouchableOpacity
+                style={styles.imagePickerOption}
+                onPress={() => handleImagePicker('camera')}
+                activeOpacity={0.7}>
+                <Text style={styles.imagePickerOptionIcon}>📷</Text>
+                <Text style={styles.imagePickerOptionText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.imagePickerOption}
+                onPress={() => handleImagePicker('gallery')}
+                activeOpacity={0.7}>
+                <Text style={styles.imagePickerOptionIcon}>🖼️</Text>
+                <Text style={styles.imagePickerOptionText}>Gallery</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.imagePickerCancel}
+              onPress={() => setShowImagePickerModal(false)}
+              activeOpacity={0.7}>
+              <Text style={styles.imagePickerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
       <AgentHeader
         onProfilePress={() => {}}
         onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
@@ -654,6 +683,59 @@ const styles = StyleSheet.create({
   },
   editPhotoText: {
     fontSize: 16,
+  },
+  imagePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  imagePickerContent: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 320,
+  },
+  imagePickerTitle: {
+    ...typography.h3,
+    color: colors.text,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  imagePickerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  imagePickerOption: {
+    flex: 1,
+    backgroundColor: colors.accentSoft,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  imagePickerOptionIcon: {
+    fontSize: 32,
+    marginBottom: spacing.sm,
+  },
+  imagePickerOptionText: {
+    ...typography.bodySemibold,
+    color: colors.primary,
+  },
+  imagePickerCancel: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  imagePickerCancelText: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
   profileName: {
     ...typography.h2,

@@ -67,18 +67,16 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
   const isPGHostel = propertyType === 'PG / Hostel';
 
   // Return configuration based on property type
-  // Note: "Row House/ Farm House" matches both isResidentialStandard and isFarmHouse
-  // According to PROPERTY_TYPE_FIELDS.md, it's listed under Standard Residential (with balconies)
-  // The Farm House section is a note for when treated as farmhouse (no balconies)
-  // Since we can't distinguish in UI, we use Standard Residential config
-  if (isResidentialStandard) {
+  // Villa / Independent House / Row House: total floors only (no floor number)
+  // Apartment / Penthouse: floor number + total floors
+  if (isResidentialIndependent) {
     return {
       showBedrooms: true,
       bedroomsRequired: true,
       showBathrooms: true,
       bathroomsRequired: true,
       showBalconies: true,
-      showFloor: true,
+      showFloor: false,
       showTotalFloors: true,
       showFacing: true,
       showAge: true,
@@ -88,14 +86,31 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
     };
   }
 
-  if (isResidentialIndependent) {
+  if (isFarmHouse) {
     return {
       showBedrooms: true,
       bedroomsRequired: true,
       showBathrooms: true,
       bathroomsRequired: true,
       showBalconies: true,
-      showFloor: true, // Updated: Independent House should show Floor
+      showFloor: false,
+      showTotalFloors: true,
+      showFacing: true,
+      showAge: true,
+      showFurnishing: true,
+      showCarpetArea: true,
+      areaLabel: 'Built-up Area',
+    };
+  }
+
+  if (isResidentialStandard) {
+    return {
+      showBedrooms: true,
+      bedroomsRequired: true,
+      showBathrooms: true,
+      bathroomsRequired: true,
+      showBalconies: true,
+      showFloor: true,
       showTotalFloors: true,
       showFacing: true,
       showAge: true,

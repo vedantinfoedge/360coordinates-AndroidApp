@@ -218,18 +218,8 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
           />
         </View>
 
-        {/* Right side buttons container */}
+        {/* Right side buttons container - switch to seller removed per product */}
         <View style={styles.rightButtons}>
-          {/* Add Property Button - Only show when callback is provided (logged in users) */}
-          {onAddPropertyPress && (
-            <TouchableOpacity
-              style={styles.addPropertyButton}
-              onPress={onAddPropertyPress}
-              activeOpacity={0.7}>
-              <Text style={styles.addPropertyText}>+ Add</Text>
-            </TouchableOpacity>
-          )}
-
           {/* Hamburger Menu */}
           <TouchableOpacity
             style={styles.menuButton}
@@ -328,26 +318,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  addPropertyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.secondary, // Dark navy blue
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: borderRadius.sm,
-    shadowColor: colors.secondary,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addPropertyText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.surface, // White text
-    letterSpacing: 0.3,
   },
   menuButton: {
     padding: spacing.sm,

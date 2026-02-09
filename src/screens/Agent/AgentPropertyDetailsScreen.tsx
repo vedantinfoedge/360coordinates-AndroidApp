@@ -403,10 +403,10 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               </Text>
             </View>
           )}
-          {property.floor && (
+          {(property.floor !== undefined && property.floor !== null && property.floor !== '') && (
             <View style={styles.infoItem}>
               <Text style={styles.infoIcon}>🏢</Text>
-              <Text style={styles.infoText}>{property.floor}</Text>
+              <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground floor' : String(property.floor)}</Text>
             </View>
           )}
         </View>

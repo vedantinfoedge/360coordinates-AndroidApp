@@ -1053,7 +1053,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>🏢</Text>
             </View>
-            <Text style={styles.infoText}>{property.floor}</Text>
+            <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground floor' : (property.floor ?? 'N/A')}</Text>
           </View>
         </View>
 
@@ -1091,6 +1091,14 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 {property.type === 'buy' ? 'For Sale' : 'For Rent'}
               </Text>
             </View>
+            {(property.property_type || '').toLowerCase().includes('pg') || (property.property_type || '').toLowerCase().includes('hostel') || property.status === 'pg' ? (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Available for bachelors</Text>
+                <Text style={styles.detailValue}>
+                  {property.available_for_bachelors === true || property.available_for_bachelors === 'true' ? 'Yes' : 'No'}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 

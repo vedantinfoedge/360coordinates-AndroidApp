@@ -18,6 +18,7 @@ export type SearchStackParamList = {
     area?: string;
     status?: 'sale' | 'rent';
     listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel';
+    project_type?: 'upcoming' | null;
   } | undefined;
   PropertyDetails: {propertyId: string; returnFromLogin?: boolean};
   AllProperties: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;

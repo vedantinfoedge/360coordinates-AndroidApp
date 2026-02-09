@@ -447,7 +447,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>🏢</Text>
             </View>
-            <Text style={styles.infoText}>{property.floor || 'N/A'}</Text>
+            <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground floor' : (property.floor || 'N/A')}</Text>
           </View>
         </View>
 

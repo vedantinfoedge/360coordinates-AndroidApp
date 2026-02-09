@@ -740,16 +740,19 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     
     const cardAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
+    const hasAnimated = useRef(false);
 
     useEffect(() => {
+      if (hasAnimated.current) return;
+      hasAnimated.current = true;
       Animated.timing(cardAnim, {
         toValue: 1,
         duration: 400,
-        delay: index * 100,
+        delay: 0,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }).start();
-    }, [index]);
+    }, []);
 
     const handlePressIn = () => {
       Animated.spring(scaleAnim, {

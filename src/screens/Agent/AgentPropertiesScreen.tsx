@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useEffect, useRef} from 'react';
+import React, {useState, useCallback, useEffect, useRef, useMemo} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Animated,
+  TextInput,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
@@ -19,8 +22,13 @@ import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
 import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
-import {formatters} from '../../utils/formatters';
+import {formatters, capitalize} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
+
+type StatusFilter = 'all' | 'sale' | 'rent';
+type SortOption = 'newest' | 'oldest' | 'price-high' | 'price-low';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -56,8 +64,13 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout} = useAuth();
   const insets = useSafeAreaInsets();
   const [properties, setProperties] = useState<Property[]>([]);
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // Check if property can be edited (within 24 hours)
@@ -197,9 +210,11 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
         });
         
         console.log('[AgentProperties] Loaded and fixed properties:', fixedProperties.length);
+        setAllProperties(fixedProperties);
         setProperties(fixedProperties);
       } else {
         console.log('[AgentProperties] No properties found in response data');
+        setAllProperties([]);
         setProperties([]);
       }
     } catch (error: any) {
@@ -215,6 +230,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
       if (showLoading) {
         CustomAlert.alert('Error Loading Properties', errorMessage);
       }
+      setAllProperties([]);
       setProperties([]);
     } finally {
       if (showLoading) {
@@ -309,6 +325,43 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     return 'INACTIVE';
   };
 
+  const filteredAndSortedProperties = useMemo(() => {
+    let filtered = [...allProperties];
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(prop =>
+        (prop.title || '').toLowerCase().includes(query) ||
+        (prop.location || '').toLowerCase().includes(query)
+      );
+    }
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(prop => prop.status === statusFilter);
+    }
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          const aDate = new Date(a.created_at || a.created_date || 0).getTime();
+          const bDate = new Date(b.created_at || b.created_date || 0).getTime();
+          return bDate - aDate;
+        case 'oldest':
+          const aDateOld = new Date(a.created_at || a.created_date || 0).getTime();
+          const bDateOld = new Date(b.created_at || b.created_date || 0).getTime();
+          return aDateOld - bDateOld;
+        case 'price-high':
+          return parseFloat(String(b.price || '0')) - parseFloat(String(a.price || '0'));
+        case 'price-low':
+          return parseFloat(String(a.price || '0')) - parseFloat(String(b.price || '0'));
+        default:
+          return 0;
+      }
+    });
+    return filtered;
+  }, [allProperties, searchQuery, statusFilter, sortBy]);
+
+  const handleAddProperty = () => {
+    navigation.getParent()?.navigate('AddProperty' as never);
+  };
+
   const renderProperty = ({item}: {item: Property}) => {
     // Validate and fix image URL for Android - improved handling
     let imageUrl: string | null = null;
@@ -331,7 +384,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     return (
       <TouchableOpacity
         style={styles.propertyCard}
-        onPress={() => navigation.getParent()?.navigate('PropertyDetails' as never, {propertyId: item.id} as never)}>
+        onPress={() => navigation.getParent()?.navigate((item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails') as never, {propertyId: item.id} as never)}>
         {imageUrl ? (
           <Image
             source={{uri: imageUrl}}
@@ -358,7 +411,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.propertyInfo}>
         <View style={styles.propertyHeader}>
           <Text style={styles.propertyTitle} numberOfLines={2}>
-            {item.title}
+            {capitalize(item.title || 'Untitled Property')}
           </Text>
           <View
             style={[
@@ -422,12 +475,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
-          onLogoutPress={logout}
-        />
-        <View style={styles.loadingContainer}>
+        <View style={[styles.loadingContainer, {paddingTop: insets.top + spacing.lg}]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading properties...</Text>
         </View>
@@ -437,40 +485,122 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
 
   return (
     <View style={styles.container}>
-      <AgentHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
-        onLogoutPress={logout}
-      />
+      <View style={[styles.header, {marginTop: insets.top + spacing.md}]}>
+        <Text style={styles.headerTitle}>All Listings</Text>
+        <TouchableOpacity style={styles.addButtonOutline} onPress={handleAddProperty}>
+          <Text style={styles.addButtonOutlineText}>+ Add Property</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.searchBar}>
+        <View style={styles.searchInputContainer}>
+          <View style={styles.searchIconContainer}>
+            <Text style={styles.searchIcon}>🔍</Text>
+          </View>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search properties..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={colors.textSecondary}
+          />
+        </View>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)} activeOpacity={0.7}>
+          <Text style={styles.filterButtonIcon}>⚙</Text>
+        </TouchableOpacity>
+      </View>
+      <Modal visible={showFilterModal} transparent animationType="slide" onRequestClose={() => setShowFilterModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter & Sort</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.filterSection}>
+              <Text style={styles.filterLabel}>Status</Text>
+              <View style={styles.filterOptions}>
+                {(['all', 'sale', 'rent'] as StatusFilter[]).map(status => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[styles.filterOption, statusFilter === status && styles.filterOptionActive]}
+                    onPress={() => setStatusFilter(status)}
+                    activeOpacity={0.7}>
+                    <Text style={[styles.filterOptionText, statusFilter === status && styles.filterOptionTextActive]}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                    {statusFilter === status && (
+                      <View style={styles.filterOptionCheck}>
+                        <Text style={styles.filterOptionCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.filterDivider} />
+            <View style={styles.filterSection}>
+              <Text style={styles.filterLabel}>Sort By</Text>
+              {(['newest', 'oldest', 'price-high', 'price-low'] as SortOption[]).map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={[styles.sortOption, sortBy === option && styles.sortOptionActive]}
+                  onPress={() => setSortBy(option)}
+                  activeOpacity={0.7}>
+                  <Text style={[styles.sortOptionText, sortBy === option && styles.sortOptionTextActive]}>
+                    {option === 'newest' && 'Newest First'}
+                    {option === 'oldest' && 'Oldest First'}
+                    {option === 'price-high' && 'Price: High to Low'}
+                    {option === 'price-low' && 'Price: Low to High'}
+                  </Text>
+                  {sortBy === option && (
+                    <View style={styles.sortOptionCheck}>
+                      <Text style={styles.checkmark}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.applyButton} onPress={() => setShowFilterModal(false)}>
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {loading ? (
+        <View style={[styles.loadingContainer, {paddingTop: insets.top + HEADER_HEIGHT}]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading properties...</Text>
+        </View>
+      ) : properties.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>🏠</Text>
+          <Text style={styles.emptyText}>No Properties Listed</Text>
+          <Text style={styles.emptySubtext}>Start by adding your first property to showcase it to potential buyers</Text>
+          <TouchableOpacity style={styles.addButtonOutline} onPress={handleAddProperty} activeOpacity={0.8}>
+            <Text style={styles.addButtonOutlineText}>+ Add Your First Property</Text>
+          </TouchableOpacity>
+        </View>
+      ) : filteredAndSortedProperties.length === 0 && searchQuery ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyText}>No Properties Found</Text>
+          <Text style={styles.emptySubtext}>Try adjusting your search terms or filters</Text>
+        </View>
+      ) : (
       <Animated.FlatList
-        data={properties}
+        data={filteredAndSortedProperties}
         renderItem={renderProperty}
         keyExtractor={item => String(item.id)}
-        contentContainerStyle={[
-          styles.listContent,
-          {paddingTop: insets.top + HEADER_HEIGHT + spacing.md},
-        ]}
+        contentContainerStyle={[styles.listContent, {paddingTop: spacing.md}]}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🏠</Text>
-            <Text style={styles.emptyText}>No properties yet</Text>
-            <Text style={styles.emptySubtext}>
-              Your property listings will appear here
-            </Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}>
-              <Text style={styles.addButtonText}>Add Your First Property</Text>
-            </TouchableOpacity>
-          </View>
-        }
         showsVerticalScrollIndicator={false}
       />
-      {/* Floating Action Button - Always visible when there are properties */}
+      )}
+      {/* FAB - Always visible when there are properties */}
       {properties.length > 0 && (
         <TouchableOpacity
           style={styles.fab}
@@ -489,6 +619,144 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1D242B',
+    flex: 1,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    height: 46,
+  },
+  searchIconContainer: {
+    width: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  searchIcon: {fontSize: 16},
+  searchInput: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    paddingVertical: 0,
+    fontSize: 14,
+    height: 46,
+  },
+  filterButton: {
+    width: 46,
+    height: 46,
+    backgroundColor: '#E3F6FF',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterButtonIcon: {fontSize: 18, color: colors.primary},
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  modalTitle: {fontSize: 20, color: '#1D242B', fontWeight: '700'},
+  modalClose: {fontSize: 24, color: '#9CA3AF', fontWeight: '500'},
+  filterSection: {marginBottom: spacing.xl},
+  filterLabel: {fontSize: 15, color: '#1D242B', fontWeight: '600', marginBottom: spacing.md},
+  filterDivider: {height: 1, backgroundColor: '#F3F4F6', marginVertical: spacing.lg},
+  filterOptions: {flexDirection: 'row', gap: 10, flexWrap: 'wrap'},
+  filterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: 10,
+    backgroundColor: '#FAFAFA',
+    gap: spacing.xs,
+    minHeight: 42,
+  },
+  filterOptionActive: {backgroundColor: colors.primary},
+  filterOptionText: {...typography.body, color: '#374151', fontSize: 14, fontWeight: '500'},
+  filterOptionTextActive: {color: colors.surface, fontWeight: '600'},
+  filterOptionCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterOptionCheckText: {color: colors.surface, fontSize: 11, fontWeight: '700'},
+  sortOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+    marginBottom: spacing.sm,
+    minHeight: 50,
+  },
+  sortOptionActive: {backgroundColor: '#E3F6FF', borderWidth: 2, borderColor: colors.primary},
+  sortOptionText: {...typography.body, color: '#374151', fontSize: 14, fontWeight: '500', flex: 1},
+  sortOptionTextActive: {color: colors.primary, fontWeight: '600'},
+  sortOptionCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+  },
+  checkmark: {color: colors.surface, fontSize: 12, fontWeight: '700'},
+  applyButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  applyButtonText: {...typography.body, color: colors.surface, fontWeight: '600', fontSize: 15},
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -500,7 +768,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   listContent: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
   propertyCard: {
@@ -665,6 +933,23 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.surface,
     fontWeight: '700',
+  },
+  addButtonOutline: {
+    backgroundColor: 'transparent',
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    minWidth: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButtonOutlineText: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 13,
   },
   fab: {
     position: 'absolute',

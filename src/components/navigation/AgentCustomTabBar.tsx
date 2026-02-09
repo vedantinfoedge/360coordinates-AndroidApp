@@ -130,7 +130,7 @@ export default function AgentCustomTabBar({state, descriptors, navigation}: Bott
       </View>
     </View>
       
-      {/* FAB Menu Modal */}
+      {/* FAB Arc Menu Modal - options in arc above FAB */}
       <Modal
         visible={showFABMenu}
         transparent={true}
@@ -140,21 +140,20 @@ export default function AgentCustomTabBar({state, descriptors, navigation}: Bott
           style={styles.menuOverlay}
           activeOpacity={1}
           onPress={() => setShowFABMenu(false)}>
-          <View style={styles.menuContainer}>
+          <View style={styles.arcMenuContainer}>
             <TouchableOpacity
-              style={styles.menuItem}
+              style={[styles.arcMenuItem, styles.arcMenuItemTop]}
               onPress={handleAddProperty}
-              activeOpacity={0.7}>
-              <Text style={styles.menuItemIcon}>🏠</Text>
-              <Text style={styles.menuItemText}>Add Property</Text>
+              activeOpacity={0.8}>
+              <Text style={styles.arcMenuIcon}>🏠</Text>
+              <Text style={styles.arcMenuLabel}>Add Property</Text>
             </TouchableOpacity>
-            <View style={styles.menuDivider} />
             <TouchableOpacity
-              style={styles.menuItem}
+              style={[styles.arcMenuItem, styles.arcMenuItemBottom]}
               onPress={handleAddProject}
-              activeOpacity={0.7}>
-              <Text style={styles.menuItemIcon}>🏗️</Text>
-              <Text style={styles.menuItemText}>Add Project</Text>
+              activeOpacity={0.8}>
+              <Text style={styles.arcMenuIcon}>🏗️</Text>
+              <Text style={styles.arcMenuLabel}>Add Project</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -226,39 +225,45 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
-  menuContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-    overflow: 'hidden',
-  },
-  menuItem: {
+  arcMenuContainer: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginBottom: -FAB_SIZE / 2,
+  },
+  arcMenuItem: {
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    minHeight: 56,
+    borderRadius: 24,
+    minWidth: 120,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  menuItemIcon: {
-    fontSize: 24,
-    marginRight: spacing.md,
+  arcMenuItemTop: {
+    marginBottom: 60,
+    transform: [{translateX: -40}],
   },
-  menuItemText: {
+  arcMenuItemBottom: {
+    marginBottom: 20,
+    transform: [{translateX: 40}],
+  },
+  arcMenuIcon: {
+    fontSize: 28,
+    marginBottom: spacing.xs,
+  },
+  arcMenuLabel: {
     ...typography.body,
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginHorizontal: spacing.md,
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

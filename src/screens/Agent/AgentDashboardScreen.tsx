@@ -16,8 +16,9 @@ import {
 } from 'react-native';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {AgentStackParamList} from '../../navigation/AgentNavigator';
+import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
@@ -29,7 +30,7 @@ import CustomAlert from '../../utils/alertHelper';
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 type AgentDashboardScreenNavigationProp = CompositeNavigationProp<
-  NativeStackNavigationProp<AgentStackParamList, 'Dashboard'>,
+  BottomTabScreenProps<AgentTabParamList, 'Home'>['navigation'],
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -63,39 +64,20 @@ interface RecentInquiry {
   created_at: string;
 }
 
-// Animated Add Property Button
-const AnimatedAddPropertyButton = React.memo(({onPress, title}: {onPress: () => void; title: string}) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.95,
-      useNativeDriver: true,
-      friction: 3,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 3,
-    }).start();
-  };
-
-  return (
-    <Animated.View style={{transform: [{scale: scaleAnim}]}}>
-      <TouchableOpacity
-        style={styles.addPropertyButton}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={0.9}>
-        <Text style={styles.addPropertyButtonText}>{title}</Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-});
+// Direct Add Property / Add Project buttons for dashboard
+const AddActionButtons = React.memo(({
+  onAddProperty,
+  onAddProject,
+}: {onAddProperty: () => void; onAddProject: () => void}) => (
+  <View style={styles.actionButtonsRow}>
+    <TouchableOpacity style={styles.addPropertyButton} onPress={onAddProperty} activeOpacity={0.9}>
+      <Text style={styles.addPropertyButtonText}>+ Add Property</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={styles.addPropertyButton} onPress={onAddProject} activeOpacity={0.9}>
+      <Text style={styles.addPropertyButtonText}>+ Add Project</Text>
+    </TouchableOpacity>
+  </View>
+));
 
 // Animated Stat Card Component
 const AnimatedStatCard = React.memo(({
@@ -462,7 +444,7 @@ const AnimatedPropertyCard = React.memo(({
       }}>
       <TouchableOpacity 
         style={styles.propertyCard} 
-        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+        onPress={() => (navigation.getParent() as any)?.navigate(item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails', {propertyId: String(item.id)})}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.9}>
@@ -589,46 +571,6 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
     }
   }, []);
 
-  // Check user type access
-  useEffect(() => {
-    if (user && user.user_type !== 'agent') {
-      const userTypeLabel = 
-        user.user_type === 'buyer' ? 'Buyer/Tenant' :
-        user.user_type === 'seller' ? 'Seller/Owner' :
-        user.user_type || 'User';
-      
-      CustomAlert.alert(
-        'Access Denied',
-        `You are registered as ${userTypeLabel}. You cannot access this dashboard.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              if (user.user_type === 'buyer') {
-                navigation.reset({
-                  index: 0,
-                  routes: [{name: 'Buyer' as never}],
-                });
-              } else if (user.user_type === 'seller') {
-                navigation.reset({
-                  index: 0,
-                  routes: [{name: 'Seller' as never}],
-                });
-              } else {
-                navigation.reset({
-                  index: 0,
-                  routes: [{name: 'Auth' as never}],
-                });
-              }
-            },
-          },
-        ],
-        {cancelable: false}
-      );
-      return;
-    }
-  }, [user, navigation]);
-
   const loadDashboardData = useCallback(async (showLoading: boolean = true, forceRefresh: boolean = false) => {
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchTimeRef.current;
@@ -737,7 +679,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
 
   useFocusEffect(
     useCallback(() => {
-      if (user && user.user_type === 'agent') {
+      if (user && (user.user_type || '').toLowerCase() === 'agent') {
         const task = InteractionManager.runAfterInteractions(() => {
           loadDashboardData(false, false);
         });
@@ -747,7 +689,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
   );
 
   useEffect(() => {
-    if (user && user.user_type === 'agent') {
+    if (user && (user.user_type || '').toLowerCase() === 'agent') {
       const task = InteractionManager.runAfterInteractions(() => {
         loadDashboardData(true, true);
       });
@@ -771,8 +713,8 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
     loadDashboardData(false, true);
   };
 
-  // Show access denied message if user is not an agent
-  if (user && user.user_type !== 'agent') {
+  // Show access denied message if user is not an agent (case-insensitive)
+  if (user && (user.user_type || '').toLowerCase() !== 'agent') {
     return (
       <View style={styles.container}>
         <AgentHeader
@@ -866,16 +808,10 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
                   Manage your properties and track your leads
                 </Text>
               </View>
-              <View style={styles.actionButtonsRow}>
-                <AnimatedAddPropertyButton
-                  onPress={() => navigation.navigate('AddProperty')}
-                  title="+ Add Property"
-                />
-                <AnimatedAddPropertyButton
-                  onPress={() => navigation.navigate('AddProject')}
-                  title="+ Add Project"
-                />
-              </View>
+              <AddActionButtons
+                onAddProperty={() => (navigation.getParent() as any)?.navigate('AddProperty')}
+                onAddProject={() => (navigation.getParent() as any)?.navigate('AddProject')}
+              />
             </View>
           </View>
 

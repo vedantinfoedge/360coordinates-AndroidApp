@@ -21,6 +21,7 @@ import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import {chatService} from '../../services/chat.service';
+import {buyerService} from '../../services/buyer.service';
 import CustomAlert from '../../utils/alertHelper';
 import {markChatAsRead} from '../../services/firebase.service';
 import firestore from '@react-native-firebase/firestore';
@@ -77,6 +78,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const [participantName, setParticipantName] = useState<string>(userName || '');
   const flatListRef = useRef<FlatList>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const inquirySentForPropertyRef = useRef<number | null>(null);
 
   useEffect(() => {
     let unsubscribeFn: (() => void) | null = null;
@@ -368,6 +370,24 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           if (conversationId) {
             backendChatRoomId = conversationId;
             console.log('[Chat] Using conversationId after error:', backendChatRoomId);
+          }
+        }
+
+        // Ensure seller/agent receives an inquiry: send inquiry when buyer starts a new chat
+        // (Seller Inquiries list reads from inquiry API; chat create-room may not create an inquiry record)
+        if (
+          user?.user_type === 'buyer' &&
+          propertyId &&
+          !conversationId &&
+          backendChatRoomId &&
+          inquirySentForPropertyRef.current !== Number(propertyId)
+        ) {
+          try {
+            await buyerService.sendInquiry(Number(propertyId), 'Interested in this property.');
+            inquirySentForPropertyRef.current = Number(propertyId);
+            console.log('[Chat] Sent inquiry for property so seller receives it in Inquiries list');
+          } catch (e) {
+            console.warn('[Chat] Could not send inquiry (seller may still see chat):', e);
           }
         }
       } else if (conversationId) {

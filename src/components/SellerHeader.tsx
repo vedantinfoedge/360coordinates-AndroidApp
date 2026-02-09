@@ -134,17 +134,7 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
             </Animated.View>
           )}
 
-          {/* Buy Property Button - Switch to buyer dashboard */}
-          {onBuyPropertyPress && (
-            <TouchableOpacity
-              style={styles.buyPropertyButton}
-              onPress={onBuyPropertyPress}
-              activeOpacity={0.7}>
-              <Text style={styles.buyPropertyText}>Buy</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Hamburger Menu */}
+          {/* Hamburger Menu - switch to buyer removed per product */}
           <TouchableOpacity
             style={styles.menuButton}
             onPress={() => setMenuVisible(true)}
@@ -299,25 +289,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     flexShrink: 0,
-  },
-  buyPropertyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.secondary, // Dark navy blue
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    shadowColor: colors.secondary,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  buyPropertyText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.surface, // White text
   },
   menuButton: {
     padding: 6,

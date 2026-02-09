@@ -1,4 +1,4 @@
-import React, {useState, useMemo, useEffect} from 'react';
+import React, {useState, useMemo, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,11 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, RouteProp} from '@react-navigation/native';
-import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
+import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AgentStackParamList} from '../../navigation/AgentNavigator';
@@ -72,6 +73,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [location, setLocation] = useState('');
   const [locationSelected, setLocationSelected] = useState(false);
   const [state, setState] = useState('');
+  const stateAutoFilledFromLocation = useRef(false);
   const [additionalAddress, setAdditionalAddress] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -94,9 +96,19 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [depositAmount, setDepositAmount] = useState('');
   const [maintenance, setMaintenance] = useState('');
   const [availableForBachelors, setAvailableForBachelors] = useState(false);
+  const stepScrollViewRef = useRef<{scrollTo: (opts: {y: number; animated?: boolean}) => void} | null>(null);
 
   const showError = (title: string, message: string) => {
     Alert.alert(title, message, [{text: 'OK'}]);
+  };
+
+  const formatPriceShort = (raw: string): string | null => {
+    const n = parseFloat(raw.replace(/[^0-9.]/g, ''));
+    if (isNaN(n) || n <= 0) return null;
+    if (n >= 1e7) return (n / 1e7).toFixed(1).replace(/\.0$/, '') + 'Cr';
+    if (n >= 1e5) return (n / 1e5).toFixed(1).replace(/\.0$/, '') + 'L';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return null;
   };
 
   const totalSteps = 5;
@@ -261,6 +273,31 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     return true;
   };
 
+  const requestCameraCapturePermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA, {
+          title: 'Camera Permission',
+          message: 'App needs camera access to take property photos',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        });
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  useEffect(() => {
+    if (currentStep !== 4) return;
+    requestCameraPermission().catch(() => {});
+    requestCameraCapturePermission().catch(() => {});
+  }, [currentStep]);
+
   const handleImagePicker = async () => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
@@ -386,8 +423,6 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   });
                   if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
                     Alert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines. Please upload property images only.', [{text: 'OK'}]);
-                  } else if (result.moderationStatus === 'PENDING' || result.moderationStatus === 'NEEDS_REVIEW') {
-                    Alert.alert('Image Under Review', 'Your image is being reviewed and will be visible after approval.', [{text: 'OK'}]);
                   }
                 })
                 .catch(error => {
@@ -419,6 +454,94 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           console.error('[AddProperty] Image processing error:', err);
           Alert.alert('Error', 'Failed to process images. Please try again.', [{text: 'OK'}]);
         }
+      }
+    });
+  };
+
+  const handleCameraCapture = async () => {
+    if (photos.length >= 10) {
+      showError('Limit Reached', 'You can upload maximum 10 photos');
+      return;
+    }
+    const hasPermission = await requestCameraCapturePermission();
+    if (!hasPermission) {
+      Alert.alert('Permission Denied', 'Please grant camera access in Settings to take photos.', [{text: 'OK'}]);
+      return;
+    }
+    const options = {
+      mediaType: 'photo' as MediaType,
+      quality: 0.6 as const,
+      includeBase64: true,
+      saveToPhotos: false,
+    };
+    launchCamera(options, (response: ImagePickerResponse) => {
+      if (response.didCancel) return;
+      if (response.errorCode) {
+        const msg = response.errorMessage || response.errorCode === 'camera_unavailable' ? 'Camera not available' : 'Failed to take photo';
+        Alert.alert('Error', msg, [{text: 'OK'}]);
+        return;
+      }
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        let imageType = asset.type || 'jpeg';
+        if (!asset.type && asset.uri) {
+          const uriLower = asset.uri.toLowerCase();
+          if (uriLower.includes('.png')) imageType = 'png';
+          else if (uriLower.includes('.jpg') || uriLower.includes('.jpeg')) imageType = 'jpeg';
+          else if (uriLower.includes('.webp')) imageType = 'webp';
+        }
+        let base64Data = asset.base64;
+        if (base64Data && base64Data.includes('data:image/')) {
+          const parts = base64Data.split(',');
+          base64Data = parts.length > 1 ? parts[1] : base64Data;
+        }
+        const base64String = base64Data ? `data:image/${imageType};base64,${base64Data}` : undefined;
+        const newPhoto = {
+          uri: asset.uri || '',
+          base64: base64String,
+          moderationStatus: 'checking' as const,
+          moderationReason: undefined,
+          imageUrl: undefined,
+        };
+        const newPhotos = [newPhoto];
+        const updatedPhotos = [...photos, ...newPhotos];
+        setPhotos(updatedPhotos);
+        const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
+        const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
+        if (!firebaseEnabled || !firebaseAvailable) {
+          const message = !user?.id ? 'You must be signed in to upload images.' : !firebaseAvailable ? 'Firebase Storage is not available.' : 'Firebase Storage is required.';
+          Alert.alert('Image Upload Unavailable', message, [{text: 'OK'}]);
+          setPhotos(prev => prev.map((p, i) => (i === prev.length - 1 ? { ...p, moderationStatus: 'REJECTED' as const, moderationReason: message } : p)));
+          return;
+        }
+        const imgIndex = updatedPhotos.length - 1;
+        const uploadPropertyId = isEditMode && propertyId ? String(propertyId) : null;
+        uploadPropertyImageWithModeration(asset.uri || '', uploadPropertyId, user!.id)
+          .then(result => {
+            setPhotos(prev => {
+              const updated = [...prev];
+              if (updated[imgIndex]) {
+                const status = String(result.moderationStatus || '').toUpperCase();
+                let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'REJECTED';
+                if (status === 'SAFE' || status === 'APPROVED') moderationStatus = 'APPROVED';
+                else if (status === 'REJECTED' || status === 'UNSAFE') moderationStatus = 'REJECTED';
+                else moderationStatus = 'APPROVED';
+                updated[imgIndex] = { ...updated[imgIndex], moderationStatus, moderationReason: result.moderationReason ?? undefined, imageUrl: result.firebaseUrl || result.imageUrl || '' };
+              }
+              return updated;
+            });
+            if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
+              Alert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.', [{text: 'OK'}]);
+            }
+          })
+          .catch(error => {
+            setPhotos(prev => {
+              const updated = [...prev];
+              if (updated[imgIndex]) updated[imgIndex] = { ...updated[imgIndex], moderationStatus: 'REJECTED' as const, moderationReason: error.message };
+              return updated;
+            });
+            Alert.alert('Upload Failed', error.message || 'Failed to upload image.', [{text: 'OK'}]);
+          });
       }
     });
   };
@@ -464,6 +587,14 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         showError('Error', 'Please select number of bathrooms');
         return;
       }
+      if (fieldVisibility.showAge && !propertyAge.trim()) {
+        showError('Error', 'Please select property age');
+        return;
+      }
+      if (fieldVisibility.showFurnishing && !furnishing.trim()) {
+        showError('Error', 'Please select furnishing status');
+        return;
+      }
       if (!builtUpArea.trim()) {
         showError('Error', `Please enter ${fieldVisibility.areaLabel}`);
         return;
@@ -496,6 +627,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
     }
     if (currentStep === 3) {
+      if (selectedAmenities.length < 1) {
+        showError('Error', 'Please select at least one amenity');
+        return;
+      }
       if (!description.trim()) {
         showError('Error', 'Please enter property description');
         return;
@@ -510,8 +645,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
     }
     if (currentStep === 4) {
-      if (photos.length === 0) {
-        showError('Error', 'Please upload at least one image');
+      if (photos.length < 4) {
+        showError('Error', 'Please upload at least 4 images');
         return;
       }
       const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
@@ -520,22 +655,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         return;
       }
       const rejectedImages = photos.filter(p => p.moderationStatus === 'REJECTED');
+      const approvedImagesStep4 = photos.filter(p => p.moderationStatus === 'APPROVED');
       if (rejectedImages.length > 0) {
-        const rejectedReasons = rejectedImages.map((img, idx) => {
-          const reason = img.moderationReason || 'Image rejected';
-          return `Image ${idx + 1}: ${reason}`;
-        }).join('\n');
-        showError('Image Validation Failed', `Please fix or remove rejected images:\n\n${rejectedReasons}`);
+        const msg = approvedImagesStep4.length > 0
+          ? `Some images are rejected. Remove ${rejectedImages.length} rejected image(s) to move forward. You have ${approvedImagesStep4.length} approved image(s).`
+          : `Please remove all rejected images and upload valid images to continue.`;
+        showError('Remove Rejected Images', msg);
         return;
       }
-      const pendingImages = photos.filter(p => p.moderationStatus === 'PENDING');
-      if (pendingImages.length > 0) {
-        showError('Error', 'All images must be approved before proceeding. Some images are still pending review.');
-        return;
-      }
-      const approvedImages = photos.filter(p => p.moderationStatus === 'APPROVED');
-      if (approvedImages.length === 0) {
-        showError('Error', 'Please ensure at least one image is approved');
+      const approvedImagesCount = photos.filter(p => p.moderationStatus === 'APPROVED').length;
+      if (approvedImagesCount < 4) {
+        showError('Error', 'Please ensure at least 4 images are approved');
         return;
       }
       const mobileRegex = /(\+91[\s-]?)?[6-9]\d{9}/g;
@@ -563,6 +693,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
+      stepScrollViewRef.current?.scrollTo({ y: 0, animated: true });
     } else {
       handleSubmit();
     }
@@ -571,6 +702,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const handlePrevious = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      stepScrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }
   };
 
@@ -647,7 +779,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         if (propertyStatus === 'rent' && depositAmount) {
           updateData.deposit_amount = parseFloat(depositAmount.replace(/[^0-9.]/g, ''));
         }
-        if (propertyStatus === 'rent' && (propertyType === 'flat' || propertyType === 'apartment' || propertyType === 'pg-hostel')) {
+        if (propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel')) {
           updateData.available_for_bachelors = availableForBachelors;
         }
         
@@ -701,35 +833,21 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         }
       } else {
         // CREATE MODE: Create new property
-        // Collect base64 for approved/pending images (Google Vision API moderated)
+        // Prefer Firebase URLs so backend stores references only; fallback to base64 when Firebase not used
         const validImages = photos.filter(
-          p =>
-            (p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING') &&
-            !!p.base64
+          p => p.moderationStatus === 'APPROVED' || p.moderationStatus === 'PENDING',
         );
-        
-        const imageBase64Strings = validImages
-          .map(p => {
-            if (!p.base64) return null;
-            let base64 = p.base64.trim();
-            if (base64.startsWith('data:image/')) {
-              if (!base64.includes(';base64,')) return null;
-              return base64;
-            }
-            return `data:image/jpeg;base64,${base64}`;
-          })
-          .filter((base64): base64 is string => base64 !== null && base64 !== '');
-        
-        if (validImages.length === 0) {
+
+        if (validImages.length < 4) {
           Alert.alert(
             'No Valid Images',
-            'Please upload at least one image that has been approved or is pending review.',
+            'Please upload at least 4 images that have been approved or are pending review.',
             [{text: 'OK'}]
           );
           setIsSubmitting(false);
           return;
         }
-        
+
         const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
         if (checkingImages.length > 0) {
           Alert.alert(
@@ -740,18 +858,46 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           setIsSubmitting(false);
           return;
         }
-        
-        if (imageBase64Strings.length === 0) {
-          Alert.alert(
-            'Image Data Missing',
-            'Approved images are missing image data. Please try removing and re-uploading the images.',
-            [{text: 'OK'}]
-          );
-          setIsSubmitting(false);
-          return;
+
+        let imagesPayload: string[] | undefined;
+        if (USE_FIREBASE_STORAGE) {
+          const imageUrls = validImages
+            .map(p => p.imageUrl)
+            .filter((url): url is string => !!url && (url.startsWith('http://') || url.startsWith('https://')));
+          if (imageUrls.length > 0) {
+            imagesPayload = imageUrls;
+            console.log('[AddProperty] Sending Firebase image URLs (images stay in Firebase):', imageUrls.length);
+          }
         }
-        
-        console.log('[AddProperty] Total photos:', photos.length, 'Valid (approved/pending):', validImages.length, 'Base64 ready:', imageBase64Strings.length);
+        if (!imagesPayload) {
+          const imageBase64Strings = validImages
+            .map(p => {
+              if (!p.base64) return null;
+              let base64 = p.base64.trim();
+              if (base64.startsWith('data:image/')) {
+                if (!base64.includes(';base64,')) return null;
+                return base64;
+              }
+              return `data:image/jpeg;base64,${base64}`;
+            })
+            .filter((base64): base64 is string => base64 !== null && base64 !== '');
+          if (imageBase64Strings.length === 0) {
+            Alert.alert(
+              'Image Data Missing',
+              USE_FIREBASE_STORAGE
+                ? 'Please wait for images to finish uploading to Firebase, or try removing and re-adding them.'
+                : 'Approved images are missing image data. Please try removing and re-uploading the images.',
+              [{text: 'OK'}]
+            );
+            setIsSubmitting(false);
+            return;
+          }
+          imagesPayload = imageBase64Strings;
+          console.log('[AddProperty] Sending images as base64 (fallback):', imageBase64Strings.length);
+        }
+
+        const imageCount = imagesPayload.length;
+        console.log('[AddProperty] Total photos:', photos.length, 'Valid (approved/pending):', validImages.length, 'Images to send:', imageCount);
 
         // Property type is already in the correct format from guide
         const propertyData: any = {
@@ -778,22 +924,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           price_negotiable: priceNegotiable,
           maintenance_charges: maintenance ? parseFloat(maintenance.replace(/[^0-9.]/g, '')) : null,
           amenities: selectedAmenities,
-          // Deposit amount (only for rent properties)
           deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : undefined,
-          // Available for bachelors (only for rent properties: flat, apartment, pg-hostel)
-          available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'flat' || propertyType === 'apartment' || propertyType === 'pg-hostel') ? availableForBachelors : undefined,
-          // Include images as base64 strings in the request
-          images: imageBase64Strings.length > 0 ? imageBase64Strings : undefined,
+          available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel') ? availableForBachelors : undefined,
+          images: imagesPayload.length > 0 ? imagesPayload : undefined,
         };
 
         console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
-        console.log('[AddProperty] Images included as base64:', imageBase64Strings.length);
+        console.log('[AddProperty] Images:', imageCount, imagesPayload[0]?.startsWith('http') ? '(Firebase URLs)' : '(base64)');
 
-        // Same endpoint as seller; backend skips property limit for agents
         const response: any = await propertyService.createProperty(propertyData, 'agent');
         
         if (response && response.success) {
-          const imageCount = imageBase64Strings.length;
           Alert.alert(
             'Success', 
             `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
@@ -887,6 +1028,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.typeButton}
                   onPress={() => setPropertyStatus('sell')}>
                   {propertyStatus === 'sell' ? (
+                    // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
                       colors={['#0077C0', '#005A94']}
                       start={{x: 0, y: 0}}
@@ -907,6 +1049,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.typeButton}
                   onPress={() => setPropertyStatus('rent')}>
                   {propertyStatus === 'rent' ? (
+                    // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
                       colors={['#0077C0', '#005A94']}
                       start={{x: 0, y: 0}}
@@ -1024,6 +1167,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     // Extract state from context if available
                     const extractedState = extractStateFromContext(locationData.context);
                     if (extractedState) {
+                      stateAutoFilledFromLocation.current = true;
                       setState(extractedState);
                     }
                   }}
@@ -1037,6 +1181,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <TouchableOpacity 
                   style={styles.mapButton}
                   onPress={() => setLocationPickerVisible(true)}>
+                  {/* @ts-expect-error - LinearGradient works but TypeScript types are incorrect */}
                   <LinearGradient
                     colors={['#0077C0', '#005A94']}
                     start={{x: 0, y: 0}}
@@ -1070,6 +1215,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 // Extract state from context if available
                 const extractedState = extractStateFromContext(locationData.context);
                 if (extractedState) {
+                  stateAutoFilledFromLocation.current = true;
                   setState(extractedState);
                 }
                 setLocationPickerVisible(false);
@@ -1087,14 +1233,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter state"
                   placeholderTextColor={colors.textSecondary}
                   value={state}
-                  onChangeText={setState}
+                  onChangeText={(text: string) => {
+                    stateAutoFilledFromLocation.current = false;
+                    setState(text);
+                  }}
                 />
                 <StateAutoSuggest
                   query={state}
                   onSelect={(stateData) => {
                     setState(stateData.name || stateData.placeName);
                   }}
-                  visible={state.length >= 2}
+                  visible={state.length >= 2 && !stateAutoFilledFromLocation.current}
                 />
               </View>
             </View>
@@ -1125,6 +1274,20 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 ) : (
                   <View style={styles.numberButtonsContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.numberButton,
+                        bedrooms === 0 && styles.numberButtonActive,
+                      ]}
+                      onPress={() => setBedrooms(0)}>
+                      <Text
+                        style={[
+                          styles.numberButtonText,
+                          bedrooms === 0 && styles.numberButtonTextActive,
+                        ]}>
+                        0
+                      </Text>
+                    </TouchableOpacity>
                     {[1, 2, 3, 4, 5].map(num => (
                       <TouchableOpacity
                         key={num}
@@ -1251,7 +1414,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder={fieldVisibility.areaLabel === 'Plot Area' ? 'Enter plot area' : 'Enter area'}
                   placeholderTextColor={colors.textSecondary}
                   value={builtUpArea}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     // Validate plot area limit (3 lac = 300,000 sq ft)
                     if (fieldVisibility.areaLabel === 'Plot Area') {
                       const numValue = parseFloat(text.replace(/[^0-9.]/g, ''));
@@ -1298,7 +1461,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="e.g., 5"
                   placeholderTextColor={colors.textSecondary}
                   value={floor}
-                  onChangeText={(text) => setFloor(text.replace(/[^0-9]/g, ''))}
+                  onChangeText={(text: string) => setFloor(text.replace(/[^0-9]/g, ''))}
                   keyboardType="number-pad"
                 />
               </View>
@@ -1312,7 +1475,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Total floors in building"
                   placeholderTextColor={colors.textSecondary}
                   value={totalFloors}
-                  onChangeText={(text) => setTotalFloors(text.replace(/[^0-9]/g, ''))}
+                  onChangeText={(text: string) => setTotalFloors(text.replace(/[^0-9]/g, ''))}
                   keyboardType="number-pad"
                 />
               </View>
@@ -1434,7 +1597,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Upload Photos</Text>
             <Text style={styles.stepSubtitle}>
-              Add up to 10 high-quality photos of your property
+              Add 4–10 high-quality photos of your property (minimum 4 required)
             </Text>
 
             <TouchableOpacity 
@@ -1447,26 +1610,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 Select up to {10 - photos.length} more photos
               </Text>
               <Text style={styles.photoUploadHint}>
-                Supports: JPG, PNG, WEBP (Max 5MB each)
+                Minimum 4 images required. Supports: JPG, PNG, WEBP (Max 5MB each)
               </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.photoCameraButton}
+              onPress={handleCameraCapture}
+              activeOpacity={0.7}>
+              <Text style={styles.photoUploadIcon}>📷</Text>
+              <Text style={styles.photoUploadText}>Take photo with camera</Text>
             </TouchableOpacity>
 
             {photos.length > 0 && (
               <View style={styles.photosPreview}>
                 {photos.map((photo, index) => {
-                  const statusColor = 
-                    photo.moderationStatus === 'APPROVED' ? '#4CAF50' :
-                    photo.moderationStatus === 'REJECTED' ? colors.error :
-                    photo.moderationStatus === 'PENDING' ? '#FF9800' :
-                    photo.moderationStatus === 'checking' ? colors.textSecondary :
-                    'transparent';
-                  
-                  const statusText = 
-                    photo.moderationStatus === 'APPROVED' ? '✓' :
-                    photo.moderationStatus === 'REJECTED' ? '✗' :
-                    photo.moderationStatus === 'PENDING' ? '⏳' :
-                    photo.moderationStatus === 'checking' ? '...' :
-                    '';
+                  const isApproved = photo.moderationStatus === 'APPROVED' || photo.moderationStatus === 'checking' || photo.moderationStatus === 'PENDING';
+                  const statusColor = isApproved ? '#4CAF50' : photo.moderationStatus === 'REJECTED' ? colors.error : 'transparent';
+                  const statusText = isApproved ? '✓' : photo.moderationStatus === 'REJECTED' ? '✗' : '';
                   
                   return (
                     <View key={index} style={styles.photoPreviewItem}>
@@ -1532,6 +1692,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   keyboardType="numeric"
                 />
               </View>
+              {formatPriceShort(expectedPrice) && (
+                <Text style={styles.priceSuggestionText}>≈ ₹{formatPriceShort(expectedPrice)}</Text>
+              )}
               <TouchableOpacity
                 style={styles.checkboxContainer}
                 onPress={() => setPriceNegotiable(!priceNegotiable)}>
@@ -1566,8 +1729,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </Text>
                 </View>
                 
-                {/* Available for Bachelors - Only for Flat, Apartment, PG/Hostel */}
-                {(propertyType === 'flat' || propertyType === 'apartment' || propertyType === 'pg-hostel') && (
+                {/* Available for Bachelors - Only for Apartment, PG / Hostel */}
+                {(propertyType === 'Apartment' || propertyType === 'PG / Hostel') && (
                   <View style={styles.inputContainer}>
                     <TouchableOpacity
                       style={styles.checkboxContainer}
@@ -1675,6 +1838,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         onRequestClose={handleClose}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
+            {/* @ts-expect-error SafeAreaView accepts style at runtime (types incomplete) */}
             <SafeAreaView style={styles.safeArea}>
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
@@ -1697,7 +1861,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
+          {/* @ts-expect-error SafeAreaView accepts style at runtime (types incomplete) */}
           <SafeAreaView style={styles.safeArea}>
+            <KeyboardAvoidingView
+              style={styles.safeArea}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
             {/* Restricted edit banner for older listings */}
             {isEditMode && isLimitedEdit && (
               <View style={styles.limitedBanner}>
@@ -1719,11 +1888,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             {/* Progress Steps */}
-            <View style={styles.progressContainer}>
-              {steps.map((step, index) => {
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.progressContainer}
+              contentContainerStyle={styles.progressContent}>
+              {steps.map((step) => {
                 const status = getStepStatus(step.id);
                 return (
-                  <View key={step.id} style={styles.stepItem}>
+                  <TouchableOpacity
+                    key={step.id}
+                    style={styles.stepItem}
+                    onPress={() => {
+                      if (status === 'completed' || status === 'active') {
+                        setCurrentStep(step.id);
+                      }
+                    }}
+                    disabled={status === 'pending'}>
                     <View
                       style={[
                         styles.stepCircle,
@@ -1741,28 +1922,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                         styles.stepLabel,
                         status === 'completed' && styles.stepLabelCompleted,
                         status === 'active' && styles.stepLabelActive,
-                      ]}>
+                      ]}
+                      numberOfLines={1}>
                       {step.name}
                     </Text>
-                    {index < steps.length - 1 && (
-                      <View
-                        style={[
-                          styles.stepLine,
-                          status === 'completed' && styles.stepLineCompleted,
-                          status === 'active' && styles.stepLineActive,
-                        ]}
-                      />
-                    )}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {/* Content */}
             <ScrollView
+              ref={stepScrollViewRef}
               style={styles.content}
               contentContainerStyle={styles.contentContainer}
-              showsVerticalScrollIndicator={false}>
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag">
               {renderStepContent()}
             </ScrollView>
 
@@ -1782,6 +1958,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 onPress={handleNext}
                 disabled={isSubmitting}>
                 {currentStep === totalSteps ? (
+                  // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                   <LinearGradient
                     colors={isSubmitting ? ['#CCCCCC', '#999999'] : ['#43A047', '#2E7D32']}
                     start={{x: 0, y: 0}}
@@ -1793,6 +1970,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     </Text>
                   </LinearGradient>
                 ) : (
+                  // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                   <LinearGradient
                     colors={['#0077C0', '#005A94']}
                     start={{x: 0, y: 0}}
@@ -1804,6 +1982,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 )}
               </TouchableOpacity>
             </View>
+            </KeyboardAvoidingView>
           </SafeAreaView>
         </View>
       </View>
@@ -1851,6 +2030,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#FFC107',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    flexShrink: 0,
   },
   limitedBannerTitle: {
     ...typography.h3,
@@ -1875,6 +2055,7 @@ const styles = StyleSheet.create({
     minHeight: 70,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    flexShrink: 0,
   },
   headerTitle: {
     ...typography.h1,
@@ -1896,23 +2077,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    maxHeight: 100,
+  },
+  progressContent: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
   },
   stepItem: {
-    flex: 1,
     alignItems: 'center',
-    position: 'relative',
+    minWidth: 60,
+    marginRight: spacing.sm,
   },
   stepCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1928,7 +2110,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   stepCheckmark: {
-    fontSize: 24,
+    fontSize: 20,
     color: colors.surface,
     fontWeight: 'bold',
   },
@@ -1947,29 +2129,16 @@ const styles = StyleSheet.create({
     color: '#0077C0',
     fontWeight: '700',
   },
-  stepLine: {
-    position: 'absolute',
-    top: 24,
-    left: '60%',
-    right: '-40%',
-    height: 2,
-    backgroundColor: colors.border,
-    zIndex: -1,
-  },
-  stepLineCompleted: {
-    backgroundColor: '#43A047',
-  },
-  stepLineActive: {
-    backgroundColor: '#0077C0',
-  },
   content: {
     flex: 1,
   },
   contentContainer: {
     padding: spacing.xl,
+    paddingBottom: spacing.xxl,
+    flexGrow: 1,
   },
   stepContent: {
-    flex: 1,
+    paddingBottom: spacing.lg,
   },
   stepTitle: {
     ...typography.h1,
@@ -2245,24 +2414,23 @@ const styles = StyleSheet.create({
   amenitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
     marginTop: spacing.sm,
-    marginHorizontal: -spacing.xs, // Negative margin for spacing
+    marginHorizontal: -spacing.xs,
   },
   amenityButton: {
-    width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 4) / 3, // Responsive width for 3 columns
-    minWidth: 90, // Minimum width for small screens
-    maxWidth: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 4) / 3, // Max width same as width
+    width: '25%',
+    minWidth: 72,
+    maxWidth: 120,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
+    padding: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 90,
-    marginHorizontal: spacing.xs / 2, // Half margin on each side
-    marginBottom: spacing.md, // Bottom margin for wrapping
+    minHeight: 80,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   amenityButtonActive: {
     borderColor: '#0077C0',
@@ -2315,6 +2483,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 12,
+  },
+  photoCameraButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: '#E8F4FD',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   photosPreview: {
     flexDirection: 'row',
@@ -2416,6 +2595,12 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     backgroundColor: 'transparent',
   },
+  priceSuggestionText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.xs,
+  },
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2493,11 +2678,14 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    backgroundColor: colors.surface,
     gap: spacing.md,
+    flexShrink: 0,
   },
   backButton: {
     flexDirection: 'row',
@@ -2579,16 +2767,6 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
-  },
-  progressContainerScroll: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    maxHeight: 100,
-  },
-  progressContent: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    gap: spacing.xs,
   },
   buttonGrid: {
     flexDirection: 'row',

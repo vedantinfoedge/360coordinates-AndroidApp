@@ -46,6 +46,7 @@ type Props = {
       area?: string;
       status?: 'sale' | 'rent';
       listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel';
+      project_type?: 'upcoming' | null;
     };
   };
 };
@@ -91,7 +92,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const initialBedrooms = routeParams.bedrooms || '';
   const initialArea = routeParams.area || '';
   const initialStatus = routeParams.status || (routeParams.listingType === 'buy' ? 'sale' : routeParams.listingType === 'rent' ? 'rent' : '');
-  const initialListingType = routeParams.listingType || 'all';
+  const initialListingType = routeParams.listingType || 'buy';
+  const projectTypeFilter = routeParams.project_type || null;
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
@@ -99,12 +101,13 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [searchText, setSearchText] = useState(initialLocation);
   const [loading, setLoading] = useState(true);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<'listing' | 'property' | 'budget' | null>(null);
 
-  // Filters - initialize with route params (website-style)
+  // Filters - initialize with route params (Buy, Rent, PG only - no All)
   const [listingType, setListingType] = useState<ListingType | 'all'>(
     initialListingType === 'buy' ? 'buy' : 
     initialListingType === 'pg-hostel' ? 'pg-hostel' : 
-    initialListingType === 'rent' ? 'rent' : 'all'
+    initialListingType === 'rent' ? 'rent' : 'buy'
   );
   
   const [selectedPropertyType, setSelectedPropertyType] = useState<string>(initialPropertyType || 'all');
@@ -124,7 +127,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const pendingMinBudget = useRef<number>(0);
   const pendingMaxBudget = useRef<number>(1000);
   const scrollY = useRef(new Animated.Value(0)).current;
-  const searchBarHeight = 120; // Approximate height of search bar + results header
+  const searchBarHeight = 175; // Search bar + dropdown row + results header
 
   // Search bar: visible at top, hides on scroll down
   const searchBarAnimatedStyle = {
@@ -298,9 +301,19 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           searchParams.status = 'sale';
         } else if (listingType === 'rent') {
           searchParams.status = 'rent';
-        } else if (listingType === 'pg-hostel') {
+        } else       if (listingType === 'pg-hostel') {
           searchParams.status = 'rent'; // PG uses rent status
         }
+      }
+      
+      // Upcoming projects only (from Upcoming Projects "See All")
+      if (projectTypeFilter === 'upcoming') {
+        searchParams.project_type = 'upcoming';
+      }
+      
+      // PG/Hostel: only those available for bachelors
+      if (listingType === 'pg-hostel') {
+        searchParams.available_for_bachelors = 'true';
       }
       
       // PART B: Safely get location with trim() - handle null/empty/spaces
@@ -464,6 +477,15 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         }
       }
       
+      // Client-side: show only upcoming projects when requested
+      if (projectTypeFilter === 'upcoming') {
+        results = results.filter((p: any) => (p.project_type || '') === 'upcoming');
+      }
+      // Client-side: for PG/Hostel, show only those available for bachelors (if API didn't filter)
+      if (listingType === 'pg-hostel') {
+        results = results.filter((p: any) => p.available_for_bachelors === true || p.available_for_bachelors === 'true');
+      }
+      
       // Format properties
       const formattedProperties = results.map((prop: any) => {
         const propStatus = prop.status || prop.property_status || 'sale';
@@ -503,7 +525,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     } finally {
       setLoading(false);
     }
-  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, status, initialLocation, bathrooms, minBudget, maxBudget, isBedroomBased, isAreaBased, isLandProperty]);
+  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, status, initialLocation, bathrooms, minBudget, maxBudget, isBedroomBased, isAreaBased, isLandProperty, projectTypeFilter]);
 
   // Track if this is the first render to skip initial search trigger
   const isFirstRender = React.useRef(true);
@@ -592,8 +614,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       // Check if we're in the default state (no location, listingType is 'all')
       const currentRouteLocation = (routeParams?.query || routeParams?.location || routeParams?.searchQuery || '').trim();
       
-      // If opened from tab bar with no specific params, ensure we show all properties
-      if (!currentRouteLocation && listingType === 'all' && !status && properties.length === 0) {
+      // If opened from tab bar with no specific params, ensure we load (default listing type is buy)
+      if (!currentRouteLocation && !status && properties.length === 0) {
         // Reset search fields and load all properties
         setSearchText('');
         setLocation('');
@@ -706,18 +728,17 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   const clearFilters = () => {
-    setListingType('all');
+    setListingType('buy');
+    setStatus('sale');
     setSelectedPropertyType('all');
     setBudget('');
     setMinBudget(0);
-    setMaxBudget(500); // Default max
+    setMaxBudget(500);
     setBedrooms(null);
     setArea('');
-    setStatus('');
     setBathrooms(null);
     setSearchText('');
     setLocation('');
-    // Reload properties after clearing filters
     setTimeout(() => loadProperties(), 100);
   };
 
@@ -922,14 +943,30 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 setShowLocationSuggestions(text.length >= 2);
               }}
               onSubmitEditing={() => {
-                setLocation(searchText);
+                const loc = (searchText || '').trim();
+                setLocation(loc);
+                setSearchText(loc);
                 setShowLocationSuggestions(false);
-                setTimeout(() => {
-                  loadProperties();
-                }, 100);
+                setTimeout(() => loadProperties(), 100);
+              }}
+              onBlur={() => {
+                // Sync location from search text when leaving the field so filters use it
+                const loc = (searchText || '').trim();
+                if (loc !== location) setLocation(loc);
               }}
               returnKeyType="search"
             />
+            <TouchableOpacity
+              style={styles.searchBarSearchButton}
+              onPress={() => {
+                const loc = (searchText || '').trim();
+                setLocation(loc);
+                setSearchText(loc);
+                setShowLocationSuggestions(false);
+                setTimeout(() => loadProperties(), 100);
+              }}>
+              <Text style={styles.searchBarSearchButtonText}>Search</Text>
+            </TouchableOpacity>
           </View>
           {showLocationSuggestions && searchText.length >= 2 && (
             <View style={styles.locationSuggestionsContainer}>
@@ -955,6 +992,115 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             <Text style={styles.filterText}>Filters</Text>
           </TouchableOpacity>
         </View>
+        {/* Quick filters - dropdown theme: Listing type, Property type, Budget */}
+        <View style={styles.quickFiltersDropdownRow}>
+          <TouchableOpacity
+            style={styles.dropdownTrigger}
+            onPress={() => setOpenDropdown(openDropdown === 'listing' ? null : 'listing')}>
+            <Text style={styles.dropdownLabel}>Listing</Text>
+            <Text style={styles.dropdownValue} numberOfLines={1}>
+              {listingType === 'buy' ? 'Buy' : listingType === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
+            </Text>
+            <Text style={styles.dropdownChevron}>{openDropdown === 'listing' ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.dropdownTrigger}
+            onPress={() => setOpenDropdown(openDropdown === 'property' ? null : 'property')}>
+            <Text style={styles.dropdownLabel}>Property</Text>
+            <Text style={styles.dropdownValue} numberOfLines={1}>
+              {selectedPropertyType === 'all' ? 'All' : selectedPropertyType}
+            </Text>
+            <Text style={styles.dropdownChevron}>{openDropdown === 'property' ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.dropdownTrigger}
+            onPress={() => setOpenDropdown(openDropdown === 'budget' ? null : 'budget')}>
+            <Text style={styles.dropdownLabel}>Budget</Text>
+            <Text style={styles.dropdownValue} numberOfLines={1}>
+              {listingType === 'buy'
+                ? (minBudget === 0 && maxBudget === 2000 ? 'Any' : `₹${minBudget >= 100 ? (minBudget / 100) + 'Cr' : minBudget + 'L'}-${maxBudget >= 100 ? (maxBudget / 100) + 'Cr' : maxBudget + 'L'}`)
+                : (minBudget === 0 && maxBudget === 200 ? 'Any' : `₹${minBudget}K-${maxBudget}K`)}
+            </Text>
+            <Text style={styles.dropdownChevron}>{openDropdown === 'budget' ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+        </View>
+        {/* Dropdown options modal */}
+        <Modal visible={openDropdown !== null} transparent animationType="fade">
+          <TouchableOpacity style={styles.dropdownBackdrop} activeOpacity={1} onPress={() => setOpenDropdown(null)}>
+            <View style={styles.dropdownOptionsBox} onStartShouldSetResponder={() => true}>
+              {openDropdown === 'listing' && (
+                <>
+                  {(['buy', 'rent', 'pg-hostel'] as const).map(type => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[styles.dropdownOption, listingType === type && styles.dropdownOptionActive]}
+                      onPress={() => {
+                        setListingType(type);
+                        if (type === 'buy') setStatus('sale');
+                        else setStatus('rent');
+                        setOpenDropdown(null);
+                        setTimeout(() => loadProperties(), 150);
+                      }}>
+                      <Text style={[styles.dropdownOptionText, listingType === type && styles.dropdownOptionTextActive]}>
+                        {type === 'buy' ? 'Buy' : type === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+              {openDropdown === 'property' && (
+                <ScrollView style={styles.dropdownOptionsScroll} nestedScrollEnabled>
+                {allPropertyTypes.map(type => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[styles.dropdownOption, selectedPropertyType === type && styles.dropdownOptionActive]}
+                    onPress={() => {
+                      setSelectedPropertyType(type);
+                      setOpenDropdown(null);
+                      setTimeout(() => loadProperties(), 150);
+                    }}>
+                    <Text style={[styles.dropdownOptionText, selectedPropertyType === type && styles.dropdownOptionTextActive]}>
+                      {type === 'all' ? 'All types' : type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                </ScrollView>
+              )}
+              {openDropdown === 'budget' && (
+                <>
+                  {(listingType === 'buy'
+                    ? [
+                        {label: 'Any', min: 0, max: 2000},
+                        {label: 'Under 25L', min: 0, max: 25},
+                        {label: '25L-50L', min: 25, max: 50},
+                        {label: '50L-1Cr', min: 50, max: 100},
+                        {label: '1Cr+', min: 100, max: 2000},
+                      ]
+                    : [
+                        {label: 'Any', min: 0, max: 200},
+                        {label: 'Under 10K', min: 0, max: 10},
+                        {label: '10K-25K', min: 10, max: 25},
+                        {label: '25K-50K', min: 25, max: 50},
+                        {label: '50K+', min: 50, max: 200},
+                      ]
+                  ).map(({label, min, max}) => (
+                    <TouchableOpacity
+                      key={label}
+                      style={[styles.dropdownOption, minBudget === min && maxBudget === max && styles.dropdownOptionActive]}
+                      onPress={() => {
+                        setMinBudget(min);
+                        setMaxBudget(max);
+                        setOpenDropdown(null);
+                        setTimeout(() => loadProperties(), 150);
+                      }}>
+                      <Text style={[styles.dropdownOptionText, minBudget === min && maxBudget === max && styles.dropdownOptionTextActive]}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
         {/* Results Count */}
         <View style={styles.resultsHeader}>
           <Text style={styles.resultsCount}>
@@ -1037,32 +1183,28 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             <ScrollView
               style={styles.filtersScroll}
               showsVerticalScrollIndicator={false}>
-              {/* Listing Type (Buy/Rent/PG-Hostel) */}
+              {/* Listing Type (Buy/Rent/PG-Hostel only) */}
               <View style={styles.filterSection}>
                 <Text style={styles.filterLabel}>Listing Type</Text>
                 <View style={styles.filterOptions}>
-                  {['all', 'buy', 'rent', 'pg-hostel'].map(type => (
+                  {(['buy', 'rent', 'pg-hostel'] as const).map(type => (
                     <TouchableOpacity
                       key={type}
                       style={[
                         styles.filterChip,
                         listingType === type && styles.filterChipActive,
                       ]}
-                      onPress={() =>
-                        setListingType(type as ListingType | 'all')
-                      }>
+                      onPress={() => {
+                        setListingType(type);
+                        if (type === 'buy') setStatus('sale');
+                        else setStatus('rent');
+                      }}>
                       <Text
                         style={[
                           styles.filterChipText,
                           listingType === type && styles.filterChipTextActive,
                         ]}>
-                        {type === 'all' 
-                          ? 'All' 
-                          : type === 'buy' 
-                          ? 'Buy' 
-                          : type === 'rent'
-                          ? 'Rent'
-                          : 'PG/Hostel'}
+                        {type === 'buy' ? 'Buy' : type === 'rent' ? 'Rent' : 'PG/Hostel'}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1117,32 +1259,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                   </Text>
                 </View>
               </View>
-
-              {/* Bedrooms - Only show for bedroom-based property types */}
-              {isBedroomBased && (
-                <View style={styles.filterSection}>
-                  <Text style={styles.filterLabel}>Bedrooms</Text>
-                  <View style={styles.filterOptions}>
-                    {[null, 1, 2, 3, 4, 5].map(num => (
-                      <TouchableOpacity
-                        key={num ?? 'all'}
-                        style={[
-                          styles.filterChip,
-                          bedrooms === num && styles.filterChipActive,
-                        ]}
-                        onPress={() => setBedrooms(num)}>
-                        <Text
-                          style={[
-                            styles.filterChipText,
-                            bedrooms === num && styles.filterChipTextActive,
-                          ]}>
-                          {num === null ? 'All' : `${num}+`}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
 
               {/* Area - Only show for area-based property types */}
               {isAreaBased && (
@@ -1275,6 +1391,85 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     padding: 0,
+    minWidth: 80,
+  },
+  searchBarSearchButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+  },
+  searchBarSearchButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  quickFiltersDropdownRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    gap: spacing.sm,
+  },
+  dropdownTrigger: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    minHeight: 44,
+  },
+  dropdownLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  dropdownValue: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    fontSize: 13,
+  },
+  dropdownChevron: {
+    fontSize: 10,
+    color: colors.textSecondary,
+  },
+  dropdownBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  dropdownOptionsBox: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    minWidth: 220,
+    maxHeight: 320,
+    paddingVertical: spacing.xs,
+  },
+  dropdownOptionsScroll: {
+    maxHeight: 280,
+  },
+  dropdownOption: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  dropdownOptionActive: {
+    backgroundColor: colors.primary + '20',
+  },
+  dropdownOptionText: {
+    ...typography.body,
+    color: colors.text,
+  },
+  dropdownOptionTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   locationSuggestionsContainer: {
     position: 'absolute',

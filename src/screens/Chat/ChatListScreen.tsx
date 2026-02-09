@@ -86,6 +86,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [chatFilter, setChatFilter] = useState<'all' | 'unread'>('all');
   const [propertyCache, setPropertyCache] = useState<Record<string, any>>({});
   const [buyerCache, setBuyerCache] = useState<Record<string, {name: string; profile_image?: string}>>({});
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -1346,35 +1347,38 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     );
   }
 
+  const isAgentOrSellerLoading = (user?.user_type || '').toLowerCase() === 'seller' || (user?.user_type || '').toLowerCase() === 'agent';
   if (loading && chatList.length === 0) {
     return (
       <View style={styles.container}>
-        <BuyerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={isLoggedIn ? logout : undefined}
-          onSignInPress={
-            isGuest
-              ? () =>
-                  (navigation as any).navigate('Auth', {
-                    screen: 'Login',
-                    params: {returnTo: 'Chats'},
-                  })
-              : undefined
-          }
-          onSignUpPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
-              : undefined
-          }
-          showLogout={isLoggedIn}
-          showProfile={isLoggedIn}
-          showSignIn={isGuest}
-          showSignUp={isGuest}
-          scrollY={scrollY}
-          headerHeight={headerHeight}
-        />
-        <View style={[styles.loadingContainer, {paddingTop: insets.top + 60 + spacing.md * 2}]}>
+        {!isAgentOrSellerLoading && (
+          <BuyerHeader
+            onProfilePress={() => navigation.navigate('Profile')}
+            onSupportPress={() => navigation.navigate('Support')}
+            onLogoutPress={isLoggedIn ? logout : undefined}
+            onSignInPress={
+              isGuest
+                ? () =>
+                    (navigation as any).navigate('Auth', {
+                      screen: 'Login',
+                      params: {returnTo: 'Chats'},
+                    })
+                : undefined
+            }
+            onSignUpPress={
+              isGuest
+                ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+                : undefined
+            }
+            showLogout={isLoggedIn}
+            showProfile={isLoggedIn}
+            showSignIn={isGuest}
+            showSignUp={isGuest}
+            scrollY={scrollY}
+            headerHeight={headerHeight}
+          />
+        )}
+        <View style={[styles.loadingContainer, {paddingTop: isAgentOrSellerLoading ? insets.top + spacing.md * 2 : insets.top + 60 + spacing.md * 2}]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading chats...</Text>
         </View>
@@ -1382,20 +1386,12 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     );
   }
 
-  // Import SellerHeader for agents/sellers
-  const SellerHeader = user?.user_type === 'seller' || user?.user_type === 'agent'
-    ? require('../../components/SellerHeader').default
-    : null;
+  const isAgentOrSeller = (user?.user_type || '').toLowerCase() === 'seller' || (user?.user_type || '').toLowerCase() === 'agent';
+  const filteredChatList = chatFilter === 'unread' ? chatList.filter(item => (item.unreadCount || 0) > 0) : chatList;
 
   return (
     <View style={styles.container}>
-      {(user?.user_type === 'seller' || user?.user_type === 'agent') && SellerHeader ? (
-        <SellerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={isLoggedIn ? logout : undefined}
-        />
-      ) : (
+      {!isAgentOrSeller && (
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.navigate('Support')}
@@ -1422,14 +1418,30 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           headerHeight={headerHeight}
         />
       )}
+      {isAgentOrSeller && (
+        <View style={[styles.chatFilterBar, {paddingTop: insets.top + spacing.sm, paddingBottom: spacing.sm}]}>
+          <TouchableOpacity
+            style={[styles.chatFilterOption, chatFilter === 'all' && styles.chatFilterOptionActive]}
+            onPress={() => setChatFilter('all')}
+            activeOpacity={0.7}>
+            <Text style={[styles.chatFilterText, chatFilter === 'all' && styles.chatFilterTextActive]}>All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chatFilterOption, chatFilter === 'unread' && styles.chatFilterOptionActive]}
+            onPress={() => setChatFilter('unread')}
+            activeOpacity={0.7}>
+            <Text style={[styles.chatFilterText, chatFilter === 'unread' && styles.chatFilterTextActive]}>Unread</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {chatList.length > 0 ? (
         <Animated.FlatList
-          data={chatList}
+          data={isAgentOrSeller ? filteredChatList : chatList}
           renderItem={renderChatItem}
           keyExtractor={(item: ChatListItem) => item.id}
           contentContainerStyle={[
             styles.listContent,
-            {paddingTop: insets.top + 60 + spacing.md * 2},
+            {paddingTop: isAgentOrSeller ? spacing.md : insets.top + 60 + spacing.md * 2},
           ]}
           showsVerticalScrollIndicator={false}
           onScroll={Animated.event(
@@ -1447,10 +1459,10 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           }
         />
       ) : (
-        <View style={[styles.emptyContainer, {paddingTop: insets.top + 60 + spacing.md * 2}]}>
+        <View style={[styles.emptyContainer, {paddingTop: isAgentOrSeller ? spacing.xl : insets.top + 60 + spacing.md * 2}]}>
           <Text style={styles.emptyIcon}>💬</Text>
-          <Text style={styles.emptyText}>No chats yet</Text>
-          <Text style={styles.emptySubtext}>Start a conversation by chatting with a property owner</Text>
+          <Text style={styles.emptyText}>{chatFilter === 'unread' ? 'No unread chats' : 'No chats yet'}</Text>
+          <Text style={styles.emptySubtext}>{chatFilter === 'unread' ? 'You have no unread messages' : 'Start a conversation by chatting with a property owner'}</Text>
         </View>
       )}
     </View>
@@ -1461,6 +1473,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  chatFilterBar: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E0E0E0',
+  },
+  chatFilterOption: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    backgroundColor: '#F0F0F0',
+  },
+  chatFilterOptionActive: {
+    backgroundColor: colors.primary,
+  },
+  chatFilterText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  chatFilterTextActive: {
+    color: '#FFFFFF',
   },
   listContent: {
     paddingBottom: spacing.xs,

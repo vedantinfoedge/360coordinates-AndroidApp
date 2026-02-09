@@ -89,14 +89,10 @@ android {
         applicationId "Indiapropertys.com"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName "1.5"
+        versionCode 4
+        versionName "1.6"
     }
-    
-    // Enable cleartext traffic for development (Metro bundler)
-    buildTypes.each {
-        it.buildConfigField "boolean", "usesCleartextTraffic", "true"
-    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -105,20 +101,28 @@ android {
             keyPassword 'android'
         }
         release {
-            // Use explicit path to ensure keystore is found
-            def keystoreFile = keystoreProperties['storeFile'] ?: 'release.keystore'
-            storeFile file(keystoreFile)
-            storePassword keystoreProperties['storePassword'] ?: ''
-            keyAlias keystoreProperties['keyAlias'] ?: ''
-            keyPassword keystoreProperties['keyPassword'] ?: ''
+            if (keystorePropertiesFile.exists() && keystoreProperties['storePassword']) {
+                def keystoreFile = keystoreProperties['storeFile'] ?: 'release.keystore'
+                storeFile file(keystoreFile)
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
         }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+            buildConfigField "boolean", "usesCleartextTraffic", "true"
         }
         release {
-            signingConfig signingConfigs.release
+            buildConfigField "boolean", "usesCleartextTraffic", "true"
+            if (keystorePropertiesFile.exists() && keystoreProperties['storePassword']) {
+                signingConfig signingConfigs.release
+            } else {
+                // Fallback to debug signing when keystore.properties is missing (e.g. CI)
+                signingConfig signingConfigs.debug
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

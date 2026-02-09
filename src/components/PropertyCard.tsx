@@ -36,6 +36,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 }) => {
   const [favorite, setFavorite] = useState(isFavorite);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [slideWidth, setSlideWidth] = useState(0);
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -82,10 +83,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     setFavorite(isFavorite);
   }, [isFavorite]);
 
-  // Reset image error when image URL changes
+  // Reset image error and loaded state when image URL changes
   React.useEffect(() => {
     setImageError(false);
-  }, [image]);
+    setImageLoaded(false);
+  }, [image, imageUrls.length, imageUrls[0]]);
 
   const [imageErrorIndices, setImageErrorIndices] = useState<Set<number>>(new Set());
   const scrollViewRef = useRef<{scrollTo: (opts: {x: number; animated?: boolean}) => void} | null>(null);
@@ -180,6 +182,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                         source={{uri}}
                         style={styles.image}
                         resizeMode="cover"
+                        onLoadEnd={() => index === 0 && setImageLoaded(true)}
                         onError={() => {
                           setImageErrorIndices(prev => new Set(prev).add(index));
                         }}
@@ -229,14 +232,22 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               </View>
             </>
           ) : imageUrls.length >= 1 && !imageError ? (
-            <Image
-              source={{uri: imageUrls[0]}}
-              style={styles.image}
-              resizeMode="cover"
-              onError={() => {
-                setImageError(true);
-              }}
-            />
+            <>
+              {!imageLoaded && (
+                <View style={styles.imagePlaceholder} pointerEvents="none">
+                  <Text style={styles.imagePlaceholderText}>🏠</Text>
+                </View>
+              )}
+              <Image
+                source={{uri: imageUrls[0]}}
+                style={[styles.image, !imageLoaded && styles.imageWhileLoading]}
+                resizeMode="cover"
+                onLoadEnd={() => setImageLoaded(true)}
+                onError={() => {
+                  setImageError(true);
+                }}
+              />
+            </>
           ) : imageUrls.length >= 1 && imageError ? (
             <View style={styles.imagePlaceholder}>
               <Text style={styles.imagePlaceholderText}>🏠</Text>
@@ -356,6 +367,10 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  imageWhileLoading: {
+    position: 'absolute',
+    opacity: 0,
   },
   navArrow: {
     position: 'absolute',

@@ -51,7 +51,7 @@ const TOP_CITIES: TopCity[] = [
   {id: 'ahmedabad', name: 'Ahmedabad', image: require('../../assets/Ahmedabad.png')},
 ];
 
-type ListingType = 'all' | 'sale' | 'rent' | 'pg';
+type ListingType = 'sale' | 'rent' | 'pg';
 
 const HomeScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout, isAuthenticated} = useAuth();
@@ -60,7 +60,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
   const isGuest = !isLoggedIn;
-  const [listingType, setListingType] = useState<ListingType>('all');
+  const [listingType, setListingType] = useState<ListingType>('sale');
   const [properties, setProperties] = useState<Property[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<Property[]>([]);
   const [buyNewHomeProperties, setBuyNewHomeProperties] = useState<Property[]>([]);
@@ -209,10 +209,10 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         if (listingType === 'pg') {
           filteredProperties = filteredProperties.filter((prop: any) => {
             const propType = (prop.property_type || prop.type || '').toLowerCase();
-            return propType.includes('pg') || 
-                   propType.includes('hostel') || 
-                   propType === 'pg-hostel' ||
-                   prop.status === 'pg';
+            const isPG = propType.includes('pg') || propType.includes('hostel') || propType === 'pg-hostel' || prop.status === 'pg';
+            if (!isPG) return false;
+            // Show only PG/Hostels that are available for bachelors
+            return prop.available_for_bachelors === true || prop.available_for_bachelors === 'true';
           });
         }
         
@@ -269,10 +269,9 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         params.searchQuery = searchLocationText;
       }
       
-      // Add listing type filter
-      if (listingType !== 'all') {
-        params.listingType = listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType;
-      }
+      // Pass listing type (Buy, Rent, PG only - no All)
+      params.listingType = listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent';
+      params.status = listingType === 'sale' ? 'sale' : 'rent';
       
       navigation.navigate('Search' as never, {
         screen: 'SearchResults',
@@ -408,15 +407,8 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
             </Text>
           </View>
 
-          {/* Listing Type Toggle Buttons */}
+          {/* Listing Type Toggle Buttons - Buy, Rent, PG/Hostel only */}
           <View style={styles.toggleSection}>
-            <TouchableOpacity
-              style={[styles.toggleButton, listingType === 'all' && styles.toggleButtonActive]}
-              onPress={() => setListingType('all')}>
-              <Text style={[styles.toggleButtonText, listingType === 'all' && styles.toggleButtonTextActive]}>
-                All
-              </Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleButton, listingType === 'sale' && styles.toggleButtonActive]}
               onPress={() => setListingType('sale')}>
@@ -489,8 +481,11 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                   console.error('Error navigating to map:', err);
                   CustomAlert.alert('Error', 'Map is not available.');
                 }
-              }}>
-              <Text style={styles.mapSearchIcon}>🗺️</Text>
+              }}
+              activeOpacity={0.8}>
+              <View style={styles.mapSearchIconWrap}>
+                <Text style={styles.mapSearchIcon}>📍</Text>
+              </View>
               <Text style={styles.mapSearchText}>Search on Map</Text>
             </TouchableOpacity>
           </View>
@@ -511,23 +506,9 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                     const params: any = {
                       query: '',
                       location: '',
-                      listingType: 'all', // Default to show all properties
+                      listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent',
+                      status: listingType === 'sale' ? 'sale' : 'rent',
                     };
-
-                    // Preserve the currently selected listing type when navigating
-                    if (listingType === 'sale') {
-                      params.status = 'sale';
-                      params.listingType = 'buy';
-                    } else if (listingType === 'rent') {
-                      params.status = 'rent';
-                      params.listingType = 'rent';
-                    } else if (listingType === 'pg') {
-                      params.status = 'rent'; // PG uses rent status in API
-                      params.listingType = 'pg-hostel';
-                    } else if (listingType === 'all') {
-                      // Explicitly set to 'all' to show all properties regardless of type
-                      params.listingType = 'all';
-                    }
 
                     // Navigate to SearchResults screen
                     console.log('[HomeScreen] Navigating to SearchResults with params:', params);
@@ -613,7 +594,13 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                 onPress={() => {
                   navigation.navigate('Search' as never, {
                     screen: 'SearchResults',
-                    params: {query: '', location: '', listingType: 'all'},
+                    params: {
+                      query: '',
+                      location: '',
+                      listingType: 'buy',
+                      status: 'sale',
+                      project_type: 'upcoming',
+                    },
                   } as never);
                 }}>
                 <Text style={styles.seeAllText}>See All</Text>
@@ -835,28 +822,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.primary,
     borderRadius: scale(12),
     paddingVertical: verticalScale(12),
     paddingHorizontal: spacing.md,
     marginTop: spacing.sm,
-    minHeight: verticalScale(44),
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
+    minHeight: verticalScale(48),
+    gap: spacing.sm,
+    borderWidth: 0,
+    shadowColor: colors.primary,
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.2,
     shadowRadius: 6,
-    elevation: 2,
+    elevation: 3,
+  },
+  mapSearchIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mapSearchIcon: {
-    fontSize: moderateScale(18),
-    marginRight: spacing.xs,
+    fontSize: moderateScale(16),
   },
   mapSearchText: {
-    fontSize: moderateScale(16),
-    fontWeight: '600',
-    color: colors.text,
+    fontSize: moderateScale(15),
+    fontWeight: '700',
+    color: colors.surface,
   },
   // Toggle Section - Pill-shaped buttons
   toggleSection: {
