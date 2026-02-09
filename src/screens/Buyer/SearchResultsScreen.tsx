@@ -459,11 +459,20 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       
       let results: any[] = [];
       try {
-        // PG/Hostel: match website exactly - two API calls then merge (website calls list twice)
+        // PG/Hostel: two API calls then merge; show only PG/Hostel type (not apartments for bachelors)
         if (listingType === 'pg-hostel') {
-          const baseParams: any = { limit: 1000, status: 'rent' };
-          if (searchParams.location) baseParams.location = searchParams.location;
-          if (searchParams.city) baseParams.city = searchParams.city;
+          const baseParams: any = {
+            limit: 1000,
+            status: 'rent',
+            property_type: 'PG / Hostel',
+            ...(searchParams.location && { location: searchParams.location }),
+            ...(searchParams.city && { city: searchParams.city }),
+            ...(searchParams.min_price != null && { min_price: searchParams.min_price }),
+            ...(searchParams.max_price != null && { max_price: searchParams.max_price }),
+            ...(searchParams.budget && { budget: searchParams.budget }),
+            ...(searchParams.bedrooms && { bedrooms: searchParams.bedrooms }),
+            ...(searchParams.sort_by && { sort_by: searchParams.sort_by }),
+          };
           const [resPG, resBachelors] = await Promise.all([
             propertyService.getProperties({ ...baseParams, property_type: 'PG / Hostel' }) as Promise<any>,
             propertyService.getProperties({ ...baseParams, available_for_bachelors: '1' }) as Promise<any>,
@@ -477,7 +486,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           };
           add(resPG?.success ? (resPG.data?.properties ?? resPG.data ?? []) : []);
           add(resBachelors?.success ? (resBachelors.data?.properties ?? resBachelors.data ?? []) : []);
-          // Display rule: show if PG/Hostel type OR available for bachelors (website logic)
+          // Display: PG/Hostel type OR any property available for bachelors (per backend/reference)
           results = Array.from(byId.values()).filter((p: any) => {
             const pt = (p.property_type || p.type || '').toLowerCase();
             const isPGHostel = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
