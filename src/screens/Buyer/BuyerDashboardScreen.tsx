@@ -266,8 +266,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         add(resBachelors?.success ? (resBachelors.data?.properties ?? resBachelors.data ?? []) : []);
         filteredProperties = Array.from(byId.values()).filter((p: any) => {
           const pt = (p.property_type || p.type || '').toLowerCase();
-          return (pt.includes('pg') || pt.includes('hostel') || p.status === 'pg') &&
-            (p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1' || p.available_for_bachelors == null);
+          const isPG = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
+          const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
+          return isPG && forBachelors;
         });
       } else {
         const listParams: any = { limit: 10 };

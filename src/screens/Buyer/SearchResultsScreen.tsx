@@ -463,13 +463,12 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           };
           add(resPG?.success ? (resPG.data?.properties ?? resPG.data ?? []) : []);
           add(resBachelors?.success ? (resBachelors.data?.properties ?? resBachelors.data ?? []) : []);
-          // Show PG/Hostel; prefer those available for bachelors when field is present
+          // Display rule: show if PG/Hostel type OR available for bachelors (website logic)
           results = Array.from(byId.values()).filter((p: any) => {
             const pt = (p.property_type || p.type || '').toLowerCase();
-            const isPG = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
-            if (!isPG) return false;
-            const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
-            return forBachelors || p.available_for_bachelors === undefined || p.available_for_bachelors === null;
+            const isPGHostel = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
+            const isAvailableForBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
+            return isPGHostel || isAvailableForBachelors;
           });
           console.log('[SearchResultsScreen] PG/Hostel: merged', byId.size, 'unique, showing', results.length);
         } else {
