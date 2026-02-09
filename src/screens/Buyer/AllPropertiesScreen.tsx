@@ -20,6 +20,7 @@ import PropertyCard from '../../components/PropertyCard';
 import BuyerHeader from '../../components/BuyerHeader';
 import {useAuth} from '../../context/AuthContext';
 import {buyerService, Property} from '../../services/buyer.service';
+import {propertyService} from '../../services/property.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
@@ -74,64 +75,60 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
       } else if (listingType === 'rent') {
         statusFilter = 'rent';
       } else if (listingType === 'pg-hostel') {
-        statusFilter = 'rent'; // PG/Hostel use rent status
-        propertyTypeFilter = 'PG / Hostel'; // Backend list.php expects exact 'PG / Hostel'
+        statusFilter = 'rent';
+        propertyTypeFilter = 'PG / Hostel';
       }
       
-      const params: any = {
-        page: pageNum,
-        limit: 50,
-      };
-      if (statusFilter) {
-        params.status = statusFilter;
-      }
-      if (propertyTypeFilter) {
-        params.property_type = propertyTypeFilter;
-      }
-      // PG/Hostel: same as website - bachelors-only (backend list.php)
+      let propertiesList: any[] = [];
       if (listingType === 'pg-hostel') {
-        params.available_for_bachelors = true;
-      }
-      
-      const response = await buyerService.getProperties(params);
-      
-      if (response && response.success && response.data) {
-        let propertiesList = response.data.properties || [];
-        // Backend filters by property_type + available_for_bachelors; optional client-side safety
-        if (listingType === 'pg-hostel') {
-          propertiesList = propertiesList.filter((prop: any) => {
-            const propType = (prop.property_type || prop.type || '').toLowerCase();
-            return (propType.includes('pg') || propType.includes('hostel') || prop.status === 'pg') &&
-                   (prop.available_for_bachelors === true || prop.available_for_bachelors === 'true');
+        // Same as website: two calls then merge (PG/Hostel only + Bachelors only)
+        const baseParams: any = { page: pageNum, limit: 50, status: 'rent' };
+        const [resPG, resBachelors] = await Promise.all([
+          propertyService.getProperties({ ...baseParams, property_type: 'PG / Hostel' }) as Promise<any>,
+          propertyService.getProperties({ ...baseParams, available_for_bachelors: '1' }) as Promise<any>,
+        ]);
+        const byId = new Map<string, any>();
+        const add = (list: any[]) => {
+          (list || []).forEach((p: any) => {
+            const id = String(p.id ?? p.property_id ?? '');
+            if (id && !byId.has(id)) byId.set(id, p);
           });
-        }
-        
-        // Extract favorite IDs
-        const favorites = propertiesList
-          .filter((p: any) => p.is_favorite)
-          .map((p: any) => p.id);
-        setFavoriteIds(new Set(favorites));
-        
-        if (append) {
-          setProperties(prev => [...prev, ...propertiesList]);
-        } else {
-          setProperties(propertiesList);
-        }
-        
-        // Check pagination
-        const pagination = response.data.pagination;
-        if (pagination) {
-          const currentPage = pagination.page || pageNum;
-          const totalPages = pagination.total_pages || Math.ceil((pagination.total || 0) / (pagination.limit || 50));
-          setHasMore(currentPage < totalPages);
-        } else {
-          setHasMore(propertiesList.length === 50);
+        };
+        add(resPG?.success ? (resPG.data?.properties ?? resPG.data ?? []) : []);
+        add(resBachelors?.success ? (resBachelors.data?.properties ?? resBachelors.data ?? []) : []);
+        propertiesList = Array.from(byId.values()).filter((p: any) => {
+          const pt = (p.property_type || p.type || '').toLowerCase();
+          const isPG = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
+          const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
+          return isPG && (forBachelors || p.available_for_bachelors == null);
+        });
+      let pagination: any = null;
+      if (listingType !== 'pg-hostel') {
+        const params: any = { page: pageNum, limit: 50 };
+        if (statusFilter) params.status = statusFilter;
+        if (propertyTypeFilter) params.property_type = propertyTypeFilter;
+        const response = await buyerService.getProperties(params);
+        if (response?.success && response.data) {
+          propertiesList = response.data.properties || [];
+          pagination = response.data.pagination ?? null;
         }
       } else {
-        if (!append) {
-          setProperties([]);
-        }
-        setHasMore(false);
+        pagination = { page: pageNum, total_pages: 1, total: propertiesList.length, limit: 50 };
+      }
+      
+      const favorites = propertiesList.filter((p: any) => p.is_favorite).map((p: any) => p.id);
+      setFavoriteIds(new Set(favorites));
+      if (append) {
+        setProperties(prev => [...prev, ...propertiesList]);
+      } else {
+        setProperties(propertiesList);
+      }
+      if (pagination) {
+        const currentPage = pagination.page ?? pageNum;
+        const totalPages = pagination.total_pages ?? Math.ceil((pagination.total || 0) / (pagination.limit || 50));
+        setHasMore(currentPage < totalPages);
+      } else {
+        setHasMore(propertiesList.length >= 50);
       }
     } catch (error: any) {
       console.error('Error loading properties:', error);

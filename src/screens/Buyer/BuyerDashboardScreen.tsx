@@ -27,6 +27,7 @@ import CustomAlert from '../../utils/alertHelper';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
 import {buyerService, Property} from '../../services/buyer.service';
+import {propertyService} from '../../services/property.service';
 import {favoriteService} from '../../services/favorite.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
@@ -225,7 +226,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     // Resume auto-scroll after a short delay
     setTimeout(() => {
       isUserScrolling.current = false;
-    }, 2000); // 2 second pause after user interaction
+    }, 6000); // 6 second pause after user interaction
   }, []);
 
   // Pause marquee when user interacts with image carousel inside a card
@@ -235,7 +236,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const handleImageCarouselScrollEnd = useCallback(() => {
     setTimeout(() => {
       isUserScrolling.current = false;
-    }, 2000);
+    }, 6000);
   }, []);
   
   // Create duplicated data for seamless infinite scroll
@@ -251,22 +252,34 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         setLoading(true);
       }
       
-      // Same backend as website: property_type 'PG / Hostel', available_for_bachelors (list.php)
-      const listParams: any = { limit: 10 };
-      if (listingType === 'sale') {
-        listParams.status = 'sale';
-      } else if (listingType === 'rent') {
-        listParams.status = 'rent';
-      } else if (listingType === 'pg') {
-        listParams.status = 'rent';
-        listParams.property_type = 'PG / Hostel';
-        listParams.available_for_bachelors = true;
+      // PG tab: same as website - two API calls then merge
+      let filteredProperties: any[] = [];
+      if (listingType === 'pg') {
+        const base = { limit: 10, status: 'rent' };
+        const [resPG, resBachelors] = await Promise.all([
+          propertyService.getProperties({ ...base, property_type: 'PG / Hostel' }) as Promise<any>,
+          propertyService.getProperties({ ...base, available_for_bachelors: '1' }) as Promise<any>,
+        ]);
+        const byId = new Map<string, any>();
+        const add = (list: any[]) => (list || []).forEach((p: any) => { const id = String(p.id ?? p.property_id ?? ''); if (id && !byId.has(id)) byId.set(id, p); });
+        add(resPG?.success ? (resPG.data?.properties ?? resPG.data ?? []) : []);
+        add(resBachelors?.success ? (resBachelors.data?.properties ?? resBachelors.data ?? []) : []);
+        filteredProperties = Array.from(byId.values()).filter((p: any) => {
+          const pt = (p.property_type || p.type || '').toLowerCase();
+          return (pt.includes('pg') || pt.includes('hostel') || p.status === 'pg') &&
+            (p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1' || p.available_for_bachelors == null);
+        });
+      } else {
+        const listParams: any = { limit: 10 };
+        if (listingType === 'sale') listParams.status = 'sale';
+        else if (listingType === 'rent') listParams.status = 'rent';
+        const propertiesResponse = await buyerService.getProperties(listParams);
+        if (propertiesResponse.success && propertiesResponse.data) {
+          filteredProperties = propertiesResponse.data.properties || [];
+        }
       }
 
-      const propertiesResponse = await buyerService.getProperties(listParams);
-
-      if (propertiesResponse.success && propertiesResponse.data) {
-        const filteredProperties = propertiesResponse.data.properties || [];
+      if (filteredProperties.length >= 0) {
         setProperties(filteredProperties);
         const favorites = (filteredProperties as Property[])
           .filter(p => p.is_favorite)

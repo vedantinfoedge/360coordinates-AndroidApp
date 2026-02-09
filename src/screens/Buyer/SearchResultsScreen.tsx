@@ -350,10 +350,10 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         searchParams.project_type = 'upcoming';
       }
       
-      // PG/Hostel: same as website - property_type 'PG / Hostel' + available_for_bachelors (backend list.php)
+      // PG/Hostel: same as website - use 1 for PHP backend; two calls then merge (website calls list twice)
       if (listingType === 'pg-hostel') {
         searchParams.property_type = 'PG / Hostel';
-        searchParams.available_for_bachelors = 'true';
+        searchParams.available_for_bachelors = '1'; // PHP backend often expects 1/0
       }
       
       // PART B: Safely get location with trim() - handle null/empty/spaces
@@ -445,79 +445,91 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       
       let results: any[] = [];
       try {
-        const response = await propertyService.getProperties(searchParams) as any;
-        console.log('[SearchResultsScreen] API response:', response);
-        
-        if (response && response.success) {
-          results = response.data?.properties || response.data || [];
-          console.log('[SearchResultsScreen] Found', results.length, 'properties');
-          
-          // If no results and we used category, try with specific type as fallback
-          if (results.length === 0 && searchParams.property_type && selectedPropertyType && selectedPropertyType !== 'all') {
-            const specificTypeMap: {[key: string]: string} = {
-              'Apartment': 'apartment',
-              'Villa': 'villa',
-              'Independent House': 'independent-house',
-              'Bungalow': 'bungalow',
-              'Studio Apartment': 'studio-apartment',
-              'Penthouse': 'penthouse',
-              'Farm House': 'farm-house',
-              'Plot / Land': 'plot-land',
-              'Commercial Office': 'commercial-office',
-              'Commercial Shop': 'commercial-shop',
-              'Retail Space': 'retail-space',
-              'Co-working Space': 'coworking-space',
-              'Warehouse / Godown': 'warehouse-godown',
-              'Industrial Property': 'industrial-property',
-              'PG / Hostel': 'pg-hostel',
-            };
-            
-            const specificType = specificTypeMap[selectedPropertyType];
-            if (specificType && searchParams.property_type !== specificType) {
-              console.log('[SearchResultsScreen] No results with category, trying specific type:', specificType);
-              const typeParams = {...searchParams};
-              typeParams.property_type = specificType;
-              
-              try {
-                const typeResponse = await propertyService.getProperties(typeParams) as any;
-                if (typeResponse && typeResponse.success) {
-                  const typeResults = typeResponse.data?.properties || typeResponse.data || [];
-                  if (typeResults.length > 0) {
-                    console.log('[SearchResultsScreen] Found', typeResults.length, 'properties with specific type filter');
-                    results = typeResults;
+        // PG/Hostel: match website exactly - two API calls then merge (website calls list twice)
+        if (listingType === 'pg-hostel') {
+          const baseParams: any = { limit: 1000, status: 'rent' };
+          if (searchParams.location) baseParams.location = searchParams.location;
+          if (searchParams.city) baseParams.city = searchParams.city;
+          const [resPG, resBachelors] = await Promise.all([
+            propertyService.getProperties({ ...baseParams, property_type: 'PG / Hostel' }) as Promise<any>,
+            propertyService.getProperties({ ...baseParams, available_for_bachelors: '1' }) as Promise<any>,
+          ]);
+          const byId = new Map<string, any>();
+          const add = (list: any[]) => {
+            (list || []).forEach((p: any) => {
+              const id = String(p.id ?? p.property_id ?? '');
+              if (id && !byId.has(id)) byId.set(id, p);
+            });
+          };
+          add(resPG?.success ? (resPG.data?.properties ?? resPG.data ?? []) : []);
+          add(resBachelors?.success ? (resBachelors.data?.properties ?? resBachelors.data ?? []) : []);
+          // Show PG/Hostel; prefer those available for bachelors when field is present
+          results = Array.from(byId.values()).filter((p: any) => {
+            const pt = (p.property_type || p.type || '').toLowerCase();
+            const isPG = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
+            if (!isPG) return false;
+            const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
+            return forBachelors || p.available_for_bachelors === undefined || p.available_for_bachelors === null;
+          });
+          console.log('[SearchResultsScreen] PG/Hostel: merged', byId.size, 'unique, showing', results.length);
+        } else {
+          const response = await propertyService.getProperties(searchParams) as any;
+          console.log('[SearchResultsScreen] API response:', response);
+          if (response && response.success) {
+            results = response.data?.properties || response.data || [];
+            console.log('[SearchResultsScreen] Found', results.length, 'properties');
+            if (results.length === 0 && searchParams.property_type && selectedPropertyType && selectedPropertyType !== 'all') {
+              const specificTypeMap: {[key: string]: string} = {
+                'Apartment': 'apartment', 'Villa': 'villa', 'Independent House': 'independent-house',
+                'Bungalow': 'bungalow', 'Studio Apartment': 'studio-apartment', 'Penthouse': 'penthouse',
+                'Farm House': 'farm-house', 'Plot / Land': 'plot-land', 'Commercial Office': 'commercial-office',
+                'Commercial Shop': 'commercial-shop', 'Retail Space': 'retail-space', 'Co-working Space': 'coworking-space',
+                'Warehouse / Godown': 'warehouse-godown', 'Industrial Property': 'industrial-property',
+                'PG / Hostel': 'pg-hostel',
+              };
+              const specificType = specificTypeMap[selectedPropertyType];
+              if (specificType && searchParams.property_type !== specificType) {
+                try {
+                  const typeResponse = await propertyService.getProperties({ ...searchParams, property_type: specificType }) as any;
+                  if (typeResponse?.success) {
+                    const typeResults = typeResponse.data?.properties || typeResponse.data || [];
+                    if (typeResults.length > 0) results = typeResults;
                   }
-                }
-              } catch (typeError) {
-                console.error('[SearchResultsScreen] Specific type filter error:', typeError);
+                } catch (e) { /* ignore */ }
               }
             }
           }
         }
       } catch (error) {
         console.error('[SearchResultsScreen] API error:', error);
-        // Fallback: try without some filters if error occurs
         try {
-          const fallbackParams: any = {limit: 100};
-          if (currentLocation) fallbackParams.location = currentLocation;
-          if (status || listingType !== 'all') {
+          const fallbackParams: any = { limit: 100 };
+          if (searchParams.location) fallbackParams.location = searchParams.location;
+          if (searchParams.city) fallbackParams.city = searchParams.city;
+          if (listingType === 'pg-hostel') {
+            fallbackParams.status = 'rent';
+            fallbackParams.property_type = 'PG / Hostel';
+            fallbackParams.available_for_bachelors = '1';
+          } else if (status || listingType !== 'all') {
             fallbackParams.status = status || (listingType === 'buy' ? 'sale' : 'rent');
           }
           const fallbackResponse = await propertyService.getProperties(fallbackParams) as any;
-          if (fallbackResponse && fallbackResponse.success) {
+          if (fallbackResponse?.success) {
             results = fallbackResponse.data?.properties || fallbackResponse.data || [];
+            if (listingType === 'pg-hostel') {
+              results = results.filter((p: any) => {
+                const pt = (p.property_type || '').toLowerCase();
+                return (pt.includes('pg') || pt.includes('hostel')) && (p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1');
+              });
+            }
           }
         } catch (fallbackError) {
           console.error('[SearchResultsScreen] Fallback error:', fallbackError);
         }
       }
       
-      // Client-side: show only upcoming projects when requested
       if (projectTypeFilter === 'upcoming') {
         results = results.filter((p: any) => (p.project_type || '') === 'upcoming');
-      }
-      // Client-side: for PG/Hostel, show only those available for bachelors (if API didn't filter)
-      if (listingType === 'pg-hostel') {
-        results = results.filter((p: any) => p.available_for_bachelors === true || p.available_for_bachelors === 'true');
       }
       
       // Format properties

@@ -23,6 +23,7 @@ import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
 import {buyerService, Property} from '../../services/buyer.service';
+import {propertyService} from '../../services/property.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import CustomAlert from '../../utils/alertHelper';
 import {formatters} from '../../utils/formatters';
@@ -189,23 +190,31 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         setLoading(true);
       }
       
-      // Same backend as website: property_type 'PG / Hostel', available_for_bachelors (list.php)
-      const listParams: any = { limit: 10 };
-      if (listingType === 'sale') {
-        listParams.status = 'sale';
-      } else if (listingType === 'rent') {
-        listParams.status = 'rent';
-      } else if (listingType === 'pg') {
-        listParams.status = 'rent';
-        listParams.property_type = 'PG / Hostel';
-        listParams.available_for_bachelors = true;
-      }
-
-      const propertiesResponse = await buyerService.getProperties(listParams);
-
-      if (propertiesResponse.success && propertiesResponse.data) {
-        const filteredProperties = propertiesResponse.data.properties || [];
+      // PG tab: same as website - two API calls then merge
+      if (listingType === 'pg') {
+        const base = { limit: 10, status: 'rent' };
+        const [resPG, resBachelors] = await Promise.all([
+          propertyService.getProperties({ ...base, property_type: 'PG / Hostel' }) as Promise<any>,
+          propertyService.getProperties({ ...base, available_for_bachelors: '1' }) as Promise<any>,
+        ]);
+        const byId = new Map<string, any>();
+        const add = (list: any[]) => (list || []).forEach((p: any) => { const id = String(p.id ?? p.property_id ?? ''); if (id && !byId.has(id)) byId.set(id, p); });
+        add(resPG?.success ? (resPG.data?.properties ?? resPG.data ?? []) : []);
+        add(resBachelors?.success ? (resBachelors.data?.properties ?? resBachelors.data ?? []) : []);
+        const filteredProperties = Array.from(byId.values()).filter((p: any) => {
+          const pt = (p.property_type || p.type || '').toLowerCase();
+          return (pt.includes('pg') || pt.includes('hostel') || p.status === 'pg') &&
+            (p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1' || p.available_for_bachelors == null);
+        });
         setProperties(filteredProperties);
+      } else {
+        const listParams: any = { limit: 10 };
+        if (listingType === 'sale') listParams.status = 'sale';
+        else if (listingType === 'rent') listParams.status = 'rent';
+        const propertiesResponse = await buyerService.getProperties(listParams);
+        if (propertiesResponse.success && propertiesResponse.data) {
+          setProperties(propertiesResponse.data.properties || []);
+        }
       }
 
       const allResponse = await buyerService.getProperties({limit: 50});
