@@ -102,6 +102,7 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
           const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
           return isPG && forBachelors;
         });
+      }
       let pagination: any = null;
       if (listingType !== 'pg-hostel') {
         const params: any = { page: pageNum, limit: 50 };
