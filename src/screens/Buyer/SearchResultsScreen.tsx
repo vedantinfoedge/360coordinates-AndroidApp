@@ -428,6 +428,20 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       const budgetString = budget || getBudgetString(minBudget, maxBudget, listingType, selectedPropertyType);
       if (budgetString) {
         searchParams.budget = normalizeBudgetForBackend(budgetString, listingType);
+        // Send numeric min/max price so backend can filter and sort by price (list.php often expects these)
+        if (listingType === 'buy') {
+          // Slider in Lakhs: 1 Lakh = 100000, 1 Cr = 100 Lakh
+          searchParams.min_price = String(Math.round(minBudget * 100000));
+          searchParams.max_price = String(Math.round(maxBudget * 100000));
+        } else {
+          // Rent/PG: slider in thousands per month
+          searchParams.min_price = String(Math.round(minBudget * 1000));
+          searchParams.max_price = String(Math.round(maxBudget * 1000));
+        }
+        // Sort by price when budget filter is applied so results match budget order
+        searchParams.sort_by = 'price_asc';
+      } else {
+        searchParams.sort_by = 'newest';
       }
       
       // Bedrooms (format: "2 BHK", "5+ BHK", etc.) - only for bedroom-based types
