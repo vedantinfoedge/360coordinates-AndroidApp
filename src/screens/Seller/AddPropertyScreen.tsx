@@ -1503,6 +1503,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Dropdown
                 label="Property Age"
                 placeholder="Select property age"
+                required={true}
                 options={[
                   {label: 'New Construction', value: 'New Construction'},
                   {label: 'Less than 1 Year', value: 'Less than 1 Year'},
@@ -1519,6 +1520,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Dropdown
                 label="Furnishing"
                 placeholder="Select furnishing status"
+                required={true}
                 options={[
                   {label: 'Unfurnished', value: 'Unfurnished'},
                   {label: 'Semi-Furnished', value: 'Semi-Furnished'},

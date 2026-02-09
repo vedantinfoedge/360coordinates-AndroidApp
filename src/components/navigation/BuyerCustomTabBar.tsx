@@ -8,14 +8,15 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {BottomTabBarProps} from '@react-navigation/bottom-tabs';
-import {CommonActions} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useArcFAB} from '../../context/ArcFABContext';
 import {useAuth} from '../../context/AuthContext';
 import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
 import {colors, typography} from '../../theme';
 import {moderateScale, scale} from '../../utils/responsive';
+import CustomAlert from '../../utils/alertHelper';
 import {TabIcon} from './TabIcons';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
@@ -56,7 +57,7 @@ const TAB_CONFIG = [
 
 export default function BuyerCustomTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const {isAuthenticated} = useAuth();
+  const {isAuthenticated, switchRole} = useAuth();
   const unreadCount = useUnreadChatCount();
   const {openMenu, closeMenu, isMenuOpen, setOnRoleSelect} = useArcFAB();
   const fabRef = useRef<MeasurableView | null>(null);
@@ -112,10 +113,27 @@ export default function BuyerCustomTabBar({state, descriptors, navigation}: Bott
       setTimeout(() => {
         fabSwitchCooldownRef.current = false;
       }, FAB_SWITCH_COOLDOWN_MS);
+
       const root = getRootNav();
-      if (root) {
-        root.dispatch(CommonActions.navigate({name: 'Seller'}));
-      }
+      (async () => {
+        try {
+          await AsyncStorage.setItem('@target_dashboard', 'seller');
+          await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
+          await switchRole('seller');
+          if (root) {
+            (root as any).reset({
+              index: 0,
+              routes: [{name: 'Seller'}],
+            });
+          }
+        } catch (error: any) {
+          console.error('[BuyerCustomTabBar] Error switching to seller:', error);
+          CustomAlert.alert(
+            'Switch Failed',
+            error?.message || 'Could not switch to Seller dashboard. Please try again.',
+          );
+        }
+      })();
       return;
     }
     // Not logged in: open arc menu for role selection (Register flow).
@@ -124,7 +142,7 @@ export default function BuyerCustomTabBar({state, descriptors, navigation}: Bott
     setTimeout(() => {
       isAnimating.current = false;
     }, 400);
-  }, [isAuthenticated, isMenuOpen, closeMenu, getRootNav, measureFAB]);
+  }, [isAuthenticated, isMenuOpen, closeMenu, getRootNav, measureFAB, switchRole]);
 
   return (
     <View style={[styles.wrapper, {height: barHeight, paddingBottom: insets.bottom}]}>
