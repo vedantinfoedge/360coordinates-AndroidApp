@@ -189,33 +189,22 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         setLoading(true);
       }
       
-      let statusFilter: 'sale' | 'rent' | 'pg' | undefined = undefined;
+      // Same backend as website: property_type 'PG / Hostel', available_for_bachelors (list.php)
+      const listParams: any = { limit: 10 };
       if (listingType === 'sale') {
-        statusFilter = 'sale';
+        listParams.status = 'sale';
       } else if (listingType === 'rent') {
-        statusFilter = 'rent';
+        listParams.status = 'rent';
       } else if (listingType === 'pg') {
-        statusFilter = 'pg';
+        listParams.status = 'rent';
+        listParams.property_type = 'PG / Hostel';
+        listParams.available_for_bachelors = true;
       }
-      
-      const propertiesResponse = await buyerService.getProperties({
-        limit: 10,
-        ...(statusFilter && {status: statusFilter}),
-      });
+
+      const propertiesResponse = await buyerService.getProperties(listParams);
 
       if (propertiesResponse.success && propertiesResponse.data) {
-        let filteredProperties = propertiesResponse.data.properties || [];
-        
-        if (listingType === 'pg') {
-          filteredProperties = filteredProperties.filter((prop: any) => {
-            const propType = (prop.property_type || prop.type || '').toLowerCase();
-            const isPG = propType.includes('pg') || propType.includes('hostel') || propType === 'pg-hostel' || prop.status === 'pg';
-            if (!isPG) return false;
-            // Show only PG/Hostels that are available for bachelors
-            return prop.available_for_bachelors === true || prop.available_for_bachelors === 'true';
-          });
-        }
-        
+        const filteredProperties = propertiesResponse.data.properties || [];
         setProperties(filteredProperties);
       }
 

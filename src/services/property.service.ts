@@ -6,17 +6,17 @@ export const propertyService = {
   /**
    * Get properties list with all filters and pagination
    * 
-   * Supported query parameters:
+   * Supported query parameters (same backend as website: /buyer/properties/list.php):
    * - page: Page number (default: 1)
    * - limit: Items per page (default: 20, max: 100)
-   * - status: Property status ('approved', 'pending', 'rejected')
-   * - property_type: 'Residential', 'Commercial', 'Land', 'Industrial'
-   * - city: Filter by city
+   * - status: Property status ('sale', 'rent')
+   * - property_type: e.g. 'PG / Hostel', 'Residential', 'Commercial', 'Land', 'Industrial'
    * - location: Filter by location/area
+   * - city: Filter by city
+   * - available_for_bachelors: true/false for PG/Hostel bachelors-only
    * - min_price: Minimum price
    * - max_price: Maximum price
-   * - bedrooms: Number of bedrooms
-   * - bathrooms: Number of bathrooms
+   * - bedrooms: Bedroom filter (e.g. "1 BHK", "2 BHK", "5+ BHK") - only for bedroom-based property types
    * - min_area: Minimum area in sq ft
    * - max_area: Maximum area in sq ft
    * - search: Search in title/description

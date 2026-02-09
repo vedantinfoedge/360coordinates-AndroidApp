@@ -74,8 +74,8 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
       } else if (listingType === 'rent') {
         statusFilter = 'rent';
       } else if (listingType === 'pg-hostel') {
-        statusFilter = 'rent'; // PG/Hostel are often listed under 'rent' status
-        propertyTypeFilter = 'pg-hostel'; // Specific property type filter
+        statusFilter = 'rent'; // PG/Hostel use rent status
+        propertyTypeFilter = 'PG / Hostel'; // Backend list.php expects exact 'PG / Hostel'
       }
       
       const params: any = {
@@ -88,20 +88,21 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
       if (propertyTypeFilter) {
         params.property_type = propertyTypeFilter;
       }
+      // PG/Hostel: same as website - bachelors-only (backend list.php)
+      if (listingType === 'pg-hostel') {
+        params.available_for_bachelors = true;
+      }
       
       const response = await buyerService.getProperties(params);
       
       if (response && response.success && response.data) {
         let propertiesList = response.data.properties || [];
-        
-        // Additional filter for PG/Hostel to ensure we only get PG/Hostel properties
+        // Backend filters by property_type + available_for_bachelors; optional client-side safety
         if (listingType === 'pg-hostel') {
           propertiesList = propertiesList.filter((prop: any) => {
             const propType = (prop.property_type || prop.type || '').toLowerCase();
-            return propType.includes('pg') || 
-                   propType.includes('hostel') || 
-                   propType === 'pg-hostel' ||
-                   prop.status === 'pg';
+            return (propType.includes('pg') || propType.includes('hostel') || prop.status === 'pg') &&
+                   (prop.available_for_bachelors === true || prop.available_for_bachelors === 'true');
           });
         }
         

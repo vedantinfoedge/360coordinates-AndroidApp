@@ -107,17 +107,19 @@ export interface BuyerProfileResponse {
 }
 
 export const buyerService = {
-  // Get properties list
+  // Get properties list (same backend as website: /buyer/properties/list.php)
+  // Backend supports: property_type (e.g. 'PG / Hostel'), location/city, available_for_bachelors
   getProperties: async (params?: {
     page?: number;
     limit?: number;
     status?: 'sale' | 'rent' | 'pg';
     property_type?: string;
     location?: string;
+    city?: string;
+    available_for_bachelors?: boolean | string;
     min_price?: number;
     max_price?: number;
-    bedrooms?: number;
-    bathrooms?: number;
+    bedrooms?: string;
     search?: string;
   }): Promise<PropertiesListResponse> => {
     const response = await api.get(API_ENDPOINTS.BUYER_PROPERTIES_LIST, {

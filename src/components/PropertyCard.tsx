@@ -18,6 +18,10 @@ interface PropertyCardProps {
   isFavorite?: boolean;
   property?: any; // Full property object for compatibility
   style?: any; // Optional style prop for card container
+  /** Called when user starts interacting with the image carousel (swipe or arrow). Pause parent scroll animation. */
+  onImageCarouselScrollStart?: () => void;
+  /** Called when user finishes interacting with the image carousel. Resume parent scroll after delay. */
+  onImageCarouselScrollEnd?: () => void;
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -33,6 +37,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   isFavorite = false,
   property,
   style,
+  onImageCarouselScrollStart,
+  onImageCarouselScrollEnd,
 }) => {
   const [favorite, setFavorite] = useState(isFavorite);
   const [imageError, setImageError] = useState(false);
@@ -165,8 +171,15 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={onScrollEnd}
-                onScrollEndDrag={onScrollEnd}
+                onScrollBeginDrag={() => onImageCarouselScrollStart?.()}
+                onMomentumScrollEnd={(e) => {
+                  onScrollEnd(e);
+                  onImageCarouselScrollEnd?.();
+                }}
+                onScrollEndDrag={(e) => {
+                  onScrollEnd(e);
+                  onImageCarouselScrollEnd?.();
+                }}
                 decelerationRate="fast"
                 style={styles.imageCarousel}
                 contentContainerStyle={styles.imageCarouselContent}>
@@ -196,7 +209,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 style={[styles.navArrow, styles.navArrowLeft]}
                 onPress={(e: {stopPropagation: () => void}) => {
                   e.stopPropagation();
+                  onImageCarouselScrollStart?.();
                   goToPrev();
+                  setTimeout(() => onImageCarouselScrollEnd?.(), 400);
                 }}
                 activeOpacity={0.8}
                 disabled={currentIndex <= 0}>
@@ -208,7 +223,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 style={[styles.navArrow, styles.navArrowRight]}
                 onPress={(e: {stopPropagation: () => void}) => {
                   e.stopPropagation();
+                  onImageCarouselScrollStart?.();
                   goToNext();
+                  setTimeout(() => onImageCarouselScrollEnd?.(), 400);
                 }}
                 activeOpacity={0.8}
                 disabled={currentIndex >= imageUrls.length - 1}>

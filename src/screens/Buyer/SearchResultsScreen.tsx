@@ -30,6 +30,46 @@ import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 
+/**
+ * Normalize budget string to backend-expected format (same as website).
+ * Backend list.php maps budget to min/max price; keys must match (e.g. 25L-50L, 1Cr+, 50K+).
+ */
+function normalizeBudgetForBackend(
+  budgetString: string,
+  listingType: 'all' | 'buy' | 'rent' | 'pg-hostel',
+): string {
+  if (!budgetString || !budgetString.trim()) return budgetString;
+  const s = budgetString.trim();
+
+  if (listingType === 'buy') {
+    // Backend expects: 0-25L, 25L-50L, 50L-75L, 75L-1Cr, 1Cr-2Cr, 2Cr+
+    // App sends: 0L-25L, 25L-50L, 50L-1.0Cr, 1.0Cr-20.0Cr
+    const normalized = s.replace(/\.0Cr/g, 'Cr');
+    // 0L-25L → 0-25L
+    if (normalized === '0L-25L') return '0-25L';
+    // Open-ended high range (e.g. 1Cr-20Cr) → 1Cr+
+    const buyPlusMatch = normalized.match(/^(\d+)Cr-(\d+)Cr$/);
+    if (buyPlusMatch) {
+      const lowCr = parseInt(buyPlusMatch[1], 10);
+      const highCr = parseInt(buyPlusMatch[2], 10);
+      if (highCr >= 10) return `${lowCr}Cr+`;
+    }
+    return normalized;
+  }
+
+  // Rent / PG: backend expects 0K-5K, 5K-10K, 10K-20K, … 2L+
+  const rentNormalized = s.replace(/(\d+\.?\d*)Lakh/gi, (_, n) => `${Math.round(parseFloat(n))}L`);
+  // 0K-10K is fine; 50K-200K or 50K-1L → 50K+
+  const rentPlusMatch = rentNormalized.match(/^(\d+)K-(\d+)(K|L)$/);
+  if (rentPlusMatch) {
+    const lowK = parseInt(rentPlusMatch[1], 10);
+    const highVal = parseInt(rentPlusMatch[2], 10);
+    const unit = rentPlusMatch[3];
+    if (unit === 'L' || highVal >= 100) return `${lowK}K+`;
+  }
+  return rentNormalized;
+}
+
 type SearchResultsScreenNavigationProp = NativeStackNavigationProp<SearchStackParamList, 'SearchResults'>;
 
 type Props = {
@@ -116,10 +156,10 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   // Budget slider values (in base units: Lakhs for buy, thousands for rent)
   const [minBudget, setMinBudget] = useState<number>(0);
   const [maxBudget, setMaxBudget] = useState<number>(1000); // Default max
-  const [bedrooms, setBedrooms] = useState<number | null>(initialBedrooms ? parseInt(initialBedrooms) : null);
+  // Bedrooms: '' = Any, '1 BHK', '2 BHK', '3 BHK', '4 BHK', '5+ BHK' (PG also has '1RK')
+  const [bedrooms, setBedrooms] = useState<string>(initialBedrooms && /^(1RK|1 BHK|2 BHK|3 BHK|4 BHK|5\+ BHK)$/.test(initialBedrooms) ? initialBedrooms : '');
   const [area, setArea] = useState<string>(initialArea);
   const [status, setStatus] = useState<'sale' | 'rent' | ''>(initialStatus);
-  const [bathrooms, setBathrooms] = useState<number | null>(null);
   
   // Ref to track if user is actively dragging budget slider (prevents search during drag)
   const isDraggingBudget = useRef(false);
@@ -147,11 +187,12 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     }),
   };
 
-  // Property type classification
+  // Property type classification (bedroom filter shown for these types only)
   const bedroomBasedTypes = [
     'Apartment',
     'Studio Apartment',
     'Villa',
+    'Row House',
     'Independent House',
     'Bungalow',
     'Farm House',
@@ -183,7 +224,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     );
   }, [selectedPropertyType]);
 
-  // Check if property type is land/plot (bathrooms not applicable)
+  // Check if property type is land/plot
   const isLandProperty = useMemo(() => {
     if (selectedPropertyType === 'all') return false;
     return selectedPropertyType.includes('Plot') || 
@@ -255,25 +296,23 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     }
     
     if (selectedPropertyType === 'all') {
-      setBedrooms(null);
+      // When category is ALL, budget range is driven by listing type only - ensure it updates
+      setBedrooms('');
       setArea('');
       setBudget('');
       setMinBudget(0);
+      setMaxBudget(maxBudgetForType);
     } else {
       // Clear bedrooms if switching to area-based type
       if (isAreaBased) {
-        setBedrooms(null);
+        setBedrooms('');
       }
       // Clear area if switching to bedroom-based type
       if (isBedroomBased) {
         setArea('');
       }
-      // Clear bathrooms if switching to land property
-      if (isLandProperty) {
-        setBathrooms(null);
-      }
     }
-  }, [selectedPropertyType, isBedroomBased, isAreaBased, isLandProperty, listingType, maxBudgetForType, minBudget]);
+  }, [selectedPropertyType, isBedroomBased, isAreaBased, listingType, maxBudgetForType, minBudget]);
 
   // Get all property types for filter
   const allPropertyTypes = useMemo(() => {
@@ -311,8 +350,9 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         searchParams.project_type = 'upcoming';
       }
       
-      // PG/Hostel: only those available for bachelors
+      // PG/Hostel: same as website - property_type 'PG / Hostel' + available_for_bachelors (backend list.php)
       if (listingType === 'pg-hostel') {
+        searchParams.property_type = 'PG / Hostel';
         searchParams.available_for_bachelors = 'true';
       }
       
@@ -351,9 +391,9 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       
       
       // Property type (supports compound types like "Villa / Row House")
-      // Backend API expects category: 'Residential', 'Commercial', 'Land', 'Industrial'
-      if (selectedPropertyType && selectedPropertyType !== 'all') {
-        // Map display labels to API categories
+      // Backend list.php: property_type uses LIKE (e.g. 'PG / Hostel'); do not override when listingType is pg-hostel
+      if (selectedPropertyType && selectedPropertyType !== 'all' && listingType !== 'pg-hostel') {
+        // PG / Hostel is already set above when listingType === 'pg-hostel'
         const categoryMap: {[key: string]: string} = {
           'Apartment': 'Residential',
           'Villa': 'Residential',
@@ -369,41 +409,35 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           'Co-working Space': 'Commercial',
           'Warehouse / Godown': 'Commercial',
           'Industrial Property': 'Industrial',
-          'PG / Hostel': 'Residential', // PG/Hostel might be under Residential or separate
+          'PG / Hostel': 'PG / Hostel', // Backend expects exact 'PG / Hostel' for LIKE
         };
         
         const category = categoryMap[selectedPropertyType];
         if (category) {
           searchParams.property_type = category;
-          console.log('[SearchResultsScreen] Using property_type category:', category, 'for:', selectedPropertyType);
+          console.log('[SearchResultsScreen] Using property_type:', category, 'for:', selectedPropertyType);
         } else {
-          // Fallback: try specific type if category not found
           const fallbackType = selectedPropertyType.toLowerCase().replace(/ /g, '-');
           searchParams.property_type = fallbackType;
           console.log('[SearchResultsScreen] Using fallback property_type:', fallbackType);
         }
       }
       
-      // Budget range (format: "25L-50L", "5K-10K", etc.)
+      // Budget range (format: "25L-50L", "5K-10K", etc.) — normalize to backend-expected format
       // Use slider values if budget string is empty
       const budgetString = budget || getBudgetString(minBudget, maxBudget, listingType, selectedPropertyType);
       if (budgetString) {
-        searchParams.budget = budgetString;
+        searchParams.budget = normalizeBudgetForBackend(budgetString, listingType);
       }
       
       // Bedrooms (format: "2 BHK", "5+ BHK", etc.) - only for bedroom-based types
-      if (bedrooms !== null && isBedroomBased) {
-        searchParams.bedrooms = bedrooms.toString();
+      if (bedrooms && isBedroomBased) {
+        searchParams.bedrooms = bedrooms;
       }
       
       // Area range (format: "1000-2000 sq ft", "10000+ sq ft", etc.) - only for area-based types
       if (area && isAreaBased) {
         searchParams.area = area;
-      }
-      
-      // Bathrooms filter (not applicable for land/plot properties)
-      if (bathrooms !== null && !isLandProperty) {
-        searchParams.bathrooms = bathrooms.toString();
       }
       
       // Call API with website-style parameters
@@ -525,7 +559,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     } finally {
       setLoading(false);
     }
-  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, status, initialLocation, bathrooms, minBudget, maxBudget, isBedroomBased, isAreaBased, isLandProperty, projectTypeFilter]);
+  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, status, initialLocation, minBudget, maxBudget, isBedroomBased, isAreaBased, isLandProperty, projectTypeFilter]);
 
   // Track if this is the first render to skip initial search trigger
   const isFirstRender = React.useRef(true);
@@ -553,7 +587,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       isMounted = false;
       clearTimeout(searchTimeout);
     };
-  }, [location, listingType, selectedPropertyType, budget, bedrooms, area, bathrooms, loadProperties]);
+  }, [location, listingType, selectedPropertyType, budget, bedrooms, area, loadProperties]);
   
   // Separate effect for budget changes (with longer debounce to avoid lag during slider drag)
   useEffect(() => {
@@ -667,19 +701,16 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       }
     }
 
-    // Bedrooms filter (skip for PG/Hostel and commercial properties)
-    if (bedrooms !== null && listingType !== 'pg-hostel') {
+    // Bedrooms filter: parse "2 BHK" (exact) or "5+ BHK" (>= 5)
+    if (bedrooms && isBedroomBased) {
+      const match = bedrooms.match(/^(\d+)\+\s*BHK$/); // 5+ BHK
+      const isPlus = Boolean(match);
+      const bedroomCount = isPlus ? parseInt(match![1], 10) : parseInt(bedrooms, 10) || (bedrooms === '1RK' ? 1 : 0);
       filtered = filtered.filter(p => {
-        if (p.type === 'pg-hostel') return true;
-        return p.bedrooms === bedrooms;
-      });
-    }
-
-    // Bathrooms filter (skip for PG/Hostel, land properties, and commercial properties)
-    if (bathrooms !== null && listingType !== 'pg-hostel' && !isLandProperty) {
-      filtered = filtered.filter(p => {
-        if (p.type === 'pg-hostel') return true;
-        return p.bathrooms === bathrooms;
+        const propBedrooms = typeof p.bedrooms === 'number' ? p.bedrooms : parseInt(String(p.bedrooms || '0'), 10) || 0;
+        if (isPlus) return propBedrooms >= bedroomCount;
+        if (bedrooms === '1RK') return propBedrooms === 1; // 1RK treated as 1 bedroom
+        return propBedrooms === bedroomCount;
       });
     }
 
@@ -734,9 +765,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     setBudget('');
     setMinBudget(0);
     setMaxBudget(500);
-    setBedrooms(null);
+    setBedrooms('');
     setArea('');
-    setBathrooms(null);
     setSearchText('');
     setLocation('');
     setTimeout(() => loadProperties(), 100);
@@ -764,7 +794,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         budget,
         bedrooms,
         area,
-        bathrooms,
         status,
         location,
       });
@@ -1018,8 +1047,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             <Text style={styles.dropdownLabel}>Budget</Text>
             <Text style={styles.dropdownValue} numberOfLines={1}>
               {listingType === 'buy'
-                ? (minBudget === 0 && maxBudget === 2000 ? 'Any' : `₹${minBudget >= 100 ? (minBudget / 100) + 'Cr' : minBudget + 'L'}-${maxBudget >= 100 ? (maxBudget / 100) + 'Cr' : maxBudget + 'L'}`)
-                : (minBudget === 0 && maxBudget === 200 ? 'Any' : `₹${minBudget}K-${maxBudget}K`)}
+                ? (minBudget === 0 && maxBudget === maxBudgetForType ? 'Any' : `₹${minBudget >= 100 ? (minBudget / 100) + 'Cr' : minBudget + 'L'}-${maxBudget >= 100 ? (maxBudget / 100) + 'Cr' : maxBudget + 'L'}`)
+                : (minBudget === 0 && maxBudget === maxBudgetForType ? 'Any' : `₹${minBudget}K-${maxBudget}K`)}
             </Text>
             <Text style={styles.dropdownChevron}>{openDropdown === 'budget' ? '▲' : '▼'}</Text>
           </TouchableOpacity>
@@ -1070,18 +1099,18 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 <>
                   {(listingType === 'buy'
                     ? [
-                        {label: 'Any', min: 0, max: 2000},
+                        {label: 'Any', min: 0, max: maxBudgetForType},
                         {label: 'Under 25L', min: 0, max: 25},
                         {label: '25L-50L', min: 25, max: 50},
                         {label: '50L-1Cr', min: 50, max: 100},
-                        {label: '1Cr+', min: 100, max: 2000},
+                        {label: '1Cr+', min: 100, max: maxBudgetForType},
                       ]
                     : [
-                        {label: 'Any', min: 0, max: 200},
+                        {label: 'Any', min: 0, max: maxBudgetForType},
                         {label: 'Under 10K', min: 0, max: 10},
                         {label: '10K-25K', min: 10, max: 25},
                         {label: '25K-50K', min: 25, max: 50},
-                        {label: '50K+', min: 50, max: 200},
+                        {label: '50K+', min: 50, max: maxBudgetForType},
                       ]
                   ).map(({label, min, max}) => (
                     <TouchableOpacity
@@ -1294,25 +1323,31 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 </View>
               )}
 
-              {/* Bathrooms - Hide for land/plot properties */}
-              {!isLandProperty && (
+              {/* Bedrooms - Only for bedroom-based property types (Apartment, Villa, PG/Hostel, etc.) */}
+              {isBedroomBased && (
                 <View style={styles.filterSection}>
-                  <Text style={styles.filterLabel}>Bathrooms</Text>
+                  <Text style={styles.filterLabel}>
+                    {listingType === 'pg-hostel' ? 'Bedroom / Room Type' : 'Bedrooms'}
+                  </Text>
                   <View style={styles.filterOptions}>
-                    {[null, 1, 2, 3, 4].map(num => (
+                    {(
+                      listingType === 'pg-hostel'
+                        ? [{label: 'Any', value: ''}, {label: '1RK', value: '1RK'}, {label: '1 BHK', value: '1 BHK'}, {label: '2 BHK', value: '2 BHK'}, {label: '3 BHK', value: '3 BHK'}, {label: '4 BHK', value: '4 BHK'}, {label: '5+ BHK', value: '5+ BHK'}]
+                        : [{label: 'Any', value: ''}, {label: '1 BHK', value: '1 BHK'}, {label: '2 BHK', value: '2 BHK'}, {label: '3 BHK', value: '3 BHK'}, {label: '4 BHK', value: '4 BHK'}, {label: '5+ BHK', value: '5+ BHK'}]
+                    ).map(option => (
                       <TouchableOpacity
-                        key={num ?? 'all'}
+                        key={option.value || 'any'}
                         style={[
                           styles.filterChip,
-                          bathrooms === num && styles.filterChipActive,
+                          bedrooms === option.value && styles.filterChipActive,
                         ]}
-                        onPress={() => setBathrooms(num)}>
+                        onPress={() => setBedrooms(option.value)}>
                         <Text
                           style={[
                             styles.filterChipText,
-                            bathrooms === num && styles.filterChipTextActive,
+                            bedrooms === option.value && styles.filterChipTextActive,
                           ]}>
-                          {num === null ? 'All' : `${num}+`}
+                          {option.label}
                         </Text>
                       </TouchableOpacity>
                     ))}

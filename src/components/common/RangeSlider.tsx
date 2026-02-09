@@ -47,13 +47,15 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
   const startX = useRef(0);
   const startValue = useRef(0);
 
-  // Sync with external values when not dragging
+  // Sync with external values when not dragging (e.g. when category is "ALL" and listing type changes)
   useEffect(() => {
     if (!isDragging.current) {
-      setLocalMinValue(minValue);
-      setLocalMaxValue(maxValue);
+      const clampedMin = Math.max(min, Math.min(minValue, max));
+      const clampedMax = Math.max(min, Math.min(maxValue, max));
+      setLocalMinValue(clampedMin);
+      setLocalMaxValue(clampedMax);
     }
-  }, [minValue, maxValue]);
+  }, [minValue, maxValue, min, max]);
 
   // Handle layout
   const onLayout = useCallback((event: LayoutChangeEvent) => {

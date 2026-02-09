@@ -158,27 +158,23 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
   const loadRelatedProperties = async (centerLat: number, centerLng: number, propertyStatus?: string, currentProperty?: Property) => {
     try {
-      // Build status filter based on listing type or property status
-      let statusFilter: 'sale' | 'rent' | 'pg' | undefined = undefined;
-      if (listingType === 'buy') {
-        statusFilter = 'sale';
-      } else if (listingType === 'rent') {
-        statusFilter = 'rent';
-      } else if (listingType === 'pg-hostel') {
-        statusFilter = 'pg';
-      } else if (propertyStatus) {
-        statusFilter = propertyStatus as 'sale' | 'rent' | 'pg';
-      }
-      
+      // Same backend as website for PG: property_type 'PG / Hostel', available_for_bachelors
       const params: any = {
         limit: 50,
         latitude: centerLat,
         longitude: centerLng,
-        radius: 5, // 5km radius for related properties
+        radius: 5,
       };
-      
-      if (statusFilter) {
-        params.status = statusFilter;
+      if (listingType === 'buy') {
+        params.status = 'sale';
+      } else if (listingType === 'rent') {
+        params.status = 'rent';
+      } else if (listingType === 'pg-hostel') {
+        params.status = 'rent';
+        params.property_type = 'PG / Hostel';
+        params.available_for_bachelors = true;
+      } else if (propertyStatus) {
+        params.status = propertyStatus as 'sale' | 'rent' | 'pg';
       }
       
       const response = await propertyService.getProperties(params);
@@ -230,25 +226,22 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     try {
       setLoading(true);
       
-      // Build status filter based on listing type
-      let statusFilter: 'sale' | 'rent' | 'pg' | undefined = undefined;
+      // Same backend as website: property_type 'PG / Hostel', available_for_bachelors (list.php)
+      const params: any = { limit: 50 };
       if (listingType === 'buy') {
-        statusFilter = 'sale';
+        params.status = 'sale';
       } else if (listingType === 'rent') {
-        statusFilter = 'rent';
+        params.status = 'rent';
       } else if (listingType === 'pg-hostel') {
-        statusFilter = 'pg'; // PG/Hostel filter
-      }
-      
-      const params: any = {limit: 50};
-      if (statusFilter) {
-        params.status = statusFilter;
+        params.status = 'rent';
+        params.property_type = 'PG / Hostel';
+        params.available_for_bachelors = true;
       }
       
       const response = await propertyService.getProperties(params);
       
       if (response.success && response.data?.properties) {
-        let formattedProperties = response.data.properties
+        const formattedProperties = response.data.properties
           .filter((prop: any) => prop.latitude && prop.longitude)
           .map((prop: any) => ({
             id: prop.id,
@@ -261,18 +254,6 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
             longitude: parseFloat(prop.longitude),
             cover_image: prop.cover_image || prop.image,
           }));
-        
-        // Additional filter for PG/Hostel - ensure property_type matches
-        if (listingType === 'pg-hostel') {
-          formattedProperties = formattedProperties.filter((prop: any) => {
-            const propType = (prop.property_type || '').toLowerCase();
-            return propType.includes('pg') || 
-                   propType.includes('hostel') || 
-                   propType === 'pg-hostel' ||
-                   prop.status === 'pg';
-          });
-        }
-        
         setProperties(formattedProperties);
         log.property(`Loaded ${formattedProperties.length} properties for map (filter: ${listingType})`);
       }

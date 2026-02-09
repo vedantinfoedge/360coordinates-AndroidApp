@@ -227,6 +227,16 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       isUserScrolling.current = false;
     }, 2000); // 2 second pause after user interaction
   }, []);
+
+  // Pause marquee when user interacts with image carousel inside a card
+  const handleImageCarouselScrollStart = useCallback(() => {
+    isUserScrolling.current = true;
+  }, []);
+  const handleImageCarouselScrollEnd = useCallback(() => {
+    setTimeout(() => {
+      isUserScrolling.current = false;
+    }, 2000);
+  }, []);
   
   // Create duplicated data for seamless infinite scroll
   const getMarqueeData = useCallback(() => {
@@ -241,37 +251,22 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         setLoading(true);
       }
       
-      // Build status filter based on listing type
-      let statusFilter: 'sale' | 'rent' | 'pg' | undefined = undefined;
+      // Same backend as website: property_type 'PG / Hostel', available_for_bachelors (list.php)
+      const listParams: any = { limit: 10 };
       if (listingType === 'sale') {
-        statusFilter = 'sale';
+        listParams.status = 'sale';
       } else if (listingType === 'rent') {
-        statusFilter = 'rent';
+        listParams.status = 'rent';
       } else if (listingType === 'pg') {
-        statusFilter = 'pg'; // PG/Hostel filter
+        listParams.status = 'rent';
+        listParams.property_type = 'PG / Hostel';
+        listParams.available_for_bachelors = true;
       }
-      // Note: 'all' shows all properties (no filter)
-      
-      // Load properties
-      const propertiesResponse = await buyerService.getProperties({
-        limit: 10,
-        ...(statusFilter && {status: statusFilter}),
-      });
+
+      const propertiesResponse = await buyerService.getProperties(listParams);
 
       if (propertiesResponse.success && propertiesResponse.data) {
-        let filteredProperties = propertiesResponse.data.properties || [];
-
-        // Additional filter for PG/Hostel - ensure property_type matches
-        if (listingType === 'pg') {
-          filteredProperties = filteredProperties.filter((prop: any) => {
-            const propType = (prop.property_type || prop.type || '').toLowerCase();
-            const isPG = propType.includes('pg') || propType.includes('hostel') || propType === 'pg-hostel' || prop.status === 'pg';
-            if (!isPG) return false;
-            // Show only PG/Hostels that are available for bachelors
-            return prop.available_for_bachelors === true || prop.available_for_bachelors === 'true';
-          });
-        }
-
+        const filteredProperties = propertiesResponse.data.properties || [];
         setProperties(filteredProperties);
         const favorites = (filteredProperties as Property[])
           .filter(p => p.is_favorite)
@@ -725,6 +720,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                       isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
                       property={item}
                       style={styles.carouselPropertyCard}
+                      onImageCarouselScrollStart={handleImageCarouselScrollStart}
+                      onImageCarouselScrollEnd={handleImageCarouselScrollEnd}
                     />
                   </View>
                 );
