@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -406,6 +406,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const lastFetchTimeRef = useRef<number>(0);
   const isFetchingRef = useRef<boolean>(false);
   const hasAnimatedRef = useRef<boolean>(false);
+  const hasLoadedOnceRef = useRef<boolean>(false);
   const CACHE_DURATION = 30000; // 30 seconds cache
   
   // Animation values
@@ -475,7 +476,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
     
-    if (!forceRefresh && timeSinceLastFetch < CACHE_DURATION && dashboardStats) {
+    if (!forceRefresh && timeSinceLastFetch < CACHE_DURATION && hasLoadedOnceRef.current) {
       return; // Use cached data
     }
     
@@ -607,9 +608,11 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         });
         
         setRecentProperties(formattedProperties);
+        hasLoadedOnceRef.current = true;
       } else {
         // No properties found - set empty stats to allow screen to render
         setRecentProperties([]);
+        hasLoadedOnceRef.current = true;
         const emptyStats: DashboardStats = {
           total_properties: 0,
           active_properties: 0,
@@ -653,7 +656,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       isFetchingRef.current = false;
       lastFetchTimeRef.current = Date.now();
     }
-  }, [dashboardStats]);
+  }, []);
 
   // Load data when screen is focused (e.g., returning from AddProperty)
   // Uses caching to prevent unnecessary API calls
@@ -699,8 +702,48 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     loadDashboardData(false, true); // Force refresh on pull-to-refresh
   };
 
-  // Animated Property Card Component - extracted to fix hook rules violation
-  const AnimatedPropertyCard = React.memo(({
+  // Property Image Card Component with error handling (defined first so AnimatedPropertyCard can use it)
+  const PropertyImageCard: React.FC<{
+    imageUrl: string | null;
+    propertyId: number | string;
+    onPress: () => void;
+    onPressIn?: () => void;
+    onPressOut?: () => void;
+    style: any;
+    children: React.ReactNode;
+  }> = ({imageUrl, propertyId, onPress, onPressIn, onPressOut, style, children}) => {
+    const [hasError, setHasError] = useState(false);
+
+    React.useEffect(() => {
+      setHasError(false);
+    }, [imageUrl]);
+
+    return (
+      <TouchableOpacity
+        style={style}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={0.9}>
+        {imageUrl && !hasError ? (
+          <Image
+            source={{uri: imageUrl}}
+            style={styles.propertyImage}
+            resizeMode="cover"
+            onError={() => setHasError(true)}
+          />
+        ) : (
+          <View style={styles.propertyImagePlaceholder}>
+            <Text style={styles.propertyImagePlaceholderText}>🏠</Text>
+          </View>
+        )}
+        {children}
+      </TouchableOpacity>
+    );
+  };
+
+  // Animated Property Card - stable component reference to prevent list item remount/opacity blink
+  const AnimatedPropertyCard = useMemo(() => React.memo(({
     item,
     index,
     navigation,
@@ -838,62 +881,15 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         </PropertyImageCard>
       </Animated.View>
     );
-  });
+  }), []);
 
-  const renderPropertyCard = ({item, index}: {item: RecentProperty; index: number}) => {
-    return (
-      <AnimatedPropertyCard
-        item={item}
-        index={index}
-        navigation={navigation}
-      />
-    );
-  };
-
-  // Property Image Card Component with error handling
-  const PropertyImageCard: React.FC<{
-    imageUrl: string | null;
-    propertyId: number | string;
-    onPress: () => void;
-    onPressIn?: () => void;
-    onPressOut?: () => void;
-    style: any;
-    children: React.ReactNode;
-  }> = ({imageUrl, propertyId, onPress, onPressIn, onPressOut, style, children}) => {
-    const [hasError, setHasError] = useState(false);
-    
-    // Reset error state when imageUrl changes
-    React.useEffect(() => {
-      setHasError(false);
-    }, [imageUrl]);
-    
-    return (
-      <TouchableOpacity 
-        style={style} 
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        activeOpacity={0.9}>
-        {imageUrl && !hasError ? (
-          <Image
-            source={{uri: imageUrl}}
-            style={styles.propertyImage}
-            resizeMode="cover"
-            onError={() => {
-              // Silently handle image errors - show placeholder instead
-              setHasError(true);
-            }}
-          />
-        ) : (
-          <View style={styles.propertyImagePlaceholder}>
-            <Text style={styles.propertyImagePlaceholderText}>🏠</Text>
-          </View>
-        )}
-        {children}
-      </TouchableOpacity>
-    );
-  };
-
+  const renderPropertyCard = useCallback(({item, index}: {item: RecentProperty; index: number}) => (
+    <AnimatedPropertyCard
+      item={item}
+      index={index}
+      navigation={navigation}
+    />
+  ), [navigation]);
 
   const getInitials = (name: string): string => {
     return name
@@ -1215,7 +1211,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           {recentProperties.length > 0 ? (
             <FlatList
               data={recentProperties}
-              renderItem={({item, index}: {item: RecentProperty; index: number}) => renderPropertyCard({item, index})}
+              renderItem={renderPropertyCard}
               keyExtractor={(item: RecentProperty) => String(item.id)}
               scrollEnabled={false}
               showsVerticalScrollIndicator={false}
