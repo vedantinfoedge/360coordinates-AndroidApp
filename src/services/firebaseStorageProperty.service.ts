@@ -316,6 +316,90 @@ export const uploadProfileImageToFirebase = async (
 };
 
 /**
+ * Upload property video to Firebase Storage (optional media)
+ * @param fileUri - Local file URI (file:// or content://)
+ * @param userId - User ID
+ * @param propertyId - Property ID (null for temp upload)
+ * @param onProgress - Progress callback (optional)
+ */
+export const uploadPropertyVideoToFirebase = async (
+  fileUri: string,
+  userId: number | string,
+  propertyId: number | string | null = null,
+  onProgress?: (progress: number) => void,
+): Promise<FirebaseUploadResult> => {
+  if (!isFirebaseStorageAvailable()) {
+    throw new Error('Firebase Storage is not available. Please rebuild the app.');
+  }
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).substring(2, 15);
+  const ext = (fileUri.split('.').pop() || 'mp4').split('?')[0];
+  const fileName = `video_${timestamp}_${randomId}.${ext}`;
+  const folder = propertyId ? `properties/${propertyId}` : `properties/temp/${userId}`;
+  const storagePath = `${folder}/${fileName}`;
+
+  const storageInstance = storage();
+  const storageRef = storageInstance.ref(storagePath);
+  let filePath = fileUri;
+  if (Platform.OS === 'android' && fileUri.startsWith('file://')) {
+    filePath = fileUri.replace('file://', '');
+  }
+
+  const uploadTask = storageRef.putFile(filePath);
+  if (onProgress) {
+    uploadTask.on('state_changed', snapshot => {
+      const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+      onProgress(progress);
+    });
+  }
+  await uploadTask;
+  const downloadURL = await storageRef.getDownloadURL();
+  return { url: downloadURL, path: storagePath, fileName };
+};
+
+/**
+ * Upload property PDF to Firebase Storage (optional media)
+ * @param fileUri - Local file URI (file:// or content://)
+ * @param userId - User ID
+ * @param propertyId - Property ID (null for temp upload)
+ * @param onProgress - Progress callback (optional)
+ */
+export const uploadPropertyPdfToFirebase = async (
+  fileUri: string,
+  userId: number | string,
+  propertyId: number | string | null = null,
+  onProgress?: (progress: number) => void,
+): Promise<FirebaseUploadResult> => {
+  if (!isFirebaseStorageAvailable()) {
+    throw new Error('Firebase Storage is not available. Please rebuild the app.');
+  }
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).substring(2, 15);
+  const ext = (fileUri.split('.').pop() || 'pdf').split('?')[0];
+  const fileName = `doc_${timestamp}_${randomId}.${ext}`;
+  const folder = propertyId ? `properties/${propertyId}` : `properties/temp/${userId}`;
+  const storagePath = `${folder}/${fileName}`;
+
+  const storageInstance = storage();
+  const storageRef = storageInstance.ref(storagePath);
+  let filePath = fileUri;
+  if (Platform.OS === 'android' && fileUri.startsWith('file://')) {
+    filePath = fileUri.replace('file://', '');
+  }
+
+  const uploadTask = storageRef.putFile(filePath);
+  if (onProgress) {
+    uploadTask.on('state_changed', snapshot => {
+      const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+      onProgress(progress);
+    });
+  }
+  await uploadTask;
+  const downloadURL = await storageRef.getDownloadURL();
+  return { url: downloadURL, path: storagePath, fileName };
+};
+
+/**
  * Delete image from Firebase Storage
  * @param storagePath - Firebase Storage path
  */

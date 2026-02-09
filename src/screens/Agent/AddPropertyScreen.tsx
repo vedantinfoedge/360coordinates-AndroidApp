@@ -30,7 +30,8 @@ import {sellerService} from '../../services/seller.service';
 import {uploadPropertyImageWithModeration} from '../../services/imageUpload.service';
 import {formatters} from '../../utils/formatters';
 import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
-import {isFirebaseStorageAvailable} from '../../services/firebaseStorageProperty.service';
+import {isFirebaseStorageAvailable, uploadPropertyVideoToFirebase, uploadPropertyPdfToFirebase} from '../../services/firebaseStorageProperty.service';
+import DocumentPicker from 'react-native-document-picker';
 import {useAuth} from '../../context/AuthContext';
 import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
@@ -91,6 +92,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<Array<{uri: string; base64?: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [pdfUploading, setPdfUploading] = useState(false);
   const [expectedPrice, setExpectedPrice] = useState('');
   const [priceNegotiable, setPriceNegotiable] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
@@ -546,6 +551,57 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     });
   };
 
+  const handleVideoUpload = (source: 'gallery' | 'camera') => {
+    if (!user?.id || !isFirebaseStorageAvailable()) {
+      Alert.alert('Unavailable', 'Firebase Storage is required for video upload.');
+      return;
+    }
+    const doUpload = async (response: ImagePickerResponse) => {
+      if (response.didCancel || response.errorCode || !response.assets?.[0]?.uri) {
+        setVideoUploading(false);
+        return;
+      }
+      try {
+        const uri = response.assets[0].uri!;
+        const result = await uploadPropertyVideoToFirebase(uri, user.id, null);
+        setVideoUrl(result.url);
+        Alert.alert('Success', 'Video uploaded.');
+      } catch (e: any) {
+        Alert.alert('Error', e?.message || 'Failed to upload video.');
+      } finally {
+        setVideoUploading(false);
+      }
+    };
+    setVideoUploading(true);
+    if (source === 'gallery') {
+      launchImageLibrary({ mediaType: 'video' as MediaType, videoQuality: 'high' }, doUpload);
+    } else {
+      launchCamera({ mediaType: 'video' as MediaType, videoQuality: 'high' }, doUpload);
+    }
+  };
+
+  const handlePdfUpload = async () => {
+    if (!user?.id || !isFirebaseStorageAvailable()) {
+      Alert.alert('Unavailable', 'Firebase Storage is required for PDF upload.');
+      return;
+    }
+    setPdfUploading(true);
+    try {
+      const res = await DocumentPicker.pickSingle({ type: DocumentPicker.types.pdf });
+      const uri = res?.uri;
+      if (!uri) { setPdfUploading(false); return; }
+      const result = await uploadPropertyPdfToFirebase(uri, user.id, null);
+      setPdfUrl(result.url);
+      Alert.alert('Success', 'PDF uploaded.');
+    } catch (e: any) {
+      if (e?.code !== 'DOCUMENT_PICKER_CANCELED' && e?.code !== 'E_DOCUMENT_PICKER_CANCELED') {
+        Alert.alert('Error', e?.message || 'Failed to upload PDF.');
+      }
+    } finally {
+      setPdfUploading(false);
+    }
+  };
+
   const handleNext = () => {
     // Validation
     if (currentStep === 1) {
@@ -927,6 +983,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : undefined,
           available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel') ? availableForBachelors : undefined,
           images: imagesPayload.length > 0 ? imagesPayload : undefined,
+          video_url: videoUrl || undefined,
+          pdf_url: pdfUrl || undefined,
         };
 
         console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
@@ -1656,18 +1714,56 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                           <Text style={styles.errorDetailsText}>View Details</Text>
                         </TouchableOpacity>
                       )}
-                      <TouchableOpacity
-                        style={styles.photoRemoveButton}
-                        onPress={() => {
-                          setPhotos(prev => prev.filter((_, i) => i !== index));
-                        }}>
-                        <Text style={styles.photoRemoveText}>×</Text>
-                      </TouchableOpacity>
+<TouchableOpacity
+                          style={styles.photoRemoveButton}
+                          onPress={() => {
+                            setPhotos(prev => prev.filter((_, i) => i !== index));
+                          }}>
+                          <Text style={styles.photoRemoveText}>×</Text>
+                        </TouchableOpacity>
                     </View>
                   );
                 })}
               </View>
             )}
+
+            <Text style={[styles.stepSubtitle, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>
+              Optional: Video & PDF
+            </Text>
+            <TouchableOpacity
+              style={styles.photoCameraButton}
+              onPress={() => Alert.alert('Video', 'Choose source', [
+                { text: 'Gallery', onPress: () => handleVideoUpload('gallery') },
+                { text: 'Camera', onPress: () => handleVideoUpload('camera') },
+                { text: 'Cancel', style: 'cancel' },
+              ])}
+              disabled={videoUploading}
+              activeOpacity={0.7}>
+              <Text style={styles.photoUploadIcon}>🎬</Text>
+              <Text style={styles.photoUploadText}>
+                {videoUploading ? 'Uploading video...' : videoUrl ? 'Video uploaded ✓' : 'Upload video (optional)'}
+              </Text>
+            </TouchableOpacity>
+            {videoUrl ? (
+              <TouchableOpacity onPress={() => setVideoUrl(null)} style={{ marginBottom: spacing.sm }}>
+                <Text style={{ color: colors.error, fontSize: 12 }}>Remove video</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              style={styles.photoCameraButton}
+              onPress={handlePdfUpload}
+              disabled={pdfUploading}
+              activeOpacity={0.7}>
+              <Text style={styles.photoUploadIcon}>📄</Text>
+              <Text style={styles.photoUploadText}>
+                {pdfUploading ? 'Uploading PDF...' : pdfUrl ? 'PDF uploaded ✓' : 'Upload PDF (optional)'}
+              </Text>
+            </TouchableOpacity>
+            {pdfUrl ? (
+              <TouchableOpacity onPress={() => setPdfUrl(null)}>
+                <Text style={{ color: colors.error, fontSize: 12 }}>Remove PDF</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         );
 

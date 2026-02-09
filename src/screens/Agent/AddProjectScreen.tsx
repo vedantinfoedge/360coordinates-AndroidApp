@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {launchImageLibrary, ImagePickerResponse, MediaType} from 'react-native-image-picker';
+import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
@@ -28,6 +28,8 @@ import {extractStateFromContext} from '../../utils/geocoding';
 import {useAuth} from '../../context/AuthContext';
 import {formatters} from '../../utils/formatters';
 import {Alert} from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import CustomAlert from '../../utils/alertHelper';
 
 type AddProjectScreenNavigationProp = NativeStackNavigationProp<
   AgentStackParamList,
@@ -127,6 +129,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
   const [bookingAmount, setBookingAmount] = useState('');
   const [launchDate, setLaunchDate] = useState('');
   const [possessionDate, setPossessionDate] = useState('');
+  const [showLaunchDatePicker, setShowLaunchDatePicker] = useState(false);
+  const [showPossessionDatePicker, setShowPossessionDatePicker] = useState(false);
   
   // Step 5: Amenities
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
@@ -245,7 +249,95 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
     return true;
   };
 
-  // Handle project images upload with moderation
+  const requestCameraPermissionForCapture = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'App needs camera access to take photos',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Handle project images from camera (single photo, then same Firebase + moderation flow)
+  const handleProjectImagesFromCamera = async () => {
+    const hasPermission = await requestCameraPermissionForCapture();
+    if (!hasPermission) {
+      CustomAlert.alert('Permission Denied', 'Please grant camera permission to take photos');
+      return;
+    }
+    if (projectImages.length >= 20) {
+      CustomAlert.alert('Limit Reached', 'You can upload maximum 20 images');
+      return;
+    }
+    const options = { mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true };
+    launchCamera(options, async (response: ImagePickerResponse) => {
+      if (response.didCancel || response.errorCode) {
+        if (response.errorMessage) CustomAlert.alert('Error', response.errorMessage);
+        return;
+      }
+      if (response.assets && response.assets[0]) {
+        const asset = response.assets[0];
+        const newImage = {
+          uri: asset.uri || '',
+          base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
+          moderationStatus: 'checking' as const,
+        };
+        setProjectImages(prev => [...prev, newImage]);
+        const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
+        const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
+        if (!firebaseEnabled || !firebaseAvailable) {
+          CustomAlert.alert('Image Upload Unavailable', 'Firebase Storage is required for project images.');
+          setProjectImages(prev => {
+            const idx = prev.length - 1;
+            const updated = [...prev];
+            if (updated[idx]) updated[idx] = { ...updated[idx], moderationStatus: 'REJECTED' as const, moderationReason: 'Firebase unavailable' };
+            return updated;
+          });
+          return;
+        }
+        const prevLen = projectImages.length;
+        uploadPropertyImageWithModeration(newImage.uri, null, user!.id)
+          .then(result => {
+            setProjectImages(prev => {
+              const updated = [...prev];
+              const imgIndex = prevLen;
+              if (updated[imgIndex]) {
+                const status = String(result.moderationStatus || '').toUpperCase();
+                const moderationStatus = (status === 'SAFE' || status === 'APPROVED' ? 'APPROVED' : status === 'REJECTED' || status === 'UNSAFE' ? 'REJECTED' : 'PENDING') as 'APPROVED' | 'REJECTED' | 'PENDING';
+                updated[imgIndex] = { ...updated[imgIndex], moderationStatus, moderationReason: result.moderationReason, imageUrl: result.firebaseUrl || result.imageUrl || '' };
+              }
+              return updated;
+            });
+            if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
+              CustomAlert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.');
+            }
+          })
+          .catch(err => {
+            setProjectImages(prev => {
+              const updated = [...prev];
+              if (updated[prevLen]) updated[prevLen] = { ...updated[prevLen], moderationStatus: 'REJECTED' as const, moderationReason: err.message };
+              return updated;
+            });
+            CustomAlert.alert('Upload Failed', err.message || 'Failed to upload image.');
+          });
+      }
+    });
+  };
+
+  // Handle project images upload with moderation (gallery)
   const handleProjectImagesUpload = async () => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
@@ -320,7 +412,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                     const imgIndex = prev.length - newImages.length + index;
                     if (updated[imgIndex]) {
                       const status = String(result.moderationStatus || '').toUpperCase();
-                      const moderationStatus = status === 'SAFE' || status === 'APPROVED' ? 'APPROVED' : status === 'REJECTED' || status === 'UNSAFE' ? 'REJECTED' : 'PENDING';
+                      const moderationStatus = (status === 'SAFE' || status === 'APPROVED' || status === 'PENDING' || status === 'NEEDS_REVIEW' ? 'APPROVED' : 'REJECTED') as 'APPROVED' | 'REJECTED' | 'PENDING';
                       const firebaseUrl = result.firebaseUrl || result.imageUrl || '';
                       updated[imgIndex] = {
                         ...updated[imgIndex],
@@ -333,8 +425,6 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   });
                   if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
                     CustomAlert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.', [{text: 'OK'}]);
-                  } else if (result.moderationStatus === 'PENDING' || result.moderationStatus === 'NEEDS_REVIEW') {
-                    CustomAlert.alert('Image Under Review', 'Your image is being reviewed and will be visible after approval.', [{text: 'OK'}]);
                   }
                 })
                 .catch(error => {
@@ -401,7 +491,12 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
           return false;
         }
         if (!carpetAreaRange.trim()) {
-          CustomAlert.alert('Error', 'Please enter carpet area range');
+          CustomAlert.alert('Error', 'Please enter carpet area (numbers only)');
+          return false;
+        }
+        const carpetNum = parseFloat(carpetAreaRange);
+        if (isNaN(carpetNum) || carpetNum <= 0) {
+          CustomAlert.alert('Error', 'Carpet area must be a positive number');
           return false;
         }
         return true;
@@ -471,11 +566,11 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Collect approved images
+      // Collect approved images: prefer Firebase URL when available (same as Add Property)
       const approvedImages = projectImages
         .filter(img => img.moderationStatus === 'APPROVED')
-        .map(img => img.base64 || img.imageUrl)
-        .filter((url): url is string => url !== undefined);
+        .map(img => img.imageUrl || img.base64)
+        .filter((url): url is string => url !== undefined && url !== '');
 
       if (approvedImages.length < 2) {
         Alert.alert('Error', 'Please upload at least 2 approved images', [{text: 'OK'}]);
@@ -894,14 +989,17 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.areaInputContainer}>
                 <TextInput
                   style={[styles.input, styles.areaInput]}
-                  placeholder="e.g., 650 - 1200"
+                  placeholder="e.g., 1200"
                   placeholderTextColor={colors.textSecondary}
                   value={carpetAreaRange}
                   onChangeText={(text) => {
-                    // Auto-remove "sq.ft" if typed
-                    const cleaned = text.replace(/sq\.ft/gi, '').trim();
-                    setCarpetAreaRange(cleaned);
+                    const cleaned = text.replace(/[^0-9.]/g, '');
+                    const parts = cleaned.split('.');
+                    if (parts.length <= 2) {
+                      setCarpetAreaRange(parts[0] + (parts[1] != null ? '.' + parts[1] : ''));
+                    }
                   }}
+                  keyboardType="decimal-pad"
                 />
                 <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
@@ -1023,24 +1121,58 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Launch Date (Optional)</Text>
-              <TextInput
+              <TouchableOpacity
                 style={styles.input}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textSecondary}
-                value={launchDate}
-                onChangeText={setLaunchDate}
-              />
+                onPress={() => setShowLaunchDatePicker(true)}>
+                <Text style={launchDate ? styles.dateText : styles.datePlaceholder}>
+                  {launchDate || 'Select date'}
+                </Text>
+              </TouchableOpacity>
+              {showLaunchDatePicker && (
+                <DateTimePicker
+                  value={launchDate ? new Date(launchDate) : new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(_, selectedDate) => {
+                    setShowLaunchDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      const y = selectedDate.getFullYear();
+                      const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                      const d = String(selectedDate.getDate()).padStart(2, '0');
+                      setLaunchDate(`${y}-${m}-${d}`);
+                    }
+                  }}
+                  onTouchCancel={() => setShowLaunchDatePicker(false)}
+                />
+              )}
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Expected Possession Date (Optional)</Text>
-              <TextInput
+              <TouchableOpacity
                 style={styles.input}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textSecondary}
-                value={possessionDate}
-                onChangeText={setPossessionDate}
-              />
+                onPress={() => setShowPossessionDatePicker(true)}>
+                <Text style={possessionDate ? styles.dateText : styles.datePlaceholder}>
+                  {possessionDate || 'Select date'}
+                </Text>
+              </TouchableOpacity>
+              {showPossessionDatePicker && (
+                <DateTimePicker
+                  value={possessionDate ? new Date(possessionDate) : new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(_, selectedDate) => {
+                    setShowPossessionDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      const y = selectedDate.getFullYear();
+                      const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                      const d = String(selectedDate.getDate()).padStart(2, '0');
+                      setPossessionDate(`${y}-${m}-${d}`);
+                    }
+                  }}
+                  onTouchCancel={() => setShowPossessionDatePicker(false)}
+                />
+              )}
             </View>
           </View>
         );
@@ -1197,22 +1329,22 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
             
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Project Cover Image (Optional)</Text>
-              <TouchableOpacity
-                style={styles.imageUploadButton}
-                onPress={async () => {
-                  const hasPermission = await requestCameraPermission();
-                  if (!hasPermission) return;
-                  
-                  launchImageLibrary({mediaType: 'photo', quality: 0.8, includeBase64: true}, (response) => {
-                    if (response.assets && response.assets[0]) {
-                      const asset = response.assets[0];
-                      setCoverImage({
-                        uri: asset.uri || '',
-                        base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
-                      });
-                    }
-                  });
-                }}>
+              <View style={styles.coverImageActions}>
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={async () => {
+                    const hasPermission = await requestCameraPermission();
+                    if (!hasPermission) return;
+                    launchImageLibrary({mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true}, (response) => {
+                      if (response.assets && response.assets[0]) {
+                        const asset = response.assets[0];
+                        setCoverImage({
+                          uri: asset.uri || '',
+                          base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
+                        });
+                      }
+                    });
+                  }}>
                 {coverImage ? (
                   <Image source={{uri: coverImage.uri}} style={styles.imagePreview} />
                 ) : (
@@ -1222,6 +1354,24 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 )}
               </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.uploadButton, styles.uploadButtonSecondary]}
+                  onPress={async () => {
+                    const ok = await requestCameraPermissionForCapture();
+                    if (!ok) return;
+                    launchCamera({mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true}, (response) => {
+                      if (response.assets && response.assets[0]) {
+                        const asset = response.assets[0];
+                        setCoverImage({
+                          uri: asset.uri || '',
+                          base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
+                        });
+                      }
+                    });
+                  }}>
+                  <Text style={styles.uploadButtonText}>📷 Take photo</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
@@ -1231,7 +1381,12 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               <TouchableOpacity
                 style={styles.uploadButton}
                 onPress={handleProjectImagesUpload}>
-                <Text style={styles.uploadButtonText}>📷 Upload Images (Max 20)</Text>
+                <Text style={styles.uploadButtonText}>🖼️ Upload from gallery (Max 20)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.uploadButton, styles.uploadButtonSecondary]}
+                onPress={handleProjectImagesFromCamera}>
+                <Text style={styles.uploadButtonText}>📷 Take photo with camera</Text>
               </TouchableOpacity>
               <Text style={styles.imageCountText}>
                 Images uploaded: {approvedImagesCount} / 20 (Minimum 2 required)
@@ -1355,31 +1510,49 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Master Plan Image (Optional)</Text>
-              <TouchableOpacity
-                style={styles.imageUploadButton}
-                onPress={async () => {
-                  const hasPermission = await requestCameraPermission();
-                  if (!hasPermission) return;
-                  
-                  launchImageLibrary({mediaType: 'photo', quality: 0.8, includeBase64: true}, (response) => {
-                    if (response.assets && response.assets[0]) {
-                      const asset = response.assets[0];
-                      setMasterPlan({
-                        uri: asset.uri || '',
-                        base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
-                      });
-                    }
-                  });
-                }}>
-                {masterPlan ? (
-                  <Image source={{uri: masterPlan.uri}} style={styles.imagePreview} />
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>🗺️</Text>
-                    <Text style={styles.imagePlaceholderLabel}>Upload Master Plan</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+              <View style={styles.coverImageActions}>
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={async () => {
+                    const hasPermission = await requestCameraPermission();
+                    if (!hasPermission) return;
+                    launchImageLibrary({mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true}, (response) => {
+                      if (response.assets && response.assets[0]) {
+                        const asset = response.assets[0];
+                        setMasterPlan({
+                          uri: asset.uri || '',
+                          base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
+                        });
+                      }
+                    });
+                  }}>
+                  {masterPlan ? (
+                    <Image source={{uri: masterPlan.uri}} style={styles.imagePreview} />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Text style={styles.imagePlaceholderText}>🗺️</Text>
+                      <Text style={styles.imagePlaceholderLabel}>Upload Master Plan</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.uploadButton, styles.uploadButtonSecondary]}
+                  onPress={async () => {
+                    const ok = await requestCameraPermissionForCapture();
+                    if (!ok) return;
+                    launchCamera({mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true}, (response) => {
+                      if (response.assets && response.assets[0]) {
+                        const asset = response.assets[0];
+                        setMasterPlan({
+                          uri: asset.uri || '',
+                          base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
+                        });
+                      }
+                    });
+                  }}>
+                  <Text style={styles.uploadButtonText}>📷 Take photo</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         );
@@ -2181,6 +2354,25 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     alignItems: 'center',
     marginBottom: spacing.sm,
+  },
+  uploadButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#0077C0',
+  },
+  coverImageActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  dateText: {
+    ...typography.body,
+    color: colors.text,
+  },
+  datePlaceholder: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
   uploadButtonText: {
     ...typography.body,

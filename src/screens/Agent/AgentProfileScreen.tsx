@@ -14,9 +14,10 @@ import {
 } from 'react-native';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
+import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
-import {AgentStackParamList} from '../../navigation/AgentNavigator';
+import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
@@ -27,7 +28,7 @@ import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  NativeStackNavigationProp<AgentStackParamList, 'Profile'>,
+  BottomTabNavigationProp<AgentTabParamList, 'Profile'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -255,7 +256,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
   const handleImagePicker = (source: 'camera' | 'gallery') => {
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.8,
+      quality: 0.8 as const,
       maxWidth: 800,
       maxHeight: 800,
     };
@@ -439,7 +440,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.full_name}
-                  onChangeText={text => setFormData({...formData, full_name: text})}
+                  onChangeText={(text: string) => setFormData({...formData, full_name: text})}
                   placeholder="Enter your full name"
                 />
               ) : (
@@ -475,7 +476,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.whatsapp_number}
-                  onChangeText={text => setFormData({...formData, whatsapp_number: text})}
+                  onChangeText={(text: string) => setFormData({...formData, whatsapp_number: text})}
                   placeholder="Enter WhatsApp number"
                   keyboardType="phone-pad"
                 />
@@ -490,7 +491,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.alternate_mobile}
-                  onChangeText={text => setFormData({...formData, alternate_mobile: text})}
+                  onChangeText={(text: string) => setFormData({...formData, alternate_mobile: text})}
                   placeholder="Enter alternate mobile number"
                   keyboardType="phone-pad"
                 />
@@ -505,7 +506,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={formData.address}
-                  onChangeText={text => setFormData({...formData, address: text})}
+                  onChangeText={(text: string) => setFormData({...formData, address: text})}
                   placeholder="Enter your address"
                   multiline
                   numberOfLines={3}
@@ -527,7 +528,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.company_name}
-                  onChangeText={text => setFormData({...formData, company_name: text})}
+                  onChangeText={(text: string) => setFormData({...formData, company_name: text})}
                   placeholder="Enter company name"
                 />
               ) : (
@@ -541,7 +542,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.license_number}
-                  onChangeText={text => setFormData({...formData, license_number: text})}
+                  onChangeText={(text: string) => setFormData({...formData, license_number: text})}
                   placeholder="Enter RERA id"
                 />
               ) : (
@@ -555,7 +556,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.gst_number}
-                  onChangeText={text => setFormData({...formData, gst_number: text})}
+                  onChangeText={(text: string) => setFormData({...formData, gst_number: text})}
                   placeholder="Enter GST number"
                 />
               ) : (
@@ -569,7 +570,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.website}
-                  onChangeText={text => setFormData({...formData, website: text})}
+                  onChangeText={(text: string) => setFormData({...formData, website: text})}
                   placeholder="Enter website URL"
                   keyboardType="url"
                   autoCapitalize="none"
@@ -745,7 +746,7 @@ const styles = StyleSheet.create({
   },
   profileRole: {
     ...typography.body,
-    color: colors.accent,
+    color: colors.primaryDark,
     fontWeight: '600',
   },
   section: {
