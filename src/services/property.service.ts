@@ -2,6 +2,36 @@ import api from './api.service';
 import {API_ENDPOINTS, API_CONFIG} from '../config/api.config';
 import {fixImageUrl, fixPropertyImages} from '../utils/imageHelper';
 
+// Upcoming projects: backend stores extra fields inside `upcoming_project_data` (JSON).
+// For app screens, we merge those fields into the property object (without overriding non-empty top-level fields).
+const mergeUpcomingProjectData = (prop: any) => {
+  if (!prop) return prop;
+
+  const raw = prop.upcoming_project_data;
+  if (!raw) return prop;
+
+  let parsed: any = null;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_) {
+      return prop;
+    }
+  } else if (typeof raw === 'object') {
+    parsed = raw;
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return prop;
+
+  const merged: any = {...prop, upcoming_project_data: parsed};
+  for (const key of Object.keys(parsed)) {
+    if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+      merged[key] = parsed[key];
+    }
+  }
+  return merged;
+};
+
 export const propertyService = {
   /**
    * Get properties list with all filters and pagination
@@ -96,19 +126,22 @@ export const propertyService = {
       
       if (properties.length > 0) {
         // Fix image URLs for all properties
-        const fixedProperties = properties.map((prop: any) => ({
-          ...prop,
-          cover_image: fixImageUrl(prop.cover_image),
-          // Fix latitude/longitude (backend returns as strings)
-          latitude: prop.latitude ? parseFloat(prop.latitude) : null,
-          longitude: prop.longitude ? parseFloat(prop.longitude) : null,
-          // Fix numeric fields
-          price: parseFloat(prop.price || '0'),
-          area: parseFloat(prop.area || '0'),
-          carpet_area: parseFloat(prop.carpet_area || '0'),
-          maintenance_charges: parseFloat(prop.maintenance_charges || '0'),
-          deposit_amount: parseFloat(prop.deposit_amount || '0'),
-        }));
+        const fixedProperties = properties.map((prop: any) => {
+          const merged = mergeUpcomingProjectData(prop);
+          return {
+            ...merged,
+            cover_image: fixImageUrl(merged.cover_image),
+            // Fix latitude/longitude (backend returns as strings)
+            latitude: merged.latitude ? parseFloat(merged.latitude) : null,
+            longitude: merged.longitude ? parseFloat(merged.longitude) : null,
+            // Fix numeric fields
+            price: parseFloat(merged.price || '0'),
+            area: parseFloat(merged.area || '0'),
+            carpet_area: parseFloat(merged.carpet_area || '0'),
+            maintenance_charges: parseFloat(merged.maintenance_charges || '0'),
+            deposit_amount: parseFloat(merged.deposit_amount || '0'),
+          };
+        });
         
         // Return response matching guide format: {success: true, data: {properties: [...], pagination: {...}}}
         const currentPage = response.data?.page || response.data?.pagination?.current_page || response.page || params.page || 1;
@@ -161,7 +194,7 @@ export const propertyService = {
     if (response && response.success && response.data) {
       // Don't use fixPropertyImages - it might modify images incorrectly
       // Just get the raw property data
-      const rawProperty = response.data.property || response.data;
+      const rawProperty = mergeUpcomingProjectData(response.data.property || response.data);
       
       console.log('[PropertyService] Raw property images:', {
         images: rawProperty.images,
@@ -186,7 +219,7 @@ export const propertyService = {
       }
       
       // Merge owner data into property
-      const propertyWithOwner = {
+      const propertyWithOwner = mergeUpcomingProjectData({
         ...property,
         seller_name: property.seller_name || owner.name || owner.full_name,
         seller_email: property.seller_email || owner.email,
@@ -194,7 +227,7 @@ export const propertyService = {
         seller_id: property.seller_id || owner.id || owner.user_id,
         seller_verified: property.seller_verified || owner.verified,
         owner: owner,
-      };
+      });
       
       return {
         ...response,

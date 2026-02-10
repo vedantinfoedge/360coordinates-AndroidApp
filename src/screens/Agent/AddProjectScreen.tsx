@@ -222,7 +222,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
     );
     if (cityContext) {
       setCity(cityContext.text || '');
-      setArea(cityContext.text || '');
+      // IMPORTANT: don't overwrite numeric built-up area (sq ft) with city/locality text.
     }
   };
 
@@ -480,6 +480,15 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
           CustomAlert.alert('Error', 'Please enter location');
           return false;
         }
+        if (!area.trim()) {
+          CustomAlert.alert('Error', 'Please enter area (sq ft)');
+          return false;
+        }
+        const areaNum = parseFloat(area.replace(/[^0-9.]/g, ''));
+        if (isNaN(areaNum) || areaNum <= 0) {
+          CustomAlert.alert('Error', 'Area must be a positive number (sq ft)');
+          return false;
+        }
         if (!state.trim()) {
           CustomAlert.alert('Error', 'Please enter state');
           return false;
@@ -582,50 +591,58 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       const formattedStartingPrice = formatPriceInput(startingPrice);
       const formattedPricePerSqft = pricePerSqft ? formatPriceInput(pricePerSqft) : null;
       const formattedBookingAmount = bookingAmount ? formatPriceInput(bookingAmount) : null;
+      const parsedArea = parseFloat(area.replace(/[^0-9.]/g, ''));
 
       const propertyData: any = {
         title: projectName.trim(),
         property_type: projectType,
         status: 'sale', // Upcoming projects are for sale
         project_type: 'upcoming', // Mark as upcoming project
-        project_status: projectStatus,
-        rera_number: reraNumber.trim() || null,
         description: description.trim(),
         location: location.trim(),
-        area: area || null,
-        city: city || null,
+        // Backend requires numeric area (sq ft)
+        area: isNaN(parsedArea) ? null : parsedArea,
         state: state.trim(),
         additional_address: additionalAddress.trim() || null,
-        pincode: pincode.trim() || null,
         latitude: latitude || null,
         longitude: longitude || null,
-        configurations: selectedConfigurations.join(','),
-        carpet_area: carpetAreaRange.trim(),
-        number_of_towers: numberOfTowers ? parseInt(numberOfTowers) : null,
-        total_units: totalUnits ? parseInt(totalUnits) : null,
-        floors_count: floorsCount ? parseInt(floorsCount) : null,
         price: formattedStartingPrice,
-        price_per_sqft: formattedPricePerSqft,
-        booking_amount: formattedBookingAmount,
-        launch_date: launchDate || null,
-        possession_date: possessionDate || null,
-        amenities: selectedAmenities.join(','),
-        rera_status: reraStatus || null,
-        land_ownership_type: landOwnershipType || null,
-        bank_approved: bankApproved || null,
-        approved_banks: selectedBanks.length > 0 ? selectedBanks.join(',') : null,
-        other_bank_names: otherBankNames.trim() || null,
-        sales_name: salesName.trim(),
-        sales_number: salesNumber.trim(),
-        email_id: emailId.trim(),
-        mobile_number: mobileNumber.trim() || null,
-        whatsapp_number: whatsappNumber.trim() || null,
-        alternative_number: alternativeNumber.trim() || null,
-        project_highlights: projectHighlights.trim() || null,
-        usp: usp.trim() || null,
+        // Backend expects amenities as an array (not a comma-separated string)
+        amenities: selectedAmenities,
         images: approvedImages,
-        cover_image: coverImage?.base64 || null,
-        master_plan: masterPlan?.base64 || null,
+        // Store upcoming-project-only fields inside upcoming_project_data (backend persists this JSON)
+        upcoming_project_data: {
+          project_status: projectStatus,
+          rera_number: reraNumber.trim() || null,
+          city: city || null,
+          pincode: pincode.trim() || null,
+          configurations: selectedConfigurations.join(','),
+          carpet_area_range: carpetAreaRange.trim() || null,
+          number_of_towers: numberOfTowers ? parseInt(numberOfTowers, 10) : null,
+          total_units: totalUnits ? parseInt(totalUnits, 10) : null,
+          floors_count: floorsCount ? parseInt(floorsCount, 10) : null,
+          price_per_sqft: formattedPricePerSqft,
+          booking_amount: formattedBookingAmount,
+          launch_date: launchDate || null,
+          possession_date: possessionDate || null,
+          rera_status: reraStatus || null,
+          land_ownership_type: landOwnershipType || null,
+          bank_approved: bankApproved || null,
+          approved_banks: selectedBanks.length > 0 ? selectedBanks.join(',') : null,
+          other_bank_names: otherBankNames.trim() || null,
+          sales_name: salesName.trim(),
+          sales_number: salesNumber.trim(),
+          email_id: emailId.trim(),
+          mobile_number: mobileNumber.trim() || null,
+          whatsapp_number: whatsappNumber.trim() || null,
+          alternative_number: alternativeNumber.trim() || null,
+          project_highlights: projectHighlights.trim() || null,
+          usp: usp.trim() || null,
+          // Optionally persist these media blobs for future backend support
+          // (backend currently ignores unknown fields except upcoming_project_data)
+          master_plan: masterPlan?.base64 || null,
+          cover_image: coverImage?.base64 || null,
+        },
       };
 
       console.log('[Agent AddProject] Submitting project:', propertyData);
