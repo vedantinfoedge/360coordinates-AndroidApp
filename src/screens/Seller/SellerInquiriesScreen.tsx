@@ -221,13 +221,18 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
       return;
     }
     
-    navigation.navigate('Chat' as any, {
-      screen: 'ChatConversation',
+    // Seller chat is nested under SellerTabs -> Chat (ChatNavigator)
+    // Use nested navigation so route resolution doesn't crash the app.
+    navigation.navigate('SellerTabs' as any, {
+      screen: 'Chat',
       params: {
-        userId: Number(buyerId),
-        userName: buyerName,
-        propertyId: Number(propertyId),
-        propertyTitle: propertyTitle,
+        screen: 'ChatConversation',
+        params: {
+          userId: Number(buyerId),
+          userName: buyerName,
+          propertyId: Number(propertyId),
+          propertyTitle,
+        },
       },
     });
   };

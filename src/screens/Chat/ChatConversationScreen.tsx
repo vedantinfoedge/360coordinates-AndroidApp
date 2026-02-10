@@ -24,7 +24,6 @@ import {chatService} from '../../services/chat.service';
 import {buyerService} from '../../services/buyer.service';
 import CustomAlert from '../../utils/alertHelper';
 import {generateChatRoomId, markChatAsRead} from '../../services/firebase.service';
-import firestore from '@react-native-firebase/firestore';
 
 type ChatConversationScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<ChatStackParamList, 'ChatConversation'>,
@@ -84,7 +83,6 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const flatListRef = useRef<FlatListScrollRef | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inquirySentForPropertyRef = useRef<number | null>(null);
-  const resolvedRoomIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let unsubscribeFn: (() => void) | null = null;
@@ -172,31 +170,16 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           ? (receiverRole === 'agent' ? 'agent' : 'seller')
           : (currentUserType === 'agent' ? 'agent' : 'seller');
 
-      const desiredChatRoomId = generateChatRoomId(buyerIdNum, posterIdNum, resolvedPropertyId);
-
-      // Legacy compatibility:
-      // If a different conversationId was passed and exists in Firestore, prefer it.
-      // Otherwise, always use the deterministic ID.
-      let roomIdToUse = desiredChatRoomId;
-      if (convIdStr && convIdStr !== desiredChatRoomId) {
-        try {
-          const [desiredSnap, legacySnap] = await Promise.all([
-            firestore().collection('chats').doc(desiredChatRoomId).get(),
-            firestore().collection('chats').doc(convIdStr).get(),
-          ]);
-          if (desiredSnap.exists) {
-            roomIdToUse = desiredChatRoomId;
-          } else if (legacySnap.exists) {
-            console.warn('[Chat] Using legacy room id (non-deterministic):', convIdStr);
-            roomIdToUse = convIdStr;
-          }
-          } catch {
-          // If Firestore check fails, fall back to deterministic
-          roomIdToUse = desiredChatRoomId;
-        }
+      let roomIdToUse: string;
+      try {
+        roomIdToUse = generateChatRoomId(buyerIdNum, posterIdNum, resolvedPropertyId);
+      } catch (err: any) {
+        console.error('[Chat] Failed to generate chatRoomId:', err?.message || err);
+        CustomAlert.alert('Error', 'Unable to open chat (invalid chat room id).');
+        setLoading(false);
+        return null;
       }
 
-      resolvedRoomIdRef.current = roomIdToUse;
       setActualConversationId(roomIdToUse);
       
       let mysqlConversationId: string | number | null = null;
@@ -271,20 +254,16 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       }
 
       // Step 2: Ensure deterministic Firebase room exists (unless using legacy room id)
-      // If we are using a legacy room id, we don't attempt to create a deterministic doc with it.
-      // New rooms will always be created with deterministic ID.
-      if (roomIdToUse === desiredChatRoomId) {
-        try {
-          await chatService.createFirebaseChatRoom(
-            buyerIdNum,
-            posterIdNum,
-            posterRole,
-            resolvedPropertyId,
-            mysqlConversationId ? String(mysqlConversationId) : undefined,
-          );
-          } catch {
-            console.warn('[Chat] Could not create/verify deterministic room');
-        }
+      try {
+        await chatService.createFirebaseChatRoom(
+          buyerIdNum,
+          posterIdNum,
+          posterRole,
+          resolvedPropertyId,
+          mysqlConversationId ? String(mysqlConversationId) : undefined,
+        );
+      } catch {
+        console.warn('[Chat] Could not create/verify chat room');
       }
 
       // Mark as read when conversation is opened

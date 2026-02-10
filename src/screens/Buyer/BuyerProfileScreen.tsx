@@ -464,7 +464,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           <View style={styles.divider} />
           <TouchableOpacity 
             style={styles.optionItem}
-            onPress={() => navigation.navigate('Chat')}
+            onPress={() => {
+              // Chat lives under the visible "Chats" tab (ChatNavigator)
+              (navigation as any).navigate('Chats', {screen: 'ChatList'});
+            }}
             activeOpacity={0.7}>
             <View style={styles.optionLeft}>
               <View style={styles.optionIconContainer}>
