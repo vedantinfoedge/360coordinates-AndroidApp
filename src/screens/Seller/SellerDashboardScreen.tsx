@@ -1033,7 +1033,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.sellerHeaderBox}>
               <View style={styles.sellerHeaderContent}>
                 <Text style={styles.sellerGreeting}>
-                  Welcome back, {user?.full_name?.split(' ')[0] || 'Seller'}!
+                  Welcome{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''} ❤️
                 </Text>
                 <Text style={styles.sellerSubtitle}>
                   Here's what's happening with your properties today
