@@ -478,6 +478,25 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
         throw new Error('You are not allowed to switch to this dashboard with your account.');
       }
 
+      // Ask backend to switch role and issue a role-specific JWT token.
+      // This keeps the Firebase Auth user the same but ensures seller/buyer APIs
+      // receive the correct role context in JWT claims/authorization checks.
+      try {
+        await authService.switchRole(targetRole);
+      } catch (err: any) {
+        const status = err?.status || err?.response?.status;
+        // If backend hasn't implemented /auth/switch-role.php yet, fall back to client-side role switch only.
+        if (status === 404) {
+          console.log(
+            '[AuthContext] switchUserRole: switch-role endpoint not available, using local role switch only',
+          );
+        } else {
+          // For all other errors (403, 500, etc.), surface the backend message to the UI
+          // and DO NOT change the local role to avoid inconsistent state.
+          throw err;
+        }
+      }
+
       // Build new user with active role set to targetRole (no new user, no Firebase change)
       const nextUser: User = {
         ...user,
@@ -492,7 +511,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
       // Update global role state; AppNavigator useEffect will then navigate to the correct dashboard
       setUser(nextUser);
-      console.log('[AuthContext] Role switch completed. registered_role:', registeredRole, 'active user_type:', targetRole);
+      console.log(
+        '[AuthContext] Role switch completed. registered_role:',
+        registeredRole,
+        'active user_type:',
+        targetRole,
+      );
     } catch (error: any) {
       console.error('[AuthContext] Error in switchUserRole:', error);
       throw error;
