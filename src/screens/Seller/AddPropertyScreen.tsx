@@ -314,7 +314,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.6 as const,
+      quality: 0.5 as const,
       selectionLimit: 10 - photos.length,
       includeBase64: true,
     };
@@ -471,7 +471,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     }
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.6 as const,
+      quality: 0.5 as const,
       includeBase64: true,
       saveToPhotos: false,
     };
@@ -1626,14 +1626,20 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             {photos.length > 0 && (
               <View style={styles.photosPreview}>
                 {photos.map((photo, index) => {
-                  const isApproved = photo.moderationStatus === 'APPROVED' || photo.moderationStatus === 'checking' || photo.moderationStatus === 'PENDING';
-                  const statusColor = isApproved ? '#4CAF50' : photo.moderationStatus === 'REJECTED' ? colors.error : 'transparent';
-                  const statusText = isApproved ? '✓' : photo.moderationStatus === 'REJECTED' ? '✗' : '';
+                  const showApprovedBadge = photo.moderationStatus === 'APPROVED';
+                  const showRejectedBadge = photo.moderationStatus === 'REJECTED';
+                  const statusColor = showApprovedBadge ? '#4CAF50' : showRejectedBadge ? colors.error : 'transparent';
+                  const statusText = showApprovedBadge ? '✓' : showRejectedBadge ? '✗' : '';
                   
                   return (
                     <View key={index} style={styles.photoPreviewItem}>
                       <Image source={{uri: photo.uri}} style={styles.photoPreviewImage} />
-                      {photo.moderationStatus && (
+                      {photo.moderationStatus === 'checking' && (
+                        <View style={[styles.moderationBadge, styles.moderationBadgeLoading]}>
+                          <ActivityIndicator size="small" color={colors.surface} />
+                        </View>
+                      )}
+                      {(showApprovedBadge || showRejectedBadge) && (
                         <View style={[styles.moderationBadge, {backgroundColor: statusColor}]}>
                           <Text style={styles.moderationBadgeText}>{statusText}</Text>
                         </View>
@@ -2523,6 +2529,11 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     minWidth: 60,
     alignItems: 'center',
+  },
+  moderationBadgeLoading: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    minHeight: 28,
   },
   moderationBadgeText: {
     ...typography.caption,

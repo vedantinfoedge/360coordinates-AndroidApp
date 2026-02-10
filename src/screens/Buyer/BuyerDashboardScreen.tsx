@@ -529,31 +529,24 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           (navigation as any).navigate('Auth', {screen: 'Register'});
         }}
         onAddPropertyPress={isLoggedIn ? async () => {
-          // Switch role to seller and navigate to Seller dashboard
-          if (switchingRole) return; // Prevent multiple clicks
-          try {
-            setSwitchingRole(true);
-            // Set dashboard preference first so Seller screen and AppNavigator see seller
-            await AsyncStorage.setItem('@target_dashboard', 'seller');
-            await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
-            await switchRole('seller');
-            // Navigate using root navigator so we actually land on Seller stack
-            const root = (navigation as any).getParent?.()?.getParent?.() ?? (navigation as any).getParent?.();
-            if (root?.reset) {
-              root.reset({ index: 0, routes: [{ name: 'Seller' }] });
-            } else {
-              (navigation as any).reset({ index: 0, routes: [{ name: 'Seller' }] });
+            // Switch role to seller - AppNavigator will handle navigation when user state updates
+            if (switchingRole) return; // Prevent multiple clicks
+            try {
+              setSwitchingRole(true);
+              await AsyncStorage.setItem('@target_dashboard', 'seller');
+              await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
+              await switchRole('seller');
+              // No manual reset - AppNavigator useEffect reacts to user change and navigates to Seller
+            } catch (error: any) {
+              console.error('[BuyerDashboard] Error switching role:', error);
+              CustomAlert.alert(
+                'Role Switch Failed',
+                error?.message || 'Failed to switch to seller dashboard. Please try again.',
+              );
+            } finally {
+              setSwitchingRole(false);
             }
-          } catch (error: any) {
-            console.error('[BuyerDashboard] Error switching role:', error);
-            CustomAlert.alert(
-              'Role Switch Failed',
-              error?.message || 'Failed to switch to seller dashboard. Please try again.',
-            );
-          } finally {
-            setSwitchingRole(false);
-          }
-        } : undefined}
+          } : undefined}
         showProfile={isLoggedIn}
         showLogout={isLoggedIn}
         showSignIn={isGuest}

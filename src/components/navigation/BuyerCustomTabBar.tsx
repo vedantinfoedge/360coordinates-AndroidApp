@@ -114,18 +114,13 @@ export default function BuyerCustomTabBar({state, descriptors, navigation}: Bott
         fabSwitchCooldownRef.current = false;
       }, FAB_SWITCH_COOLDOWN_MS);
 
-      const root = getRootNav();
       (async () => {
         try {
+          // Set dashboard preference first - AppNavigator will handle navigation when user state updates
           await AsyncStorage.setItem('@target_dashboard', 'seller');
           await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
           await switchRole('seller');
-          if (root) {
-            (root as any).reset({
-              index: 0,
-              routes: [{name: 'Seller'}],
-            });
-          }
+          // No manual reset - AppNavigator useEffect reacts to user change and navigates to Seller
         } catch (error: any) {
           console.error('[BuyerCustomTabBar] Error switching to seller:', error);
           CustomAlert.alert(
@@ -142,7 +137,7 @@ export default function BuyerCustomTabBar({state, descriptors, navigation}: Bott
     setTimeout(() => {
       isAnimating.current = false;
     }, 400);
-  }, [isAuthenticated, isMenuOpen, closeMenu, getRootNav, measureFAB, switchRole]);
+  }, [isAuthenticated, isMenuOpen, closeMenu, measureFAB, switchRole]);
 
   return (
     <View style={[styles.wrapper, {height: barHeight, paddingBottom: insets.bottom}]}>

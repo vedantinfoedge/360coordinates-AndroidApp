@@ -534,8 +534,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       if (!propertyUnlocked) {
         if (interactionState.remaining <= 0) {
           CustomAlert.alert(
-            'Interaction limit reached',
-            'Interaction limit reached. Upgrade to continue.',
+            'Credit limit reached',
+            'Credit limit reached. Upgrade to continue.',
           );
           return;
         }
@@ -543,8 +543,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         const result = await consumeInteraction();
         if (!result.success) {
           CustomAlert.alert(
-            'Interaction limit reached',
-            'Interaction limit reached. Upgrade to continue.',
+            'Credit limit reached',
+            'Credit limit reached. Upgrade to continue.',
           );
           return;
         }
@@ -647,8 +647,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
     if (interactionState.remaining <= 0) {
       CustomAlert.alert(
-        'Interaction limit reached',
-        'Interaction limit reached. Upgrade to continue.',
+        'Credit limit reached',
+        'Credit limit reached. Upgrade to continue.',
       );
       return;
     }
@@ -1148,7 +1148,9 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                     <View style={styles.amenityIconContainer}>
                       <Text style={styles.amenityIcon}>{getAmenityIcon(amenity)}</Text>
                     </View>
-                    <Text style={styles.amenityText}>{capitalizeAmenity(amenity)}</Text>
+                    <Text style={styles.amenityText} numberOfLines={2}>
+                      {capitalizeAmenity(amenity)}
+                    </Text>
                   </View>
                 );
               })
@@ -1202,14 +1204,14 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         </TouchableOpacity>
       </View>
       
-      {/* Interaction Limit Display */}
+      {/* Credits Display - Left side for easy visibility */}
       {user && user.user_type === 'buyer' && !interactionLoading && (
         <View style={styles.limitContainer}>
           <Text style={[
             styles.limitText,
             interactionState.remaining <= 0 && styles.limitTextError,
           ]}>
-            Interactions Left: {interactionState.remaining} / {interactionState.max}
+            Credits Left: {interactionState.remaining} / {interactionState.max}
           </Text>
         </View>
       )}
@@ -1235,14 +1237,17 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               </TouchableOpacity>
             </View>
             
-            {/* Interaction Limit Info */}
+            {/* Credits Info */}
             {user && user.user_type === 'buyer' && !interactionLoading && (
               <View style={styles.modalLimitInfo}>
                 <Text style={[
                   styles.modalLimitText,
                   interactionState.remaining <= 0 && styles.modalLimitTextError,
                 ]}>
-                  Interactions Left: {interactionState.remaining} / {interactionState.max}
+                  Credits Left: {interactionState.remaining} / {interactionState.max}
+                </Text>
+                <Text style={styles.modalCreditsResetText}>
+                  Credits will reset after 12 hours
                 </Text>
               </View>
             )}
@@ -1791,6 +1796,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     fontWeight: '500',
+    flex: 1,
+    flexShrink: 1,
   },
   address: {
     ...typography.body,
@@ -2029,22 +2036,21 @@ const styles = StyleSheet.create({
   limitContainer: {
     position: 'absolute',
     bottom: 80,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    left: spacing.md,
+    alignItems: 'flex-start',
+    paddingHorizontal: 0,
   },
   limitText: {
     ...typography.caption,
-    fontSize: 12,
-    color: colors.textSecondary,
+    fontSize: 14,
+    color: colors.text,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
-    fontWeight: '600',
+    borderColor: colors.primary + '60',
+    fontWeight: '700',
   },
   limitTextError: {
     color: colors.error,
@@ -2067,6 +2073,14 @@ const styles = StyleSheet.create({
   },
   modalLimitTextError: {
     color: '#DC2626',
+  },
+  modalCreditsResetText: {
+    ...typography.caption,
+    fontSize: 11,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+    fontStyle: 'italic',
   },
   videoSection: {
     backgroundColor: colors.surface,

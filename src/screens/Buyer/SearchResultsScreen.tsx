@@ -14,7 +14,6 @@ import {
   Share,
   Animated,
 } from 'react-native';
-import RangeSlider from '../../components/common/RangeSlider';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -153,7 +152,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [selectedPropertyType, setSelectedPropertyType] = useState<string>(initialPropertyType || 'all');
   const [location, setLocation] = useState<string>(initialLocation);
   const [budget, setBudget] = useState<string>(initialBudget);
-  // Budget slider values (in base units: Lakhs for buy, thousands for rent)
+  // Budget dropdown values (Lakhs for buy, thousands for rent/PG)
   const [minBudget, setMinBudget] = useState<number>(0);
   const [maxBudget, setMaxBudget] = useState<number>(1000); // Default max
   // Bedrooms: '' = Any, '1 BHK', '2 BHK', '3 BHK', '4 BHK', '5+ BHK' (PG also has '1RK')
@@ -161,11 +160,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [area, setArea] = useState<string>(initialArea);
   const [status, setStatus] = useState<'sale' | 'rent' | ''>(initialStatus);
   
-  // Ref to track if user is actively dragging budget slider (prevents search during drag)
-  const isDraggingBudget = useRef(false);
-  // Refs to track budget values during drag (without triggering state updates)
-  const pendingMinBudget = useRef<number>(0);
-  const pendingMaxBudget = useRef<number>(1000);
   const scrollY = useRef(new Animated.Value(0)).current;
   const searchBarHeight = 175; // Search bar + dropdown row + results header
 
@@ -313,6 +307,29 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       }
     }
   }, [selectedPropertyType, isBedroomBased, isAreaBased, listingType, maxBudgetForType, minBudget]);
+
+  // Budget options by listing type (same options for search bar dropdown and filter modal)
+  const budgetOptionsByListingType = useMemo(() => {
+    const max = maxBudgetForType;
+    if (listingType === 'buy') {
+      return [
+        {label: 'Any', min: 0, max},
+        {label: 'Under 25L', min: 0, max: 25},
+        {label: '25L-50L', min: 25, max: 50},
+        {label: '50L-1Cr', min: 50, max: 100},
+        {label: '1Cr-2Cr', min: 100, max: 200},
+        {label: '2Cr+', min: 200, max},
+      ];
+    }
+    // Rent or PG/Hostel
+    return [
+      {label: 'Any', min: 0, max},
+      {label: 'Under 10K', min: 0, max: 10},
+      {label: '10K-25K', min: 10, max: 25},
+      {label: '25K-50K', min: 25, max: 50},
+      {label: '50K+', min: 50, max},
+    ];
+  }, [listingType, maxBudgetForType]);
 
   // Get all property types for filter
   const allPropertyTypes = useMemo(() => {
@@ -599,7 +616,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const isFirstRender = React.useRef(true);
 
   // Trigger search when location or filters change (debounced)
-  // Note: minBudget and maxBudget are excluded to prevent search during slider drag
   // Note: searchText is excluded to prevent searches while typing (only location triggers searches)
   useEffect(() => {
     // Skip initial mount - it's handled by the mount useEffect
@@ -621,40 +637,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       isMounted = false;
       clearTimeout(searchTimeout);
     };
-  }, [location, listingType, selectedPropertyType, budget, bedrooms, area, loadProperties]);
-  
-  // Separate effect for budget changes (with longer debounce to avoid lag during slider drag)
-  useEffect(() => {
-    if (isFirstRender.current) {
-      return;
-    }
-    
-    // Skip if we're currently dragging (will be handled when drag ends)
-    if (isDraggingBudget.current) {
-      return;
-    }
-    
-    let isMounted = true;
-    const budgetTimeout = setTimeout(() => {
-      if (isMounted && !isDraggingBudget.current) {
-        loadProperties();
-      }
-    }, 600); // Debounce delay for budget changes (reduced from 800ms for better responsiveness)
-
-    return () => {
-      isMounted = false;
-      clearTimeout(budgetTimeout);
-    };
-  }, [minBudget, maxBudget, loadProperties]);
-
-  // Cleanup budget update timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (budgetUpdateTimeoutRef.current) {
-        clearTimeout(budgetUpdateTimeoutRef.current);
-      }
-    };
-  }, []);
+  }, [location, listingType, selectedPropertyType, budget, bedrooms, area, minBudget, maxBudget, loadProperties]);
 
   // Load initial properties on mount
   useEffect(() => {
@@ -674,6 +657,17 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sync route params to state when they change (e.g., Top Cities search from Buyer Dashboard)
+  useEffect(() => {
+    const currentRouteLocation = (routeParams?.query || routeParams?.location || routeParams?.searchQuery || '').trim();
+    const currentRouteCity = (routeParams?.city || '').trim();
+    if (currentRouteLocation || currentRouteCity) {
+      const loc = currentRouteLocation || currentRouteCity;
+      setSearchText(loc);
+      setLocation(loc);
+    }
+  }, [routeParams?.query, routeParams?.location, routeParams?.searchQuery, routeParams?.city]);
 
   // Refresh properties when screen is focused (e.g., when Search tab is clicked)
   useFocusEffect(
@@ -754,26 +748,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     setFilteredProperties(filtered);
   };
 
-  // Memoize formatBudgetValue to ensure stable reference
-  const formatBudgetValueMemo = useCallback((value: number, type: ListingType | 'all'): string => {
-    if (type === 'buy') {
-      if (value >= 100) {
-        return `₹${(value / 100).toFixed(1)} Cr`;
-      }
-      return `₹${value}L`;
-    } else {
-      // Rent or PG
-      if (value >= 100) {
-        return `₹${(value / 100).toFixed(1)} Lakh`;
-      }
-      return `₹${value}K`;
-    }
-  }, []);
-
-  // Format budget value for display (keep for backward compatibility)
-  const formatBudgetValue = formatBudgetValueMemo;
-
-  // Convert budget slider values to API format
+  // Convert budget dropdown values to API format
   const getBudgetString = (min: number, max: number, type: ListingType | 'all', propType?: string): string => {
     const defaultMax = getMaxBudgetForType(propType || selectedPropertyType, type);
     if (min === 0 && max === defaultMax) {
@@ -875,66 +850,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       }
     }
   };
-
-  // Throttle timeout ref for budget updates during drag
-  const budgetUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Optimized callbacks for RangeSlider - using useCallback with stable dependencies
-  const handleBudgetChange = useCallback((min: number, max: number) => {
-    // Store pending values in refs (no re-render)
-    pendingMinBudget.current = min;
-    pendingMaxBudget.current = max;
-    
-    // If not currently dragging, this is a final update (e.g., on release)
-    if (!isDraggingBudget.current) {
-      // Clear any pending throttled updates
-      if (budgetUpdateTimeoutRef.current) {
-        clearTimeout(budgetUpdateTimeoutRef.current);
-        budgetUpdateTimeoutRef.current = null;
-      }
-      // Update state immediately for final values
-      setMinBudget(min);
-      setMaxBudget(max);
-    } else {
-      // During drag, only update state periodically to reduce re-renders
-      // Use a throttled update (only update every 400ms during drag)
-      if (!budgetUpdateTimeoutRef.current) {
-        budgetUpdateTimeoutRef.current = setTimeout(() => {
-          setMinBudget(pendingMinBudget.current);
-          setMaxBudget(pendingMaxBudget.current);
-          budgetUpdateTimeoutRef.current = null;
-        }, 400);
-      }
-    }
-  }, []);
-
-  // Handle drag start - mark that we're dragging
-  const handleBudgetDragStart = useCallback(() => {
-    isDraggingBudget.current = true;
-    // Clear any pending updates
-    if (budgetUpdateTimeoutRef.current) {
-      clearTimeout(budgetUpdateTimeoutRef.current);
-      budgetUpdateTimeoutRef.current = null;
-    }
-  }, []);
-
-  // Handle drag end - update final values and trigger search
-  const handleBudgetDragEnd = useCallback(() => {
-    isDraggingBudget.current = false;
-    // Clear any pending throttled updates
-    if (budgetUpdateTimeoutRef.current) {
-      clearTimeout(budgetUpdateTimeoutRef.current);
-      budgetUpdateTimeoutRef.current = null;
-    }
-    // Update state with final values
-    setMinBudget(pendingMinBudget.current);
-    setMaxBudget(pendingMaxBudget.current);
-  }, []);
-
-  // Memoize formatBudgetDisplay to prevent re-creation on every render
-  const formatBudgetDisplay = useCallback((value: number) => {
-    return formatBudgetValue(value, listingType);
-  }, [listingType, formatBudgetValue]);
 
   const renderProperty = ({item}: {item: Property}) => {
     // Determine property type for PropertyCard
@@ -1131,22 +1046,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
               )}
               {openDropdown === 'budget' && (
                 <>
-                  {(listingType === 'buy'
-                    ? [
-                        {label: 'Any', min: 0, max: maxBudgetForType},
-                        {label: 'Under 25L', min: 0, max: 25},
-                        {label: '25L-50L', min: 25, max: 50},
-                        {label: '50L-1Cr', min: 50, max: 100},
-                        {label: '1Cr+', min: 100, max: maxBudgetForType},
-                      ]
-                    : [
-                        {label: 'Any', min: 0, max: maxBudgetForType},
-                        {label: 'Under 10K', min: 0, max: 10},
-                        {label: '10K-25K', min: 10, max: 25},
-                        {label: '25K-50K', min: 25, max: 50},
-                        {label: '50K+', min: 50, max: maxBudgetForType},
-                      ]
-                  ).map(({label, min, max}) => (
+                  {budgetOptionsByListingType.map(({label, min, max}) => (
                     <TouchableOpacity
                       key={label}
                       style={[styles.dropdownOption, minBudget === min && maxBudget === max && styles.dropdownOptionActive]}
@@ -1299,27 +1199,30 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 </View>
               </View>
 
-              {/* Budget Range Slider */}
+              {/* Budget - Dropdown options by listing type (same as search bar) */}
               <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Budget Range</Text>
-                <View style={styles.budgetSliderContainer}>
-                  <RangeSlider
-                    min={0}
-                    max={maxBudgetForType}
-                    minValue={minBudget}
-                    maxValue={maxBudget}
-                    onValueChange={handleBudgetChange}
-                    onDragStart={handleBudgetDragStart}
-                    onDragEnd={handleBudgetDragEnd}
-                    formatValue={formatBudgetDisplay}
-                    step={listingType === 'buy' ? 5 : 1}
-                    showMarkers={true}
-                  />
-                  <Text style={styles.priceLabel}>
-                    {listingType === 'buy' 
-                      ? 'Drag the handles to set your budget range'
-                      : 'Drag the handles to set your monthly budget'}
-                  </Text>
+                <Text style={styles.filterLabel}>Budget</Text>
+                <View style={styles.filterOptions}>
+                  {budgetOptionsByListingType.map(({label, min, max}) => (
+                    <TouchableOpacity
+                      key={label}
+                      style={[
+                        styles.filterChip,
+                        minBudget === min && maxBudget === max && styles.filterChipActive,
+                      ]}
+                      onPress={() => {
+                        setMinBudget(min);
+                        setMaxBudget(max);
+                      }}>
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          minBudget === min && maxBudget === max && styles.filterChipTextActive,
+                        ]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
 
@@ -1717,13 +1620,6 @@ const styles = StyleSheet.create({
   priceInput: {
     flex: 1,
   },
-  priceLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
-    fontSize: 12,
-    textAlign: 'center',
-  },
   priceTextInput: {
     backgroundColor: colors.surfaceSecondary,
     borderRadius: borderRadius.md,
@@ -1771,32 +1667,6 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.surface,
     fontWeight: '600',
-  },
-  budgetSliderContainer: {
-    marginTop: spacing.sm,
-  },
-  budgetRangeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  budgetValueContainer: {
-    flex: 1,
-    alignItems: 'center',
-    padding: spacing.sm,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.md,
-    marginHorizontal: spacing.xs,
-  },
-  budgetValueLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  budgetValue: {
-    ...typography.h3,
-    color: colors.text,
-    fontWeight: '700',
   },
   sliderContainer: {
     marginBottom: spacing.md,

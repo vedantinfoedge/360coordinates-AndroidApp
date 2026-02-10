@@ -297,7 +297,7 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
                   style={styles.propertyCard}>
                   <View style={styles.propertyHeader}>
                     <Text style={styles.propertyTitle} numberOfLines={2}>
-                      {item.propertyTitle}
+                      {(item.propertyTitle || '').toUpperCase()}
                     </Text>
                     <Text style={styles.viewedDate}>{formatDate(item.viewedAt)}</Text>
                   </View>
@@ -318,7 +318,7 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
                     
                     <View style={styles.ownerInfoRow}>
                       <Text style={styles.ownerInfoIcon}>👤</Text>
-                      <Text style={styles.ownerName}>{item.ownerName}</Text>
+                      <Text style={styles.ownerName}>{(item.ownerName || '').toUpperCase()}</Text>
                     </View>
                     
                     {item.ownerPhone ? (
