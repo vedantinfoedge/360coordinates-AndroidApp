@@ -234,19 +234,6 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   }, [listingType]);
 
-  // Sync state when route params change (e.g. navigating with new listingType from Home/Dashboard)
-  useEffect(() => {
-    const lt = routeParams?.listingType;
-    if (lt && (lt === 'buy' || lt === 'rent' || lt === 'pg-hostel') && lt !== listingType) {
-      setListingType(lt);
-    }
-    const loc = (routeParams?.query || routeParams?.location || routeParams?.searchQuery || '').trim();
-    if (routeParams && Object.keys(routeParams).length > 0 && loc !== location) {
-      setLocation(loc);
-      setSearchText(loc);
-    }
-  }, [routeParams?.listingType, routeParams?.query, routeParams?.location, routeParams?.searchQuery, listingType, location]);
-
   // Clear dependent fields when property type or listing type changes
   useEffect(() => {
     // Update max budget when property type or listing type changes
