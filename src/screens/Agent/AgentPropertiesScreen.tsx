@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   FlatList,
   TouchableOpacity,
   Image,
@@ -362,6 +363,10 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     navigation.getParent()?.navigate('AddProperty' as never);
   };
 
+  const handleAddProject = () => {
+    navigation.getParent()?.navigate('AddProject' as never);
+  };
+
   const renderProperty = ({item}: {item: Property}) => {
     // Validate and fix image URL for Android - improved handling
     let imageUrl: string | null = null;
@@ -487,9 +492,14 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
     <View style={styles.container}>
       <View style={[styles.header, {marginTop: insets.top + spacing.md}]}>
         <Text style={styles.headerTitle}>All Listings</Text>
-        <TouchableOpacity style={styles.addButtonOutline} onPress={handleAddProperty}>
-          <Text style={styles.addButtonOutlineText}>+ Add Property</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.addButtonOutline} onPress={handleAddProperty}>
+            <Text style={styles.addButtonOutlineText}>+ Property</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addButtonOutline} onPress={handleAddProject}>
+            <Text style={styles.addButtonOutlineText}>+ Project</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.searchBar}>
         <View style={styles.searchInputContainer}>
@@ -498,7 +508,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
           </View>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search properties..."
+            placeholder="Search properties or projects..."
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholderTextColor={colors.textSecondary}
@@ -570,38 +580,75 @@ const AgentPropertiesScreen: React.FC<Props> = ({navigation}) => {
       {loading ? (
         <View style={[styles.loadingContainer, {paddingTop: insets.top + HEADER_HEIGHT}]}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading properties...</Text>
+          <Text style={styles.loadingText}>Loading listings...</Text>
         </View>
-      ) : properties.length === 0 ? (
+      ) : allProperties.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🏠</Text>
-          <Text style={styles.emptyText}>No Properties Listed</Text>
-          <Text style={styles.emptySubtext}>Start by adding your first property to showcase it to potential buyers</Text>
-          <TouchableOpacity style={styles.addButtonOutline} onPress={handleAddProperty} activeOpacity={0.8}>
-            <Text style={styles.addButtonOutlineText}>+ Add Your First Property</Text>
-          </TouchableOpacity>
+          <Text style={styles.emptyText}>No Listings Yet</Text>
+          <Text style={styles.emptySubtext}>Start by adding your first property or project</Text>
+          <View style={styles.emptyButtonsRow}>
+            <TouchableOpacity style={styles.addButtonOutline} onPress={handleAddProperty} activeOpacity={0.8}>
+              <Text style={styles.addButtonOutlineText}>+ Add Property</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addButtonOutline} onPress={handleAddProject} activeOpacity={0.8}>
+              <Text style={styles.addButtonOutlineText}>+ Add Project</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : filteredAndSortedProperties.length === 0 && searchQuery ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyText}>No Properties Found</Text>
+          <Text style={styles.emptyText}>No Listings Found</Text>
           <Text style={styles.emptySubtext}>Try adjusting your search terms or filters</Text>
         </View>
       ) : (
-      <Animated.FlatList
-        data={filteredAndSortedProperties}
-        renderItem={renderProperty}
-        keyExtractor={item => String(item.id)}
-        contentContainerStyle={[styles.listContent, {paddingTop: spacing.md}]}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+        <ScrollView
+          style={{flex: 1}}
+          contentContainerStyle={[styles.listContent, {paddingTop: spacing.md}]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}>
+          {(() => {
+            const listingData = filteredAndSortedProperties;
+            const projects = listingData.filter(p => p.project_type === 'upcoming');
+            const propertiesOnly = listingData.filter(p => p.project_type !== 'upcoming');
+
+            const renderSection = (title: string, icon: string, data: Property[]) => {
+              return (
+                <View style={styles.sectionWrap} key={title}>
+                  <View style={styles.sectionTitleRow}>
+                    <View style={styles.sectionTitleLeft}>
+                      <Text style={styles.sectionIcon}>{icon}</Text>
+                      <Text style={styles.sectionTitleText}>{title}</Text>
+                      <View style={styles.sectionCountBadge}>
+                        <Text style={styles.sectionCountText}>{data.length}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  {data.length === 0 ? (
+                    <View style={styles.sectionEmpty}>
+                      <Text style={styles.sectionEmptyText}>No {title.toLowerCase()} found</Text>
+                    </View>
+                  ) : (
+                    data.map(item => (
+                      <View key={String(item.id)}>{renderProperty({item})}</View>
+                    ))
+                  )}
+                </View>
+              );
+            };
+
+            return (
+              <>
+                {renderSection('Properties', '🏠', propertiesOnly)}
+                {renderSection('Projects', '🏗️', projects)}
+              </>
+            );
+          })()}
+        </ScrollView>
       )}
-      {/* FAB - Always visible when there are properties */}
-      {properties.length > 0 && (
+      {/* FAB - Always visible when there are listings */}
+      {allProperties.length > 0 && (
         <TouchableOpacity
           style={styles.fab}
           onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
@@ -634,6 +681,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1D242B',
     flex: 1,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   searchBar: {
     flexDirection: 'row',
@@ -907,6 +959,13 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     minHeight: 400,
   },
+  emptyButtonsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
   emptyIcon: {
     fontSize: 64,
     marginBottom: spacing.md,
@@ -950,6 +1009,55 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
     fontSize: 13,
+  },
+  sectionWrap: {
+    marginBottom: spacing.lg,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  sectionTitleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sectionIcon: {
+    fontSize: 18,
+  },
+  sectionTitleText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1D242B',
+  },
+  sectionCountBadge: {
+    backgroundColor: '#E3F6FF',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  sectionCountText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  sectionEmpty: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  sectionEmptyText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',

@@ -245,7 +245,6 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'flex-start',
     marginLeft: 0,
   },
@@ -257,7 +256,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingRight: spacing.sm,
+    paddingRight: spacing.xl,
   },
   menuButton: {
     padding: spacing.sm,

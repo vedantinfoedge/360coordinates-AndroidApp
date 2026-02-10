@@ -19,6 +19,7 @@ import BuilderHeader from '../../components/BuilderHeader';
 import {userService} from '../../services/user.service';
 import {sellerService} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
+import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
@@ -240,12 +241,26 @@ const BuilderProfileScreen: React.FC<Props> = ({navigation}) => {
       .slice(0, 2);
   };
 
+  const memberSinceText = (() => {
+    const raw = (user as any)?.created_at || (user as any)?.createdAt || null;
+    if (!raw) return null;
+    const parsed =
+      typeof raw === 'string'
+        ? (formatters.parseMySQLDateTime(raw) || new Date(raw))
+        : raw instanceof Date
+          ? raw
+          : null;
+    if (!parsed || isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleDateString('en-IN', {month: 'short', year: 'numeric'});
+  })();
+
   if (loading) {
     return (
       <View style={styles.container}>
         <BuilderHeader
           onProfilePress={() => {}}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={handleLogout}
         />
         <View style={styles.loadingContainer}>
@@ -260,6 +275,7 @@ const BuilderProfileScreen: React.FC<Props> = ({navigation}) => {
       <BuilderHeader
         onProfilePress={() => {}}
         onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
         onLogoutPress={handleLogout}
       />
       <ScrollView 
@@ -281,6 +297,9 @@ const BuilderProfileScreen: React.FC<Props> = ({navigation}) => {
           </View>
           <Text style={styles.profileName}>{formData.full_name || 'Builder'}</Text>
           <Text style={styles.profileRole}>Builder</Text>
+          {memberSinceText && (
+            <Text style={styles.memberSince}>Member since {memberSinceText}</Text>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -443,6 +462,31 @@ const BuilderProfileScreen: React.FC<Props> = ({navigation}) => {
             </View>
           </View>
         </View>
+
+        {/* Menu Items Section */}
+        <View style={styles.menuSection}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.getParent()?.navigate('Subscription' as never)}>
+            <Text style={styles.menuIcon}>💎</Text>
+            <Text style={styles.menuText}>Subscription</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+          <View style={styles.menuDivider} />
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.getParent()?.navigate('Support' as never)}>
+            <Text style={styles.menuIcon}>🆘</Text>
+            <Text style={styles.menuText}>Support</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+          <View style={styles.menuDivider} />
+          <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+            <Text style={styles.menuIcon}>🚪</Text>
+            <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -527,6 +571,54 @@ const styles = StyleSheet.create({
   profileRole: {
     ...typography.body,
     color: colors.accent,
+    fontWeight: '600',
+  },
+  memberSince: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  menuSection: {
+    marginBottom: spacing.xl,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    marginHorizontal: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.lg,
+  },
+  menuIcon: {
+    fontSize: 18,
+    marginRight: spacing.md,
+  },
+  menuText: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '500',
+    flex: 1,
+  },
+  menuArrow: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '700',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: spacing.md,
+  },
+  logoutText: {
+    color: colors.error,
     fontWeight: '600',
   },
   section: {

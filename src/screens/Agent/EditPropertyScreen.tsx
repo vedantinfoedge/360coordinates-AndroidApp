@@ -151,6 +151,7 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
         <AgentHeader
           onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
           onSupportPress={() => navigation.navigate('Support' as never)}
+          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
           onLogoutPress={logout}
         />
         <View style={styles.loadingContainer}>
@@ -167,6 +168,7 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
         <AgentHeader
           onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
           onSupportPress={() => navigation.navigate('Support' as never)}
+          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
           onLogoutPress={logout}
         />
         <View style={styles.emptyContainer}>
@@ -181,6 +183,7 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
       <AgentHeader
         onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
         onSupportPress={() => navigation.navigate('Support' as never)}
+        onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
         onLogoutPress={logout}
       />
       

@@ -8,12 +8,14 @@ import AddPropertyScreen from '../screens/Agent/AddPropertyScreen';
 import AddProjectScreen from '../screens/Agent/AddProjectScreen';
 import EditPropertyScreen from '../screens/Agent/EditPropertyScreen';
 import AgentSupportScreen from '../screens/Agent/AgentSupportScreen';
+import SubscriptionScreen from '../screens/Agent/SubscriptionScreen';
 
 export type AgentStackParamList = {
   AgentTabs: undefined;
   Inquiries: undefined;
   PropertyDetails: {propertyId: string};
   UpcomingProjectDetails: {propertyId: string};
+  Subscription: undefined;
   AddProperty: undefined;
   AddProject: undefined;
   EditProperty: {propertyId: string | number};
@@ -31,6 +33,7 @@ const AgentNavigator = () => {
       <Stack.Screen name="Inquiries" component={AgentInquiriesScreen} />
       <Stack.Screen name="PropertyDetails" component={AgentPropertyDetailsScreen} />
       <Stack.Screen name="UpcomingProjectDetails" component={UpcomingProjectDetailsScreen} />
+      <Stack.Screen name="Subscription" component={SubscriptionScreen} />
       <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
       <Stack.Screen name="AddProject" component={AddProjectScreen} />
       <Stack.Screen name="EditProperty" component={EditPropertyScreen} />

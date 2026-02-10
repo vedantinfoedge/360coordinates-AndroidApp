@@ -647,6 +647,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     // If property already unlocked (via chat or previous contact view), show immediately
     if (propertyUnlocked) {
       setShowContactModal(true);
+      // Record "view owner" interaction for lead tracking (non-blocking)
+      try {
+        await buyerService.recordInteraction(property.id, 'view_owner');
+      } catch (_) {}
       return;
     }
 
@@ -678,6 +682,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       // Unlock property and save to history (single credit for both chat and contact)
       await unlockPropertyAndSaveHistory('contact');
       setShowContactModal(true);
+      // Record "view owner" interaction for lead tracking (non-blocking)
+      try {
+        await buyerService.recordInteraction(property.id, 'view_owner');
+      } catch (_) {}
       console.log('[PropertyDetails] Property unlocked for contact view:', property.id);
     } catch (error: any) {
       console.error('[PropertyDetails] Error in handleViewContact:', error);

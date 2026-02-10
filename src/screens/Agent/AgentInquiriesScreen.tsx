@@ -252,6 +252,25 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
     return filtered;
   }, [allInquiries, searchQuery, statusFilter, propertyFilter]);
 
+  const inquiryStats = useMemo(() => {
+    const total = allInquiries.length;
+    const newPending = allInquiries.filter(i => i.status === 'new').length;
+    const read = allInquiries.filter(i => i.status === 'viewed').length;
+    const replied = allInquiries.filter(i =>
+      i.status !== 'new' && i.status !== 'viewed'
+    ).length;
+    return {total, newPending, read, replied};
+  }, [allInquiries]);
+
+  const recentLeads = useMemo(() => {
+    const sorted = [...allInquiries].sort((a, b) => {
+      const aDate = new Date(a.created_at || 0).getTime();
+      const bDate = new Date(b.created_at || 0).getTime();
+      return bDate - aDate;
+    });
+    return sorted.slice(0, 5);
+  }, [allInquiries]);
+
   const handleRefresh = () => {
     setRefreshing(true);
     loadInquiries();
@@ -398,6 +417,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
         <AgentHeader
           onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
           onSupportPress={() => navigation.navigate('Support')}
+          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
           onLogoutPress={logout}
         />
         <View style={[styles.centerContainer, {flex: 1}]}>
@@ -413,6 +433,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
       <AgentHeader
         onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
         onSupportPress={() => navigation.navigate('Support')}
+        onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
         onLogoutPress={logout}
         scrollY={scrollY}
       />
@@ -434,6 +455,56 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
           onPress={() => setShowFilterModal(true)}>
           <Text style={styles.filterButtonText}>Filter</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Inquiry Stats + Leads */}
+      <ScrollView
+        style={styles.topInsights}
+        contentContainerStyle={styles.topInsightsContent}
+        horizontal
+        showsHorizontalScrollIndicator={false}>
+        <View style={[styles.statPill, styles.statPillPrimary]}>
+          <Text style={styles.statPillNumber}>{inquiryStats.total}</Text>
+          <Text style={styles.statPillLabel}>Total</Text>
+        </View>
+        <View style={[styles.statPill, styles.statPillDanger]}>
+          <Text style={styles.statPillNumber}>{inquiryStats.newPending}</Text>
+          <Text style={styles.statPillLabel}>New / Pending</Text>
+        </View>
+        <View style={[styles.statPill, styles.statPillNeutral]}>
+          <Text style={styles.statPillNumber}>{inquiryStats.read}</Text>
+          <Text style={styles.statPillLabel}>Read</Text>
+        </View>
+        <View style={[styles.statPill, styles.statPillSuccess]}>
+          <Text style={styles.statPillNumber}>{inquiryStats.replied}</Text>
+          <Text style={styles.statPillLabel}>Replied</Text>
+        </View>
+      </ScrollView>
+
+      <View style={styles.leadsSection}>
+        <View style={styles.leadsHeader}>
+          <Text style={styles.leadsTitle}>Recent Leads</Text>
+          <Text style={styles.leadsSubtitle}>Buyer name • contact • property</Text>
+        </View>
+        {recentLeads.length === 0 ? (
+          <View style={styles.leadsEmpty}>
+            <Text style={styles.leadsEmptyText}>No leads yet</Text>
+          </View>
+        ) : (
+          recentLeads.map(lead => (
+            <View style={styles.leadRow} key={String(lead.id)}>
+              <View style={styles.leadRowLeft}>
+                <Text style={styles.leadBuyer} numberOfLines={1}>
+                  {lead.buyer_name || 'Buyer'}
+                </Text>
+                <Text style={styles.leadMeta} numberOfLines={1}>
+                  {(lead.buyer_phone || 'No phone')} • {(lead.property_title || 'Property')}
+                </Text>
+              </View>
+              <Text style={styles.leadTime}>{formatters.timeAgo(lead.created_at)}</Text>
+            </View>
+          ))
+        )}
       </View>
       
       {/* Filter Modal */}
@@ -638,6 +709,110 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     gap: spacing.sm,
+  },
+  topInsights: {
+    maxHeight: 62,
+    marginTop: spacing.md,
+  },
+  topInsightsContent: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  statPill: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minWidth: 120,
+  },
+  statPillPrimary: {
+    backgroundColor: '#E3F6FF',
+    borderColor: '#BFE7FF',
+  },
+  statPillDanger: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FECACA',
+  },
+  statPillNeutral: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  statPillSuccess: {
+    backgroundColor: '#D1FAE5',
+    borderColor: '#A7F3D0',
+  },
+  statPillNumber: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  statPillLabel: {
+    ...typography.caption,
+    color: colors.text,
+    opacity: 0.8,
+    marginTop: 2,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  leadsSection: {
+    backgroundColor: colors.surface,
+    marginTop: spacing.md,
+    marginHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  leadsHeader: {
+    marginBottom: spacing.sm,
+  },
+  leadsTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontWeight: '800',
+  },
+  leadsSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  leadsEmpty: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  leadsEmptyText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  leadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  leadRowLeft: {
+    flex: 1,
+    paddingRight: spacing.md,
+  },
+  leadBuyer: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  leadMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  leadTime: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   searchInputContainer: {
     flex: 1,

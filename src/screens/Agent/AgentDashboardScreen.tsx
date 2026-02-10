@@ -720,6 +720,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         <AgentHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -741,6 +742,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         <AgentHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -773,6 +775,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
       <AgentHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
         onLogoutPress={async () => {
           await logout();
         }}

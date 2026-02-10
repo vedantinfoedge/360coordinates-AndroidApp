@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  SectionList,
   TouchableOpacity,
   Image,
   ActivityIndicator,
@@ -312,6 +312,7 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
         <BuilderHeader
           onProfilePress={() => navigation.navigate('Profile' as never)}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={logout}
         />
         <View style={styles.loadingContainer}>
@@ -327,31 +328,60 @@ const BuilderPropertiesScreen: React.FC<Props> = ({navigation}) => {
       <BuilderHeader
         onProfilePress={() => navigation.navigate('Profile' as never)}
         onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
         onLogoutPress={logout}
       />
-      <FlatList
-        data={properties}
+      <SectionList
+        sections={[
+          {
+            title: 'Properties',
+            icon: '🏠',
+            data: properties.filter(p => p.project_type !== 'upcoming'),
+          },
+          {
+            title: 'Projects',
+            icon: '🏗️',
+            data: properties.filter(p => p.project_type === 'upcoming'),
+          },
+        ].filter(s => s.data.length > 0)}
         renderItem={renderProperty}
         keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        renderSectionHeader={({section}) => (
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderLeft}>
+              <Text style={styles.sectionHeaderIcon}>{(section as any).icon}</Text>
+              <Text style={styles.sectionHeaderTitle}>{section.title}</Text>
+              <View style={styles.sectionCountBadge}>
+                <Text style={styles.sectionCountText}>{section.data.length}</Text>
+              </View>
+            </View>
+          </View>
+        )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🏗️</Text>
-            <Text style={styles.emptyText}>No projects yet</Text>
+            <Text style={styles.emptyIcon}>🏠</Text>
+            <Text style={styles.emptyText}>No listings yet</Text>
             <Text style={styles.emptySubtext}>
-              Your construction projects will appear here
+              Add your first property or upcoming project to get started
             </Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}>
-              <Text style={styles.addButtonText}>Add Your First Project</Text>
-            </TouchableOpacity>
+            <View style={styles.emptyButtonsRow}>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}>
+                <Text style={styles.addButtonText}>+ Add Property</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => navigation.getParent()?.navigate('AddProject' as never)}>
+                <Text style={styles.addButtonText}>+ Add Project</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         }
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
       />
       {/* Floating Action Button - Always visible when there are properties */}
       {properties.length > 0 && (
@@ -384,6 +414,44 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: spacing.md,
+  },
+  sectionHeader: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sectionHeaderIcon: {
+    fontSize: 18,
+  },
+  sectionHeaderTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  sectionCountBadge: {
+    backgroundColor: '#E3F6FF',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  sectionCountText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  emptyButtonsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   propertyCard: {
     backgroundColor: colors.surface,

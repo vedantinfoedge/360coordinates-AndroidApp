@@ -718,6 +718,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
         <BuilderHeader
           onProfilePress={() => navigation.navigate('Profile' as never)}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -750,6 +751,7 @@ const BuilderDashboardScreen: React.FC<Props> = ({navigation}) => {
       <BuilderHeader
         onProfilePress={() => navigation.navigate('Profile' as never)}
         onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
         onLogoutPress={async () => {
           await logout();
         }}

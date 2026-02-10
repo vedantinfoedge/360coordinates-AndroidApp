@@ -322,12 +322,26 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
       .slice(0, 2);
   };
 
+  const memberSinceText = (() => {
+    const raw = (user as any)?.created_at || (user as any)?.createdAt || null;
+    if (!raw) return null;
+    const parsed =
+      typeof raw === 'string'
+        ? (formatters.parseMySQLDateTime(raw) || new Date(raw))
+        : raw instanceof Date
+          ? raw
+          : null;
+    if (!parsed || isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleDateString('en-IN', {month: 'short', year: 'numeric'});
+  })();
+
   if (loading) {
     return (
       <View style={styles.container}>
         <AgentHeader
           onProfilePress={() => {}}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={handleLogout}
         />
         <View style={styles.loadingContainer}>
@@ -376,6 +390,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
       <AgentHeader
         onProfilePress={() => {}}
         onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
+        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
         onLogoutPress={handleLogout}
         scrollY={scrollY}
       />
@@ -404,6 +419,9 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
           </View>
           <Text style={styles.profileName}>{formData.full_name || 'Agent'}</Text>
           <Text style={styles.profileRole}>Agent</Text>
+          {memberSinceText && (
+            <Text style={styles.memberSince}>Member since {memberSinceText}</Text>
+          )}
         </View>
 
         {/* Profile Information Section */}
@@ -596,6 +614,16 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={() => navigation.getParent()?.navigate('Subscription' as never)}>
+            <Text style={styles.menuIcon}>💎</Text>
+            <Text style={styles.menuText}>Subscription</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+
+          <TouchableOpacity
+            style={styles.menuItem}
             onPress={() => navigation.getParent()?.navigate('Support' as never)}>
             <Text style={styles.menuIcon}>🆘</Text>
             <Text style={styles.menuText}>Support</Text>
@@ -748,6 +776,11 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.primaryDark,
     fontWeight: '600',
+  },
+  memberSince: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   section: {
     marginBottom: spacing.xl,

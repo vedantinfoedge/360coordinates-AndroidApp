@@ -138,6 +138,7 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
         onSupportPress={() => {
           // Already on support page
         }}
+        onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
         onLogoutPress={logout}
         scrollY={scrollY}
       />

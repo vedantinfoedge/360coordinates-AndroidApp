@@ -7,11 +7,13 @@ import AddPropertyScreen from '../screens/Builder/AddPropertyScreen';
 import AddProjectScreen from '../screens/Builder/AddProjectScreen';
 import EditPropertyScreen from '../screens/Builder/EditPropertyScreen';
 import BuilderSupportScreen from '../screens/Builder/BuilderSupportScreen';
+import SubscriptionScreen from '../screens/Builder/SubscriptionScreen';
 
 export type BuilderStackParamList = {
   BuilderTabs: undefined;
   Inquiries: undefined;
   PropertyDetails: {propertyId: string};
+  Subscription: undefined;
   AddProperty: undefined;
   AddProject: undefined;
   EditProperty: {propertyId: string | number};
@@ -28,6 +30,7 @@ const BuilderNavigator = () => {
       <Stack.Screen name="BuilderTabs" component={BuilderTabNavigator} />
       <Stack.Screen name="Inquiries" component={BuilderInquiriesScreen} />
       <Stack.Screen name="PropertyDetails" component={BuilderPropertyDetailsScreen} />
+      <Stack.Screen name="Subscription" component={SubscriptionScreen} />
       <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
       <Stack.Screen name="AddProject" component={AddProjectScreen} />
       <Stack.Screen name="EditProperty" component={EditPropertyScreen} />
