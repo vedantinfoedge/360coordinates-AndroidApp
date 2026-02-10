@@ -425,6 +425,16 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       };
       
       await addViewedProperty(viewedProperty);
+      // Sync to backend so history matches website / other devices (buyer-only)
+      if (user?.user_type === 'buyer') {
+        try {
+          const historyAction = action === 'chat' ? 'chat_with_owner' : 'viewed_owner_details';
+          await buyerService.addHistory(propId, historyAction);
+          console.log('[PropertyDetails] History synced to backend:', propId, historyAction);
+        } catch (err) {
+          console.warn('[PropertyDetails] Backend history sync failed (local saved):', err);
+        }
+      }
       console.log('[PropertyDetails] Property unlocked and saved to history:', propId);
     } catch (error) {
       console.error('[PropertyDetails] Error unlocking property:', error);

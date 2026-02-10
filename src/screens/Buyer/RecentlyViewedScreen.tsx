@@ -20,6 +20,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
+import {buyerService} from '../../services/buyer.service';
 import {
   getViewedProperties,
   ViewedProperty,
@@ -61,16 +62,48 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
     ]).start();
   }, []);
 
-  // Load viewed properties when screen comes into focus
+  // Load viewed properties when screen comes into focus (backend when buyer, else local)
   useFocusEffect(
     useCallback(() => {
       loadViewedProperties();
-    }, [])
+    }, [user?.user_type])
   );
 
   const loadViewedProperties = async () => {
     try {
       setLoading(true);
+      // Sync with backend when logged in as buyer so list matches website
+      if (user?.user_type === 'buyer') {
+        try {
+          const res = await buyerService.getHistory({ limit: 50 }) as any;
+          const raw = res?.data?.history ?? res?.data?.list ?? res?.data ?? (Array.isArray(res) ? res : []);
+          const list = Array.isArray(raw) ? raw : [];
+          const mapped: ViewedProperty[] = list.map((item: any) => {
+            const prop = item?.property ?? item;
+            const seller = item?.seller ?? prop?.seller;
+            const actionType = item?.action_type || item?.actionType || '';
+            const action: 'chat' | 'contact' | 'both' =
+              actionType === 'chat_with_owner' ? 'chat' :
+              actionType === 'viewed_owner_details' ? 'contact' : 'both';
+            const price = prop?.price != null ? parseFloat(prop.price) : null;
+            return {
+              propertyId: item?.property_id ?? item?.propertyId ?? prop?.id ?? '',
+              propertyTitle: prop?.title ?? prop?.property_title ?? 'Property',
+              propertyLocation: prop?.location ?? prop?.city ?? '',
+              propertyPrice: price != null ? `₹${price.toLocaleString('en-IN')}` : '',
+              ownerName: seller?.name ?? seller?.full_name ?? 'Owner',
+              ownerPhone: seller?.phone ?? '',
+              ownerEmail: seller?.email ?? '',
+              viewedAt: item?.created_at ?? item?.viewedAt ?? new Date().toISOString(),
+              action,
+            };
+          });
+          setViewedProperties(mapped);
+          return;
+        } catch (err) {
+          console.warn('[RecentlyViewed] Backend history failed, using local:', err);
+        }
+      }
       const properties = await getViewedProperties();
       setViewedProperties(properties);
     } catch (error) {
