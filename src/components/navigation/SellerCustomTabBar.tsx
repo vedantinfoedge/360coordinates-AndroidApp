@@ -7,11 +7,13 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {BottomTabBarProps} from '@react-navigation/bottom-tabs';
-import {CommonActions} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography} from '../../theme';
 import {moderateScale, scale} from '../../utils/responsive';
+import CustomAlert from '../../utils/alertHelper';
+import {useAuth} from '../../context/AuthContext';
 import {TabIcon} from './TabIcons';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
@@ -36,13 +38,9 @@ const SELLER_TAB_CONFIG = [
 
 export default function SellerCustomTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const {switchRole} = useAuth();
   const fabCooldownRef = useRef(false);
   const barHeight = TAB_BAR_HEIGHT + insets.bottom;
-
-  const getRootNav = useCallback(() => {
-    const parent = navigation.getParent();
-    return parent?.getParent() ?? parent ?? undefined;
-  }, [navigation]);
 
   const onFABPress = useCallback(() => {
     if (fabCooldownRef.current) return;
@@ -51,11 +49,21 @@ export default function SellerCustomTabBar({state, descriptors, navigation}: Bot
       fabCooldownRef.current = false;
     }, FAB_COOLDOWN_MS);
 
-    const root = getRootNav();
-    if (root) {
-      root.dispatch(CommonActions.navigate({name: 'Buyer'}));
-    }
-  }, [getRootNav]);
+    (async () => {
+      try {
+        await AsyncStorage.setItem('@target_dashboard', 'buyer');
+        await AsyncStorage.setItem('@user_dashboard_preference', 'buyer');
+        await switchRole('buyer');
+        // No manual reset - AppNavigator useEffect reacts to user change and navigates to MainTabs
+      } catch (error: any) {
+        console.error('[SellerCustomTabBar] Error switching to buyer:', error);
+        CustomAlert.alert(
+          'Switch Failed',
+          error?.message || 'Could not switch to Buyer dashboard. Please try again.',
+        );
+      }
+    })();
+  }, [switchRole]);
 
   return (
     <View style={[styles.wrapper, {height: barHeight, paddingBottom: insets.bottom}]}>

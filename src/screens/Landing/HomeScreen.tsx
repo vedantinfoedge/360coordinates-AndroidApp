@@ -205,7 +205,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
           const pt = (p.property_type || p.type || '').toLowerCase();
           const isPG = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
           const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
-          return isPG && forBachelors;
+          return isPG || forBachelors;
         });
         setProperties(filteredProperties);
       } else {
