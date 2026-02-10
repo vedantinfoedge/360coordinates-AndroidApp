@@ -23,17 +23,20 @@ import PropertyCard from '../../components/PropertyCard';
 import BuyerHeader from '../../components/BuyerHeader';
 import {useAuth} from '../../context/AuthContext';
 import {propertyTypes, pgHostelType, ListingType, PropertyType} from '../../data/propertyTypes';
+import {
+  getBudgetSetFor,
+  getBudgetOptions,
+  getMaxSliderForSet,
+  getBudgetUnitsForSelection,
+  findBudgetLabelForRange,
+  findBudgetRangeByLabel,
+  type BudgetSetType,
+} from '../../data/priceRanges';
 import {propertyService} from '../../services/property.service';
 import {propertySearchService} from '../../services/propertySearch.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
-import {
-  findBudgetLabelForRange,
-  findBudgetRangeByLabel,
-  getBudgetRangesForSelection,
-  getBudgetUnitsForSelection,
-} from '../../data/priceRanges';
 
 type SearchResultsScreenNavigationProp = NativeStackNavigationProp<SearchStackParamList, 'SearchResults'>;
 
@@ -118,7 +121,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [selectedPropertyType, setSelectedPropertyType] = useState<string>(initialPropertyType || 'all');
   const [location, setLocation] = useState<string>(initialLocation);
   const [budget, setBudget] = useState<string>(initialBudget);
-  // Budget slider values (in base units: Lakhs for buy, thousands for rent)
+  // Budget range values (from dropdown/chip selection; Lakhs for buy, thousands for rent)
   const [minBudget, setMinBudget] = useState<number>(0);
   const [maxBudget, setMaxBudget] = useState<number>(1000); // Set when user picks a preset
   // Bedrooms: '' = Any, '1 BHK', '2 BHK', '3 BHK', '4 BHK', '5+ BHK' (PG also has '1RK')
@@ -193,29 +196,23 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
            selectedPropertyType.includes('Industrial Property');
   }, [selectedPropertyType]);
 
-  const hideLowestRentBucket = listingType === 'rent' || listingType === 'pg-hostel';
+  // Active budget set from price-range-by-property-and-listing-type.md
+  const activeBudgetSet = useMemo(
+    (): BudgetSetType => getBudgetSetFor(listingType, selectedPropertyType),
+    [listingType, selectedPropertyType],
+  );
 
-  const budgetRanges = useMemo(() => {
-    return getBudgetRangesForSelection({
-      listingType,
-      propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
-      excludeLowestRentOption: hideLowestRentBucket,
-    });
-  }, [listingType, selectedPropertyType, hideLowestRentBucket]);
+  // Get appropriate max budget from active budget set
+  const maxBudgetForType = useMemo(
+    () => getMaxSliderForSet(activeBudgetSet),
+    [activeBudgetSet],
+  );
 
-  const budgetUnits = useMemo(() => {
-    return getBudgetUnitsForSelection(
-      listingType,
-      selectedPropertyType === 'all' ? undefined : selectedPropertyType,
-    );
-  }, [listingType, selectedPropertyType]);
-
-  // Get max budget from selected range set (memoized)
-  const maxBudgetForType = useMemo(() => {
-    const highestRange = budgetRanges[budgetRanges.length - 1];
-    if (!highestRange) return 500;
-    return highestRange.max ?? highestRange.min;
-  }, [budgetRanges]);
+  // Budget units for display formatting
+  const budgetUnits = useMemo(
+    () => getBudgetUnitsForSelection(listingType, selectedPropertyType === 'all' ? '' : selectedPropertyType),
+    [listingType, selectedPropertyType],
+  );
 
   // Update status when listingType changes - ensure rent filter is applied
   useEffect(() => {
@@ -383,7 +380,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
           min: minBudget,
           max: maxBudget,
-          excludeLowestRentOption: hideLowestRentBucket,
+          excludeLowestRentOption: listingType === 'rent' || listingType === 'pg-hostel',
         });
       const hasBudgetFilter = !(minBudget === 0 && maxBudget === maxBudgetForType);
       if (hasBudgetFilter) {
@@ -553,13 +550,13 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     } finally {
       setLoading(false);
     }
-  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, status, initialLocation, minBudget, maxBudget, maxBudgetForType, hideLowestRentBucket, isBedroomBased, isAreaBased, isLandProperty, projectTypeFilter]);
+  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, status, initialLocation, minBudget, maxBudget, maxBudgetForType, isBedroomBased, isAreaBased, isLandProperty, projectTypeFilter]);
 
   // Track if this is the first render to skip initial search trigger
   const isFirstRender = React.useRef(true);
 
   // Trigger search when location or filters change (debounced)
-  // Note: minBudget and maxBudget are excluded to prevent search during slider drag
+  // Note: minBudget and maxBudget are excluded to avoid search during rapid filter changes
   // Note: searchText is excluded to prevent searches while typing (only location triggers searches)
   useEffect(() => {
     // Skip initial mount - it's handled by the mount useEffect
@@ -597,13 +594,13 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       listingType,
       propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
       label: budget,
-      excludeLowestRentOption: hideLowestRentBucket,
+      excludeLowestRentOption: listingType === 'rent' || listingType === 'pg-hostel',
     });
     if (!matchedRange) return;
 
     setMinBudget(matchedRange.min);
-    setMaxBudget(matchedRange.max ?? matchedRange.min);
-  }, [budget, listingType, selectedPropertyType, hideLowestRentBucket]);
+    setMaxBudget(matchedRange.max);
+  }, [budget, listingType, selectedPropertyType]);
 
   // Load initial properties on mount
   useEffect(() => {
@@ -967,7 +964,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                     propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
                     min: minBudget,
                     max: maxBudget,
-                    excludeLowestRentOption: hideLowestRentBucket,
+                    excludeLowestRentOption: listingType === 'rent' || listingType === 'pg-hostel',
                   }) ||
                   `${formatBudgetDisplay(minBudget)}-${formatBudgetDisplay(maxBudget)}`}
             </Text>
@@ -1018,18 +1015,22 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
               )}
               {openDropdown === 'budget' && (
                 <>
-                  {[{label: 'Any', min: 0, max: maxBudgetForType}, ...budgetRanges.map(range => ({
-                    label: range.label,
-                    min: range.min,
-                    max: range.max ?? maxBudgetForType,
-                  }))].map(({label, min, max}) => (
+                  {[
+                    { label: 'Any', min: 0, max: maxBudgetForType, budgetLabel: '' },
+                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent').map((opt) => ({
+                      label: opt.label,
+                      min: opt.min,
+                      max: opt.max,
+                      budgetLabel: opt.label,
+                    })),
+                  ].map(({ label, min, max, budgetLabel }) => (
                     <TouchableOpacity
                       key={label}
                       style={[styles.dropdownOption, minBudget === min && maxBudget === max && styles.dropdownOptionActive]}
                       onPress={() => {
                         setMinBudget(min);
                         setMaxBudget(max);
-                        setBudget(label === 'Any' ? '' : label);
+                        setBudget(budgetLabel);
                         setOpenDropdown(null);
                         setTimeout(() => loadProperties(), 150);
                       }}>
@@ -1176,15 +1177,19 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 </View>
               </View>
 
-              {/* Budget Range - preset options only */}
+              {/* Budget Range - preset options only (no slider) */}
               <View style={styles.filterSection}>
                 <Text style={styles.filterLabel}>Budget Range</Text>
                 <View style={styles.filterOptions}>
-                  {[{label: 'Any', min: 0, max: maxBudgetForType}, ...budgetRanges.map(r => ({
-                    label: r.label,
-                    min: r.min,
-                    max: r.max ?? maxBudgetForType,
-                  }))].map(({label, min, max}) => {
+                  {[
+                    { label: 'Any', min: 0, max: maxBudgetForType, budgetLabel: '' },
+                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent').map((opt) => ({
+                      label: opt.label,
+                      min: opt.min,
+                      max: opt.max,
+                      budgetLabel: opt.label,
+                    })),
+                  ].map(({ label, min, max, budgetLabel }) => {
                     const isActive = minBudget === min && maxBudget === max;
                     return (
                       <TouchableOpacity
@@ -1193,7 +1198,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                         onPress={() => {
                           setMinBudget(min);
                           setMaxBudget(max);
-                          setBudget(label === 'Any' ? '' : label);
+                          setBudget(budgetLabel);
                         }}>
                         <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
                           {label}
