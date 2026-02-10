@@ -453,7 +453,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
   const switchUserRole = async (targetRole: 'buyer' | 'seller') => {
     try {
-      console.log('[AuthContext] switchUserRole →', targetRole);
+      const activeRole = user?.user_type ?? 'none';
+      console.log('[DEBUG RoleSwitch] 1. BEFORE updating role → targetRole:', targetRole, 'activeRole:', activeRole, 'userId:', user?.id);
 
       if (!user) {
         throw new Error('You must be logged in to switch dashboards.');
@@ -504,19 +505,22 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
         registered_role: registeredRole,
       };
 
+      console.log('[DEBUG RoleSwitch] 2. BEFORE AsyncStorage - nextUser.user_type:', nextUser.user_type);
+
       // Persist first so AppNavigator reads correct preference when it reacts to user change
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
       await AsyncStorage.setItem('@target_dashboard', targetRole);
       await AsyncStorage.setItem('@user_dashboard_preference', targetRole);
 
+      const storedPref = await AsyncStorage.getItem('@user_dashboard_preference');
+      const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
+      const tokenMasked = token ? (token.length > 14 ? `${token.slice(0, 10)}...${token.slice(-4)}` : '***') : 'null';
+      console.log('[DEBUG RoleSwitch] 3. AFTER AsyncStorage - stored preference:', storedPref, 'token (masked):', tokenMasked);
+
+      console.log('[DEBUG RoleSwitch] 4. BEFORE setUser (navigation reset will follow)');
       // Update global role state; AppNavigator useEffect will then navigate to the correct dashboard
       setUser(nextUser);
-      console.log(
-        '[AuthContext] Role switch completed. registered_role:',
-        registeredRole,
-        'active user_type:',
-        targetRole,
-      );
+      console.log('[DEBUG RoleSwitch] 5. AFTER setUser - role switch complete. user_type:', targetRole);
     } catch (error: any) {
       console.error('[AuthContext] Error in switchUserRole:', error);
       throw error;

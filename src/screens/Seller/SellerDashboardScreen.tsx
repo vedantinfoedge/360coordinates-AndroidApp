@@ -28,6 +28,7 @@ import {sellerService, DashboardStats} from '../../services/seller.service';
 import CustomAlert from '../../utils/alertHelper';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
+import {DEBUG_SELLER_CRASH} from '../../config/debugCrash';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -414,6 +415,19 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const statsAnim = useRef(new Animated.Value(0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    console.log('[DEBUG RoleSwitch] 12. SellerDashboardScreen MOUNTED - user:', !!user, 'user_type:', user?.user_type, 'DEBUG_SELLER_CRASH:', DEBUG_SELLER_CRASH);
+  }, [user?.user_type]);
+
+  // DEBUG: Static placeholder when isolating crash (no API, no SellerHeader, minimal hooks already run above)
+  if (DEBUG_SELLER_CRASH) {
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface}}>
+        <Text style={{fontSize: 16, color: colors.textSecondary}}>Seller Dashboard placeholder (APIs disabled)</Text>
+      </View>
+    );
+  }
 
   useEffect(() => {
     // Only run entrance animations once

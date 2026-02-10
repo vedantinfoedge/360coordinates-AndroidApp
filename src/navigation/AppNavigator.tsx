@@ -57,7 +57,7 @@ const AppNavigator = () => {
                 // Use targetDashboard if available (immediate), otherwise use persistent preference
                 const dashboard = targetDashboard || dashboardPreference;
                 console.log(
-                  '[AppNavigator] Checking dashboard - targetDashboard:',
+                  '[DEBUG RoleSwitch] 6. AppNavigator effect - targetDashboard:',
                   targetDashboard,
                   'preference:',
                   dashboardPreference,
@@ -68,7 +68,7 @@ const AppNavigator = () => {
                 );
                 
                 if (dashboard) {
-                  console.log('[AppNavigator] User authenticated with dashboard:', dashboard);
+                  console.log('[DEBUG RoleSwitch] 7. AppNavigator - dashboard selected:', dashboard);
                   // STRICT: Agent/Builder accounts must always land on Agent dashboard (never Buyer/Seller)
                   if (accountRole === 'agent' || accountRole === 'builder') {
                     console.log('[AppNavigator] 🔒 Restricted account detected; forcing Agent/Builder dashboard');
@@ -92,11 +92,12 @@ const AppNavigator = () => {
                       routes: [{name: 'Agent'}],
                     });
                   } else if (dashboard === 'seller' && user.user_type === 'seller') {
-                    console.log('[AppNavigator] Navigating to Seller dashboard');
+                    console.log('[DEBUG RoleSwitch] 8. BEFORE navigation reset to Seller');
                     navigationRef.current?.reset({
                       index: 0,
                       routes: [{name: 'Seller'}],
                     });
+                    console.log('[DEBUG RoleSwitch] 9. AFTER navigation reset to Seller');
                   } else if (dashboard === 'agent') {
                     console.log('[AppNavigator] Navigating to Agent dashboard');
                     navigationRef.current?.reset({
