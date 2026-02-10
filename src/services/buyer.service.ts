@@ -157,11 +157,34 @@ export const buyerService = {
     return response;
   },
 
-  // Send inquiry
-  sendInquiry: async (propertyId: number | string, message: string) => {
+  // Send inquiry (backend may require name, email, mobile; fetch from profile if not provided)
+  sendInquiry: async (
+    propertyId: number | string,
+    message: string,
+    options?: { name?: string; email?: string; mobile?: string },
+  ) => {
+    let name = options?.name;
+    let email = options?.email;
+    let mobile = options?.mobile;
+    if (name === undefined || email === undefined || mobile === undefined) {
+      try {
+        const profileRes = await buyerService.getProfile();
+        const profile = profileRes?.data?.profile;
+        if (profile) {
+          if (name === undefined) name = profile.full_name || profile.first_name || '';
+          if (email === undefined) email = profile.email || '';
+          if (mobile === undefined) mobile = profile.phone || profile.whatsapp_number || '';
+        }
+      } catch (_) {
+        // use empty strings if profile fetch fails
+      }
+    }
     const response = await api.post(API_ENDPOINTS.BUYER_INQUIRY_SEND, {
       property_id: propertyId,
       message,
+      name: name ?? '',
+      email: email ?? '',
+      mobile: mobile ?? '',
     });
     return response;
   },
@@ -172,14 +195,14 @@ export const buyerService = {
     return response;
   },
 
-  // Update buyer profile
+  // Update buyer profile (backend expects PUT per API spec)
   updateProfile: async (profileData: {
     full_name?: string;
     address?: string;
     whatsapp_number?: string;
     alternate_mobile?: string;
   }) => {
-    const response = await api.post(API_ENDPOINTS.BUYER_PROFILE_UPDATE, profileData);
+    const response = await api.put(API_ENDPOINTS.BUYER_PROFILE_UPDATE, profileData);
     return response;
   },
 
