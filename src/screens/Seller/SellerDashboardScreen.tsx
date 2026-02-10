@@ -392,7 +392,7 @@ const AnimatedInquiryCard = React.memo(({
 });
 
 const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, switchRole} = useAuth();
+  const {user, logout, switchUserRole} = useAuth();
   const [switchingRole, setSwitchingRole] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [allProperties, setAllProperties] = useState<any[]>([]);
@@ -987,13 +987,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           
           try {
             setSwitchingRole(true);
-            await switchRole('buyer');
-            
-            // Navigate to Buyer dashboard after successful role switch
-            (navigation as any).reset({
-              index: 0,
-              routes: [{name: 'MainTabs'}],
-            });
+            await switchUserRole('buyer');
           } catch (error: any) {
             console.error('[SellerDashboard] Error switching role:', error);
             CustomAlert.alert(

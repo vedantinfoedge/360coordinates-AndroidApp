@@ -8,7 +8,6 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {BottomTabBarProps} from '@react-navigation/bottom-tabs';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useArcFAB} from '../../context/ArcFABContext';
@@ -57,7 +56,7 @@ const TAB_CONFIG = [
 
 export default function BuyerCustomTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const {isAuthenticated, switchRole} = useAuth();
+  const {isAuthenticated, switchUserRole} = useAuth();
   const unreadCount = useUnreadChatCount();
   const {openMenu, closeMenu, isMenuOpen, setOnRoleSelect} = useArcFAB();
   const fabRef = useRef<MeasurableView | null>(null);
@@ -116,11 +115,9 @@ export default function BuyerCustomTabBar({state, descriptors, navigation}: Bott
 
       (async () => {
         try {
-          // Set dashboard preference first - AppNavigator will handle navigation when user state updates
-          await AsyncStorage.setItem('@target_dashboard', 'seller');
-          await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
-          await switchRole('seller');
-          // No manual reset - AppNavigator useEffect reacts to user change and navigates to Seller
+          // Switch role first: updates global role state + persists @target_dashboard & @user_dashboard_preference.
+          // AppNavigator reacts to user change and navigates to Seller with correct Seller UI/headers/profile.
+          await switchUserRole('seller');
         } catch (error: any) {
           console.error('[BuyerCustomTabBar] Error switching to seller:', error);
           CustomAlert.alert(
@@ -137,7 +134,7 @@ export default function BuyerCustomTabBar({state, descriptors, navigation}: Bott
     setTimeout(() => {
       isAnimating.current = false;
     }, 400);
-  }, [isAuthenticated, isMenuOpen, closeMenu, measureFAB, switchRole]);
+  }, [isAuthenticated, isMenuOpen, closeMenu, measureFAB, switchUserRole]);
 
   return (
     <View style={[styles.wrapper, {height: barHeight, paddingBottom: insets.bottom}]}>

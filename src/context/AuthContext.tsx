@@ -2,16 +2,18 @@ import React, {createContext, useState, useEffect, useContext} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {authService} from '../services/auth.service';
 
-export type UserRole = 'buyer' | 'seller' | 'agent';
+export type UserRole = 'buyer' | 'seller' | 'agent' | 'builder' | 'admin';
 
 export interface User {
   id: number;
   full_name: string;
   email: string;
   phone?: string;
-  user_type: UserRole;
+  user_type: UserRole; // active dashboard role
   profile_image?: string;
   address?: string;
+  // Canonical account role from backend (does not change when switching buyer/seller dashboards)
+  registered_role?: UserRole;
 }
 
 interface AuthContextType {
@@ -33,7 +35,10 @@ interface AuthContextType {
   verifyOTP: (userId: number, otp: string) => Promise<void>;
   resendOTP: (userId: number) => Promise<void>;
   logout: () => Promise<void>;
+  // Legacy API (kept for backward compatibility). Internally delegates to switchUserRole.
   switchRole: (targetRole: 'buyer' | 'seller') => Promise<void>;
+  // New centralized helper that enforces role access rules and updates AsyncStorage + navigation state.
+  switchUserRole: (targetRole: 'buyer' | 'seller') => Promise<void>;
   isAuthenticated: boolean;
   setUser: (user: User | null) => void;
 }
@@ -46,6 +51,25 @@ const TOKEN_STORAGE_KEY = '@auth_token';
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Helper to derive the canonical registered role for access control.
+  const getRegisteredRole = (u: User): UserRole => {
+    const raw =
+      (u as any).registered_role ||
+      (u as any).original_user_type ||
+      u.user_type;
+    const lower = (raw || 'buyer').toString().toLowerCase();
+    if (
+      lower === 'buyer' ||
+      lower === 'seller' ||
+      lower === 'agent' ||
+      lower === 'builder' ||
+      lower === 'admin'
+    ) {
+      return lower as UserRole;
+    }
+    return 'buyer';
+  };
 
   useEffect(() => {
     loadUser();
@@ -71,25 +95,43 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
           const response: any = await authService.getCurrentUser(cachedUserType);
           if (response && response.success && response.data) {
             // Normalize user_type to lowercase
-            const rawUserType = response.data.user_type || response.data.role || response.data.profile?.user_type || '';
+            const rawUserType =
+              response.data.user_type ||
+              response.data.role ||
+              response.data.profile?.user_type ||
+              '';
             const normalizedUserType = rawUserType.toLowerCase() as UserRole;
-            
+            const registeredRole: UserRole =
+              (normalizedUserType as UserRole) || 'buyer';
+
             // Get user data from response (could be in data.user, data.profile, or data directly)
             const userDataFromResponse = response.data.user || response.data.profile || response.data;
             
-            const userObj = {
+            // Active dashboard role starts from registeredRole, then applies last buyer/seller preference if allowed
+            let userType: UserRole = registeredRole;
+            // Apply last dashboard preference so app restart opens correct dashboard with correct role UI
+            const pref = await AsyncStorage.getItem('@user_dashboard_preference');
+            const preferredRole = pref?.toLowerCase().trim();
+            if (
+              (preferredRole === 'buyer' || preferredRole === 'seller') &&
+              (registeredRole === 'buyer' || registeredRole === 'seller')
+            ) {
+              userType = preferredRole as UserRole;
+            }
+            const userObj: User = {
               id: userDataFromResponse.id || userDataFromResponse.user_id,
               full_name: userDataFromResponse.full_name || userDataFromResponse.name || '',
               email: userDataFromResponse.email || '',
               phone: userDataFromResponse.phone || '',
-              user_type: normalizedUserType || 'buyer', // Default to buyer if not found
+              user_type: userType,
               profile_image: userDataFromResponse.profile_image || null,
               address: userDataFromResponse.address || '',
+              registered_role: registeredRole,
             };
             setUser(userObj);
             await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userObj));
           } else if (response && response.status === 404) {
-            // If endpoint doesn't exist (404), use cached user data
+            // If endpoint doesn't exist (404), use cached user data (may include last role from switchRole)
             try {
               const cachedUser = JSON.parse(userData);
               setUser(cachedUser);
@@ -148,23 +190,35 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
           console.log('[AuthContext] Requested userType from login screen:', userType);
           
           // Role access rules (as per website documentation):
-          // - Agent (registered) → Can ONLY login as "agent" (backend returns 403 if they try buyer/seller)
+          // - Agent/Builder/Admin (registered) → Can ONLY login into their own dashboard
           // - Buyer (registered) → Can login as "buyer" OR "seller" (backend allows both)
           // - Seller (registered) → Can login as "buyer" OR "seller" (backend allows both)
           let finalUserType: UserRole;
           
-          // STRICT: if backend says this account is an agent, it can NEVER become buyer/seller in-app.
-          // This prevents agents from "logging in as buyer/seller" via the role selector.
-          if (normalizedUserType === 'agent') {
-            console.log('[AuthContext] 🔒 Backend user_type is agent; forcing final user_type=agent');
-            finalUserType = 'agent';
+          // Determine canonical registered role from backend (does not change when switching dashboards)
+          const registeredRole: UserRole =
+            (normalizedUserType as UserRole) || 'buyer';
+
+          // STRICT: if backend says this account is agent/builder/admin, it can NEVER become buyer/seller in-app.
+          // This prevents restricted accounts from \"logging in as buyer/seller\" via the role selector.
+          if (
+            registeredRole === 'agent' ||
+            registeredRole === 'builder' ||
+            registeredRole === 'admin'
+          ) {
+            console.log('[AuthContext] 🔒 Backend user_type is restricted; forcing final user_type=', registeredRole);
+            finalUserType = registeredRole;
           }
           // ALWAYS prioritize the requested userType from login screen
           // This ensures that when a seller selects "seller" on login, they get seller dashboard
           // Even if backend returns registered type, we use the requested login type
           else if (userType && typeof userType === 'string' && userType.trim() !== '') {
             const loginUserType = userType.toLowerCase().trim() as UserRole;
-            if (loginUserType === 'seller' || loginUserType === 'buyer' || loginUserType === 'agent') {
+            if (
+              loginUserType === 'seller' ||
+              loginUserType === 'buyer' ||
+              loginUserType === 'agent'
+            ) {
               console.log('[AuthContext] ✅ Using requested role from login screen:', loginUserType);
               finalUserType = loginUserType;
             } else {
@@ -174,8 +228,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
             }
           } 
           // Fallback: Use backend response user_type if no userType was provided
-          else if (normalizedUserType &&
-                   (normalizedUserType === 'seller' || normalizedUserType === 'buyer' || normalizedUserType === 'agent')) {
+          else if (
+            normalizedUserType &&
+            (normalizedUserType === 'seller' ||
+              normalizedUserType === 'buyer' ||
+              normalizedUserType === 'agent' ||
+              normalizedUserType === 'builder' ||
+              normalizedUserType === 'admin')
+          ) {
             console.log('[AuthContext] ⚠️ No userType provided, using backend response:', normalizedUserType);
             finalUserType = normalizedUserType;
           } 
@@ -187,7 +247,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
           
           console.log('[AuthContext] 🎯 Final user_type set to:', finalUserType);
           
-          const userObj = {
+          const userObj: User = {
             id: userData.id || userData.user_id,
             full_name: userData.full_name || userData.name || '',
             email: userData.email || '',
@@ -195,6 +255,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
             user_type: finalUserType,
             profile_image: userData.profile_image || null,
             address: userData.address || '',
+            registered_role: registeredRole,
           };
           
           console.log('[AuthContext] Setting user object:', JSON.stringify(userObj, null, 2));
@@ -390,63 +451,56 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     await AsyncStorage.removeItem('@target_dashboard');
   };
 
-  const switchRole = async (targetRole: 'buyer' | 'seller') => {
+  const switchUserRole = async (targetRole: 'buyer' | 'seller') => {
     try {
-      console.log('[AuthContext] Switching role to:', targetRole);
-      
-      // Don't allow agents to switch roles
-      if (user?.user_type === 'agent') {
-        throw new Error('Agents cannot switch roles. You are locked to the Agent/Builder dashboard.');
+      console.log('[AuthContext] switchUserRole →', targetRole);
+
+      if (!user) {
+        throw new Error('You must be logged in to switch dashboards.');
       }
-      
-      // Call the API to switch role
-      const response: any = await authService.switchRole(targetRole);
-      
-      if (response && response.success) {
-        // Extract user data from response
-        const userData = response.data?.user || response.data;
-        
-        if (userData) {
-          // Normalize user_type to lowercase
-          const rawUserType = userData.user_type || userData.role || targetRole;
-          const normalizedUserType = rawUserType.toLowerCase().trim() as UserRole;
-          
-          console.log('[AuthContext] Role switch successful, new user_type:', normalizedUserType);
-          
-          const userObj = {
-            id: userData.id || userData.user_id || user?.id || 0,
-            full_name: userData.full_name || userData.name || user?.full_name || '',
-            email: userData.email || user?.email || '',
-            phone: userData.phone || user?.phone || '',
-            user_type: normalizedUserType,
-            profile_image: userData.profile_image || user?.profile_image || null,
-            address: userData.address || user?.address || '',
-          };
-          
-          // Update user state
-          setUser(userObj);
-          
-          // Update AsyncStorage (token is already updated by authService.switchRole)
-          await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userObj));
-          
-          // Update dashboard preference
-          await AsyncStorage.setItem('@target_dashboard', targetRole);
-          await AsyncStorage.setItem('@user_dashboard_preference', targetRole);
-          
-          console.log('[AuthContext] Role switch completed successfully');
-        } else {
-          throw new Error('Role switch failed: No user data in response');
-        }
-      } else {
-        throw new Error(response?.message || 'Role switch failed');
+
+      const registeredRole = getRegisteredRole(user);
+
+      // Enforce strict access rules based on registered role
+      if (registeredRole === 'agent' || registeredRole === 'builder') {
+        const message =
+          registeredRole === 'agent'
+            ? 'Your account is registered as Agent. Buyer/Seller dashboards are not available.'
+            : 'Your account is registered as Builder. Buyer/Seller dashboards are not available.';
+        throw new Error(message);
       }
+
+      // Only buyer/seller accounts may switch between buyer and seller dashboards
+      if (
+        !(registeredRole === 'buyer' || registeredRole === 'seller') ||
+        !(targetRole === 'buyer' || targetRole === 'seller')
+      ) {
+        throw new Error('You are not allowed to switch to this dashboard with your account.');
+      }
+
+      // Build new user with active role set to targetRole (no new user, no Firebase change)
+      const nextUser: User = {
+        ...user,
+        user_type: targetRole,
+        registered_role: registeredRole,
+      };
+
+      // Persist first so AppNavigator reads correct preference when it reacts to user change
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
+      await AsyncStorage.setItem('@target_dashboard', targetRole);
+      await AsyncStorage.setItem('@user_dashboard_preference', targetRole);
+
+      // Update global role state; AppNavigator useEffect will then navigate to the correct dashboard
+      setUser(nextUser);
+      console.log('[AuthContext] Role switch completed. registered_role:', registeredRole, 'active user_type:', targetRole);
     } catch (error: any) {
-      console.error('[AuthContext] Error switching role:', error);
-      
-      // Re-throw error so caller can handle it
+      console.error('[AuthContext] Error in switchUserRole:', error);
       throw error;
     }
   };
+
+  // Backwards-compatible alias used by older call sites
+  const switchRole = (targetRole: 'buyer' | 'seller') => switchUserRole(targetRole);
 
   return (
     <AuthContext.Provider
@@ -459,6 +513,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
         resendOTP,
         logout,
         switchRole,
+        switchUserRole,
         isAuthenticated: !!user,
         setUser,
       }}>

@@ -7,7 +7,6 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {BottomTabBarProps} from '@react-navigation/bottom-tabs';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography} from '../../theme';
@@ -38,7 +37,7 @@ const SELLER_TAB_CONFIG = [
 
 export default function SellerCustomTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const {switchRole} = useAuth();
+  const {switchUserRole} = useAuth();
   const fabCooldownRef = useRef(false);
   const barHeight = TAB_BAR_HEIGHT + insets.bottom;
 
@@ -51,10 +50,8 @@ export default function SellerCustomTabBar({state, descriptors, navigation}: Bot
 
     (async () => {
       try {
-        await AsyncStorage.setItem('@target_dashboard', 'buyer');
-        await AsyncStorage.setItem('@user_dashboard_preference', 'buyer');
-        await switchRole('buyer');
-        // No manual reset - AppNavigator useEffect reacts to user change and navigates to MainTabs
+        await switchUserRole('buyer');
+        // AppNavigator useEffect reacts to user change and navigates to Buyer/MainTabs
       } catch (error: any) {
         console.error('[SellerCustomTabBar] Error switching to buyer:', error);
         CustomAlert.alert(
@@ -63,7 +60,7 @@ export default function SellerCustomTabBar({state, descriptors, navigation}: Bot
         );
       }
     })();
-  }, [switchRole]);
+  }, [switchUserRole]);
 
   return (
     <View style={[styles.wrapper, {height: barHeight, paddingBottom: insets.bottom}]}>

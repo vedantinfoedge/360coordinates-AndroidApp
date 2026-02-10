@@ -42,6 +42,11 @@ const AppNavigator = () => {
         if (!isLoading && navigationRef.current) {
           // For authenticated users, check for dashboard preference or navigate based on user type
           if (isAuthenticated && user) {
+            const accountRole = (
+              ((user as any).registered_role || user.user_type || '') as string
+            )
+              .toString()
+              .toLowerCase();
             // First check for immediate targetDashboard (from InitialScreen role selection)
             // Then check for persistent dashboard preference (stored until logout)
             Promise.all([
@@ -51,13 +56,22 @@ const AppNavigator = () => {
               .then(([targetDashboard, dashboardPreference]) => {
                 // Use targetDashboard if available (immediate), otherwise use persistent preference
                 const dashboard = targetDashboard || dashboardPreference;
-                console.log('[AppNavigator] Checking dashboard - targetDashboard:', targetDashboard, 'preference:', dashboardPreference, 'user_type:', user.user_type);
+                console.log(
+                  '[AppNavigator] Checking dashboard - targetDashboard:',
+                  targetDashboard,
+                  'preference:',
+                  dashboardPreference,
+                  'user_type:',
+                  user.user_type,
+                  'registered_role:',
+                  (user as any).registered_role,
+                );
                 
                 if (dashboard) {
                   console.log('[AppNavigator] User authenticated with dashboard:', dashboard);
-                  // STRICT: Agents must always land on Agent dashboard (never Buyer/Seller)
-                  if ((user.user_type || '').toLowerCase() === 'agent') {
-                    console.log('[AppNavigator] 🔒 Agent account detected; forcing Agent dashboard');
+                  // STRICT: Agent/Builder accounts must always land on Agent dashboard (never Buyer/Seller)
+                  if (accountRole === 'agent' || accountRole === 'builder') {
+                    console.log('[AppNavigator] 🔒 Restricted account detected; forcing Agent/Builder dashboard');
                     navigationRef.current?.reset({
                       index: 0,
                       routes: [{name: 'Agent'}],
@@ -104,17 +118,28 @@ const AppNavigator = () => {
                     });
                   }
                 } else {
-                  // No dashboard preference, navigate based on user type
-                  console.log('[AppNavigator] No dashboard preference found, navigating based on user_type:', user.user_type);
-                  if (user.user_type === 'seller') {
+                  // No dashboard preference, navigate based on account role / user type
+                  console.log(
+                    '[AppNavigator] No dashboard preference found, navigating based on role:',
+                    'active user_type:',
+                    user.user_type,
+                    'registered_role:',
+                    (user as any).registered_role,
+                  );
+                  if (accountRole === 'seller') {
                     navigationRef.current?.reset({
                       index: 0,
                       routes: [{name: 'Seller'}],
                     });
-                  } else if (user.user_type === 'agent') {
+                  } else if (accountRole === 'agent' || accountRole === 'builder') {
                     navigationRef.current?.reset({
                       index: 0,
                       routes: [{name: 'Agent'}],
+                    });
+                  } else if (accountRole === 'admin') {
+                    navigationRef.current?.reset({
+                      index: 0,
+                      routes: [{name: 'Admin'}],
                     });
                   } else {
                     // Default to MainTabs for buyer
@@ -127,16 +152,21 @@ const AppNavigator = () => {
               })
               .catch(err => {
                 console.error('[AppNavigator] Error reading dashboard preference:', err);
-                // Fallback to user type navigation
-                if (user.user_type === 'seller') {
+                // Fallback to role-based navigation
+                if (accountRole === 'seller') {
                   navigationRef.current?.reset({
                     index: 0,
                     routes: [{name: 'Seller'}],
                   });
-                } else if (user.user_type === 'agent') {
+                } else if (accountRole === 'agent' || accountRole === 'builder') {
                   navigationRef.current?.reset({
                     index: 0,
                     routes: [{name: 'Agent'}],
+                  });
+                } else if (accountRole === 'admin') {
+                  navigationRef.current?.reset({
+                    index: 0,
+                    routes: [{name: 'Admin'}],
                   });
                 } else {
                   navigationRef.current?.reset({

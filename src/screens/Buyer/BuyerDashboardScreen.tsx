@@ -61,7 +61,7 @@ const TOP_CITIES: TopCity[] = [
 type ListingType = 'sale' | 'rent' | 'pg';
 
 const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, isAuthenticated, switchRole} = useAuth();
+  const {user, logout, isAuthenticated, switchUserRole} = useAuth();
   const [switchingRole, setSwitchingRole] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
@@ -533,10 +533,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             if (switchingRole) return; // Prevent multiple clicks
             try {
               setSwitchingRole(true);
-              await AsyncStorage.setItem('@target_dashboard', 'seller');
-              await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
-              await switchRole('seller');
-              // No manual reset - AppNavigator useEffect reacts to user change and navigates to Seller
+              await switchUserRole('seller');
             } catch (error: any) {
               console.error('[BuyerDashboard] Error switching role:', error);
               CustomAlert.alert(
