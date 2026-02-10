@@ -407,13 +407,14 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleCityPress = (cityName: string) => {
-    // Navigate to SearchResults with city name as both location and city params
-    // This ensures proper filtering by city
+    // Navigate to SearchResults with city name and current listing type
     navigation.navigate('SearchResults', {
       query: cityName,
       location: cityName,
       city: cityName,
       searchQuery: cityName,
+      listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent',
+      status: listingType === 'sale' ? 'sale' : 'rent',
     } as never);
   };
 

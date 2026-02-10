@@ -285,7 +285,13 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   const handleCityPress = (cityName: string) => {
     navigation.navigate('Search' as never, {
       screen: 'SearchResults',
-      params: {location: cityName},
+      params: {
+        location: cityName,
+        query: cityName,
+        searchQuery: cityName,
+        listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent',
+        status: listingType === 'sale' ? 'sale' : 'rent',
+      },
     } as never);
   };
 
