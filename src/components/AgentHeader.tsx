@@ -19,6 +19,7 @@ const HEADER_HEIGHT = verticalScale(64);
 interface AgentHeaderProps {
   onProfilePress?: () => void;
   onSupportPress?: () => void;
+  onSubscriptionPress?: () => void;
   onLogoutPress?: () => void;
   subscriptionDays?: number;
   scrollY?: InstanceType<typeof Animated.Value>; // For hide/show on scroll
@@ -27,6 +28,7 @@ interface AgentHeaderProps {
 const AgentHeader: React.FC<AgentHeaderProps> = ({
   onProfilePress,
   onSupportPress,
+  onSubscriptionPress,
   onLogoutPress,
   subscriptionDays,
   scrollY,
@@ -113,31 +115,34 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
           />
         </TouchableOpacity>
 
-        {/* Free Trial Badge - Now properly positioned inside header */}
-        {subscriptionDays !== undefined && subscriptionDays > 0 && (
-          <Animated.View
-            style={[
-              styles.trialBadge,
-              subscriptionDays <= 7 && styles.trialBadgeUrgent,
-              subscriptionDays <= 7 && {transform: [{scale: pulseAnim}]},
-            ]}>
-            <Text style={styles.trialBadgeText}>
-              {subscriptionDays} {subscriptionDays === 1 ? 'day' : 'days'} left
-            </Text>
-          </Animated.View>
-        )}
+        {/* Right Side Items */}
+        <View style={styles.rightItems}>
+          {/* Free Trial Badge */}
+          {subscriptionDays !== undefined && subscriptionDays > 0 && (
+            <Animated.View
+              style={[
+                styles.trialBadge,
+                subscriptionDays <= 7 && styles.trialBadgeUrgent,
+                subscriptionDays <= 7 && {transform: [{scale: pulseAnim}]},
+              ]}>
+              <Text style={styles.trialBadgeText}>
+                {subscriptionDays} {subscriptionDays === 1 ? 'day' : 'days'} left
+              </Text>
+            </Animated.View>
+          )}
 
-        {/* Hamburger Menu */}
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => setMenuVisible(true)}
-          activeOpacity={0.7}>
-          <View style={styles.hamburger}>
-            <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
-            <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
-            <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
-          </View>
-        </TouchableOpacity>
+          {/* Hamburger Menu */}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setMenuVisible(true)}
+            activeOpacity={0.7}>
+            <View style={styles.hamburger}>
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* Dropdown Menu Modal */}
         <Modal
@@ -173,6 +178,16 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
                 }}>
                 <Text style={styles.menuItemIcon}>💬</Text>
                 <Text style={styles.menuItemText}>Support</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  setTimeout(() => onSubscriptionPress?.(), 100);
+                }}>
+                <Text style={styles.menuItemIcon}>💎</Text>
+                <Text style={styles.menuItemText}>Subscription</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
               <TouchableOpacity
@@ -232,11 +247,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    marginLeft: -spacing.md,
+    marginLeft: 0,
   },
   logoImage: {
     width: 220,
     height: 66,
+  },
+  rightItems: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
   },
   menuButton: {
     padding: spacing.sm,
@@ -306,7 +327,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 5,
     borderRadius: 20,
-    marginRight: spacing.md,
   },
   trialBadgeUrgent: {
     backgroundColor: '#EF4444',

@@ -14,6 +14,7 @@ import {colors, spacing, typography, borderRadius} from '../theme';
 interface BuilderHeaderProps {
   onProfilePress?: () => void;
   onSupportPress?: () => void;
+  onSubscriptionPress?: () => void;
   onLogoutPress?: () => void;
   subscriptionDays?: number;
 }
@@ -21,6 +22,7 @@ interface BuilderHeaderProps {
 const BuilderHeader: React.FC<BuilderHeaderProps> = ({
   onProfilePress,
   onSupportPress,
+  onSubscriptionPress,
   onLogoutPress,
   subscriptionDays,
 }) => {
@@ -43,29 +45,32 @@ const BuilderHeader: React.FC<BuilderHeaderProps> = ({
           />
         </TouchableOpacity>
 
-        {/* Free Trial Badge */}
-        {subscriptionDays !== undefined && subscriptionDays > 0 && (
-          <View
-            style={[
-              styles.trialBadge,
-              subscriptionDays <= 7 && styles.trialBadgeUrgent,
-            ]}>
-            <Text style={styles.trialBadgeText}>
-              {subscriptionDays} {subscriptionDays === 1 ? 'day' : 'days'} left
-            </Text>
-          </View>
-        )}
+        {/* Right Side Items */}
+        <View style={styles.rightItems}>
+          {/* Free Trial Badge */}
+          {subscriptionDays !== undefined && subscriptionDays > 0 && (
+            <View
+              style={[
+                styles.trialBadge,
+                subscriptionDays <= 7 && styles.trialBadgeUrgent,
+              ]}>
+              <Text style={styles.trialBadgeText}>
+                {subscriptionDays} {subscriptionDays === 1 ? 'day' : 'days'} left
+              </Text>
+            </View>
+          )}
 
-        {/* Hamburger Menu */}
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => setMenuVisible(true)}>
-          <View style={styles.hamburger}>
-            <View style={styles.hamburgerLine} />
-            <View style={styles.hamburgerLine} />
-            <View style={styles.hamburgerLine} />
-          </View>
-        </TouchableOpacity>
+          {/* Hamburger Menu */}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setMenuVisible(true)}>
+            <View style={styles.hamburger}>
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* Dropdown Menu Modal */}
         <Modal
@@ -94,6 +99,15 @@ const BuilderHeader: React.FC<BuilderHeaderProps> = ({
                   onSupportPress?.();
                 }}>
                 <Text style={styles.menuItemText}>Support</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  onSubscriptionPress?.();
+                }}>
+                <Text style={styles.menuItemText}>Subscription</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
               <TouchableOpacity
@@ -148,11 +162,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    marginLeft: -spacing.md,
+    marginLeft: 0,
   },
   logoImage: {
     width: 220,
     height: 66,
+  },
+  rightItems: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
   },
   menuButton: {
     padding: spacing.sm,
@@ -207,7 +227,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: borderRadius.md,
-    marginRight: spacing.sm,
   },
   trialBadgeUrgent: {
     backgroundColor: colors.error,
