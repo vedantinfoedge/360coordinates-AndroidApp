@@ -111,11 +111,12 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<'listing' | 'property' | 'budget' | null>(null);
 
-  // Filters - initialize with route params (Buy, Rent, PG only - no All)
+  // Filters - initialize with route params (All, Buy, Rent, PG/Hostel - like home screen)
   const [listingType, setListingType] = useState<ListingType | 'all'>(
+    initialListingType === 'all' ? 'all' :
     initialListingType === 'buy' ? 'buy' : 
-    initialListingType === 'pg-hostel' ? 'pg-hostel' : 
-    initialListingType === 'rent' ? 'rent' : 'buy'
+    initialListingType === 'rent' ? 'rent' : 
+    initialListingType === 'pg-hostel' ? 'pg-hostel' : 'buy'
   );
   
   const [selectedPropertyType, setSelectedPropertyType] = useState<string>(initialPropertyType || 'all');
@@ -299,7 +300,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         searchParams.project_type = 'upcoming';
       }
       
-      // PG/Hostel: same as website - use 1 for PHP backend; two calls then merge (website calls list twice)
+      // PG/Hostel: same as home screen - two calls then merge (PG/Hostel type + available for bachelors)
       if (listingType === 'pg-hostel') {
         searchParams.property_type = 'PG / Hostel';
         searchParams.available_for_bachelors = '1'; // PHP backend often expects 1/0
@@ -340,9 +341,10 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       
       
       // Property type (supports compound types like "Villa / Row House")
-      // Backend list.php: property_type uses LIKE (e.g. 'PG / Hostel'); do not override when listingType is pg-hostel
-      if (selectedPropertyType && selectedPropertyType !== 'all' && listingType !== 'pg-hostel') {
-        // PG / Hostel is already set above when listingType === 'pg-hostel'
+      // Backend list.php: property_type uses LIKE (e.g. 'PG / Hostel'); do not override when listingType is pg-hostel or selectedPropertyType is PG / Hostel
+      const isPGHostelMode = listingType === 'pg-hostel' || selectedPropertyType === 'PG / Hostel';
+      if (selectedPropertyType && selectedPropertyType !== 'all' && !isPGHostelMode) {
+        // PG / Hostel uses two-call merge (PG + available_for_bachelors) - handled below
         const categoryMap: {[key: string]: string} = {
           'Apartment': 'Residential',
           'Villa': 'Residential',
@@ -414,8 +416,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       
       let results: any[] = [];
       try {
-        // PG/Hostel: two API calls then merge; show only PG/Hostel type (not apartments for bachelors)
-        if (listingType === 'pg-hostel') {
+        // PG/Hostel: two API calls then merge (PG/Hostel type + available for bachelors) - like home screen
+        if (isPGHostelMode) {
           const baseParams: any = {
             limit: 1000,
             status: 'rent',
@@ -483,7 +485,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           const fallbackParams: any = { limit: 100 };
           if (searchParams.location) fallbackParams.location = searchParams.location;
           if (searchParams.city) fallbackParams.city = searchParams.city;
-          if (listingType === 'pg-hostel') {
+          if (isPGHostelMode) {
             fallbackParams.status = 'rent';
             fallbackParams.property_type = 'PG / Hostel';
             fallbackParams.available_for_bachelors = '1';
@@ -493,7 +495,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           const fallbackResponse = await propertyService.getProperties(fallbackParams) as any;
           if (fallbackResponse?.success) {
             results = fallbackResponse.data?.properties || fallbackResponse.data || [];
-            if (listingType === 'pg-hostel') {
+            if (isPGHostelMode) {
               results = results.filter((p: any) => {
                 const pt = (p.property_type || '').toLowerCase();
                 const isPG = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
@@ -654,7 +656,8 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
     }
 
     // Property category filter
-    if (selectedPropertyType !== 'all') {
+    // Skip when PG/Hostel - results already include PG + available_for_bachelors from loadProperties merge
+    if (selectedPropertyType !== 'all' && selectedPropertyType !== 'PG / Hostel') {
       // Map display labels to property type IDs
       const propTypeMap: {[key: string]: PropertyType} = {
         'Apartment': 'apartment',
@@ -939,7 +942,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             onPress={() => setOpenDropdown(openDropdown === 'listing' ? null : 'listing')}>
             <Text style={styles.dropdownLabel}>Listing</Text>
             <Text style={styles.dropdownValue} numberOfLines={1}>
-              {listingType === 'buy' ? 'Buy' : listingType === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
+              {listingType === 'all' ? 'All' : listingType === 'buy' ? 'Buy' : listingType === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
             </Text>
             <Text style={styles.dropdownChevron}>{openDropdown === 'listing' ? '▲' : '▼'}</Text>
           </TouchableOpacity>
@@ -977,19 +980,21 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.dropdownOptionsBox} onStartShouldSetResponder={() => true}>
               {openDropdown === 'listing' && (
                 <>
-                  {(['buy', 'rent', 'pg-hostel'] as const).map(type => (
+                  {(['all', 'buy', 'rent', 'pg-hostel'] as const).map(type => (
                     <TouchableOpacity
                       key={type}
                       style={[styles.dropdownOption, listingType === type && styles.dropdownOptionActive]}
                       onPress={() => {
                         setListingType(type);
                         if (type === 'buy') setStatus('sale');
-                        else setStatus('rent');
+                        else if (type === 'rent') setStatus('rent');
+                        else if (type === 'pg-hostel') setStatus('rent');
+                        else setStatus('');
                         setOpenDropdown(null);
                         setTimeout(() => loadProperties(), 150);
                       }}>
                       <Text style={[styles.dropdownOptionText, listingType === type && styles.dropdownOptionTextActive]}>
-                        {type === 'buy' ? 'Buy' : type === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
+                        {type === 'all' ? 'All' : type === 'buy' ? 'Buy' : type === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1017,7 +1022,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 <>
                   {[
                     { label: 'Any', min: 0, max: maxBudgetForType, budgetLabel: '' },
-                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent').map((opt) => ({
+                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent' || listingType === 'pg-hostel').map((opt) => ({
                       label: opt.label,
                       min: opt.min,
                       max: opt.max,
@@ -1124,11 +1129,11 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             <ScrollView
               style={styles.filtersScroll}
               showsVerticalScrollIndicator={false}>
-              {/* Listing Type (Buy/Rent/PG-Hostel only) */}
+              {/* Listing Type (All/Buy/Rent/PG-Hostel - like home screen) */}
               <View style={styles.filterSection}>
                 <Text style={styles.filterLabel}>Listing Type</Text>
                 <View style={styles.filterOptions}>
-                  {(['buy', 'rent', 'pg-hostel'] as const).map(type => (
+                  {(['all', 'buy', 'rent', 'pg-hostel'] as const).map(type => (
                     <TouchableOpacity
                       key={type}
                       style={[
@@ -1138,14 +1143,16 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                       onPress={() => {
                         setListingType(type);
                         if (type === 'buy') setStatus('sale');
-                        else setStatus('rent');
+                        else if (type === 'rent') setStatus('rent');
+                        else if (type === 'pg-hostel') setStatus('rent');
+                        else setStatus('');
                       }}>
                       <Text
                         style={[
                           styles.filterChipText,
                           listingType === type && styles.filterChipTextActive,
                         ]}>
-                        {type === 'buy' ? 'Buy' : type === 'rent' ? 'Rent' : 'PG/Hostel'}
+                        {type === 'all' ? 'All' : type === 'buy' ? 'Buy' : type === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1183,7 +1190,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 <View style={styles.filterOptions}>
                   {[
                     { label: 'Any', min: 0, max: maxBudgetForType, budgetLabel: '' },
-                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent').map((opt) => ({
+                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent' || listingType === 'pg-hostel').map((opt) => ({
                       label: opt.label,
                       min: opt.min,
                       max: opt.max,
