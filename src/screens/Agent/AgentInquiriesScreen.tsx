@@ -361,7 +361,8 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
           userName: buyerName,
           propertyId: Number(propertyId),
           propertyTitle: propertyTitle,
-          receiverRole: 'agent',
+          // NOTE: For seller/agent views, we don't pass receiverRole (that's the poster's role).
+          // ChatConversationScreen will derive posterRole from the logged-in user.
         },
       },
     });

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
@@ -1095,7 +1094,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
                 }
               }
             }
-          } catch (error) {
+          } catch {
             // Use room.updatedAt as fallback
           }
           
@@ -1225,14 +1224,21 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             }
           }
           
-          // Navigate to chat conversation with owner info
+          // Navigate to chat conversation.
+          // IMPORTANT: `userId` here is the *counterparty* user ID (website-style),
+          // not "receiverId". ChatConversationScreen will compute the Firestore roomId
+          // deterministically using generateChatRoomId(buyerId, posterId, propertyId).
+          const isBuyer = (user?.user_type || '').toLowerCase() === 'buyer';
+          const counterpartyId = isBuyer ? item.receiverId : item.buyerId;
+
           navigation.navigate('ChatConversation', {
             conversationId: item.chatRoomId,
-            userId: item.receiverId ? Number(item.receiverId) : undefined,
-            userName: item.name, // Owner name to display in header
+            userId: counterpartyId ? Number(counterpartyId) : undefined,
+            userName: item.name,
             propertyId: item.propertyId ? Number(item.propertyId) : undefined,
             propertyTitle: item.propertyTitle,
-            receiverRole: item.receiverRole,
+            // Only buyers need receiverRole to label the poster as Seller/Agent.
+            receiverRole: isBuyer ? item.receiverRole : undefined,
           });
         }}
         activeOpacity={0.7}>

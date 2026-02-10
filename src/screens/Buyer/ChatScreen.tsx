@@ -493,6 +493,7 @@ const ChatScreen: React.FC<Props> = ({navigation}) => {
             screen: 'ChatConversation',
             params: {
               conversationId: item.chatRoomId,
+              // `userId` is counterparty id (poster for buyers).
               userId: item.receiverId ? Number(item.receiverId) : undefined,
               userName: item.name,
               propertyId: item.propertyId

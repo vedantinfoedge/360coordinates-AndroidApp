@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
@@ -23,7 +23,7 @@ import {useAuth} from '../../context/AuthContext';
 import {chatService} from '../../services/chat.service';
 import {buyerService} from '../../services/buyer.service';
 import CustomAlert from '../../utils/alertHelper';
-import {markChatAsRead} from '../../services/firebase.service';
+import {generateChatRoomId, markChatAsRead} from '../../services/firebase.service';
 import firestore from '@react-native-firebase/firestore';
 
 type ChatConversationScreenNavigationProp = CompositeNavigationProp<
@@ -52,13 +52,18 @@ interface Message {
   isSent: boolean; // true if sent by current user
 }
 
+type FlatListScrollRef = {
+  scrollToEnd: (options?: {animated?: boolean}) => void;
+};
+
 const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const {conversationId, userId, userName, propertyId, propertyTitle, receiverRole} = route.params || {};
-  const {logout, user} = useAuth();
+  const {user} = useAuth();
+  const insets = useSafeAreaInsets();
   // #region agent log
   React.useEffect(() => {
     fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:mount',message:'Route params',data:{conversationId,userId,userName,propertyId,propertyTitle,receiverRole,hasUser:!!user?.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,E'})}).catch(()=>{});
-  }, []);
+  }, [conversationId, userId, userName, propertyId, propertyTitle, receiverRole, user?.id]);
   // #endregion
   console.log('[ChatConversation] Route params:', {
     conversationId,
@@ -76,9 +81,10 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const [actualConversationId, setActualConversationId] = useState<string | number | null>(null);
   const [firebaseUnsubscribe, setFirebaseUnsubscribe] = useState<(() => void) | null>(null);
   const [participantName, setParticipantName] = useState<string>(userName || '');
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatListScrollRef | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inquirySentForPropertyRef = useRef<number | null>(null);
+  const resolvedRoomIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let unsubscribeFn: (() => void) | null = null;
@@ -102,6 +108,10 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         pollingIntervalRef.current = null;
       }
     };
+    // This effect intentionally depends only on navigation params + user id.
+    // initializeConversation creates Firestore listeners and we don't want to re-init
+    // on every internal state change (like firebaseUnsubscribe).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, userId, propertyId, user?.id]);
 
   // Update participant name when route params change
@@ -124,231 +134,103 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         setLoading(false);
         return null;
       }
-      
-      // If we already have a conversationId (from chat list), ensure Firebase room exists
-      if (conversationId) {
-        console.log('[Chat] Using existing conversationId:', conversationId);
-        const chatRoomId = String(conversationId);
-        
-        // Parse conversationId to extract propertyId if needed
-        // Format: minId_maxId_propertyId (e.g., "5_12_123" for buyer 5, seller 12, property 123)
-        // Note: Cannot determine receiverId from format alone (both IDs are in sorted order)
-        // Use route params (userId) or chat list data instead
-        let parsedPropertyId: number | undefined;
-        
-        const chatRoomIdParts = chatRoomId.split('_');
-        if (chatRoomIdParts.length >= 3) {
-          parsedPropertyId = Number(chatRoomIdParts[2]); // propertyId is always last
-          console.log('[Chat] Parsed propertyId from conversationId:', parsedPropertyId);
-          // Note: Cannot parse receiverId from minId_maxId format - use route params instead
-        }
-        
-        // Ensure Firebase chat room exists - create it if it doesn't
-        // Use route params (userId is required from chat list navigation)
-        const receiverIdToUse = userId; // Must come from route params (chat list provides this)
-        const propertyIdToUse = propertyId || parsedPropertyId;
-        const receiverRoleToUse = receiverRole || 'seller'; // Default to seller if not specified
-        
-        if (receiverIdToUse && propertyIdToUse && user?.id) {
-          try {
-            console.log('[Chat] Ensuring Firebase chat room exists for conversationId:', chatRoomId);
-            const createdRoomId = await chatService.createFirebaseChatRoom(
-              Number(user.id),
-              Number(receiverIdToUse),
-              receiverRoleToUse as 'agent' | 'seller',
-              Number(propertyIdToUse),
-              chatRoomId, // Use the existing chatRoomId
-            );
-            
-            if (createdRoomId) {
-              console.log('[Chat] ✅ Firebase chat room verified/created:', createdRoomId);
-              setActualConversationId(createdRoomId);
-            } else {
-              console.warn('[Chat] ⚠️ Could not create/verify Firebase room, but continuing with conversationId');
-              setActualConversationId(chatRoomId);
-            }
-          } catch (error: any) {
-            console.error('[Chat] Error ensuring Firebase room exists:', error);
-            // Continue anyway - try to use existing room
-            setActualConversationId(chatRoomId);
+
+      const currentUserType = (user.user_type || '').toLowerCase();
+      const isBuyer = currentUserType === 'buyer';
+
+      // Resolve propertyId from params or from conversationId (format: minId_maxId_propertyId)
+      let resolvedPropertyId: number | null = propertyId ? Number(propertyId) : null;
+      const convIdStr = conversationId ? String(conversationId) : '';
+      if ((!resolvedPropertyId || Number.isNaN(resolvedPropertyId)) && convIdStr.includes('_')) {
+        const parts = convIdStr.split('_');
+        if (parts.length >= 3) {
+          const parsed = Number(parts[2]);
+          if (!Number.isNaN(parsed) && parsed > 0) {
+            resolvedPropertyId = parsed;
           }
-        } else {
-          // If we can't parse or don't have required info, just use the conversationId
-          console.warn('[Chat] ⚠️ Cannot create Firebase room - missing required info. Using conversationId directly.');
-          setActualConversationId(chatRoomId);
-        }
-        
-        // Mark chat as read when conversation is opened
-        if (user?.id) {
-          try {
-            await markChatAsRead(chatRoomId, user.id);
-            console.log('[Chat] ✅ Marked chat as read for user:', user.id);
-          } catch (error) {
-            console.warn('[Chat] Could not mark chat as read:', error);
-          }
-        }
-        
-        // Set up listener for existing room
-        try {
-          const unsubscribe = chatService.listenToMessages(chatRoomId, (newMessages) => {
-            console.log('[Chat] Received', newMessages.length, 'messages from Firebase');
-            
-            const formattedMessages: Message[] = newMessages.map((msg: any) => {
-              let timestampStr = new Date().toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              });
-              
-              if (msg.timestamp) {
-                try {
-                  if (msg.timestamp.toDate && typeof msg.timestamp.toDate === 'function') {
-                    timestampStr = msg.timestamp.toDate().toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    });
-                  } else if (msg.timestamp instanceof Date) {
-                    timestampStr = msg.timestamp.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    });
-                  }
-                } catch (e) {
-                  console.warn('[Chat] Error parsing timestamp:', e);
-                }
-              }
-              
-              return {
-                id: msg.id,
-                text: msg.text || msg.message || '',
-                senderId: msg.senderId || '',
-                timestamp: timestampStr,
-                isSent: msg.senderId === String(user.id),
-              };
-            });
-            
-            setMessages(formattedMessages);
-            setLoading(false);
-            
-            setTimeout(() => {
-              flatListRef.current?.scrollToEnd({animated: true});
-            }, 100);
-          });
-          
-          if (unsubscribe) {
-            setFirebaseUnsubscribe(() => unsubscribe);
-            return unsubscribe;
-          }
-        } catch (error: any) {
-          console.error('[Chat] Error setting up listener for existing room:', error);
         }
       }
+
+      const counterpartyId = userId ? Number(userId) : NaN;
+      if (!resolvedPropertyId || Number.isNaN(resolvedPropertyId) || resolvedPropertyId <= 0) {
+        CustomAlert.alert('Error', 'Unable to open chat: missing propertyId');
+        setLoading(false);
+        return null;
+      }
+      if (!counterpartyId || Number.isNaN(counterpartyId) || counterpartyId <= 0) {
+        CustomAlert.alert('Error', 'Unable to open chat: missing userId');
+        setLoading(false);
+        return null;
+      }
+
+      // Website-style deterministic room id:
+      // chatRoomId = min(buyerId, posterId)_max(buyerId, posterId)_propertyId
+      const buyerIdNum = isBuyer ? Number(user.id) : counterpartyId;
+      const posterIdNum = isBuyer ? counterpartyId : Number(user.id);
+      const posterRole: 'agent' | 'seller' =
+        isBuyer
+          ? (receiverRole === 'agent' ? 'agent' : 'seller')
+          : (currentUserType === 'agent' ? 'agent' : 'seller');
+
+      const desiredChatRoomId = generateChatRoomId(buyerIdNum, posterIdNum, resolvedPropertyId);
+
+      // Legacy compatibility:
+      // If a different conversationId was passed and exists in Firestore, prefer it.
+      // Otherwise, always use the deterministic ID.
+      let roomIdToUse = desiredChatRoomId;
+      if (convIdStr && convIdStr !== desiredChatRoomId) {
+        try {
+          const [desiredSnap, legacySnap] = await Promise.all([
+            firestore().collection('chats').doc(desiredChatRoomId).get(),
+            firestore().collection('chats').doc(convIdStr).get(),
+          ]);
+          if (desiredSnap.exists) {
+            roomIdToUse = desiredChatRoomId;
+          } else if (legacySnap.exists) {
+            console.warn('[Chat] Using legacy room id (non-deterministic):', convIdStr);
+            roomIdToUse = convIdStr;
+          }
+          } catch {
+          // If Firestore check fails, fall back to deterministic
+          roomIdToUse = desiredChatRoomId;
+        }
+      }
+
+      resolvedRoomIdRef.current = roomIdToUse;
+      setActualConversationId(roomIdToUse);
       
-      let backendChatRoomId: string | number | null = null;
-      let backendReceiverRole: 'agent' | 'seller' | null = null;
+      let mysqlConversationId: string | number | null = null;
       
       // Step 1: Create backend chat room (creates inquiry in database) - as per guide
-      if (userId && propertyId) {
+      // IMPORTANT: Backend id is NOT used as Firestore doc id. We store it as mysqlConversationId if present.
+      if (isBuyer && userId && resolvedPropertyId) {
         try {
           console.log('[Chat] Creating backend chat room with:', {
             receiverId: userId,
-            propertyId: propertyId,
+            propertyId: resolvedPropertyId,
             buyerId: user.id
           });
           
-          const roomResponse = await chatService.createRoom(Number(userId), Number(propertyId));
+          const roomResponse: any = await chatService.createRoom(Number(userId), Number(resolvedPropertyId));
           
           console.log('[Chat] Backend chat room API response:', JSON.stringify(roomResponse, null, 2));
           
-          // Extract buyer name from backend response if available (for seller/agent view)
-          let buyerNameFromResponse: string | null = null;
-          let buyerProfileImageFromResponse: string | null = null;
-          
-          // Extract chat room ID and receiverRole from API response - check multiple possible response structures
+          // Extract backend conversation/inquiry id (if any) for linkage/debug
           if (roomResponse) {
             if (roomResponse.success && roomResponse.data) {
-              backendChatRoomId = 
-                roomResponse.data.chatRoomId || 
-                roomResponse.data.inquiryId || 
-                roomResponse.data.id ||
+              mysqlConversationId =
                 roomResponse.data.conversation_id ||
-                conversationId;
-              // Extract receiverRole from backend response
-              if (roomResponse.data.receiverRole && (roomResponse.data.receiverRole === 'agent' || roomResponse.data.receiverRole === 'seller')) {
-                backendReceiverRole = roomResponse.data.receiverRole;
-              }
-              
-              // Extract buyer info from response (for seller/agent)
-              buyerNameFromResponse = roomResponse.data.buyer?.name || 
-                                     roomResponse.data.buyer?.full_name ||
-                                     roomResponse.data.buyer_name ||
-                                     roomResponse.data.buyerName ||
-                                     null;
-              buyerProfileImageFromResponse = roomResponse.data.buyer?.profile_image ||
-                                            roomResponse.data.buyer_profile_image ||
-                                            null;
-              
-              console.log('[Chat] ✅ Backend chat room created successfully:', backendChatRoomId, 'receiverRole:', backendReceiverRole);
-              if (buyerNameFromResponse) {
-                console.log('[Chat] ✅ Buyer name from backend response:', buyerNameFromResponse);
-              }
+                roomResponse.data.inquiryId ||
+                roomResponse.data.id ||
+                null;
             } else if (roomResponse.data) {
-              // Some APIs return data directly without success flag
-              backendChatRoomId = 
-                roomResponse.data.chatRoomId || 
-                roomResponse.data.inquiryId || 
-                roomResponse.data.id ||
+              mysqlConversationId =
                 roomResponse.data.conversation_id ||
-                conversationId;
-              // Extract receiverRole from backend response
-              if (roomResponse.data.receiverRole && (roomResponse.data.receiverRole === 'agent' || roomResponse.data.receiverRole === 'seller')) {
-                backendReceiverRole = roomResponse.data.receiverRole;
-              }
-              
-              // Extract buyer info from response (for seller/agent)
-              if (!buyerNameFromResponse) {
-                buyerNameFromResponse = roomResponse.data.buyer?.name || 
-                                       roomResponse.data.buyer?.full_name ||
-                                       roomResponse.data.buyer_name ||
-                                       roomResponse.data.buyerName ||
-                                       null;
-                buyerProfileImageFromResponse = roomResponse.data.buyer?.profile_image ||
-                                              roomResponse.data.buyer_profile_image ||
-                                              null;
-              }
-              
-              console.log('[Chat] ✅ Backend chat room ID extracted:', backendChatRoomId, 'receiverRole:', backendReceiverRole);
-            } else if (roomResponse.chatRoomId || roomResponse.inquiryId || roomResponse.id) {
-              // Response might be flat
-              backendChatRoomId = roomResponse.chatRoomId || roomResponse.inquiryId || roomResponse.id;
-              if (roomResponse.receiverRole && (roomResponse.receiverRole === 'agent' || roomResponse.receiverRole === 'seller')) {
-                backendReceiverRole = roomResponse.receiverRole;
-              }
-              
-              // Extract buyer info from flat response (for seller/agent)
-              if (!buyerNameFromResponse) {
-                buyerNameFromResponse = roomResponse.buyer?.name || 
-                                       roomResponse.buyer?.full_name ||
-                                       roomResponse.buyer_name ||
-                                       roomResponse.buyerName ||
-                                       null;
-                buyerProfileImageFromResponse = roomResponse.buyer?.profile_image ||
-                                              roomResponse.buyer_profile_image ||
-                                              null;
-              }
-              
-              console.log('[Chat] ✅ Backend chat room ID from flat response:', backendChatRoomId, 'receiverRole:', backendReceiverRole);
+                roomResponse.data.inquiryId ||
+                roomResponse.data.id ||
+                null;
             } else {
-              console.warn('[Chat] ⚠️ Unexpected API response structure:', roomResponse);
-              // Try to use conversationId as fallback
-              if (conversationId) {
-                backendChatRoomId = conversationId;
-                console.log('[Chat] Using provided conversationId as fallback:', backendChatRoomId);
-              }
-            }
-          } else {
-            console.warn('[Chat] ⚠️ Empty API response');
-            if (conversationId) {
-              backendChatRoomId = conversationId;
+              mysqlConversationId = (roomResponse as any).conversation_id || (roomResponse as any).inquiryId || (roomResponse as any).id || null;
             }
           }
         } catch (error: any) {
@@ -367,197 +249,97 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           }
           
           // Continue anyway - room might already exist, try to use conversationId
-          if (conversationId) {
-            backendChatRoomId = conversationId;
-            console.log('[Chat] Using conversationId after error:', backendChatRoomId);
-          }
+          // No-op: Firestore room id is deterministic; backend linkage is optional.
         }
 
         // Ensure seller/agent receives an inquiry: send inquiry when buyer starts a new chat
         // (Seller Inquiries list reads from inquiry API; chat create-room may not create an inquiry record)
         if (
-          user?.user_type === 'buyer' &&
-          propertyId &&
+          isBuyer &&
+          resolvedPropertyId &&
           !conversationId &&
-          backendChatRoomId &&
-          inquirySentForPropertyRef.current !== Number(propertyId)
+          inquirySentForPropertyRef.current !== Number(resolvedPropertyId)
         ) {
           try {
-            await buyerService.sendInquiry(Number(propertyId), 'Interested in this property.');
-            inquirySentForPropertyRef.current = Number(propertyId);
+            await buyerService.sendInquiry(Number(resolvedPropertyId), 'Interested in this property.');
+            inquirySentForPropertyRef.current = Number(resolvedPropertyId);
             console.log('[Chat] Sent inquiry for property so seller receives it in Inquiries list');
           } catch (e) {
             console.warn('[Chat] Could not send inquiry (seller may still see chat):', e);
           }
         }
-      } else if (conversationId) {
-        backendChatRoomId = conversationId;
-        console.log('[Chat] Using provided conversationId:', backendChatRoomId);
-      } else {
-        console.warn('[Chat] ⚠️ Missing required parameters:', {
-          userId,
-          propertyId,
-          conversationId
-        });
       }
-      
-      // Step 2: Use existing chatRoomId or create new Firebase chat room
-      // If we already have a chatRoomId from backend, use it directly
-      let firebaseRoomId: string | null = null;
-      
-      if (backendChatRoomId && typeof backendChatRoomId === 'string') {
-        // Use the chatRoomId from backend (format: buyerId_receiverId_propertyId)
-        firebaseRoomId = backendChatRoomId;
-        console.log('[Chat] Using existing chat room ID from backend:', firebaseRoomId);
-      } else if (userId && propertyId && user?.id) {
-        // Create new Firebase chat room
+
+      // Step 2: Ensure deterministic Firebase room exists (unless using legacy room id)
+      // If we are using a legacy room id, we don't attempt to create a deterministic doc with it.
+      // New rooms will always be created with deterministic ID.
+      if (roomIdToUse === desiredChatRoomId) {
         try {
-          console.log('[Chat] 🔍 Creating Firebase chat room with parameters:', {
-            buyerId: user.id,
-            sellerId: userId,
-            propertyId: propertyId,
-          });
-          
-          // Determine receiverRole: use from backend response, params, or default to "seller"
-          const role: 'agent' | 'seller' = backendReceiverRole 
-            ? backendReceiverRole 
-            : (receiverRole === 'agent' || receiverRole === 'seller') 
-              ? receiverRole 
-              : 'seller';
-          
-          console.log('[Chat] Using receiverRole:', role);
-          
-          // Pass backend's chatRoomId to ensure Firebase uses the same format
-          // Also pass buyer name and profile image if available from backend response
-          firebaseRoomId = await chatService.createFirebaseChatRoom(
-            Number(user.id),
-            Number(userId),
-            role,
-            Number(propertyId),
-            backendChatRoomId ? String(backendChatRoomId) : undefined, // Use backend's ID if available
-            buyerNameFromResponse || undefined, // Pass buyer name if available
-            buyerProfileImageFromResponse || undefined, // Pass buyer profile image if available
+          await chatService.createFirebaseChatRoom(
+            buyerIdNum,
+            posterIdNum,
+            posterRole,
+            resolvedPropertyId,
+            mysqlConversationId ? String(mysqlConversationId) : undefined,
           );
-          
-          if (firebaseRoomId) {
-            console.log('[Chat] Firebase chat room created:', firebaseRoomId);
-          }
-        } catch (error: any) {
-          console.error('[Chat] Error creating Firebase chat room:', {
-            message: error?.message,
-            code: error?.code,
-          });
+          } catch {
+            console.warn('[Chat] Could not create/verify deterministic room');
         }
       }
-      
-      // Set up Firebase listener for messages
-      if (firebaseRoomId) {
-        try {
-          setActualConversationId(firebaseRoomId);
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:initializeConversation',message:'actualConversationId set',data:{firebaseRoomId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
-          // Try to fetch buyer name from Firebase chat room if not provided or is default
-          if (!userName || !userName.trim() || userName === 'Buyer' || userName === 'Property Owner') {
+
+      // Mark as read when conversation is opened
+      try {
+        await markChatAsRead(roomIdToUse, user.id);
+      } catch {
+        console.warn('[Chat] Could not mark chat as read');
+      }
+
+      // Listen to messages
+      const unsubscribe = chatService.listenToMessages(roomIdToUse, (newMessages) => {
+        const formattedMessages: Message[] = newMessages.map((msg: any) => {
+          let timestampStr = new Date().toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+          });
+
+          if (msg.timestamp) {
             try {
-              const chatRoomDoc = await firestore().collection('chats').doc(firebaseRoomId).get();
-              if (chatRoomDoc.exists) {
-                const roomData = chatRoomDoc.data();
-                console.log('[Chat] Chat room data:', roomData);
-                // Try to get buyer name from room data if available
-                if (roomData?.buyerName && roomData.buyerName.trim()) {
-                  setParticipantName(roomData.buyerName.trim());
-                } else if (roomData?.buyer_name && roomData.buyer_name.trim()) {
-                  setParticipantName(roomData.buyer_name.trim());
-                }
+              if (msg.timestamp.toDate && typeof msg.timestamp.toDate === 'function') {
+                timestampStr = msg.timestamp.toDate().toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                });
+              } else if (msg.timestamp instanceof Date) {
+                timestampStr = msg.timestamp.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                });
               }
-            } catch (error) {
-              console.warn('[Chat] Could not fetch buyer name from chat room:', error);
-            }
+            } catch {}
           }
-          
-          console.log('[Chat] Setting up Firebase message listener for room:', firebaseRoomId);
-          
-          // Step 3: Listen to messages via Firebase - as per guide
-          const unsubscribe = chatService.listenToMessages(firebaseRoomId, (newMessages) => {
-            console.log('[Chat] Received', newMessages.length, 'messages from Firebase');
-            
-            const formattedMessages: Message[] = newMessages.map((msg: any) => {
-              // Handle timestamp conversion
-              let timestampStr = new Date().toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              });
-              
-              if (msg.timestamp) {
-                try {
-                  if (msg.timestamp.toDate && typeof msg.timestamp.toDate === 'function') {
-                    timestampStr = msg.timestamp.toDate().toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    });
-                  } else if (msg.timestamp instanceof Date) {
-                    timestampStr = msg.timestamp.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    });
-                  }
-                } catch (e) {
-                  console.warn('[Chat] Error parsing timestamp:', e);
-                }
-              }
-              
-              return {
-                id: msg.id,
-                text: msg.text || msg.message || '',
-                senderId: msg.senderId || '',
-                timestamp: timestampStr,
-                isSent: msg.senderId === String(user.id),
-              };
-            });
-            
-            console.log('[Chat] Formatted messages:', formattedMessages.length);
-            setMessages(formattedMessages);
-            setLoading(false);
-            
-            // Scroll to bottom when new messages arrive
-            setTimeout(() => {
-              flatListRef.current?.scrollToEnd({animated: true});
-            }, 100);
-          });
-          
-          // Return unsubscribe function for cleanup
-          if (unsubscribe) {
-            setFirebaseUnsubscribe(() => unsubscribe);
-            return unsubscribe;
-          }
-        } catch (error: any) {
-          console.error('[Chat] Error setting up Firebase listener:', {
-            message: error?.message,
-            code: error?.code,
-          });
-          setLoading(false);
-        }
-      }
-      
-      // If Firebase is not available, show error instead of API fallback
-      if (!actualConversationId && backendChatRoomId) {
-        console.warn('[Chat] Firebase not available - chat requires Firebase to be set up');
-        CustomAlert.alert(
-          'Chat Not Available',
-          'Firebase is not configured. Please rebuild the app to enable chat functionality.\n\nRun: cd android && ./gradlew clean && cd .. && npm run android',
-        );
+
+          return {
+            id: msg.id,
+            text: msg.text || msg.message || '',
+            senderId: msg.senderId || '',
+            timestamp: timestampStr,
+            isSent: msg.senderId === String(user.id),
+          };
+        });
+
+        setMessages(formattedMessages);
         setLoading(false);
-        return null;
-      } else if (!actualConversationId && !backendChatRoomId) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:initializeConversation',message:'Init failed - missing params',data:{userId,propertyId,conversationId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-        CustomAlert.alert('Error', 'Unable to initialize conversation. Missing required parameters.');
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({animated: true});
+        }, 100);
+      });
+
+      if (unsubscribe) {
+        setFirebaseUnsubscribe(() => unsubscribe);
         setLoading(false);
-        return null;
+        return unsubscribe;
       }
-      
+
       setLoading(false);
       return null;
     } catch (error: any) {
@@ -570,81 +352,6 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       });
       setLoading(false);
       return null;
-    }
-  };
-
-  const loadMessages = async (convId: string | number | null, showLoading: boolean = true) => {
-    if (!convId) {
-      console.warn('Cannot load messages: conversation ID is missing');
-      if (showLoading) {
-        setLoading(false);
-      }
-      return;
-    }
-    
-    try {
-      if (showLoading) {
-        setLoading(true);
-      }
-      
-      const response = await chatService.getMessages(convId);
-      
-      if (response && response.success) {
-        const messagesData = response.data?.messages || response.data || [];
-        
-        // Format messages
-        const formatted = messagesData.map((msg: any) => {
-          const isSent = String(msg.sender_id || msg.senderId) === String(user?.id || user?.user_id);
-          
-          // Format timestamp
-          let timestamp = 'Just now';
-          if (msg.timestamp || msg.created_at) {
-            const date = new Date(msg.timestamp || msg.created_at);
-            timestamp = date.toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-            });
-          }
-          
-          return {
-            id: msg.id?.toString() || msg.message_id?.toString() || Date.now().toString(),
-            text: msg.message || msg.text || '',
-            senderId: String(msg.sender_id || msg.senderId || ''),
-            timestamp,
-            isSent,
-          };
-        });
-        
-        setMessages(formatted);
-      } else {
-        // If no messages or empty response, just show empty list (new chat)
-        console.log('[Chat] No messages found or empty response - showing empty chat');
-        setMessages([]);
-      }
-    } catch (error: any) {
-      console.error('[Chat] Error loading messages:', {
-        error: error?.message,
-        status: error?.status,
-        conversationId: convId
-      });
-      
-      // If 404, the endpoint doesn't exist - just show empty messages (user can still send)
-      if (error?.status === 404) {
-        console.warn('[Chat] Messages endpoint returned 404 - endpoint may not exist. Showing empty chat.');
-        setMessages([]);
-        if (showLoading) {
-          // Don't show error alert for 404 - it's expected if endpoint doesn't exist
-          console.log('[Chat] Messages endpoint not available, but chat room is ready for sending messages');
-        }
-      } else if (showLoading) {
-        // Only show alert for other errors
-        CustomAlert.alert('Error', error.message || 'Failed to load messages');
-      }
-    } finally {
-      if (showLoading) {
-        setLoading(false);
-      }
-      setRefreshing(false);
     }
   };
 
@@ -710,7 +417,6 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
 
   const renderMessage = ({item}: {item: Message}) => {
     const isBuyer = user?.user_type === 'buyer';
-    const isSellerOrAgent = user?.user_type === 'seller' || user?.user_type === 'agent';
     
     // Determine sender label based on user role (like website)
     // Buyer: "You" vs "Property Owner"
@@ -773,7 +479,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   }, [userName, user?.user_type]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, {paddingTop: insets.top, paddingBottom: insets.bottom}]}>
       {/* Custom Header with Owner Name */}
       <View style={styles.chatHeader}>
         <TouchableOpacity
@@ -812,10 +518,10 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
         ) : (
           <FlatList
-            ref={flatListRef}
+            ref={flatListRef as any}
             data={messages}
             renderItem={renderMessage}
-            keyExtractor={item => item.id}
+            keyExtractor={(item: Message) => item.id}
             contentContainerStyle={styles.messagesList}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() =>
@@ -866,7 +572,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -207,10 +207,19 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
 
   const handleReply = (inquiry: Inquiry) => {
     // Navigate to chat conversation with the buyer
-    const buyerId = inquiry.id || inquiry.property_id;
+    const buyerId = inquiry.buyer_id;
     const buyerName = inquiry.buyer_name || 'Buyer';
     const propertyId = inquiry.property_id;
     const propertyTitle = inquiry.property_title || 'Property';
+
+    if (!buyerId) {
+      CustomAlert.alert(
+        'Guest Inquiry',
+        'This inquiry is from a guest user. Chat is not available for guest inquiries.',
+        [{text: 'OK'}],
+      );
+      return;
+    }
     
     navigation.navigate('Chat' as any, {
       screen: 'ChatConversation',

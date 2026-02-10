@@ -7,12 +7,17 @@ import {colors} from '../theme';
 export type ChatStackParamList = {
   ChatList: undefined;
   ChatConversation: {
+    // Counterparty user id (buyer OR poster depending on current user's role).
+    // ChatConversationScreen computes deterministic Firestore roomId using:
+    // generateChatRoomId(buyerId, posterId, propertyId)
     userId?: number | string;
     userName?: string;
     propertyId?: number | string;
     propertyTitle?: string;
+    // Optional: legacy / precomputed room id. If provided and exists, it may be used for backward compatibility.
     conversationId?: string | number;
-    receiverRole?: 'agent' | 'seller'; // Role of the receiver (seller or agent)
+    // Only needed for buyer-side labeling (poster is seller or agent).
+    receiverRole?: 'agent' | 'seller';
   };
 };
 

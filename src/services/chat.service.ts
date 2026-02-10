@@ -133,7 +133,7 @@ export const chatService = {
     receiverId: number,
     receiverRole: 'agent' | 'seller',
     propertyId: number,
-    backendChatRoomId?: string, // Optional: use backend's chatRoomId if provided
+    mysqlConversationId?: string, // Optional: backend conversation/inquiry id (NOT used as Firestore doc id)
     buyerName?: string, // Optional: buyer name to store in Firebase
     buyerProfileImage?: string, // Optional: buyer profile image to store in Firebase
   ): Promise<string | null> => {
@@ -178,18 +178,10 @@ export const chatService = {
         return null;
       }
 
-      // Use backend's chatRoomId if provided, otherwise generate using website format
-      // Website format: minId_maxId_propertyId (e.g., "5_12_123" for buyer 5, seller 12, property 123)
-      // This ensures consistency with website and deterministic IDs
-      let chatRoomId: string;
-      if (backendChatRoomId) {
-        chatRoomId = backendChatRoomId;
-        console.log('[Firebase Chat] Using chatRoomId from backend:', chatRoomId);
-      } else {
-        // Generate using website format: minId_maxId_propertyId
-        chatRoomId = generateChatRoomId(buyerId, receiverId, propertyId);
-        console.log('[Firebase Chat] Generated chatRoomId using website format:', chatRoomId);
-      }
+      // ALWAYS use website format for Firestore document ID:
+      // minId_maxId_propertyId (deterministic, 1 room per buyer+poster+property)
+      const chatRoomId = generateChatRoomId(buyerId, receiverId, propertyId);
+      console.log('[Firebase Chat] Using deterministic chatRoomId (website format):', chatRoomId);
       
       // Additional validation - ensure chatRoomId is valid
       if (!chatRoomId || chatRoomId.includes('undefined') || chatRoomId.includes('null') || chatRoomId.includes('0_0')) {
@@ -238,13 +230,21 @@ export const chatService = {
           propertyId: propertyId.toString(),
           participants: participants,
           lastMessage: '',
+          // Website behavior: both sides start as 'new'
           readStatus: {
-            [buyerId.toString()]: 'read',
+            [buyerId.toString()]: 'new',
             [receiverId.toString()]: 'new',
           },
+          readBy: {},
+          lastReadAt: {},
           createdAt: firestore.FieldValue.serverTimestamp(),
           updatedAt: firestore.FieldValue.serverTimestamp(),
         };
+
+        // Store backend conversation/inquiry id (if any) for API linkage (NOT the Firestore doc id)
+        if (mysqlConversationId && String(mysqlConversationId).trim()) {
+          chatRoomData.mysqlConversationId = String(mysqlConversationId).trim();
+        }
         
         // Store buyer name and profile image if provided (from backend API response)
         if (buyerName && buyerName.trim() && buyerName !== 'Buyer' && !buyerName.startsWith('Buyer ')) {
@@ -344,43 +344,54 @@ export const chatService = {
       
       // Ensure chat room exists before adding messages - create if it doesn't exist
       const chatRef = db.collection('chats').doc(chatRoomId);
-      const roomSnap = await chatRef.get();
+      let roomSnap = await chatRef.get();
       
       if (!roomSnap.exists) {
         console.warn('[Firebase Chat] ⚠️ Chat room does not exist, creating it now...');
         
-        // Try to parse chatRoomId to extract info (format: receiverId_buyerId_propertyId)
+        // Expected deterministic format: minId_maxId_propertyId
         const parts = chatRoomId.split('_');
-        if (parts.length >= 3) {
-          const receiverIdStr = parts[0];
-          const buyerIdStr = parts[1];
-          const propertyIdStr = parts[2];
-          
-          const participants = [buyerIdStr, receiverIdStr].sort();
-          
-          try {
-            await chatRef.set({
-              chatRoomId: chatRoomId,
-              buyerId: buyerIdStr,
-              receiverId: receiverIdStr,
-              receiverRole: 'seller', // Default, can be updated later
-              propertyId: propertyIdStr,
-              participants: participants,
-              lastMessage: '',
-              readStatus: {
-                [buyerIdStr]: 'read',
-                [receiverIdStr]: 'new',
-              },
-              createdAt: firestore.FieldValue.serverTimestamp(),
-              updatedAt: firestore.FieldValue.serverTimestamp(),
-            });
-            console.log('[Firebase Chat] ✅ Chat room created automatically:', chatRoomId);
-          } catch (createError: any) {
-            console.error('[Firebase Chat] ❌ Failed to create chat room automatically:', createError);
-            return false;
-          }
-        } else {
-          console.error('[Firebase Chat] ❌ Cannot parse chatRoomId to create room. Format should be: receiverId_buyerId_propertyId');
+        if (parts.length < 3) {
+          console.error('[Firebase Chat] ❌ Cannot parse chatRoomId to auto-create room. Expected: minId_maxId_propertyId');
+          return false;
+        }
+
+        const idA = parts[0];
+        const idB = parts[1];
+        const propertyIdStr = parts[2];
+        const senderIdStr = senderId.toString();
+        const otherUserIdStr = senderIdStr === idA ? idB : idA;
+
+        // Infer buyerId/receiverId using senderRole (website-like)
+        const inferredBuyerId = senderRole === 'buyer' ? senderIdStr : otherUserIdStr;
+        const inferredReceiverId = senderRole === 'buyer' ? otherUserIdStr : senderIdStr;
+        const inferredReceiverRole: 'seller' | 'agent' =
+          senderRole === 'agent' ? 'agent' : 'seller';
+
+        const participants = [idA, idB].sort();
+
+        try {
+          await chatRef.set({
+            chatRoomId,
+            buyerId: inferredBuyerId,
+            receiverId: inferredReceiverId,
+            receiverRole: inferredReceiverRole,
+            propertyId: propertyIdStr,
+            participants,
+            lastMessage: '',
+            readStatus: {
+              [idA]: 'new',
+              [idB]: 'new',
+            },
+            readBy: {},
+            lastReadAt: {},
+            createdAt: firestore.FieldValue.serverTimestamp(),
+            updatedAt: firestore.FieldValue.serverTimestamp(),
+          });
+          console.log('[Firebase Chat] ✅ Chat room created automatically (deterministic):', chatRoomId);
+          roomSnap = await chatRef.get();
+        } catch (createError: any) {
+          console.error('[Firebase Chat] ❌ Failed to create chat room automatically:', createError);
           return false;
         }
       }
@@ -389,18 +400,20 @@ export const chatService = {
       const roomData = roomSnap.data();
       const readStatus = roomData?.readStatus || {};
       
-      // Mark message as new for receiver, read for sender
-      const updatedReadStatus: { [key: string]: 'new' | 'read' } = {
+      // Website-like readStatus updates:
+      // - Other participant -> 'new'
+      // - Sender -> keep existing or 'read'
+      const senderIdStr = senderId.toString();
+      const otherUser =
+        senderIdStr === String(roomData?.buyerId) ? String(roomData?.receiverId) : String(roomData?.buyerId);
+
+      const updatedReadStatus: {[key: string]: 'new' | 'read' | 'replied'} = {
         ...readStatus,
-        [senderId.toString()]: 'read',
       };
-      
-      // Find the other participant (receiver)
-      const participants = roomData?.participants || [];
-      const receiverId = participants.find((p: string) => p !== senderId.toString());
-      if (receiverId) {
-        updatedReadStatus[receiverId] = 'new';
+      if (otherUser && otherUser !== 'undefined' && otherUser !== 'null') {
+        updatedReadStatus[otherUser] = 'new';
       }
+      updatedReadStatus[senderIdStr] = (updatedReadStatus[senderIdStr] as any) || 'read';
       
       // Add message to subcollection (matches website structure)
       await chatRef
