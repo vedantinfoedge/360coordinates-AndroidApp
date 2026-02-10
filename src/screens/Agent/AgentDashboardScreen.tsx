@@ -805,7 +805,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.agentHeaderBox}>
               <View style={styles.agentHeaderContent}>
                 <Text style={styles.agentGreeting}>
-                  Welcome back, {user?.full_name?.split(' ')[0] || 'Agent'}!
+                  Welcome{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''} ❤️
                 </Text>
                 <Text style={styles.agentSubtitle}>
                   Manage your properties and track your leads
