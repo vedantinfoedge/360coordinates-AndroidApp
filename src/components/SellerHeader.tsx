@@ -129,7 +129,7 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
                 subscriptionDays <= 7 && {transform: [{scale: pulseAnim}]},
               ]}>
               <Text style={styles.trialBadgeText}>
-                {subscriptionDays}d
+                {subscriptionDays} {subscriptionDays === 1 ? 'day' : 'days'} left
               </Text>
             </Animated.View>
           )}
