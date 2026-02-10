@@ -153,10 +153,16 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
           // - Seller (registered) → Can login as "buyer" OR "seller" (backend allows both)
           let finalUserType: UserRole;
           
+          // STRICT: if backend says this account is an agent, it can NEVER become buyer/seller in-app.
+          // This prevents agents from "logging in as buyer/seller" via the role selector.
+          if (normalizedUserType === 'agent') {
+            console.log('[AuthContext] 🔒 Backend user_type is agent; forcing final user_type=agent');
+            finalUserType = 'agent';
+          }
           // ALWAYS prioritize the requested userType from login screen
           // This ensures that when a seller selects "seller" on login, they get seller dashboard
           // Even if backend returns registered type, we use the requested login type
-          if (userType && typeof userType === 'string' && userType.trim() !== '') {
+          else if (userType && typeof userType === 'string' && userType.trim() !== '') {
             const loginUserType = userType.toLowerCase().trim() as UserRole;
             if (loginUserType === 'seller' || loginUserType === 'buyer' || loginUserType === 'agent') {
               console.log('[AuthContext] ✅ Using requested role from login screen:', loginUserType);
@@ -168,7 +174,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
             }
           } 
           // Fallback: Use backend response user_type if no userType was provided
-          else if (normalizedUserType && 
+          else if (normalizedUserType &&
                    (normalizedUserType === 'seller' || normalizedUserType === 'buyer' || normalizedUserType === 'agent')) {
             console.log('[AuthContext] ⚠️ No userType provided, using backend response:', normalizedUserType);
             finalUserType = normalizedUserType;

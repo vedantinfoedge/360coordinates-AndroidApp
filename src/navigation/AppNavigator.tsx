@@ -7,7 +7,6 @@ import AuthNavigator from './AuthNavigator';
 import BuyerNavigator from './BuyerNavigator';
 import SellerNavigator from './SellerNavigator';
 import AgentNavigator from './AgentNavigator';
-import BuilderNavigator from './BuilderNavigator';
 import AdminNavigator from './AdminNavigator';
 import SplashScreen from '../screens/Auth/SplashScreen';
 import InitialScreen from '../screens/Landing/InitialScreen';
@@ -26,7 +25,6 @@ export type RootStackParamList = {
   Buyer: undefined;
   Seller: undefined;
   Agent: undefined;
-  Builder: undefined;
   Admin: undefined;
   TermsConditions: undefined;
   PrivacyPolicy: undefined;
@@ -57,12 +55,27 @@ const AppNavigator = () => {
                 
                 if (dashboard) {
                   console.log('[AppNavigator] User authenticated with dashboard:', dashboard);
-                  // Navigate to the specified dashboard
-                  if (dashboard === 'builder') {
-                    console.log('[AppNavigator] Navigating to Builder dashboard');
+                  // STRICT: Agents must always land on Agent dashboard (never Buyer/Seller)
+                  if ((user.user_type || '').toLowerCase() === 'agent') {
+                    console.log('[AppNavigator] 🔒 Agent account detected; forcing Agent dashboard');
                     navigationRef.current?.reset({
                       index: 0,
-                      routes: [{name: 'Builder'}],
+                      routes: [{name: 'Agent'}],
+                    });
+                    if (targetDashboard) {
+                      AsyncStorage.removeItem('@target_dashboard').catch(err => {
+                        console.error('[AppNavigator] Error removing targetDashboard:', err);
+                      });
+                    }
+                    return;
+                  }
+                  // Navigate to the specified dashboard
+                  if (dashboard === 'builder') {
+                    // Builder dashboard is not separate; route to Agent dashboard
+                    console.log('[AppNavigator] Builder selected; navigating to Agent dashboard');
+                    navigationRef.current?.reset({
+                      index: 0,
+                      routes: [{name: 'Agent'}],
                     });
                   } else if (dashboard === 'seller') {
                     console.log('[AppNavigator] Navigating to Seller dashboard');
@@ -163,7 +176,6 @@ const AppNavigator = () => {
         <RootStack.Screen name="Buyer" component={BuyerNavigator} />
         <RootStack.Screen name="Seller" component={SellerNavigator} />
         <RootStack.Screen name="Agent" component={AgentNavigator} />
-        <RootStack.Screen name="Builder" component={BuilderNavigator} />
         <RootStack.Screen name="Admin" component={AdminNavigator} />
         <RootStack.Screen
           name="TermsConditions"

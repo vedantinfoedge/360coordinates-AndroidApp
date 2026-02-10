@@ -66,7 +66,7 @@ const SellSelectionScreen: React.FC<Props> = ({navigation}) => {
       // User is authenticated, navigate to appropriate dashboard via MainTabs
       navigation.reset({
         index: 0,
-        routes: [{name: 'MainTabs' as never, params: {screen: option === 'seller' ? 'Seller' : option === 'agent' ? 'Agent' : 'Builder'}}],
+        routes: [{name: 'MainTabs' as never, params: {screen: option === 'seller' ? 'Seller' : 'Agent'}}],
       });
     }
   };
