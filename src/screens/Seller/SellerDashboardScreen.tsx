@@ -443,7 +443,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     }
   }, []);
 
-  // Check user type access
+  // Check user type access (agent cannot use seller dashboard)
   useEffect(() => {
     if (user && user.user_type === 'agent') {
       CustomAlert.alert(
@@ -467,6 +467,9 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   }, [user, navigation]);
 
   const loadDashboardData = useCallback(async (showLoading: boolean = true, forceRefresh: boolean = false) => {
+    if (!user || user.user_type !== 'seller') {
+      return;
+    }
     // Prevent duplicate fetches and implement caching
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchTimeRef.current;
@@ -505,12 +508,33 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         }
       }
 
-      // Load properties - use smaller limit if stats API worked
-      const propertiesLimit = statsSuccess ? 10 : 20;
-      const propertiesResponse: any = await sellerService.getProperties({
-        page: 1,
-        limit: propertiesLimit,
-      });
+      // Load properties - wrap in try/catch so 401/403 or network errors don't crash the app
+      let propertiesResponse: any = null;
+      try {
+        const propertiesLimit = statsSuccess ? 10 : 20;
+        propertiesResponse = await sellerService.getProperties({
+          page: 1,
+          limit: propertiesLimit,
+        });
+      } catch (propertiesError: any) {
+        if (__DEV__) {
+          console.warn('[SellerDashboard] Error loading properties:', propertiesError);
+        }
+        setDashboardStats({
+          total_properties: 0,
+          active_properties: 0,
+          total_inquiries: 0,
+          new_inquiries: 0,
+          total_views: 0,
+          views_percentage_change: 0,
+          properties_by_status: {sale: 0, rent: 0},
+          recent_inquiries: [],
+          subscription: null,
+        });
+        setRecentProperties([]);
+        hasLoadedOnceRef.current = true;
+        return;
+      }
 
       const response = propertiesResponse as any;
       
@@ -900,8 +924,18 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       .slice(0, 2);
   };
 
+  // Defensive: do not render seller content until user is present (avoids crash on role-switch race)
+  if (!user) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
   // Show access denied message if user is an agent
-  if (user && user.user_type === 'agent') {
+  if (user.user_type === 'agent') {
     return (
       <View style={styles.container}>
         <SellerHeader
@@ -960,7 +994,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     );
   }
 
-  const stats = dashboardStats || {
+  const stats: DashboardStats = dashboardStats ?? {
     total_properties: 0,
     active_properties: 0,
     total_inquiries: 0,
@@ -969,6 +1003,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     views_percentage_change: 0,
     properties_by_status: {sale: 0, rent: 0},
     recent_inquiries: [],
+    subscription: null,
   };
 
   const daysRemaining = stats.subscription?.end_date

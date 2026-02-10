@@ -83,7 +83,7 @@ const AppNavigator = () => {
                     }
                     return;
                   }
-                  // Navigate to the specified dashboard
+                  // Navigate to the specified dashboard (only navigate to Seller when role state is already seller to avoid crash)
                   if (dashboard === 'builder') {
                     // Builder dashboard is not separate; route to Agent dashboard
                     console.log('[AppNavigator] Builder selected; navigating to Agent dashboard');
@@ -91,7 +91,7 @@ const AppNavigator = () => {
                       index: 0,
                       routes: [{name: 'Agent'}],
                     });
-                  } else if (dashboard === 'seller') {
+                  } else if (dashboard === 'seller' && user.user_type === 'seller') {
                     console.log('[AppNavigator] Navigating to Seller dashboard');
                     navigationRef.current?.reset({
                       index: 0,
@@ -126,7 +126,7 @@ const AppNavigator = () => {
                     'registered_role:',
                     (user as any).registered_role,
                   );
-                  if (accountRole === 'seller') {
+                  if (accountRole === 'seller' && user.user_type === 'seller') {
                     navigationRef.current?.reset({
                       index: 0,
                       routes: [{name: 'Seller'}],
@@ -152,8 +152,8 @@ const AppNavigator = () => {
               })
               .catch(err => {
                 console.error('[AppNavigator] Error reading dashboard preference:', err);
-                // Fallback to role-based navigation
-                if (accountRole === 'seller') {
+                // Fallback to role-based navigation (only Seller when user_type is already seller)
+                if (accountRole === 'seller' && user.user_type === 'seller') {
                   navigationRef.current?.reset({
                     index: 0,
                     routes: [{name: 'Seller'}],

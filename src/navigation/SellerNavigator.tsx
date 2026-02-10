@@ -1,5 +1,7 @@
 import React from 'react';
+import {View, Text, StyleSheet, ActivityIndicator} from 'react-native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {useAuth} from '../context/AuthContext';
 import SellerTabNavigator from '../components/navigation/SellerTabNavigator';
 import SellerInquiriesScreen from '../screens/Seller/SellerInquiriesScreen';
 import SellerPropertiesScreen from '../screens/Seller/SellerPropertiesScreen';
@@ -7,6 +9,7 @@ import SellerPropertyDetailsScreen from '../screens/Seller/SellerPropertyDetails
 import AddPropertyScreen from '../screens/Seller/AddPropertyScreen';
 import SellerSupportScreen from '../screens/Seller/SellerSupportScreen';
 import SubscriptionScreen from '../screens/Seller/SubscriptionScreen';
+import {colors} from '../theme';
 
 export type SellerStackParamList = {
   SellerTabs: undefined;
@@ -23,7 +26,32 @@ export type SellerStackParamList = {
 
 const Stack = createNativeStackNavigator<SellerStackParamList>();
 
+/**
+ * Gate: only render Seller stack when active role is seller.
+ * Prevents crash when navigating from Buyer before role state/AsyncStorage are in sync.
+ */
 const SellerNavigator = () => {
+  const {user} = useAuth();
+  const isSeller = user?.user_type === 'seller';
+
+  if (!user) {
+    return (
+      <View style={styles.gateContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.gateText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!isSeller) {
+    return (
+      <View style={styles.gateContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.gateText}>Switching to Seller...</Text>
+      </View>
+    );
+  }
+
   return (
     <Stack.Navigator
       screenOptions={{headerShown: false}}
@@ -38,5 +66,19 @@ const SellerNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  gateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  gateText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+});
 
 export default SellerNavigator;
