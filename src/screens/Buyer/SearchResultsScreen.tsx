@@ -37,6 +37,7 @@ import {propertySearchService} from '../../services/propertySearch.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
+import { buildPGHostelFetchParams, PG_HOSTEL_PROPERTY_TYPE } from '../../utils/propertySearchParams';
 
 type SearchResultsScreenNavigationProp = NativeStackNavigationProp<SearchStackParamList, 'SearchResults'>;
 
@@ -230,7 +231,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   // PG/Hostel listing type: auto-select property type and prevent manual change
   useEffect(() => {
     if (listingType === 'pg-hostel') {
-      setSelectedPropertyType('PG / Hostel');
+      setSelectedPropertyType(pgHostelType.label);
     }
   }, [listingType]);
 
@@ -309,15 +310,15 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       // PG/Hostel listing type OR Rent + PG/Hostel property type: two calls then merge (PG type + available for bachelors)
       // Buy + PG/Hostel: single call, property_type only (no bachelors merge), filter by availability
       const isPGHostelListingType = listingType === 'pg-hostel';
-      const isPGHostelPropertyType = selectedPropertyType === 'PG / Hostel';
+      const isPGHostelPropertyType = selectedPropertyType === PG_HOSTEL_PROPERTY_TYPE;
       const usePGHostelMerge = isPGHostelListingType || (listingType === 'rent' && isPGHostelPropertyType);
       
       if (usePGHostelMerge) {
-        searchParams.property_type = 'PG / Hostel';
+        searchParams.property_type = PG_HOSTEL_PROPERTY_TYPE;
         searchParams.available_for_bachelors = '1'; // PHP backend often expects 1/0
       } else if (listingType === 'buy' && isPGHostelPropertyType) {
         // Buy + PG/Hostel: only property_type, no bachelors (exclude bachelor-only apartments)
-        searchParams.property_type = 'PG / Hostel';
+        searchParams.property_type = PG_HOSTEL_PROPERTY_TYPE;
       }
       
       // PART B: Safely get location with trim() - handle null/empty/spaces
@@ -373,7 +374,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           'Co-working Space': 'Commercial',
           'Warehouse / Godown': 'Commercial',
           'Industrial Property': 'Industrial',
-          'PG / Hostel': 'PG / Hostel', // Backend expects exact 'PG / Hostel' for LIKE
+          'PG / Hostel': PG_HOSTEL_PROPERTY_TYPE,
         };
         
         const category = categoryMap[selectedPropertyType];
@@ -434,7 +435,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           const buyPGParams: any = {
             ...searchParams,
             status: 'sale',
-            property_type: 'PG / Hostel',
+            property_type: PG_HOSTEL_PROPERTY_TYPE,
             limit: 1000,
           };
           delete buyPGParams.available_for_bachelors; // No bachelors merge for Buy
@@ -454,22 +455,17 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             console.log('[SearchResultsScreen] Buy+PG/Hostel: raw', raw.length, 'showing', results.length);
           }
         } else if (usePGHostelMerge) {
-          // PG/Hostel listing type OR Rent + PG/Hostel: two API calls then merge
-          const baseParams: any = {
+          // PG/Hostel listing type OR Rent + PG/Hostel: two API calls then merge (same as AllPropertiesScreen)
+          // Do NOT add min_price, max_price, bedrooms, budget - these block PG results
+          const { pgParams, bachelorsParams } = buildPGHostelFetchParams({
+            page: 1,
             limit: 1000,
-            status: 'rent',
-            property_type: 'PG / Hostel',
-            ...(searchParams.location && { location: searchParams.location }),
-            ...(searchParams.city && { city: searchParams.city }),
-            ...(searchParams.min_price != null && { min_price: searchParams.min_price }),
-            ...(searchParams.max_price != null && { max_price: searchParams.max_price }),
-            ...(searchParams.budget && { budget: searchParams.budget }),
-            ...(searchParams.bedrooms && { bedrooms: searchParams.bedrooms }),
-            ...(searchParams.sort_by && { sort_by: searchParams.sort_by }),
-          };
+            location: searchParams.location,
+            city: searchParams.city,
+          });
           const [resPG, resBachelors] = await Promise.all([
-            propertyService.getProperties({ ...baseParams, property_type: 'PG / Hostel' }) as Promise<any>,
-            propertyService.getProperties({ ...baseParams, available_for_bachelors: '1' }) as Promise<any>,
+            propertyService.getProperties(pgParams) as Promise<any>,
+            propertyService.getProperties(bachelorsParams) as Promise<any>,
           ]);
           const byId = new Map<string, any>();
           const add = (list: any[]) => {
@@ -523,30 +519,43 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           if (searchParams.location) fallbackParams.location = searchParams.location;
           if (searchParams.city) fallbackParams.city = searchParams.city;
           if (usePGHostelMerge) {
-            fallbackParams.status = 'rent';
-            fallbackParams.property_type = 'PG / Hostel';
-            fallbackParams.available_for_bachelors = '1';
-          } else if (listingType === 'buy' && isPGHostelPropertyType) {
-            fallbackParams.status = 'sale';
-            fallbackParams.property_type = 'PG / Hostel';
+            const { pgParams, bachelorsParams } = buildPGHostelFetchParams({
+              page: 1, limit: 100,
+              location: fallbackParams.location, city: fallbackParams.city,
+            });
+            const [fp1, fp2] = await Promise.all([
+              propertyService.getProperties(pgParams) as Promise<any>,
+              propertyService.getProperties(bachelorsParams) as Promise<any>,
+            ]);
+            const byId = new Map<string, any>();
+            const add = (list: any[]) => (list || []).forEach((p: any) => {
+              const id = String(p.id ?? p.property_id ?? '');
+              if (id && !byId.has(id)) byId.set(id, p);
+            });
+            add(fp1?.success ? (fp1.data?.properties ?? fp1.data ?? []) : []);
+            add(fp2?.success ? (fp2.data?.properties ?? fp2.data ?? []) : []);
+            results = Array.from(byId.values()).filter((p: any) => {
+              const pt = (p.property_type || p.type || '').toLowerCase();
+              const isPG = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
+              const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
+              return isPG || forBachelors;
+            });
           } else {
-            fallbackParams.status = status || (listingType === 'buy' ? 'sale' : 'rent');
-          }
-          const fallbackResponse = await propertyService.getProperties(fallbackParams) as any;
-          if (fallbackResponse?.success) {
-            results = fallbackResponse.data?.properties || fallbackResponse.data || [];
-            if (usePGHostelMerge) {
-              results = results.filter((p: any) => {
-                const pt = (p.property_type || '').toLowerCase();
-                const isPG = pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
-                const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
-                return isPG || forBachelors;
-              });
-            } else if (listingType === 'buy' && isPGHostelPropertyType) {
-              results = results.filter((p: any) => {
-                const pt = (p.property_type || '').toLowerCase();
-                return pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
-              });
+            if (listingType === 'buy' && isPGHostelPropertyType) {
+              fallbackParams.status = 'sale';
+              fallbackParams.property_type = PG_HOSTEL_PROPERTY_TYPE;
+            } else {
+              fallbackParams.status = status || (listingType === 'buy' ? 'sale' : 'rent');
+            }
+            const fallbackResponse = await propertyService.getProperties(fallbackParams) as any;
+            if (fallbackResponse?.success) {
+              results = fallbackResponse.data?.properties || fallbackResponse.data || [];
+              if (listingType === 'buy' && isPGHostelPropertyType) {
+                results = results.filter((p: any) => {
+                  const pt = (p.property_type || '').toLowerCase();
+                  return pt.includes('pg') || pt.includes('hostel') || p.status === 'pg';
+                });
+              }
             }
           }
         } catch (fallbackError) {

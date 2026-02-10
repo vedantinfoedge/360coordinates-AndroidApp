@@ -24,6 +24,7 @@ import {propertyService} from '../../services/property.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import { buildPGHostelFetchParams } from '../../utils/propertySearchParams';
 
 type AllPropertiesScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<BuyerStackParamList>,
@@ -81,11 +82,13 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
       
       let propertiesList: any[] = [];
       if (listingType === 'pg-hostel') {
-        // Same as website: two calls then merge (PG/Hostel only + Bachelors only)
-        const baseParams: any = { page: pageNum, limit: 50, status: 'rent' };
+        const { pgParams, bachelorsParams } = buildPGHostelFetchParams({
+          page: pageNum,
+          limit: 50,
+        });
         const [resPG, resBachelors] = await Promise.all([
-          propertyService.getProperties({ ...baseParams, property_type: 'PG / Hostel' }) as Promise<any>,
-          propertyService.getProperties({ ...baseParams, available_for_bachelors: '1' }) as Promise<any>,
+          propertyService.getProperties(pgParams) as Promise<any>,
+          propertyService.getProperties(bachelorsParams) as Promise<any>,
         ]);
         const byId = new Map<string, any>();
         const add = (list: any[]) => {
