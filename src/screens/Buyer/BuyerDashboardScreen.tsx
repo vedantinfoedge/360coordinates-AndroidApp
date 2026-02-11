@@ -451,7 +451,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         location={item.location}
         price={formatters.price(item.price, item.status === 'rent')}
         type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+        onPress={() =>
+          navigation.navigate(
+            item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+            {propertyId: String(item.id)},
+          )
+        }
         onFavoritePress={() => handleToggleFavorite(item.id)}
         onSharePress={() => handleShareProperty(item)}
         isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
@@ -784,7 +789,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                       location={item.location}
                       price={formatters.price(item.price, item.status === 'rent')}
                       type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-                      onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+                      onPress={() =>
+                        navigation.navigate(
+                          item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+                          {propertyId: String(item.id)},
+                        )
+                      }
                       onFavoritePress={() => handleToggleFavorite(item.id)}
                       onSharePress={() => handleShareProperty(item)}
                       isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
@@ -844,7 +854,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                       location={item.location}
                       price={formatters.price(item.price, false)}
                       type="buy"
-                      onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+                      onPress={() =>
+                        navigation.navigate(
+                          item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+                          {propertyId: String(item.id)},
+                        )
+                      }
                       onFavoritePress={() => handleToggleFavorite(item.id)}
                       onSharePress={() => handleShareProperty(item)}
                       isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}

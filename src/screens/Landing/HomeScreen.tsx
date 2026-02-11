@@ -289,10 +289,10 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     } as never);
   };
 
-  const handlePropertyPress = (propertyId: number) => {
+  const handlePropertyPress = (property: Property) => {
     navigation.navigate('Search' as never, {
-      screen: 'PropertyDetails',
-      params: {propertyId: String(propertyId)},
+      screen: property.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+      params: {propertyId: String(property.id)},
     } as never);
   };
 
@@ -322,14 +322,14 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
           opacity: fadeAnim,
           transform: [{translateY: slideAnim}],
         }}>
-        <PropertyCard
+          <PropertyCard
           image={imageUrl || undefined}
           images={images}
           name={item.title}
           location={item.location}
           price={formatters.price(item.price, item.status === 'rent')}
           type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-          onPress={() => handlePropertyPress(item.id)}
+          onPress={() => handlePropertyPress(item)}
           onSharePress={() => handleShareProperty(item)}
           isFavorite={false}
           property={item}
@@ -563,7 +563,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                         location={item.location}
                         price={formatters.price(item.price, item.status === 'rent')}
                         type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-                        onPress={() => handlePropertyPress(item.id)}
+                        onPress={() => handlePropertyPress(item)}
                         onSharePress={() => handleShareProperty(item)}
                         isFavorite={false}
                         property={item}
@@ -624,7 +624,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                         location={item.location}
                         price={formatters.price(item.price, item.status === 'rent')}
                         type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-                        onPress={() => handlePropertyPress(item.id)}
+                        onPress={() => handlePropertyPress(item)}
                         onSharePress={() => handleShareProperty(item)}
                         isFavorite={false}
                         property={item}
@@ -679,7 +679,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                         location={item.location}
                         price={formatters.price(item.price, false)}
                         type="buy"
-                        onPress={() => handlePropertyPress(item.id)}
+                        onPress={() => handlePropertyPress(item)}
                         onSharePress={() => handleShareProperty(item)}
                         isFavorite={false}
                         property={item}

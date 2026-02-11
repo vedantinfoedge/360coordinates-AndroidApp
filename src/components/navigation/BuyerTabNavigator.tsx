@@ -10,6 +10,7 @@ import AllPropertiesScreen from '../../screens/Buyer/AllPropertiesScreen';
 import PropertyDetailsScreen from '../../screens/Buyer/PropertyDetailsScreen';
 import PropertyMapScreen from '../../screens/Buyer/PropertyMapScreen';
 import SupportScreen from '../../screens/Buyer/SupportScreen';
+import UpcomingProjectDetailsScreen from '../../screens/Agent/UpcomingProjectDetailsScreen';
 import FavoritesScreen from '../../screens/FavoritesScreen';
 import RecentlyViewedScreen from '../../screens/Buyer/RecentlyViewedScreen';
 import AddTabScreen from '../../screens/Buyer/AddTabScreen';
@@ -35,6 +36,7 @@ export type BuyerTabParamList = {
   SearchResults: {searchQuery?: string; location?: string; listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
   AllProperties: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'} | undefined;
   PropertyDetails: {propertyId: string};
+  UpcomingProjectDetails: {propertyId: string};
   PropertyMap: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'; propertyId?: string | number} | undefined;
   Support: undefined;
 };
@@ -192,6 +194,14 @@ const BuyerTabNavigator = () => {
         component={PropertyDetailsScreen}
         options={{
           title: 'Property Details',
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="UpcomingProjectDetails"
+        component={UpcomingProjectDetailsScreen}
+        options={{
+          title: 'Upcoming Project Details',
           tabBarButton: () => null, // Hide from tab bar
         }}
       />

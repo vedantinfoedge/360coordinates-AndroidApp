@@ -189,7 +189,12 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
         price={formatters.price(item.price, propertyType === 'rent')}
         type={propertyType}
         isFavorite={true}
-        onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+        onPress={() =>
+          navigation.navigate(
+            (item as any).project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+            {propertyId: String(item.id)},
+          )
+        }
         onFavoritePress={() => handleToggleFavorite(item.id)}
         onSharePress={() => handleShareProperty(item)}
         property={item}
