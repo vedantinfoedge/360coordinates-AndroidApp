@@ -350,24 +350,24 @@ const AnimatedInquiryCard = React.memo(({
           ) : (
             <View style={styles.inquiryAvatarPlaceholder}>
               <Text style={styles.inquiryAvatarText}>
-                {item.buyer_name.charAt(0).toUpperCase()}
+                {((item.buyer_name || '').charAt(0) || '?').toUpperCase()}
               </Text>
             </View>
           )}
           <View style={styles.inquiryCardInfo}>
             <Text style={styles.inquiryBuyerName} numberOfLines={1}>
-              {item.buyer_name}
+              {item.buyer_name || 'Unknown'}
             </Text>
             <Text style={styles.inquiryTime}>
-              {formatters.timeAgo(item.created_at)}
+              {item.created_at ? formatters.timeAgo(item.created_at) : ''}
             </Text>
           </View>
         </View>
         <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
-          {item.property_title}
+          {item.property_title || '—'}
         </Text>
         <Text style={styles.inquiryMessage} numberOfLines={2}>
-          {item.message}
+          {item.message || ''}
         </Text>
       </TouchableOpacity>
     </Animated.View>
@@ -593,7 +593,15 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         const statsResponse: any = await sellerService.getDashboardStats();
         if (statsResponse && statsResponse.success && statsResponse.data) {
           apiStats = statsResponse.data;
-          setRecentInquiries(statsResponse.data.recent_inquiries || []);
+          const raw = statsResponse.data.recent_inquiries || [];
+          setRecentInquiries(raw.map((inq: any) => ({
+            ...inq,
+            buyer_name: inq.buyer_name ?? '',
+            property_title: inq.property_title ?? '',
+            message: inq.message ?? '',
+            created_at: inq.created_at ?? '',
+            status: inq.status ?? '',
+          })));
         }
       } catch (statsError: any) {
         if (statsError?.status !== 404 && statsError?.response?.status !== 404) {
