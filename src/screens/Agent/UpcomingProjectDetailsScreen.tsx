@@ -25,8 +25,6 @@ import ImageGallery from '../../components/common/ImageGallery';
 import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 import {AMENITIES_LIST} from '../../utils/propertyTypeConfig';
-import {geocodeLocation} from '../../utils/geocoding';
-import PropertyMapView from '../../components/map/PropertyMapView';
 
 type UpcomingProjectDetailsScreenNavigationProp = NativeStackNavigationProp<
   AgentStackParamList,
@@ -158,90 +156,6 @@ const buildFormattedProject = (prop: any, propertyImages: PropertyImage[]): any 
   };
 };
 
-// Map section: use project coords or geocode location/fullAddress; fallback to "View on Map" link
-const UpcomingProjectMapSection: React.FC<{project: any}> = ({project}) => {
-  const [coords, setCoords] = useState<{latitude: number; longitude: number} | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const lat = project?.latitude != null ? Number(project.latitude) : NaN;
-    const lng = project?.longitude != null ? Number(project.longitude) : NaN;
-    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      setCoords({latitude: lat, longitude: lng});
-      setLoading(false);
-      return;
-    }
-    const address = project?.location || project?.fullAddress || project?.address;
-    if (!address || typeof address !== 'string') {
-      setLoading(false);
-      return;
-    }
-    geocodeLocation(address).then(result => {
-      if (cancelled) return;
-      if (result) setCoords({latitude: result.latitude, longitude: result.longitude});
-      setLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [project?.id, project?.latitude, project?.longitude, project?.location, project?.fullAddress, project?.address]);
-
-  if (loading) {
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Map</Text>
-        <View style={styles.mapPlaceholder}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.mapPlaceholderText}>Loading map...</Text>
-        </View>
-      </View>
-    );
-  }
-  if (coords) {
-    const mapProperty = {
-      id: project.id,
-      title: project.title || 'Project',
-      location: project.location || '',
-      price: typeof project.price === 'number' ? project.price : parseFloat(project.price || '0'),
-      status: 'sale' as const,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      cover_image: project.cover_image,
-    };
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Map</Text>
-        <View style={styles.mapContainer}>
-          <PropertyMapView
-            properties={[mapProperty]}
-            initialCenter={[coords.longitude, coords.latitude]}
-            initialZoom={14}
-            showListToggle={false}
-            selectedPropertyId={project.id}
-          />
-        </View>
-      </View>
-    );
-  }
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Map</Text>
-      <View style={styles.mapPlaceholder}>
-        <Text style={styles.mapPlaceholderText}>Location could not be displayed on map.</Text>
-        {project.mapLink ? (
-          <TouchableOpacity
-            onPress={() => {
-              const url = String(project.mapLink).startsWith('http') ? project.mapLink : `https://${project.mapLink}`;
-              Linking.openURL(url).catch(() => CustomAlert.alert('Error', 'Could not open map link'));
-            }}
-            style={styles.mapLinkButton}>
-            <Text style={styles.linkText}>View on Map</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
-    </View>
-  );
-};
-
 const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
   const {logout} = useAuth();
@@ -362,17 +276,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       <View style={styles.detailItem} key={label}>
         <Text style={styles.detailLabel}>{label}</Text>
         <Text style={styles.detailValue}>{String(value)}</Text>
-      </View>
-    );
-  };
-
-  // Always show row (use "—" when empty) so all fields are visible
-  const renderDetailRow = (label: string, value: string | number | null | undefined) => {
-    const display = value != null && value !== '' ? String(value) : '—';
-    return (
-      <View style={styles.detailItem} key={label}>
-        <Text style={styles.detailLabel}>{label}</Text>
-        <Text style={[styles.detailValue, display === '—' && styles.detailValueEmpty]}>{display}</Text>
       </View>
     );
   };
@@ -564,54 +467,53 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           <Text style={styles.description}>{property.description || 'No description available'}</Text>
         </View>
 
-        {/* Project details grid: all fields always visible (— when empty) */}
+        {/* Project details grid: only show fields that have data from API */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Project Details</Text>
           <View style={styles.detailsGrid}>
-            {renderDetailRow('Builder / Developer', property.builder)}
-            {renderDetailRow('Project Type', property.property_type || property.project_type)}
-            {renderDetailRow('Project Status', property.project_status)}
-            {renderDetailRow('RERA Number', property.rera_number)}
-            {renderDetailRow('Configuration', bhkTypeText)}
-            {renderDetailRow('Area (sq ft)', property.area != null && property.area !== '' ? String(property.area) : null)}
-            {renderDetailRow('Carpet Area Range', property.carpet_area_range || property.carpet_area)}
-            {renderDetailRow('Number of Towers', property.number_of_towers)}
-            {renderDetailRow('Total Units', property.total_units)}
-            {renderDetailRow('Floors', property.floors_count)}
-            {renderDetailRow('Location', property.location)}
-            {renderDetailRow('City', property.city)}
-            {renderDetailRow('State', property.state)}
-            {renderDetailRow('Address', property.fullAddress || property.address || property.additional_address)}
-            {renderDetailRow('Additional Address', property.additional_address)}
-            {renderDetailRow('Pincode', property.pincode)}
-            {renderDetailRow('Starting Price', property.starting_price != null && property.starting_price !== '' ? formatters.price(Number(property.starting_price), false) : (property.price != null && property.price !== '' ? formatters.price(Number(property.price), false) : null))}
-            {renderDetailRow('Price per Sqft', pricePerSqft ?? (property.price_per_sqft != null && property.price_per_sqft !== '' ? formatters.price(Number(property.price_per_sqft), false) + ' / sq ft' : null))}
-            {renderDetailRow('Booking Amount', bookingAmount ?? (property.booking_amount != null && property.booking_amount !== '' ? formatters.price(Number(property.booking_amount), false) : null))}
-            {renderDetailRow('Expected Launch', formatDate(property.launch_date))}
-            {renderDetailRow('Expected Possession', formatDate(property.possession_date))}
-            {renderDetailRow('RERA Status', property.rera_status)}
-            {renderDetailRow('Land Ownership', property.land_ownership_type)}
-            {renderDetailRow('Bank Approved', property.bank_approved)}
-            <View style={styles.detailItemFull}>
-              <Text style={styles.detailLabel}>Approved Banks</Text>
-              <Text style={[styles.detailValue, (!approvedBanks || approvedBanks.length === 0) && styles.detailValueEmpty]}>
-                {approvedBanks && approvedBanks.length > 0 ? approvedBanks.join(', ') : '—'}
-              </Text>
-            </View>
-            {renderDetailRow('Other Banks', property.other_bank_names)}
-            <View style={styles.detailItemFull}>
-              <Text style={styles.detailLabel}>Map Link</Text>
-              {property.mapLink ? (
+            {renderDetail('Builder / Developer', property.builder)}
+            {renderDetail('Project Type', property.property_type || property.project_type)}
+            {renderDetail('Project Status', property.project_status)}
+            {renderDetail('RERA Number', property.rera_number)}
+            {bhkTypeText && renderDetail('Configuration', bhkTypeText)}
+            {property.area != null && property.area !== '' && renderDetail('Area (sq ft)', String(property.area))}
+            {renderDetail('Carpet Area Range', property.carpet_area_range || property.carpet_area)}
+            {renderDetail('Number of Towers', property.number_of_towers)}
+            {renderDetail('Total Units', property.total_units)}
+            {renderDetail('Floors', property.floors_count)}
+            {renderDetail('Location', property.location)}
+            {renderDetail('City', property.city)}
+            {renderDetail('State', property.state)}
+            {renderDetail('Address', property.fullAddress || property.address || property.additional_address)}
+            {property.additional_address && renderDetail('Additional Address', property.additional_address)}
+            {renderDetail('Pincode', property.pincode)}
+            {((property.starting_price != null && property.starting_price !== '') || (property.price != null && property.price !== '')) &&
+              renderDetail('Starting Price', formatters.price(Number(property.starting_price ?? property.price), false))}
+            {pricePerSqft && renderDetail('Price per Sqft', pricePerSqft)}
+            {bookingAmount && renderDetail('Booking Amount', bookingAmount)}
+            {renderDetail('Expected Launch', formatDate(property.launch_date))}
+            {renderDetail('Expected Possession', formatDate(property.possession_date))}
+            {renderDetail('RERA Status', property.rera_status)}
+            {renderDetail('Land Ownership', property.land_ownership_type)}
+            {renderDetail('Bank Approved', property.bank_approved)}
+            {approvedBanks.length > 0 && (
+              <View style={styles.detailItemFull}>
+                <Text style={styles.detailLabel}>Approved Banks</Text>
+                <Text style={styles.detailValue}>{approvedBanks.join(', ')}</Text>
+              </View>
+            )}
+            {property.other_bank_names && renderDetail('Other Banks', property.other_bank_names)}
+            {property.mapLink ? (
+              <View style={styles.detailItemFull}>
+                <Text style={styles.detailLabel}>Map Link</Text>
                 <TouchableOpacity onPress={() => {
                   const url = String(property.mapLink).startsWith('http') ? property.mapLink : `https://${property.mapLink}`;
                   Linking.openURL(url).catch(() => CustomAlert.alert('Error', 'Could not open map link'));
                 }}>
                   <Text style={[styles.detailValue, styles.linkText]}>View on Map</Text>
                 </TouchableOpacity>
-              ) : (
-                <Text style={[styles.detailValue, styles.detailValueEmpty]}>—</Text>
-              )}
-            </View>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -637,7 +539,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
         )}
 
-        {/* Location / Address */}
+        {/* Location / Address - same as property details: address + View on Map button */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Location</Text>
           <Text style={styles.address}>
@@ -648,21 +550,33 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           {property.latitude != null && property.longitude != null && (
             <Text style={styles.coordinates}>Coordinates: {property.latitude}, {property.longitude}</Text>
           )}
+          <TouchableOpacity
+            style={styles.mapButton}
+            onPress={() => {
+              (navigation as any).navigate('PropertyMap', {
+                propertyId: property.id,
+                listingType: 'buy',
+              });
+            }}>
+            <Text style={styles.mapButtonText}>View on Map</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Contact & Sales - all fields always visible */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact & Sales</Text>
-          <View style={styles.detailsGrid}>
-            {renderDetailRow('Sales Person Name', property.sales_name)}
-            {renderDetailRow('Phone', property.sales_number)}
-            {renderDetailRow('Mobile', property.mobile_number)}
-            {renderDetailRow('Email', property.email_id)}
-            {renderDetailRow('WhatsApp', property.whatsapp_number)}
-            {renderDetailRow('Alternative Number', property.alternative_number)}
-            {renderDetailRow('Office Address', property.office_address)}
+        {/* Contact & Sales - only show fields that have data from API */}
+        {(property.sales_name || property.sales_number || property.mobile_number || property.email_id || property.whatsapp_number || property.alternative_number || property.office_address) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Contact & Sales</Text>
+            <View style={styles.detailsGrid}>
+              {renderDetail('Sales Person Name', property.sales_name)}
+              {renderDetail('Phone', property.sales_number)}
+              {renderDetail('Mobile', property.mobile_number)}
+              {renderDetail('Email', property.email_id)}
+              {renderDetail('WhatsApp', property.whatsapp_number)}
+              {renderDetail('Alternative Number', property.alternative_number)}
+              {renderDetail('Office Address', property.office_address)}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Project Highlights */}
         {property.project_highlights && (
@@ -696,8 +610,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
         )}
 
-        {/* Map */}
-        <UpcomingProjectMapSection project={property} />
       </ScrollView>
 
       <View style={[styles.actionButtons, {paddingBottom: insets.bottom}]}>
@@ -754,10 +666,8 @@ const styles = StyleSheet.create({
   linkText: { color: colors.primary, textDecorationLine: 'underline', fontWeight: '600' },
   brochureButton: { backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start' },
   brochureButtonText: { ...typography.body, color: colors.primary, fontWeight: '600' },
-  mapContainer: { height: 220, borderRadius: borderRadius.md, overflow: 'hidden', backgroundColor: colors.surfaceSecondary },
-  mapPlaceholder: { height: 120, backgroundColor: colors.surfaceSecondary, borderRadius: borderRadius.md, justifyContent: 'center', alignItems: 'center', padding: spacing.lg },
-  mapPlaceholderText: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
-  mapLinkButton: { paddingVertical: spacing.sm },
+  mapButton: { backgroundColor: colors.surfaceSecondary, borderRadius: borderRadius.lg, padding: spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '40', marginTop: spacing.md },
+  mapButtonText: { ...typography.body, color: colors.primary, fontWeight: '700', fontSize: 16 },
   quickInfo: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.surface, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.sm },
   infoCard: { flex: 1, minWidth: '30%', alignItems: 'center', backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
   infoIcon: { fontSize: 20, marginBottom: spacing.xs },
@@ -773,7 +683,6 @@ const styles = StyleSheet.create({
   detailItemFull: { width: '100%', padding: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, marginTop: spacing.xs },
   detailLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, fontSize: 12, fontWeight: '500', textTransform: 'uppercase' },
   detailValue: { ...typography.body, color: colors.text, fontWeight: '600', fontSize: 14 },
-  detailValueEmpty: { color: colors.textSecondary, fontWeight: '400' },
   amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   amenityItem: { flexDirection: 'row', alignItems: 'center', width: '47%', backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
   amenityIcon: { fontSize: 16, color: colors.primary, fontWeight: 'bold' },
