@@ -11,7 +11,9 @@ import {
   Share,
   Platform,
   Linking,
+  Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
@@ -25,6 +27,14 @@ import ImageGallery from '../../components/common/ImageGallery';
 import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 import {AMENITIES_LIST} from '../../utils/propertyTypeConfig';
+import {buyerService} from '../../services/buyer.service';
+import {createLead} from '../../services/leadsService';
+import {
+  isPropertyUnlocked,
+  markPropertyUnlocked,
+  addViewedProperty,
+  ViewedProperty,
+} from '../../services/viewedProperties.service';
 
 type UpcomingProjectDetailsScreenNavigationProp = NativeStackNavigationProp<
   AgentStackParamList,
@@ -39,6 +49,11 @@ type Props = {
 };
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
+// Carousel width with horizontal margins (same as property details screen)
+const IMAGE_CAROUSEL_WIDTH = SCREEN_WIDTH - (spacing.md * 2);
+
+const TOTAL_INTERACTION_LIMIT = 5;
+const INTERACTION_STORAGE_KEY = 'interaction_remaining';
 
 // Helper: parse comma-separated string to array of labels (e.g. "1bhk,2bhk" -> ["1 BHK", "2 BHK"])
 const formatConfigurations = (val: string | null | undefined): string[] => {
@@ -158,7 +173,8 @@ const buildFormattedProject = (prop: any, propertyImages: PropertyImage[]): any 
 
 const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
-  const {logout} = useAuth();
+  const {logout, user} = useAuth();
+  const isBuyer = (user?.user_type || '').toLowerCase() === 'buyer';
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -166,9 +182,26 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const imageScrollViewRef = useRef<ScrollView>(null);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
 
+  // Buyer: View Contact / Chat with Builder (same credit flow as property details)
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [interactionState, setInteractionState] = useState({ remaining: TOTAL_INTERACTION_LIMIT, max: TOTAL_INTERACTION_LIMIT });
+  const [interactionLoading, setInteractionLoading] = useState(true);
+  const [propertyUnlocked, setPropertyUnlocked] = useState(false);
+  const [processingContact, setProcessingContact] = useState(false);
+  const [processingChat, setProcessingChat] = useState(false);
+
   useEffect(() => {
     loadProjectDetails();
   }, [route.params.propertyId]);
+
+  useEffect(() => {
+    if (isBuyer) initializeInteractionState();
+  }, [isBuyer]);
+
+  useEffect(() => {
+    if (isBuyer && property?.id) loadPropertyUnlockState(property.id);
+    else if (!property?.id) setPropertyUnlocked(false);
+  }, [isBuyer, property?.id]);
 
   useEffect(() => {
     if (property && property.images && property.images.length > 0) {
@@ -236,6 +269,195 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
+  const initializeInteractionState = async () => {
+    try {
+      setInteractionLoading(true);
+      const stored = await AsyncStorage.getItem(INTERACTION_STORAGE_KEY);
+      let remaining = TOTAL_INTERACTION_LIMIT;
+      if (stored !== null) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 0) remaining = Math.min(parsed, TOTAL_INTERACTION_LIMIT);
+      } else {
+        await AsyncStorage.setItem(INTERACTION_STORAGE_KEY, TOTAL_INTERACTION_LIMIT.toString());
+      }
+      setInteractionState({ remaining, max: TOTAL_INTERACTION_LIMIT });
+    } catch (_) {
+      setInteractionState({ remaining: TOTAL_INTERACTION_LIMIT, max: TOTAL_INTERACTION_LIMIT });
+    } finally {
+      setInteractionLoading(false);
+    }
+  };
+
+  const loadPropertyUnlockState = async (propertyId: string | number) => {
+    try {
+      const unlocked = await isPropertyUnlocked(propertyId);
+      setPropertyUnlocked(unlocked);
+    } catch (_) {
+      setPropertyUnlocked(false);
+    }
+  };
+
+  const consumeInteraction = async (): Promise<{success: boolean; remaining: number}> => {
+    try {
+      const stored = await AsyncStorage.getItem(INTERACTION_STORAGE_KEY);
+      let remaining = TOTAL_INTERACTION_LIMIT;
+      if (stored !== null) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 0) remaining = Math.min(parsed, TOTAL_INTERACTION_LIMIT);
+      }
+      if (remaining <= 0) {
+        setInteractionState({ remaining: 0, max: TOTAL_INTERACTION_LIMIT });
+        return { success: false, remaining: 0 };
+      }
+      const newRemaining = remaining - 1;
+      await AsyncStorage.setItem(INTERACTION_STORAGE_KEY, newRemaining.toString());
+      setInteractionState({ remaining: newRemaining, max: TOTAL_INTERACTION_LIMIT });
+      return { success: true, remaining: newRemaining };
+    } catch (_) {
+      return { success: false, remaining: interactionState.remaining };
+    }
+  };
+
+  const unlockPropertyAndSaveHistory = async (action: 'chat' | 'contact') => {
+    if (!property || !isBuyer) return;
+    try {
+      const propId = property.id || property.property_id;
+      await markPropertyUnlocked(propId);
+      setPropertyUnlocked(true);
+      const contactName = property.sales_name || property.seller_name || 'Sales Contact';
+      const contactPhone = property.sales_number || property.mobile_number || property.seller_phone || '';
+      const contactEmail = property.email_id || property.seller_email || '';
+      const viewedProperty: ViewedProperty = {
+        propertyId: propId,
+        propertyTitle: property.title || 'Project',
+        propertyLocation: property.location || property.city || '',
+        propertyPrice: property.priceRange || (property.price ? formatters.price(Number(property.price), false) : ''),
+        ownerName: contactName,
+        ownerPhone: contactPhone,
+        ownerEmail: contactEmail,
+        viewedAt: new Date().toISOString(),
+        action,
+      };
+      await addViewedProperty(viewedProperty);
+      if (user?.user_type === 'buyer') {
+        try {
+          const historyAction = action === 'chat' ? 'chat_with_owner' : 'viewed_owner_details';
+          await buyerService.addHistory(propId, historyAction);
+        } catch (_) {}
+      }
+    } catch (_) {}
+  };
+
+  const handlePhonePress = (phone: string) => {
+    if (phone) Linking.openURL(`tel:${phone}`).catch(() => CustomAlert.alert('Error', 'Unable to open phone dialer.'));
+  };
+
+  const handleEmailPress = (email: string) => {
+    if (email) Linking.openURL(`mailto:${email}`).catch(() => CustomAlert.alert('Error', 'Unable to open email client.'));
+  };
+
+  const handleViewContact = async () => {
+    if (processingContact || !property?.id) return;
+    if (!user) {
+      CustomAlert.alert('Login Required', 'Please login to view contact details.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => (navigation as any).navigate('Auth', { screen: 'Login', params: { returnTo: 'UpcomingProjectDetails', propertyId: route.params.propertyId } }) },
+      ]);
+      return;
+    }
+    if (user.user_type !== 'buyer') return;
+    if (showContactModal) {
+      setShowContactModal(false);
+      return;
+    }
+    if (propertyUnlocked) {
+      setShowContactModal(true);
+      try { await buyerService.recordInteraction(property.id, 'view_owner'); } catch (_) {}
+      const sellerId = property.seller_id || property.user_id;
+      if (sellerId != null && user?.id != null) {
+        try { await createLead({ property_id: property.id, seller_id: sellerId, buyer_id: user.id, buyer_name: user.full_name ?? '', buyer_phone: user.phone ?? '', buyer_email: user.email ?? '' }); } catch (_) {}
+      }
+      return;
+    }
+    if (interactionLoading) {
+      CustomAlert.alert('Please wait', 'Loading your interaction balance...');
+      return;
+    }
+    if (interactionState.remaining <= 0) {
+      CustomAlert.alert('Credit limit reached', 'Credit limit reached. Upgrade to continue.');
+      return;
+    }
+    try {
+      setProcessingContact(true);
+      const result = await consumeInteraction();
+      if (!result.success) {
+        CustomAlert.alert('Interaction limit reached', 'Interaction limit reached. Upgrade to continue.');
+        return;
+      }
+      await unlockPropertyAndSaveHistory('contact');
+      setShowContactModal(true);
+      try { await buyerService.recordInteraction(property.id, 'view_owner'); } catch (_) {}
+      const sellerId = property.seller_id || property.user_id;
+      if (sellerId != null && user?.id != null) {
+        try { await createLead({ property_id: property.id, seller_id: sellerId, buyer_id: user.id, buyer_name: user.full_name ?? '', buyer_phone: user.phone ?? '', buyer_email: user.email ?? '' }); } catch (_) {}
+      }
+    } catch (_) {
+      CustomAlert.alert('Error', 'Failed to process contact view. Please try again.');
+    } finally {
+      setProcessingContact(false);
+    }
+  };
+
+  const handleChatWithBuilder = async () => {
+    if (processingChat || !property) return;
+    if (!user) {
+      CustomAlert.alert('Login Required', 'Please login to chat with the builder.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => (navigation as any).navigate('Auth', { screen: 'Login', params: { returnTo: 'UpcomingProjectDetails', propertyId: route.params.propertyId } }) },
+      ]);
+      return;
+    }
+    if (user.user_type !== 'buyer') return;
+    if (interactionLoading) {
+      CustomAlert.alert('Please wait', 'Loading your interaction balance...');
+      return;
+    }
+    const sellerId = property.seller_id || property.owner?.id || property.owner?.user_id || property.user_id;
+    const propId = property.id || property.property_id;
+    const propTitle = property.title || 'Project';
+    if (!sellerId) {
+      CustomAlert.alert('Error', 'Builder/agent information not available');
+      return;
+    }
+    try {
+      setProcessingChat(true);
+      if (!propertyUnlocked) {
+        if (interactionState.remaining <= 0) {
+          CustomAlert.alert('Credit limit reached', 'Credit limit reached. Upgrade to continue.');
+          return;
+        }
+        const result = await consumeInteraction();
+        if (!result.success) {
+          CustomAlert.alert('Credit limit reached', 'Credit limit reached. Upgrade to continue.');
+          return;
+        }
+        await unlockPropertyAndSaveHistory('chat');
+      }
+      (navigation as any).navigate('Chats', {
+        screen: 'ChatConversation',
+        params: {
+          userId: Number(sellerId),
+          userName: '',
+          propertyId: Number(propId),
+          propertyTitle: propTitle,
+          receiverRole: property.owner?.user_type === 'agent' ? 'agent' : 'seller',
+        },
+      });
+    } finally {
+      setProcessingChat(false);
+    }
+  };
+
   if (loading || !property) {
     return (
       <View style={styles.container}>
@@ -280,6 +502,15 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     );
   };
 
+  // Only show area when it's a meaningful value (backend may return 0 or 1 as placeholder)
+  const hasValidArea = property.area != null && property.area !== '' && Number(property.area) > 1;
+  // Only show carpet area range when it's meaningful (hide 0 or "0")
+  const carpetDisplay = property.carpet_area_range || property.carpet_area;
+  const hasValidCarpetArea =
+    carpetDisplay != null &&
+    carpetDisplay !== '' &&
+    String(carpetDisplay).trim() !== '0';
+
   const formatDate = (d: any) => {
     if (!d) return null;
     if (typeof d === 'string') {
@@ -306,7 +537,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, isBuyer && { paddingBottom: 160 }]}>
         {/* Image carousel */}
         <View style={styles.imageCarouselContainer}>
           {propertyImages.length > 0 ? (
@@ -317,13 +548,13 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onMomentumScrollEnd={e => {
-                  const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                  const index = Math.round(e.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH);
                   if (index >= 0 && index < propertyImages.length) setCurrentImageIndex(index);
                 }}
                 scrollEventThrottle={16}
                 style={styles.imageCarousel}
-                contentContainerStyle={{...styles.imageCarouselContent, width: SCREEN_WIDTH * propertyImages.length}}
-                snapToInterval={SCREEN_WIDTH}
+                contentContainerStyle={{...styles.imageCarouselContent, width: IMAGE_CAROUSEL_WIDTH * propertyImages.length}}
+                snapToInterval={IMAGE_CAROUSEL_WIDTH}
                 snapToAlignment="center">
                 {propertyImages.map((image: PropertyImage, index: number) => (
                   <TouchableOpacity
@@ -354,7 +585,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       key={index}
                       onPress={() => {
                         setCurrentImageIndex(index);
-                        imageScrollViewRef.current?.scrollTo({x: index * SCREEN_WIDTH, animated: true});
+                        imageScrollViewRef.current?.scrollTo({x: index * IMAGE_CAROUSEL_WIDTH, animated: true});
                       }}
                       activeOpacity={0.7}>
                       <View style={[styles.indicator, index === currentImageIndex && styles.indicatorActive]} />
@@ -364,7 +595,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               )}
             </>
           ) : (
-            <View style={styles.imageContainer}>
+            <View style={[styles.imageContainer, {width: IMAGE_CAROUSEL_WIDTH}]}>
               <View style={[styles.image, styles.imagePlaceholder]}>
                 <Text style={styles.imagePlaceholderText}>🏗️</Text>
                 <Text style={styles.imagePlaceholderSubtext}>No images</Text>
@@ -415,7 +646,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               <Text style={styles.infoText}>{String(property.project_status)}</Text>
             </View>
           )}
-          {property.area != null && property.area !== '' && (
+          {hasValidArea && (
             <View style={styles.infoCard}>
               <Text style={styles.infoIcon}>📐</Text>
               <Text style={styles.infoText}>{property.area} sq ft</Text>
@@ -439,10 +670,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               <Text style={styles.infoText}>{property.floors_count} Floors</Text>
             </View>
           )}
-          {(property.carpet_area || property.carpet_area_range) && (
+          {hasValidCarpetArea && (
             <View style={styles.infoCard}>
               <Text style={styles.infoIcon}>📏</Text>
-              <Text style={styles.infoText}>{property.carpet_area || property.carpet_area_range}</Text>
+              <Text style={styles.infoText}>{carpetDisplay}</Text>
             </View>
           )}
         </View>
@@ -476,8 +707,8 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             {renderDetail('Project Status', property.project_status)}
             {renderDetail('RERA Number', property.rera_number)}
             {bhkTypeText && renderDetail('Configuration', bhkTypeText)}
-            {property.area != null && property.area !== '' && renderDetail('Area (sq ft)', String(property.area))}
-            {renderDetail('Carpet Area Range', property.carpet_area_range || property.carpet_area)}
+            {hasValidArea && renderDetail('Area (sq ft)', String(property.area))}
+            {hasValidCarpetArea && renderDetail('Carpet Area Range', carpetDisplay)}
             {renderDetail('Number of Towers', property.number_of_towers)}
             {renderDetail('Total Units', property.total_units)}
             {renderDetail('Floors', property.floors_count)}
@@ -543,7 +774,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Location</Text>
           <Text style={styles.address}>
-            {[property.location, property.area, property.city, property.state].filter(Boolean).join(', ') || property.address || property.fullAddress || 'Address not available'}
+            {[property.location, hasValidArea ? property.area : null, property.city, property.state].filter(Boolean).join(', ') || property.address || property.fullAddress || 'Address not available'}
           </Text>
           {property.additional_address && <Text style={styles.addressSub}>{property.additional_address}</Text>}
           {property.pincode && <Text style={styles.addressSub}>Pincode: {property.pincode}</Text>}
@@ -612,13 +843,134 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
       </ScrollView>
 
-      <View style={[styles.actionButtons, {paddingBottom: insets.bottom}]}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => navigation.navigate('EditProperty', {propertyId: property.id})}>
-          <Text style={styles.editButtonText}>✏️ Edit Project</Text>
-        </TouchableOpacity>
-      </View>
+      {isBuyer && (
+        <>
+          <View style={[styles.buyerActionButtons, { paddingBottom: insets.bottom }]}>
+            <TouchableOpacity
+              style={[styles.contactButton, (processingContact || interactionLoading) && styles.contactButtonDisabled]}
+              onPress={handleViewContact}
+              disabled={processingContact || interactionLoading}>
+              <Text style={styles.contactButtonText}>{showContactModal ? 'Hide Contact' : 'View Contact'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.chatButton, (processingChat || interactionLoading) && styles.contactButtonDisabled]}
+              onPress={handleChatWithBuilder}
+              disabled={processingChat || interactionLoading}>
+              <Text style={styles.chatButtonText}>💬 Chat with Builder</Text>
+            </TouchableOpacity>
+          </View>
+          {!interactionLoading && (
+            <View style={[styles.limitContainer, { bottom: (insets.bottom || 0) + 70 }]}>
+              <Text style={[styles.limitText, interactionState.remaining <= 0 && styles.limitTextError]}>
+                Credits Left: {interactionState.remaining} / {interactionState.max}
+              </Text>
+            </View>
+          )}
+        </>
+      )}
+
+      {!isBuyer && (
+        <View style={[styles.actionButtons, {paddingBottom: insets.bottom}]}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => navigation.navigate('EditProperty', {propertyId: property.id})}>
+            <Text style={styles.editButtonText}>✏️ Edit Project</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Contact Modal - Buyer only (Sales / Builder contact) */}
+      {isBuyer && (
+        <Modal visible={showContactModal} transparent animationType="slide" onRequestClose={() => setShowContactModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Sales / Builder Contact</Text>
+                <TouchableOpacity onPress={() => setShowContactModal(false)}>
+                  <Text style={styles.modalClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              {!interactionLoading && (
+                <View style={styles.modalLimitInfo}>
+                  <Text style={[styles.limitText, interactionState.remaining <= 0 && styles.limitTextError]}>
+                    Credits Left: {interactionState.remaining} / {interactionState.max}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.contactDetails}>
+                <View style={styles.contactItem}>
+                  <Text style={styles.contactLabel}>Name</Text>
+                  <Text style={styles.contactValue}>{property.sales_name || property.seller_name || 'Sales Contact'}</Text>
+                </View>
+                <View style={styles.contactItem}>
+                  <Text style={styles.contactLabel}>📞 Phone</Text>
+                  {(property.sales_number || property.seller_phone) ? (
+                    <TouchableOpacity onPress={() => handlePhonePress(property.sales_number || property.seller_phone || '')}>
+                      <Text style={[styles.contactValue, styles.contactLink]}>{property.sales_number || property.seller_phone}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.contactValue}>Not available</Text>
+                  )}
+                </View>
+                <View style={styles.contactItem}>
+                  <Text style={styles.contactLabel}>📱 Mobile</Text>
+                  {property.mobile_number ? (
+                    <TouchableOpacity onPress={() => handlePhonePress(property.mobile_number)}>
+                      <Text style={[styles.contactValue, styles.contactLink]}>{property.mobile_number}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.contactValue}>Not available</Text>
+                  )}
+                </View>
+                <View style={styles.contactItem}>
+                  <Text style={styles.contactLabel}>✉ Email</Text>
+                  {(property.email_id || property.seller_email) ? (
+                    <TouchableOpacity onPress={() => handleEmailPress(property.email_id || property.seller_email || '')}>
+                      <Text style={[styles.contactValue, styles.contactLink]}>{property.email_id || property.seller_email}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.contactValue}>Not available</Text>
+                  )}
+                </View>
+                {(property.whatsapp_number || property.alternative_number || property.office_address) && (
+                  <>
+                    {property.whatsapp_number && (
+                      <View style={styles.contactItem}>
+                        <Text style={styles.contactLabel}>WhatsApp</Text>
+                        <TouchableOpacity onPress={() => handlePhonePress(property.whatsapp_number)}>
+                          <Text style={[styles.contactValue, styles.contactLink]}>{property.whatsapp_number}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {property.alternative_number && (
+                      <View style={styles.contactItem}>
+                        <Text style={styles.contactLabel}>Alternative</Text>
+                        <TouchableOpacity onPress={() => handlePhonePress(property.alternative_number)}>
+                          <Text style={[styles.contactValue, styles.contactLink]}>{property.alternative_number}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {property.office_address && (
+                      <View style={styles.contactItem}>
+                        <Text style={styles.contactLabel}>Office Address</Text>
+                        <Text style={styles.contactValue}>{property.office_address}</Text>
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.modalChatButton}
+                onPress={() => {
+                  setShowContactModal(false);
+                  setTimeout(() => handleChatWithBuilder(), 300);
+                }}>
+                <Text style={styles.modalChatButtonText}>💬 Start Chat</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <ImageGallery
         visible={showImageGallery}
@@ -636,10 +988,10 @@ const styles = StyleSheet.create({
   loadingText: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
-  imageCarouselContainer: { height: 300, position: 'relative' },
-  imageCarousel: { height: 300 },
+  imageCarouselContainer: { height: 300, position: 'relative', marginHorizontal: spacing.md, borderRadius: borderRadius.lg, overflow: 'hidden', backgroundColor: colors.surfaceSecondary },
+  imageCarousel: { height: 300, borderRadius: borderRadius.lg },
   imageCarouselContent: { alignItems: 'center' },
-  imageContainer: { width: SCREEN_WIDTH, height: 300 },
+  imageContainer: { width: IMAGE_CAROUSEL_WIDTH, height: 300, overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
   imagePlaceholder: { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' },
   imagePlaceholderText: { fontSize: 48, marginBottom: spacing.xs },
@@ -693,6 +1045,28 @@ const styles = StyleSheet.create({
   actionButtons: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, flexDirection: 'row', gap: spacing.md },
   editButton: { flex: 1, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   editButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
+  buyerActionButtons: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, ...Platform.select({ android: { elevation: 8 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4 } }) },
+  contactButton: { flex: 1, backgroundColor: colors.surface, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.primary },
+  contactButtonText: { ...typography.body, color: colors.primary, fontWeight: '700', fontSize: 16 },
+  chatButton: { flex: 1, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center' },
+  chatButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
+  contactButtonDisabled: { opacity: 0.5 },
+  limitContainer: { position: 'absolute', left: spacing.md, alignItems: 'flex-start' },
+  limitText: { ...typography.caption, fontSize: 14, color: colors.text, backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.primary + '60', fontWeight: '700' },
+  limitTextError: { color: colors.error || '#c62828' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl, borderTopRightRadius: borderRadius.xl, padding: spacing.lg, maxHeight: '70%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  modalTitle: { fontSize: 24, fontWeight: '700', color: colors.text },
+  modalClose: { fontSize: 28, color: colors.textSecondary, fontWeight: '300' },
+  modalLimitInfo: { marginBottom: spacing.md },
+  contactDetails: { gap: spacing.sm, marginBottom: spacing.lg },
+  contactItem: { paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  contactLabel: { ...typography.caption, color: colors.textSecondary, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', marginBottom: spacing.xs },
+  contactValue: { ...typography.body, color: colors.text, fontSize: 16, fontWeight: '600' },
+  contactLink: { color: colors.primary, textDecorationLine: 'underline' },
+  modalChatButton: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
+  modalChatButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
 });
 
 export default UpcomingProjectDetailsScreen;
