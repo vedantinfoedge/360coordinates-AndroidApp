@@ -364,8 +364,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
       
       console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
-      // PART A: Always navigate to SearchResults - empty location is valid
-      navigation.navigate('SearchResults', params as never);
+      // Navigate to Search tab (SearchResultsScreen) so tab selection updates correctly
+      navigation.navigate('Search' as never, params as never);
     } catch (error: any) {
       console.error('Error navigating to search:', error);
       CustomAlert.alert('Error', 'Failed to navigate to search. Please try again.');
@@ -409,12 +409,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const handleCityPress = (cityName: string) => {
     // Navigate to SearchResults with city name as both location and city params
     // This ensures proper filtering by city
-    navigation.navigate('SearchResults', {
+    const params: any = {
       query: cityName,
       location: cityName,
       city: cityName,
       searchQuery: cityName,
-    } as never);
+      listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent',
+      status: listingType === 'sale' ? 'sale' : 'rent',
+    };
+    navigation.navigate('Search' as never, params as never);
   };
 
   const handleShareProperty = async (property: Property) => {
@@ -675,7 +678,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
                     // Navigate directly to SearchResults screen
                   console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
-                  navigation.navigate('SearchResults', params as never);
+                  navigation.navigate('Search' as never, params as never);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   CustomAlert.alert('Error', 'Failed to load all properties. Please try again.');
@@ -749,7 +752,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             </View>
             <TouchableOpacity
               onPress={() => {
-                navigation.navigate('SearchResults', {
+                navigation.navigate('Search' as never, {
                   query: '',
                   location: '',
                   listingType: 'buy',
@@ -810,7 +813,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             </View>
             <TouchableOpacity
               onPress={() => {
-                navigation.navigate('SearchResults', {
+                navigation.navigate('Search' as never, {
                   query: '',
                   location: '',
                   listingType: 'buy',

@@ -132,6 +132,76 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
   const [area, setArea] = useState<string>(initialArea);
   const [status, setStatus] = useState<'sale' | 'rent' | ''>(initialStatus);
   
+  // When navigating to this screen multiple times (e.g. from Buyer dashboard / Home screen),
+  // React Navigation may reuse the mounted screen. Sync state from latest route params so
+  // listingType/location updates actually apply.
+  const lastRouteSyncKeyRef = useRef<string>('');
+  const routeSyncKey = useMemo(() => {
+    const p: any = routeParams ?? {};
+    return JSON.stringify({
+      query: p.query ?? '',
+      searchQuery: p.searchQuery ?? '',
+      location: p.location ?? '',
+      city: p.city ?? '',
+      propertyType: p.propertyType ?? '',
+      budget: p.budget ?? '',
+      bedrooms: p.bedrooms ?? '',
+      area: p.area ?? '',
+      status: p.status ?? '',
+      listingType: p.listingType ?? '',
+      project_type: p.project_type ?? '',
+    });
+  }, [
+    (routeParams as any)?.query,
+    (routeParams as any)?.searchQuery,
+    (routeParams as any)?.location,
+    (routeParams as any)?.city,
+    (routeParams as any)?.propertyType,
+    (routeParams as any)?.budget,
+    (routeParams as any)?.bedrooms,
+    (routeParams as any)?.area,
+    (routeParams as any)?.status,
+    (routeParams as any)?.listingType,
+    (routeParams as any)?.project_type,
+  ]);
+
+  useEffect(() => {
+    if (lastRouteSyncKeyRef.current === routeSyncKey) return;
+    lastRouteSyncKeyRef.current = routeSyncKey;
+
+    const p: any = routeParams ?? {};
+
+    // Location/query
+    const nextLocation = (p.query || p.location || p.searchQuery || '').trim();
+    setSearchText(nextLocation);
+    setLocation(nextLocation);
+
+    // Listing type + status
+    const nextListingType = p.listingType;
+    if (nextListingType === 'buy' || nextListingType === 'rent' || nextListingType === 'pg-hostel') {
+      setListingType(nextListingType);
+    }
+
+    const nextStatus = p.status;
+    if (nextStatus === 'sale' || nextStatus === 'rent' || nextStatus === '') {
+      setStatus(nextStatus);
+    }
+
+    // Optional filters (only apply if explicitly provided and non-empty)
+    if (typeof p.propertyType === 'string' && p.propertyType.trim()) {
+      setSelectedPropertyType(p.propertyType);
+    }
+    if (typeof p.budget === 'string' && p.budget.trim()) {
+      setBudget(p.budget);
+    }
+    if (typeof p.bedrooms === 'string' && p.bedrooms.trim()) {
+      setBedrooms(p.bedrooms);
+    }
+    if (typeof p.area === 'string' && p.area.trim()) {
+      setArea(p.area);
+    }
+  }, [routeSyncKey]);
+
   const hasInitializedBudgetContext = useRef(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const searchBarHeight = 175; // Search bar + dropdown row + results header
