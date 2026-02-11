@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Share,
   Platform,
+  Linking,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -23,6 +24,9 @@ import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import {AMENITIES_LIST} from '../../utils/propertyTypeConfig';
+import {geocodeLocation} from '../../utils/geocoding';
+import PropertyMapView from '../../components/map/PropertyMapView';
 
 type UpcomingProjectDetailsScreenNavigationProp = NativeStackNavigationProp<
   AgentStackParamList,
@@ -68,6 +72,176 @@ const parseBanks = (val: any): string[] => {
   return [];
 };
 
+// BHK text from configurations (website: formatBhkType)
+const formatBhkType = (configurations: string | string[] | null | undefined): string => {
+  const arr = formatConfigurations(
+    Array.isArray(configurations) ? (configurations as string[]).join(',') : (configurations as string)
+  );
+  return arr.length ? arr.join(', ') : '';
+};
+
+// Build a single formatted project object from API prop + upcoming_project_data (website parity)
+const buildFormattedProject = (prop: any, propertyImages: PropertyImage[]): any => {
+  let upcomingData: any = {};
+  const raw = prop.upcoming_project_data;
+  if (raw != null) {
+    if (typeof raw === 'string') {
+      try {
+        upcomingData = JSON.parse(raw) || {};
+      } catch (_) {
+        upcomingData = {};
+      }
+    } else if (typeof raw === 'object' && !Array.isArray(raw)) {
+      upcomingData = raw;
+    }
+  }
+  const priceNum = typeof prop.price === 'number' ? prop.price : parseFloat(prop.price || '0');
+  const priceRange = priceNum > 0 ? formatters.price(priceNum, false) : (prop.price_range || 'Price on request');
+  const bhkType = formatBhkType(prop.configurations ?? upcomingData.configurations);
+  return {
+    id: prop.id,
+    title: prop.title,
+    location: prop.location || upcomingData.location,
+    priceRange,
+    bhkType,
+    builder: prop.builder_name || prop.builder || upcomingData.builder_name || upcomingData.builder,
+    builder_link: prop.builder_link || upcomingData.builder_link,
+    description: prop.description,
+    configurations: prop.configurations ?? upcomingData.configurations,
+    amenities: prop.amenities ?? upcomingData.amenities,
+    images: propertyImages,
+    latitude: prop.latitude ?? upcomingData.latitude,
+    longitude: prop.longitude ?? upcomingData.longitude,
+    seller_id: prop.seller_id || prop.user_id,
+    seller_name: prop.seller_name,
+    seller_email: prop.seller_email,
+    seller_phone: prop.seller_phone,
+    property_type: prop.property_type || upcomingData.property_type,
+    project_type: prop.project_type || upcomingData.project_type,
+    project_status: prop.project_status ?? upcomingData.project_status,
+    rera_number: prop.rera_number ?? upcomingData.rera_number,
+    city: prop.city ?? upcomingData.city,
+    area: prop.area ?? upcomingData.area,
+    fullAddress: prop.fullAddress ?? prop.address ?? upcomingData.fullAddress ?? upcomingData.address,
+    state: prop.state ?? upcomingData.state,
+    pincode: prop.pincode ?? upcomingData.pincode,
+    mapLink: prop.map_link ?? prop.mapLink ?? upcomingData.map_link ?? upcomingData.mapLink,
+    carpet_area: prop.carpet_area ?? upcomingData.carpet_area,
+    carpet_area_range: prop.carpet_area_range ?? upcomingData.carpet_area_range,
+    number_of_towers: prop.number_of_towers ?? upcomingData.number_of_towers,
+    total_units: prop.total_units ?? upcomingData.total_units,
+    floors_count: prop.floors_count ?? upcomingData.floors_count,
+    starting_price: prop.starting_price ?? prop.price ?? upcomingData.starting_price ?? upcomingData.price,
+    price_per_sqft: prop.price_per_sqft ?? upcomingData.price_per_sqft,
+    booking_amount: prop.booking_amount ?? upcomingData.booking_amount,
+    launch_date: prop.launch_date ?? upcomingData.launch_date,
+    possession_date: prop.possession_date ?? upcomingData.possession_date,
+    rera_status: prop.rera_status ?? upcomingData.rera_status,
+    land_ownership_type: prop.land_ownership_type ?? upcomingData.land_ownership_type,
+    bank_approved: prop.bank_approved ?? upcomingData.bank_approved,
+    approved_banks: prop.approved_banks ?? upcomingData.approved_banks,
+    other_bank_names: prop.other_bank_names ?? upcomingData.other_bank_names,
+    sales_name: prop.sales_name ?? upcomingData.sales_name,
+    sales_number: prop.sales_number ?? upcomingData.sales_number,
+    email_id: prop.email_id ?? upcomingData.email_id,
+    mobile_number: prop.mobile_number ?? upcomingData.mobile_number,
+    whatsapp_number: prop.whatsapp_number ?? upcomingData.whatsapp_number,
+    alternative_number: prop.alternative_number ?? upcomingData.alternative_number,
+    office_address: prop.office_address ?? upcomingData.office_address,
+    project_highlights: prop.project_highlights ?? upcomingData.project_highlights,
+    usp: prop.usp ?? upcomingData.usp,
+    brochure: prop.brochure ?? upcomingData.brochure,
+    brochure_url: prop.brochure_url ?? upcomingData.brochure_url,
+    additional_address: prop.additional_address,
+    cover_image: prop.cover_image,
+    price: prop.price,
+  };
+};
+
+// Map section: use project coords or geocode location/fullAddress; fallback to "View on Map" link
+const UpcomingProjectMapSection: React.FC<{project: any}> = ({project}) => {
+  const [coords, setCoords] = useState<{latitude: number; longitude: number} | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const lat = project?.latitude != null ? Number(project.latitude) : NaN;
+    const lng = project?.longitude != null ? Number(project.longitude) : NaN;
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      setCoords({latitude: lat, longitude: lng});
+      setLoading(false);
+      return;
+    }
+    const address = project?.location || project?.fullAddress || project?.address;
+    if (!address || typeof address !== 'string') {
+      setLoading(false);
+      return;
+    }
+    geocodeLocation(address).then(result => {
+      if (cancelled) return;
+      if (result) setCoords({latitude: result.latitude, longitude: result.longitude});
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [project?.id, project?.latitude, project?.longitude, project?.location, project?.fullAddress, project?.address]);
+
+  if (loading) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Map</Text>
+        <View style={styles.mapPlaceholder}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.mapPlaceholderText}>Loading map...</Text>
+        </View>
+      </View>
+    );
+  }
+  if (coords) {
+    const mapProperty = {
+      id: project.id,
+      title: project.title || 'Project',
+      location: project.location || '',
+      price: typeof project.price === 'number' ? project.price : parseFloat(project.price || '0'),
+      status: 'sale' as const,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      cover_image: project.cover_image,
+    };
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Map</Text>
+        <View style={styles.mapContainer}>
+          <PropertyMapView
+            properties={[mapProperty]}
+            initialCenter={[coords.longitude, coords.latitude]}
+            initialZoom={14}
+            showListToggle={false}
+            selectedPropertyId={project.id}
+          />
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Map</Text>
+      <View style={styles.mapPlaceholder}>
+        <Text style={styles.mapPlaceholderText}>Location could not be displayed on map.</Text>
+        {project.mapLink ? (
+          <TouchableOpacity
+            onPress={() => {
+              const url = String(project.mapLink).startsWith('http') ? project.mapLink : `https://${project.mapLink}`;
+              Linking.openURL(url).catch(() => CustomAlert.alert('Error', 'Could not open map link'));
+            }}
+            style={styles.mapLinkButton}>
+            <Text style={styles.linkText}>View on Map</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </View>
+  );
+};
+
 const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
   const {logout} = useAuth();
@@ -98,30 +272,32 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       const response = await propertyService.getPropertyDetails(route.params.propertyId);
       const responseData = response as any;
 
-      if (responseData && responseData.success && responseData.data) {
-        const propData = responseData.data.property || responseData.data;
-
-        let propertyImages: PropertyImage[] = validateAndProcessPropertyImages(
-          propData.images,
-          propData.title || 'Project',
-          propData.cover_image
-        );
-
-        if (propertyImages.length === 0) {
-          propertyImages = [{
-            id: 1,
-            url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=500',
-            alt: propData.title || 'Project image',
-          }];
-        }
-
-        propData.images = propertyImages;
-        setProperty(propData);
-        setCurrentImageIndex(0);
-      } else {
-        CustomAlert.alert('Error', 'Failed to load project details');
+      if (!responseData?.success || !responseData?.data || !responseData.data.property) {
+        CustomAlert.alert('Error', 'Project not found');
         navigation.goBack();
+        return;
       }
+
+      const propData = responseData.data.property;
+
+      let propertyImages: PropertyImage[] = validateAndProcessPropertyImages(
+        propData.images,
+        propData.title || 'Project',
+        propData.cover_image
+      );
+
+      if (propertyImages.length === 0) {
+        propertyImages = [{
+          id: 1,
+          url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=500',
+          alt: propData.title || 'Project image',
+        }];
+      }
+
+      const formattedProject = buildFormattedProject(propData, propertyImages);
+      formattedProject.images = propertyImages;
+      setProperty(formattedProject);
+      setCurrentImageIndex(0);
     } catch (error: any) {
       console.error('[UpcomingProjectDetails] Error loading project:', error);
       CustomAlert.alert('Error', error.message || 'Failed to load project details');
@@ -167,7 +343,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     ? property.images.filter((img: any): img is PropertyImage => img && typeof img === 'object' && img.url && typeof img.url === 'string' && img.url.trim() !== '')
     : [];
 
-  const formattedPrice = property.price ? formatters.price(parseFloat(property.price), false) : 'Price on request';
+  const priceRangeText = property.priceRange || (property.price ? formatters.price(parseFloat(String(property.price)), false) : 'Price on request');
   const pricePerSqft = property.price_per_sqft != null && property.price_per_sqft !== ''
     ? formatters.price(Number(property.price_per_sqft), false) + ' / sq ft'
     : null;
@@ -178,6 +354,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const amenities = parseAmenities(property.amenities);
   const configurations = formatConfigurations(property.configurations);
   const approvedBanks = parseBanks(property.approved_banks);
+  const bhkTypeText = property.bhkType ?? formatBhkType(property.configurations);
 
   const renderDetail = (label: string, value: string | number | null | undefined) => {
     if (value == null || value === '') return null;
@@ -292,15 +469,26 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
           <View style={styles.locationContainer}>
             <Text style={styles.locationIcon}>📍</Text>
-            <Text style={styles.location}>{property.location || property.city || property.address || 'Location not specified'}</Text>
+            <Text style={styles.location}>{property.location || property.city || property.fullAddress || property.address || 'Location not specified'}</Text>
           </View>
-          <Text style={styles.price}>{formattedPrice}</Text>
+          <Text style={styles.priceLabel}>Price Range</Text>
+          <Text style={styles.price}>{priceRangeText}</Text>
           {pricePerSqft && <Text style={styles.priceSub}>{pricePerSqft}</Text>}
           {bookingAmount && <Text style={styles.bookingLabel}>Booking amount: {bookingAmount}</Text>}
         </View>
 
-        {/* Quick info: Project type, status, config, towers, units, floors, carpet area */}
+        {/* Quick info: Configuration (BHK), Status Upcoming, area, towers, units, floors, carpet area */}
         <View style={styles.quickInfo}>
+          {bhkTypeText ? (
+            <View style={styles.infoCard}>
+              <Text style={styles.infoIcon}>🏠</Text>
+              <Text style={styles.infoText}>{bhkTypeText}</Text>
+            </View>
+          ) : null}
+          <View style={styles.infoCard}>
+            <Text style={styles.infoIcon}>📋</Text>
+            <Text style={styles.infoText}>Upcoming</Text>
+          </View>
           {(property.property_type || property.project_type) && (
             <View style={styles.infoCard}>
               <Text style={styles.infoIcon}>🏢</Text>
@@ -311,6 +499,12 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.infoCard}>
               <Text style={styles.infoIcon}>📋</Text>
               <Text style={styles.infoText}>{String(property.project_status)}</Text>
+            </View>
+          )}
+          {property.area != null && property.area !== '' && (
+            <View style={styles.infoCard}>
+              <Text style={styles.infoIcon}>📐</Text>
+              <Text style={styles.infoText}>{property.area} sq ft</Text>
             </View>
           )}
           {property.number_of_towers != null && property.number_of_towers !== '' && (
@@ -355,18 +549,33 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
         {/* Description */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About this project</Text>
+          <Text style={styles.sectionTitle}>About this place</Text>
           <Text style={styles.description}>{property.description || 'No description available'}</Text>
         </View>
 
-        {/* Project details: RERA, launch, possession, legal, banks */}
+        {/* Project details grid: only when value exists (website order) */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Project details</Text>
+          <Text style={styles.sectionTitle}>Project Details</Text>
           <View style={styles.detailsGrid}>
-            {renderDetail('RERA Number', property.rera_number)}
+            {renderDetail('Builder / Developer', property.builder)}
+            {renderDetail('Project Type', property.property_type || property.project_type)}
             {renderDetail('Project Status', property.project_status)}
-            {renderDetail('Launch Date', formatDate(property.launch_date))}
-            {renderDetail('Possession Date', formatDate(property.possession_date))}
+            {renderDetail('RERA Number', property.rera_number)}
+            {bhkTypeText && renderDetail('Configuration', bhkTypeText)}
+            {renderDetail('Carpet Area Range', property.carpet_area_range || property.carpet_area)}
+            {renderDetail('Number of Towers', property.number_of_towers)}
+            {renderDetail('Total Units', property.total_units)}
+            {renderDetail('Floors', property.floors_count)}
+            {renderDetail('Location', property.location)}
+            {renderDetail('City', property.city)}
+            {renderDetail('State', property.state)}
+            {renderDetail('Address', property.fullAddress || property.address || property.additional_address)}
+            {renderDetail('Pincode', property.pincode)}
+            {property.starting_price != null && property.starting_price !== '' && renderDetail('Starting Price', formatters.price(Number(property.starting_price), false))}
+            {pricePerSqft && renderDetail('Price per Sqft', pricePerSqft)}
+            {bookingAmount && renderDetail('Booking Amount', bookingAmount)}
+            {renderDetail('Expected Launch', formatDate(property.launch_date))}
+            {renderDetail('Possession', formatDate(property.possession_date))}
             {renderDetail('RERA Status', property.rera_status)}
             {renderDetail('Land Ownership', property.land_ownership_type)}
             {renderDetail('Bank Approved', property.bank_approved)}
@@ -377,20 +586,38 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               </View>
             )}
             {property.other_bank_names && renderDetail('Other Banks', property.other_bank_names)}
+            {property.mapLink ? (
+              <View style={styles.detailItemFull}>
+                <Text style={styles.detailLabel}>Map Link</Text>
+                <TouchableOpacity onPress={() => {
+                  const url = String(property.mapLink).startsWith('http') ? property.mapLink : `https://${property.mapLink}`;
+                  Linking.openURL(url).catch(() => CustomAlert.alert('Error', 'Could not open map link'));
+                }}>
+                  <Text style={[styles.detailValue, styles.linkText]}>View on Map</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         </View>
 
-        {/* Amenities */}
+        {/* Amenities - What this place offers (with icons from AMENITIES_LIST) */}
         {amenities.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Amenities</Text>
+            <Text style={styles.sectionTitle}>What this place offers</Text>
             <View style={styles.amenitiesGrid}>
-              {amenities.map((a: string, i: number) => (
-                <View key={i} style={styles.amenityItem}>
-                  <Text style={styles.amenityIcon}>✓</Text>
-                  <Text style={styles.amenityText}>{capitalizeAmenity(a)}</Text>
-                </View>
-              ))}
+              {amenities.map((a: string, i: number) => {
+                const id = String(a).trim().toLowerCase().replace(/\s+/g, '_');
+                const matched = AMENITIES_LIST.find(
+                  x => x.id === id || x.id === a || x.label.toLowerCase() === String(a).toLowerCase()
+                );
+                const icon = matched?.icon ?? '✓';
+                return (
+                  <View key={i} style={styles.amenityItem}>
+                    <Text style={styles.amenityIcon}>{icon}</Text>
+                    <Text style={styles.amenityText}>{capitalizeAmenity(matched?.label ?? a)}</Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}
@@ -412,33 +639,50 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact & Sales</Text>
           <View style={styles.detailsGrid}>
-            {renderDetail('Sales Contact', property.sales_name)}
-            {renderDetail('Sales Number', property.sales_number)}
-            {renderDetail('Email', property.email_id)}
+            {renderDetail('Sales Person Name', property.sales_name)}
+            {renderDetail('Phone', property.sales_number)}
             {renderDetail('Mobile', property.mobile_number)}
+            {renderDetail('Email', property.email_id)}
             {renderDetail('WhatsApp', property.whatsapp_number)}
             {renderDetail('Alternative Number', property.alternative_number)}
+            {renderDetail('Office Address', property.office_address)}
           </View>
         </View>
 
-        {/* Marketing */}
-        {(property.project_highlights || property.usp) && (
+        {/* Project Highlights */}
+        {property.project_highlights && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Marketing</Text>
-            {property.project_highlights && (
-              <>
-                <Text style={styles.detailLabel}>Highlights</Text>
-                <Text style={styles.description}>{property.project_highlights}</Text>
-              </>
-            )}
-            {property.usp && (
-              <>
-                <Text style={[styles.detailLabel, {marginTop: spacing.md}]}>USP</Text>
-                <Text style={styles.description}>{property.usp}</Text>
-              </>
-            )}
+            <Text style={styles.sectionTitle}>Project Highlights</Text>
+            <Text style={styles.description}>{property.project_highlights}</Text>
           </View>
         )}
+
+        {/* Unique Selling Points */}
+        {property.usp && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Unique Selling Points</Text>
+            <Text style={styles.description}>{property.usp}</Text>
+          </View>
+        )}
+
+        {/* Project Brochure */}
+        {(property.brochure_url || property.brochure) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Project Brochure</Text>
+            <TouchableOpacity
+              style={styles.brochureButton}
+              onPress={() => {
+                const url = property.brochure_url || property.brochure;
+                const href = String(url).startsWith('http') ? url : `https://${url}`;
+                Linking.openURL(href).catch(() => CustomAlert.alert('Error', 'Could not open brochure'));
+              }}>
+              <Text style={styles.brochureButtonText}>📑 Download Brochure</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Map */}
+        <UpcomingProjectMapSection project={property} />
       </ScrollView>
 
       <View style={[styles.actionButtons, {paddingBottom: insets.bottom}]}>
@@ -488,9 +732,17 @@ const styles = StyleSheet.create({
   locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, gap: spacing.xs },
   locationIcon: { fontSize: 16 },
   location: { fontSize: 16, color: colors.textSecondary, flex: 1 },
+  priceLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs, textTransform: 'uppercase', fontWeight: '600' },
   price: { fontSize: 28, fontWeight: '700', color: colors.primary, marginTop: spacing.xs },
   priceSub: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
   bookingLabel: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
+  linkText: { color: colors.primary, textDecorationLine: 'underline', fontWeight: '600' },
+  brochureButton: { backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start' },
+  brochureButtonText: { ...typography.body, color: colors.primary, fontWeight: '600' },
+  mapContainer: { height: 220, borderRadius: borderRadius.md, overflow: 'hidden', backgroundColor: colors.surfaceSecondary },
+  mapPlaceholder: { height: 120, backgroundColor: colors.surfaceSecondary, borderRadius: borderRadius.md, justifyContent: 'center', alignItems: 'center', padding: spacing.lg },
+  mapPlaceholderText: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
+  mapLinkButton: { paddingVertical: spacing.sm },
   quickInfo: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.surface, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.sm },
   infoCard: { flex: 1, minWidth: '30%', alignItems: 'center', backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
   infoIcon: { fontSize: 20, marginBottom: spacing.xs },
