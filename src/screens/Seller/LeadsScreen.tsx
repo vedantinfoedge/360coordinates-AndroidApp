@@ -9,11 +9,13 @@ import {
   TouchableOpacity,
   Linking,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {verticalScale} from '../../utils/responsive';
 import SellerHeader from '../../components/SellerHeader';
 import {getLeads, Lead} from '../../services/leadsService';
 import {formatters} from '../../utils/formatters';
@@ -85,11 +87,16 @@ const LeadCard: React.FC<{item: Lead}> = ({item}) => {
   );
 };
 
+const HEADER_HEIGHT = verticalScale(48);
+
 const LeadsScreen: React.FC<Props> = ({navigation}) => {
+  const insets = useSafeAreaInsets();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const contentTopPadding = insets.top + HEADER_HEIGHT;
 
   const loadLeads = useCallback(async () => {
     try {
@@ -125,12 +132,12 @@ const LeadsScreen: React.FC<Props> = ({navigation}) => {
         onSupportPress={() => navigation.navigate('Support' as never)}
       />
       {loading && leads.length === 0 ? (
-        <View style={styles.center}>
+        <View style={[styles.center, {paddingTop: contentTopPadding}]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading leads...</Text>
         </View>
       ) : error && leads.length === 0 ? (
-        <View style={styles.center}>
+        <View style={[styles.center, {paddingTop: contentTopPadding}]}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorTitle}>Unable to load leads</Text>
           <Text style={styles.errorText}>{error}</Text>
@@ -143,7 +150,11 @@ const LeadsScreen: React.FC<Props> = ({navigation}) => {
           data={leads}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          contentContainerStyle={[styles.listContent, leads.length === 0 && styles.listContentEmpty]}
+          contentContainerStyle={[
+            styles.listContent,
+            {paddingTop: contentTopPadding},
+            leads.length === 0 && styles.listContentEmpty,
+          ]}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>📋</Text>

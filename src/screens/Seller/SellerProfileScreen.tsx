@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import {launchImageLibrary, launchCamera, MediaType, ImagePickerResponse} from 'react-native-image-picker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CompositeNavigationProp} from '@react-navigation/native';
+import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {SellerStackParamList} from '../../navigation/SellerNavigator';
@@ -55,14 +55,11 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
     address: '',
     whatsapp_number: '',
     alternate_mobile: '',
-    gst_number: '',
-    facebook: '',
-    instagram: '',
-    linkedin: '',
   });
 
   const [originalData, setOriginalData] = useState({...formData});
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [stats, setStats] = useState({listedProperties: 0, inquiries: 0});
   
   // Scroll animation for header hide/show
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -71,6 +68,13 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  // Load dynamic stats (properties count + inquiries count) on mount and when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      loadStats();
+    }, []),
+  );
 
   // Update form data when user changes
   useEffect(() => {
@@ -89,10 +93,6 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         address: (user as any).address || '',
         whatsapp_number: (user as any).whatsapp_number || '',
         alternate_mobile: (user as any).alternate_mobile || '',
-        gst_number: (user as any).gst_number || '',
-        facebook: (user as any).social_links?.facebook || '',
-        instagram: (user as any).social_links?.instagram || '',
-        linkedin: (user as any).social_links?.linkedin || '',
       });
       if (user.profile_image) {
         setProfileImage(fixImageUrl(user.profile_image));
@@ -113,16 +113,6 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
         
-        const socialLinks = profile.social_links || {};
-        if (typeof socialLinks === 'string') {
-          try {
-            const parsed = JSON.parse(socialLinks);
-            Object.assign(socialLinks, parsed);
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-        
         const profileData = {
           first_name: firstName,
           last_name: lastName,
@@ -132,10 +122,6 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
           address: profile.address || '',
           whatsapp_number: profile.whatsapp_number || '',
           alternate_mobile: profile.alternate_mobile || '',
-          gst_number: profile.gst_number || '',
-          facebook: socialLinks.facebook || '',
-          instagram: socialLinks.instagram || '',
-          linkedin: socialLinks.linkedin || '',
         };
         
         setFormData(profileData);
@@ -151,6 +137,43 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       console.error('Error loading profile:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const [propertiesResponse, inquiriesResponse]: any[] = await Promise.all([
+        sellerService.getProperties({page: 1, limit: 100}),
+        sellerService.getInquiries({page: 1, limit: 100}),
+      ]);
+      let propertiesCount = 0;
+      if (propertiesResponse) {
+        if (Array.isArray(propertiesResponse)) {
+          propertiesCount = propertiesResponse.length;
+        } else if (propertiesResponse.success && propertiesResponse.data) {
+          const data = propertiesResponse.data;
+          const arr = data.properties ?? (Array.isArray(data) ? data : null);
+          if (Array.isArray(arr)) propertiesCount = arr.length;
+          else if (typeof data === 'object' && !Array.isArray(data)) {
+            for (const key of Object.keys(data)) {
+              if (Array.isArray(data[key])) {
+                propertiesCount = data[key].length;
+                break;
+              }
+            }
+          }
+        } else if (propertiesResponse.data && Array.isArray(propertiesResponse.data)) {
+          propertiesCount = propertiesResponse.data.length;
+        }
+      }
+      let inquiriesCount = 0;
+      if (inquiriesResponse && inquiriesResponse.success) {
+        const inquiriesData = inquiriesResponse.data?.inquiries ?? inquiriesResponse.data;
+        inquiriesCount = Array.isArray(inquiriesData) ? inquiriesData.length : 0;
+      }
+      setStats({listedProperties: propertiesCount, inquiries: inquiriesCount});
+    } catch (error: any) {
+      if (__DEV__) console.error('Error loading profile stats:', error);
     }
   };
 
@@ -208,33 +231,6 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       newErrors.address = 'Address must be less than 500 characters';
     }
 
-    // GST number validation (optional, valid GST format if provided)
-    if (formData.gst_number && formData.gst_number.trim()) {
-      const gstTrimmed = formData.gst_number.trim().toUpperCase();
-      // Indian GSTIN: 15 chars, 2 digits + 10 alphanumeric + 3 chars
-      const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-      if (gstTrimmed.length !== 15 || !gstRegex.test(gstTrimmed)) {
-        newErrors.gst_number = 'Please enter a valid 15-character GST number';
-      }
-    }
-    
-    // Social links URL validation (optional)
-    const validateUrl = (url: string, fieldName: string): void => {
-      if (!url || !url.trim()) return;
-      const trimmed = url.trim();
-      // Add protocol if missing for validation
-      const urlToValidate = trimmed.match(/^https?:\/\//i) ? trimmed : `https://${trimmed}`;
-      try {
-        new URL(urlToValidate);
-      } catch {
-        newErrors[fieldName] = 'Please enter a valid URL';
-      }
-    };
-    
-    validateUrl(formData.facebook, 'facebook');
-    validateUrl(formData.instagram, 'instagram');
-    validateUrl(formData.linkedin, 'linkedin');
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -274,53 +270,12 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         return digits; // Store as digits only
       };
       
-      // Validate and normalize social links (URLs)
-      const validateUrl = (url: string): string | null => {
-        if (!url || !url.trim()) return null;
-        const trimmed = url.trim();
-        // Add protocol if missing
-        if (!trimmed.match(/^https?:\/\//i)) {
-          // Try to validate as URL with protocol
-          try {
-            new URL(`https://${trimmed}`);
-            return `https://${trimmed}`;
-          } catch {
-            return null; // Invalid URL
-          }
-        }
-        // Validate URL format
-        try {
-          new URL(trimmed);
-          return trimmed;
-        } catch {
-          return null; // Invalid URL
-        }
-      };
-      
       const profileData: any = {
         full_name: fullName,
         address: formData.address?.trim() || null,
         whatsapp_number: normalizePhone(formData.whatsapp_number),
         alternate_mobile: normalizePhone(formData.alternate_mobile),
-        gst_number: formData.gst_number?.trim() || null,
-        social_links: {
-          facebook: validateUrl(formData.facebook),
-          instagram: validateUrl(formData.instagram),
-          linkedin: validateUrl(formData.linkedin),
-        },
       };
-      
-      // Remove null values from social_links
-      Object.keys(profileData.social_links).forEach(key => {
-        if (profileData.social_links[key] === null) {
-          delete profileData.social_links[key];
-        }
-      });
-      
-      // Remove social_links if empty
-      if (Object.keys(profileData.social_links).length === 0) {
-        delete profileData.social_links;
-      }
       
       // Remove null values from top level
       Object.keys(profileData).forEach(key => {
@@ -469,11 +424,6 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
   const memberSince = (user as any)?.created_at 
     ? formatters.timeAgo((user as any).created_at)
     : 'Recently';
-
-  const stats = {
-    listedProperties: 0, // TODO: Fetch from dashboard stats
-    inquiries: 0, // TODO: Fetch from dashboard stats
-  };
 
   if (loading && !user) {
     return (
@@ -697,29 +647,6 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>GST Number</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  !isEditing && styles.inputDisabled,
-                  errors.gst_number && styles.inputError,
-                ]}
-                value={formData.gst_number}
-                onChangeText={(text: string) => {
-                  setFormData({...formData, gst_number: text.toUpperCase()});
-                  if (errors.gst_number) setErrors({...errors, gst_number: ''});
-                }}
-                editable={isEditing}
-                placeholder="22AAAAA0000A1Z5"
-                autoCapitalize="characters"
-              />
-              {errors.gst_number && (
-                <Text style={styles.errorText}>{errors.gst_number}</Text>
-              )}
-              <Text style={styles.hintText}>Optional - 15 character GSTIN</Text>
-            </View>
-
-            <View style={styles.inputContainer}>
               <Text style={styles.label}>Address</Text>
               <TextInput
                 style={[
@@ -744,78 +671,6 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.errorText}>{errors.address}</Text>
               )}
               <Text style={styles.hintText}>Optional - Max 500 characters</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Social Links Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Social Media Links</Text>
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Facebook</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  !isEditing && styles.inputDisabled,
-                  errors.facebook && styles.inputError,
-                ]}
-                value={formData.facebook}
-                onChangeText={(text: string) => {
-                  setFormData({...formData, facebook: text});
-                  if (errors.facebook) setErrors({...errors, facebook: ''});
-                }}
-                editable={isEditing}
-                keyboardType="url"
-                placeholder="https://facebook.com/..."
-              />
-              {errors.facebook && (
-                <Text style={styles.errorText}>{errors.facebook}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Instagram</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  !isEditing && styles.inputDisabled,
-                  errors.instagram && styles.inputError,
-                ]}
-                value={formData.instagram}
-                onChangeText={(text: string) => {
-                  setFormData({...formData, instagram: text});
-                  if (errors.instagram) setErrors({...errors, instagram: ''});
-                }}
-                editable={isEditing}
-                keyboardType="url"
-                placeholder="https://instagram.com/..."
-              />
-              {errors.instagram && (
-                <Text style={styles.errorText}>{errors.instagram}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>LinkedIn</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  !isEditing && styles.inputDisabled,
-                  errors.linkedin && styles.inputError,
-                ]}
-                value={formData.linkedin}
-                onChangeText={(text: string) => {
-                  setFormData({...formData, linkedin: text});
-                  if (errors.linkedin) setErrors({...errors, linkedin: ''});
-                }}
-                editable={isEditing}
-                keyboardType="url"
-                placeholder="https://linkedin.com/..."
-              />
-              {errors.linkedin && (
-                <Text style={styles.errorText}>{errors.linkedin}</Text>
-              )}
             </View>
           </View>
         </View>

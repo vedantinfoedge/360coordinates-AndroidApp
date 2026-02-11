@@ -24,6 +24,9 @@ import {SellerStackParamList} from '../../navigation/SellerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const AMENITY_GAP = spacing.xs;
+const AMENITY_COLS = 4;
+const AMENITY_ITEM_WIDTH = (SCREEN_WIDTH - 2 * spacing.xl - (AMENITY_COLS - 1) * AMENITY_GAP) / AMENITY_COLS;
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {sellerService} from '../../services/seller.service';
@@ -2435,11 +2438,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: spacing.sm,
+    gap: AMENITY_GAP,
   },
   amenityButton: {
-    width: '25%',
-    minWidth: 72,
-    maxWidth: 120,
+    width: AMENITY_ITEM_WIDTH,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -2448,10 +2450,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 80,
-    marginBottom: spacing.sm,
     paddingHorizontal: spacing.xs,
-    marginHorizontal: spacing.xs,
-    marginTop: spacing.xs,
   },
   amenityButtonActive: {
     borderColor: '#0077C0',
