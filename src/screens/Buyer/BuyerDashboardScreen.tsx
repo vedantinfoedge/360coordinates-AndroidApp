@@ -293,7 +293,13 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       if (allResponse.success && allResponse.data?.properties) {
         const allList = allResponse.data.properties as Property[];
         const upcoming = allList.filter(p => p.project_type === 'upcoming').slice(0, 15);
-        const forSale = allList.filter(p => p.status === 'sale').slice(0, 15);
+        const forSale = allList
+          .filter(
+            p =>
+              p.status === 'sale' &&
+              (p.property_type || '').toLowerCase().includes('apartment'),
+          )
+          .slice(0, 15);
         setUpcomingProjects(upcoming);
         setBuyNewHomeProperties(forSale);
       }
@@ -828,6 +834,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                   location: '',
                   listingType: 'buy',
                   status: 'sale',
+                  propertyType: 'Apartment',
                 } as never);
               }}>
               <Text style={styles.seeAllText}>See All</Text>

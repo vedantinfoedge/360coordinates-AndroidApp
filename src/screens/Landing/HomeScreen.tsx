@@ -222,7 +222,15 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
       if (allResponse.success && allResponse.data?.properties) {
         const allList = allResponse.data.properties as Property[];
         setUpcomingProjects(allList.filter(p => p.project_type === 'upcoming').slice(0, 15));
-        setBuyNewHomeProperties(allList.filter(p => p.status === 'sale').slice(0, 15));
+        setBuyNewHomeProperties(
+          allList
+            .filter(
+              p =>
+                p.status === 'sale' &&
+                (p.property_type || '').toLowerCase().includes('apartment'),
+            )
+            .slice(0, 15),
+        );
       }
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
@@ -654,7 +662,13 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                 onPress={() => {
                   navigation.navigate('Search' as never, {
                     screen: 'SearchResults',
-                    params: {query: '', location: '', listingType: 'buy', status: 'sale'},
+                    params: {
+                      query: '',
+                      location: '',
+                      listingType: 'buy',
+                      status: 'sale',
+                      propertyType: 'Apartment',
+                    },
                   } as never);
                 }}>
                 <Text style={styles.seeAllText}>See All</Text>
