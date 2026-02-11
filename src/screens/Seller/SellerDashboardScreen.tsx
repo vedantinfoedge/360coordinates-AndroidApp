@@ -28,7 +28,7 @@ import {sellerService, DashboardStats} from '../../services/seller.service';
 import CustomAlert from '../../utils/alertHelper';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
-import {DEBUG_SELLER_CRASH} from '../../config/debugCrash';
+import {DEBUG_SELLER_CRASH, SELLER_DASHBOARD_SAFE_MODE} from '../../config/debugCrash';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -368,24 +368,24 @@ const AnimatedInquiryCard = React.memo(({
           ) : (
             <View style={styles.inquiryAvatarPlaceholder}>
               <Text style={styles.inquiryAvatarText}>
-                {item.buyer_name.charAt(0).toUpperCase()}
+                {(item.buyer_name ? String(item.buyer_name).charAt(0).toUpperCase() : '?')}
               </Text>
             </View>
           )}
           <View style={styles.inquiryCardInfo}>
             <Text style={styles.inquiryBuyerName} numberOfLines={1}>
-              {item.buyer_name}
+              {item.buyer_name ?? 'Unknown'}
             </Text>
             <Text style={styles.inquiryTime}>
-              {formatters.timeAgo(item.created_at)}
+              {formatters.timeAgo(item.created_at ?? '')}
             </Text>
           </View>
         </View>
         <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
-          {item.property_title}
+          {item.property_title ?? ''}
         </Text>
         <Text style={styles.inquiryMessage} numberOfLines={2}>
-          {item.message}
+          {item.message ?? ''}
         </Text>
       </TouchableOpacity>
     </Animated.View>
@@ -417,7 +417,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    console.log('[DEBUG RoleSwitch] 12. SellerDashboardScreen MOUNTED - user:', !!user, 'user_type:', user?.user_type, 'DEBUG_SELLER_CRASH:', DEBUG_SELLER_CRASH);
+    console.log('[DEBUG RoleSwitch] 12. SellerDashboardScreen MOUNTED - user:', !!user, 'user_type:', user?.user_type, 'DEBUG_SELLER_CRASH:', DEBUG_SELLER_CRASH, 'SELLER_DASHBOARD_SAFE_MODE:', SELLER_DASHBOARD_SAFE_MODE);
   }, [user?.user_type]);
 
   // DEBUG: Static placeholder when isolating crash (no API, no SellerHeader, minimal hooks already run above)
@@ -457,27 +457,29 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     }
   }, []);
 
-  // Check user type access (agent cannot use seller dashboard)
+  // Check user type access (agent cannot use seller dashboard). navigation.reset only in callback, not during render.
   useEffect(() => {
-    if (user && user.user_type === 'agent') {
-      CustomAlert.alert(
-        'Access Denied',
-        'You are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              navigation.reset({
+    if (!user || user.user_type !== 'agent') return;
+    CustomAlert.alert(
+      'Access Denied',
+      'You are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.',
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            try {
+              (navigation as any).reset({
                 index: 0,
-                routes: [{name: 'Agent' as never}],
+                routes: [{name: 'Agent'}],
               });
-            },
+            } catch (e: any) {
+              console.warn('[SellerDashboard] Agent redirect reset failed:', e?.message);
+            }
           },
-        ],
-        {cancelable: false}
-      );
-      return;
-    }
+        },
+      ],
+      {cancelable: false}
+    );
   }, [user, navigation]);
 
   const loadDashboardData = useCallback(async (showLoading: boolean = true, forceRefresh: boolean = false) => {
@@ -509,10 +511,13 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       let statsSuccess = false;
       
       try {
+        console.log('[SellerDashboard] Before getDashboardStats');
         const statsResponse: any = await sellerService.getDashboardStats();
+        console.log('[SellerDashboard] After getDashboardStats success:', !!statsResponse?.success, 'hasData:', !!statsResponse?.data);
         if (statsResponse && statsResponse.success && statsResponse.data) {
           apiStats = statsResponse.data;
-          setRecentInquiries(statsResponse.data.recent_inquiries || []);
+          const inquiries = statsResponse.data.recent_inquiries;
+          setRecentInquiries(Array.isArray(inquiries) ? inquiries : []);
           statsSuccess = true;
         }
       } catch (statsError: any) {
@@ -525,11 +530,13 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       // Load properties - wrap in try/catch so 401/403 or network errors don't crash the app
       let propertiesResponse: any = null;
       try {
+        console.log('[SellerDashboard] Before getProperties');
         const propertiesLimit = statsSuccess ? 10 : 20;
         propertiesResponse = await sellerService.getProperties({
           page: 1,
           limit: propertiesLimit,
         });
+        console.log('[SellerDashboard] After getProperties success:', !!propertiesResponse?.success, 'hasData:', !!propertiesResponse?.data);
       } catch (propertiesError: any) {
         if (__DEV__) {
           console.warn('[SellerDashboard] Error loading properties:', propertiesError);
@@ -697,9 +704,10 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   }, []);
 
   // Load data when screen is focused (e.g., returning from AddProperty)
-  // Uses caching to prevent unnecessary API calls
+  // Uses caching to prevent unnecessary API calls. Skip when safe mode (no API).
   useFocusEffect(
     useCallback(() => {
+      if (SELLER_DASHBOARD_SAFE_MODE) return;
       if (user && user.user_type === 'seller') {
         // Wait for navigation animation to complete before fetching
         const task = InteractionManager.runAfterInteractions(() => {
@@ -710,9 +718,11 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     }, [user, loadDashboardData])
   );
 
-  // Initial load on mount and auto-refresh setup
+  // Initial load on mount and auto-refresh setup. Skip when safe mode (no API).
   useEffect(() => {
+    if (SELLER_DASHBOARD_SAFE_MODE) return;
     if (user && user.user_type === 'seller') {
+      console.log('[SellerDashboard] Initial load starting (before API)');
       // Defer first fetch by one frame so Seller screen paints immediately when switching from Buyer
       const rafId = requestAnimationFrame(() => {
         InteractionManager.runAfterInteractions(() => {
@@ -734,6 +744,15 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       };
     }
   }, [user?.user_type, loadDashboardData]);
+
+  // Safe mode: render only static JSX (no API, no SellerHeader). All hooks have run above.
+  if (SELLER_DASHBOARD_SAFE_MODE) {
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface}}>
+        <Text style={{fontSize: 16, color: colors.textSecondary}}>Seller Safe Mode</Text>
+      </View>
+    );
+  }
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -1076,7 +1095,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.sellerHeaderBox}>
               <View style={styles.sellerHeaderContent}>
                 <Text style={styles.sellerGreeting}>
-                  Welcome{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''} ❤️
+                  Welcome{user?.full_name ? `, ${String(user.full_name).split(' ')[0] ?? ''}` : ''} ❤️
                 </Text>
                 <Text style={styles.sellerSubtitle}>
                   Here's what's happening with your properties today
@@ -1163,11 +1182,11 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           {/* Card 4: Listing Status */}
           <AnimatedStatCard
             icon="📊"
-            number={stats.properties_by_status.sale + stats.properties_by_status.rent}
+            number={(stats.properties_by_status?.sale ?? 0) + (stats.properties_by_status?.rent ?? 0)}
             label="Listing Status"
             statusPills={{
-              sale: stats.properties_by_status.sale,
-              rent: stats.properties_by_status.rent,
+              sale: stats.properties_by_status?.sale ?? 0,
+              rent: stats.properties_by_status?.rent ?? 0,
             }}
             delay={300}
           />
@@ -1251,9 +1270,9 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.viewAllArrow}>›</Text>
             </AnimatedSeeAllButton>
           </View>
-          {recentProperties.length > 0 ? (
+          {(recentProperties?.length ?? 0) > 0 ? (
             <FlatList
-              data={recentProperties}
+              data={recentProperties ?? []}
               renderItem={renderPropertyCard}
               keyExtractor={(item: RecentProperty) => String(item.id)}
               scrollEnabled={false}
@@ -1302,9 +1321,9 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.viewAllArrow}>›</Text>
             </AnimatedSeeAllButton>
           </View>
-          {recentInquiries.length > 0 ? (
+          {(recentInquiries?.length ?? 0) > 0 ? (
             <FlatList
-              data={recentInquiries.slice(0, 4)}
+              data={(recentInquiries ?? []).slice(0, 4)}
               renderItem={({item, index}: {item: RecentInquiry; index: number}) => (
                 <AnimatedInquiryCard item={item} index={index} navigation={navigation} />
               )}

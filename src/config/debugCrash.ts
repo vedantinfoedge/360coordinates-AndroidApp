@@ -5,4 +5,11 @@
  * If crash continues → cause is in navigator or first-render (hooks/native).
  * REMOVE or set to false after identifying and fixing root cause.
  */
-export const DEBUG_SELLER_CRASH = true;
+export const DEBUG_SELLER_CRASH = false;
+
+/**
+ * When true: SellerDashboardScreen (first Seller screen) renders only static
+ * "Seller Safe Mode" and skips all API/async. Use to isolate crash to dashboard.
+ * Re-enable features step-by-step (local state → API → Mapbox → Firestore).
+ */
+export const SELLER_DASHBOARD_SAFE_MODE = true;
