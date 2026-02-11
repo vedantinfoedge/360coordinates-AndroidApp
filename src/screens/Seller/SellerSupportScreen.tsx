@@ -43,9 +43,9 @@ const faqs = [
   },
   {
     id: '3',
-    question: 'How do I respond to inquiries?',
+    question: 'How do I view and respond to leads?',
     answer:
-      'Go to the "Inquiries" tab to see all inquiries about your properties. Click on any inquiry to view details and respond through the chat feature.',
+      'Go to "View Leads" from your dashboard to see all leads from buyers who viewed your contact. You can call or email them directly from the lead card.',
   },
   {
     id: '4',

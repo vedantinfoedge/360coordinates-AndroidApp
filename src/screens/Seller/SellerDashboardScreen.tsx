@@ -52,20 +52,6 @@ interface RecentProperty {
   inquiries: number;
 }
 
-interface RecentInquiry {
-  id: number;
-  property_id: number;
-  property_title: string;
-  buyer_id: number | null; // null for guest inquiries
-  buyer_name: string;
-  buyer_email: string;
-  buyer_phone: string;
-  buyer_profile_image?: string;
-  message: string;
-  status: string;
-  created_at: string;
-}
-
 // Animated Components
 const AnimatedAddPropertyButton = React.memo(({onPress}: {onPress: () => void}) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -309,96 +295,12 @@ const AnimatedSeeAllButton = React.memo(({onPress, children}: {
   );
 });
 
-const AnimatedInquiryCard = React.memo(({
-  item,
-  index,
-  navigation,
-}: {
-  item: RecentInquiry;
-  index: number;
-  navigation: any;
-}) => {
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    Animated.timing(cardAnim, {
-      toValue: 1,
-      duration: 400,
-      delay: index * 100,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.97,
-      useNativeDriver: true,
-      friction: 3,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 3,
-    }).start();
-  };
-
-  return (
-    <Animated.View
-      style={{
-        opacity: cardAnim,
-        transform: [{scale: scaleAnim}],
-      }}>
-      <TouchableOpacity
-        style={styles.inquiryCard}
-        onPress={() => navigation.navigate('Inquiries', {inquiryId: item.id} as never)}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={0.8}>
-        <View style={styles.inquiryCardHeader}>
-          {item.buyer_profile_image ? (
-            <Image
-              source={{uri: fixImageUrl(item.buyer_profile_image)}}
-              style={styles.inquiryAvatar}
-            />
-          ) : (
-            <View style={styles.inquiryAvatarPlaceholder}>
-              <Text style={styles.inquiryAvatarText}>
-                {(item.buyer_name ? String(item.buyer_name).charAt(0).toUpperCase() : '?')}
-              </Text>
-            </View>
-          )}
-          <View style={styles.inquiryCardInfo}>
-            <Text style={styles.inquiryBuyerName} numberOfLines={1}>
-              {item.buyer_name ?? 'Unknown'}
-            </Text>
-            <Text style={styles.inquiryTime}>
-              {formatters.timeAgo(item.created_at ?? '')}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
-          {item.property_title ?? ''}
-        </Text>
-        <Text style={styles.inquiryMessage} numberOfLines={2}>
-          {item.message ?? ''}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-});
-
 const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout, switchUserRole} = useAuth();
   const [switchingRole, setSwitchingRole] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
-  const [recentInquiries, setRecentInquiries] = useState<RecentInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -517,8 +419,6 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         console.log('[SellerDashboard] After getDashboardStats success:', !!statsResponse?.success, 'hasData:', !!statsResponse?.data);
         if (statsResponse && statsResponse.success && statsResponse.data) {
           apiStats = statsResponse.data;
-          const inquiries = statsResponse.data.recent_inquiries;
-          setRecentInquiries(Array.isArray(inquiries) ? inquiries : []);
           statsSuccess = true;
         }
       } catch (statsError: any) {
@@ -1172,14 +1072,14 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             delay={100}
           />
 
-          {/* Card 3: Total Inquiries */}
+          {/* Card 3: Total Leads */}
           <AnimatedStatCard
             icon="💬"
             number={stats.total_inquiries}
-            label="Total Inquiries"
+            label="Total Leads"
             badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
             badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F3F4F6'}
-            onPress={() => navigation.navigate('Inquiries')}
+            onPress={() => navigation.navigate('Leads')}
             delay={200}
           />
 
@@ -1244,9 +1144,9 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
           <AnimatedQuickActionCard
             icon="💬"
-            title="View Inquiries"
-            description="Respond to buyer inquiries"
-            onPress={() => navigation.navigate('Inquiries')}
+            title="View Leads"
+            description="See leads from buyers who viewed contact"
+            onPress={() => navigation.navigate('Leads')}
             delay={200}
           />
 
@@ -1297,53 +1197,6 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
                 activeOpacity={0.8}>
                 <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
               </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Recent Inquiries Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={styles.sectionIconContainer}>
-                <Text style={styles.sectionIcon}>💬</Text>
-              </View>
-              <View style={styles.sectionTitleRow}>
-                <Text style={styles.sectionTitle}>Recent Inquiries</Text>
-                {stats.new_inquiries > 0 && (
-                  <View style={styles.sectionBadge}>
-                    <Text style={styles.sectionBadgeText}>
-                      {stats.new_inquiries} New
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
-            <AnimatedSeeAllButton
-              onPress={() => navigation.navigate('Inquiries')}>
-              <Text style={styles.viewAllText}>View All</Text>
-              <Text style={styles.viewAllArrow}>›</Text>
-            </AnimatedSeeAllButton>
-          </View>
-          {(recentInquiries?.length ?? 0) > 0 ? (
-            <FlatList
-              data={(recentInquiries ?? []).slice(0, 4)}
-              renderItem={({item, index}: {item: RecentInquiry; index: number}) => (
-                <AnimatedInquiryCard item={item} index={index} navigation={navigation} />
-              )}
-              keyExtractor={(item: RecentInquiry) => String(item.id)}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyStateIconContainer}>
-                <Text style={styles.emptyStateIcon}>💬</Text>
-              </View>
-              <Text style={styles.emptyStateTitle}>No New Inquiries</Text>
-              <Text style={styles.emptyStateText}>
-                You'll see buyer inquiries here when they contact you
-              </Text>
             </View>
           )}
         </View>
@@ -1792,71 +1645,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
     lineHeight: 28,
-  },
-  inquiryCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  inquiryCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm + 2,
-  },
-  inquiryAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: spacing.md,
-  },
-  inquiryAvatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  inquiryAvatarText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  inquiryCardInfo: {
-    flex: 1,
-  },
-  inquiryBuyerName: {
-    ...typography.body,
-    color: '#1D242B', // Dark Charcoal
-    fontWeight: '600',
-    marginBottom: 3,
-    fontSize: 15,
-  },
-  inquiryTime: {
-    ...typography.caption,
-    color: '#9CA3AF',
-    fontSize: 12,
-  },
-  inquiryPropertyTitle: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-    fontSize: 14,
-  },
-  inquiryMessage: {
-    ...typography.caption,
-    color: '#6B7280',
-    fontSize: 13,
-    lineHeight: 20,
   },
   emptyState: {
     backgroundColor: colors.surface,
