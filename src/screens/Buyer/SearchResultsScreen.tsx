@@ -959,7 +959,10 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
         type={propertyType}
         isFavorite={item.is_favorite || false}
         onPress={() =>
-          navigation.navigate('PropertyDetails', {propertyId: item.id})
+          navigation.navigate(
+            (item as any).project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+            {propertyId: String(item.id)},
+          )
         }
         onFavoritePress={() => handleToggleFavorite(item.id)}
         onSharePress={() => handleShareProperty(item)}

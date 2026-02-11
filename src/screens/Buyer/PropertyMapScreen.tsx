@@ -37,7 +37,10 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handlePropertyPress = (property: any) => {
     try {
-      navigation.navigate('PropertyDetails', {propertyId: String(property.id)});
+      navigation.navigate(
+        property.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+        {propertyId: String(property.id)},
+      );
     } catch (error: any) {
       console.error('Error navigating to property details:', error);
     }
