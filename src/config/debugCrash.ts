@@ -12,4 +12,4 @@ export const DEBUG_SELLER_CRASH = false;
  * "Seller Safe Mode" and skips all API/async. Use to isolate crash to dashboard.
  * Re-enable features step-by-step (local state → API → Mapbox → Firestore).
  */
-export const SELLER_DASHBOARD_SAFE_MODE = true;
+export const SELLER_DASHBOARD_SAFE_MODE = false;

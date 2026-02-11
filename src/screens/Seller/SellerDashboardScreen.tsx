@@ -483,7 +483,8 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   }, [user, navigation]);
 
   const loadDashboardData = useCallback(async (showLoading: boolean = true, forceRefresh: boolean = false) => {
-    if (!user || user.user_type !== 'seller') {
+    if (!user || user?.user_type !== 'seller') {
+      if (showLoading) setLoading(false);
       return;
     }
     // Prevent duplicate fetches and implement caching
@@ -563,15 +564,17 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         // Handle different response structures
         let properties: any[] = [];
         
-        if (response.data.properties && Array.isArray(response.data.properties)) {
-          properties = response.data.properties;
-        } else if (Array.isArray(response.data)) {
-          properties = response.data;
-        } else {
-          const dataKeys = Object.keys(response.data);
+        const data = response.data;
+        if (data?.properties && Array.isArray(data.properties)) {
+          properties = data.properties;
+        } else if (Array.isArray(data)) {
+          properties = data;
+        } else if (data && typeof data === 'object' && !Array.isArray(data)) {
+          const dataKeys = Object.keys(data);
           for (const key of dataKeys) {
-            if (Array.isArray(response.data[key])) {
-              properties = response.data[key];
+            const val = data[key];
+            if (Array.isArray(val)) {
+              properties = val;
               break;
             }
           }
@@ -744,15 +747,6 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       };
     }
   }, [user?.user_type, loadDashboardData]);
-
-  // Safe mode: render only static JSX (no API, no SellerHeader). All hooks have run above.
-  if (SELLER_DASHBOARD_SAFE_MODE) {
-    return (
-      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface}}>
-        <Text style={{fontSize: 16, color: colors.textSecondary}}>Seller Safe Mode</Text>
-      </View>
-    );
-  }
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -949,13 +943,23 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   ), [navigation]);
 
   const getInitials = (name: string): string => {
+    if (!name || typeof name !== 'string') return '';
     return name
       .split(' ')
-      .map(n => n[0])
+      .map(n => (n && n[0]) || '')
       .join('')
       .toUpperCase()
       .slice(0, 2);
   };
+
+  // Safe mode: render only static JSX (no API, no SellerHeader). Must be after ALL hooks (useMemo, useCallback above).
+  if (SELLER_DASHBOARD_SAFE_MODE) {
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface}}>
+        <Text style={{fontSize: 16, color: colors.textSecondary}}>Seller Home Safe</Text>
+      </View>
+    );
+  }
 
   // Defensive: do not render seller content until user is present (avoids crash on role-switch race)
   if (!user) {
