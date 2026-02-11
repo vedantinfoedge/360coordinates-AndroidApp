@@ -17,15 +17,19 @@ export interface PGHostelFetchParams {
 /**
  * Build params for PG/Hostel two-call merge strategy.
  * Matches AllPropertiesScreen logic: two separate calls, then merge by id.
- * Do NOT add bedrooms, min_price, max_price, budget - these block PG results.
+ * Website behavior: filters (e.g. budget/min_price/max_price) should apply to both calls.
  */
 export function buildPGHostelFetchParams(options: {
   page?: number;
   limit?: number;
   location?: string;
   city?: string;
+  min_price?: string | number;
+  max_price?: string | number;
+  budget?: string;
+  sort_by?: string;
 }): PGHostelFetchParams {
-  const { page = 1, limit = 50, location, city } = options;
+  const { page = 1, limit = 50, location, city, min_price, max_price, budget, sort_by } = options;
 
   const common: Record<string, string | number> = {
     page,
@@ -34,6 +38,10 @@ export function buildPGHostelFetchParams(options: {
   };
   if (location && location.trim()) common.location = location.trim();
   if (city && city.trim()) common.city = city.trim();
+  if (min_price !== undefined && min_price !== null && String(min_price) !== '') common.min_price = min_price;
+  if (max_price !== undefined && max_price !== null && String(max_price) !== '') common.max_price = max_price;
+  if (budget && budget.trim()) common.budget = budget.trim();
+  if (sort_by && sort_by.trim()) common.sort_by = sort_by.trim();
 
   return {
     pgParams: { ...common, property_type: PG_HOSTEL_PROPERTY_TYPE },

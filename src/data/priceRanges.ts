@@ -224,7 +224,8 @@ export function findBudgetLabelForRange({
   excludeLowestRentOption?: boolean;
 }): string {
   const setType = getBudgetSetFor(listingType, propertyType || '');
-  const isRentPage = listingType === 'rent' || listingType === 'pg-hostel';
+  // Website behavior: PG/Hostel uses rent_residential budget ranges but should not hide "0K-5K" like the Rent page.
+  const isRentPage = listingType === 'rent';
   const options = getBudgetOptions(setType, isRentPage);
   const match = options.find((opt) => opt.min === min && opt.max === max);
   return match?.label ?? '';
@@ -245,7 +246,8 @@ export function findBudgetRangeByLabel({
   excludeLowestRentOption?: boolean;
 }): BudgetOption | null {
   const setType = getBudgetSetFor(listingType, propertyType || '');
-  const isRentPage = listingType === 'rent' || listingType === 'pg-hostel';
+  // Website behavior: PG/Hostel uses rent_residential budget ranges but should not hide "0K-5K" like the Rent page.
+  const isRentPage = listingType === 'rent';
   const options = getBudgetOptions(setType, isRentPage);
   const normalizedLabel = (label || '').trim().toLowerCase();
   return options.find((opt) => opt.label.trim().toLowerCase() === normalizedLabel) ?? null;

@@ -313,10 +313,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       const isPGHostelPropertyType = selectedPropertyType === PG_HOSTEL_PROPERTY_TYPE;
       const usePGHostelMerge = isPGHostelListingType || (listingType === 'rent' && isPGHostelPropertyType);
       
-      if (usePGHostelMerge) {
-        searchParams.property_type = PG_HOSTEL_PROPERTY_TYPE;
-        searchParams.available_for_bachelors = '1'; // PHP backend often expects 1/0
-      } else if (listingType === 'buy' && isPGHostelPropertyType) {
+      if (listingType === 'buy' && isPGHostelPropertyType) {
         // Buy + PG/Hostel: only property_type, no bachelors (exclude bachelor-only apartments)
         searchParams.property_type = PG_HOSTEL_PROPERTY_TYPE;
       }
@@ -396,7 +393,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
           min: minBudget,
           max: maxBudget,
-          excludeLowestRentOption: listingType === 'rent' || listingType === 'pg-hostel',
+          excludeLowestRentOption: listingType === 'rent',
         });
       const hasBudgetFilter = !(minBudget === 0 && maxBudget === maxBudgetForType);
       if (hasBudgetFilter) {
@@ -456,12 +453,16 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
           }
         } else if (usePGHostelMerge) {
           // PG/Hostel listing type OR Rent + PG/Hostel: two API calls then merge (same as AllPropertiesScreen)
-          // Do NOT add min_price, max_price, bedrooms, budget - these block PG results
+          // Website behavior: apply budget/min/max filters to both calls, then merge + dedupe.
           const { pgParams, bachelorsParams } = buildPGHostelFetchParams({
             page: 1,
             limit: 1000,
             location: searchParams.location,
             city: searchParams.city,
+            min_price: searchParams.min_price,
+            max_price: searchParams.max_price,
+            budget: searchParams.budget,
+            sort_by: searchParams.sort_by,
           });
           const [resPG, resBachelors] = await Promise.all([
             propertyService.getProperties(pgParams) as Promise<any>,
@@ -522,6 +523,10 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
             const { pgParams, bachelorsParams } = buildPGHostelFetchParams({
               page: 1, limit: 100,
               location: fallbackParams.location, city: fallbackParams.city,
+              min_price: searchParams.min_price,
+              max_price: searchParams.max_price,
+              budget: searchParams.budget,
+              sort_by: searchParams.sort_by,
             });
             const [fp1, fp2] = await Promise.all([
               propertyService.getProperties(pgParams) as Promise<any>,
@@ -654,7 +659,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
       listingType,
       propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
       label: budget,
-      excludeLowestRentOption: listingType === 'rent' || listingType === 'pg-hostel',
+      excludeLowestRentOption: listingType === 'rent',
     });
     if (!matchedRange) return;
 
@@ -1023,7 +1028,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                     propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
                     min: minBudget,
                     max: maxBudget,
-                    excludeLowestRentOption: listingType === 'rent' || listingType === 'pg-hostel',
+                    excludeLowestRentOption: listingType === 'rent',
                   }) ||
                   `${formatBudgetDisplay(minBudget)}-${formatBudgetDisplay(maxBudget)}`}
             </Text>
@@ -1078,7 +1083,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 <ScrollView style={styles.dropdownOptionsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
                   {[
                     { label: 'Any', min: 0, max: maxBudgetForType, budgetLabel: '' },
-                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent' || listingType === 'pg-hostel').map((opt) => ({
+                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent').map((opt) => ({
                       label: opt.label,
                       min: opt.min,
                       max: opt.max,
@@ -1245,7 +1250,7 @@ const SearchResultsScreen: React.FC<Props> = ({navigation, route}) => {
                 <View style={styles.filterOptions}>
                   {[
                     { label: 'Any', min: 0, max: maxBudgetForType, budgetLabel: '' },
-                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent' || listingType === 'pg-hostel').map((opt) => ({
+                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent').map((opt) => ({
                       label: opt.label,
                       min: opt.min,
                       max: opt.max,

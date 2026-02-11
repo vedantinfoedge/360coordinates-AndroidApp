@@ -785,8 +785,24 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     allHaveUrl: propertyImages.every(img => img && img.url),
   });
   
-  const formattedPrice = property.price 
-    ? `₹${parseFloat(property.price).toLocaleString('en-IN')}`
+  const normalizedStatus = (property.status ?? property.type ?? '')
+    .toString()
+    .trim()
+    .toLowerCase();
+  const isRentListing = normalizedStatus === 'rent';
+  const isSaleListing = normalizedStatus === 'sale';
+
+  const hasBachelorsFlag =
+    property.available_for_bachelors !== undefined &&
+    property.available_for_bachelors !== null;
+  const availableForBachelors =
+    property.available_for_bachelors === true ||
+    property.available_for_bachelors === 'true' ||
+    property.available_for_bachelors === 1 ||
+    property.available_for_bachelors === '1';
+
+  const formattedPrice = property.price
+    ? `₹${parseFloat(property.price).toLocaleString('en-IN')}${isRentListing ? '/month' : ''}`
     : 'Price not available';
   
   const amenities = property.amenities || [];
@@ -1106,14 +1122,20 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Type</Text>
               <Text style={styles.detailValue}>
-                {property.type === 'buy' ? 'For Sale' : 'For Rent'}
+                {isSaleListing ? 'For Sale' : isRentListing ? 'For Rent' : property.type === 'buy' ? 'For Sale' : 'For Rent'}
               </Text>
             </View>
-            {(property.property_type || '').toLowerCase().includes('pg') || (property.property_type || '').toLowerCase().includes('hostel') || property.status === 'pg' ? (
+            {property.property_type ? (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Property Type</Text>
+                <Text style={styles.detailValue}>{property.property_type}</Text>
+              </View>
+            ) : null}
+            {isRentListing && hasBachelorsFlag ? (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Available for bachelors</Text>
                 <Text style={styles.detailValue}>
-                  {property.available_for_bachelors === true || property.available_for_bachelors === 'true' ? 'Yes' : 'No'}
+                  {availableForBachelors ? 'Yes' : 'No'}
                 </Text>
               </View>
             ) : null}
