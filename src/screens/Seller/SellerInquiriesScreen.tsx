@@ -50,6 +50,74 @@ interface Inquiry {
 
 type StatusFilter = 'all' | 'new' | 'contacted' | 'viewed' | 'interested' | 'not_interested' | 'closed';
 
+// Inquiry card as a proper component so hooks (useState) can be used inside it
+const InquiryCard: React.FC<{
+  item: Inquiry;
+  onMarkAsViewed: (id: string | number) => void;
+  onReply: (inquiry: Inquiry) => void;
+}> = ({item, onMarkAsViewed, onReply}) => {
+  const [expanded, setExpanded] = useState(false);
+  const messageLines = item.message.split('\n').length;
+  const shouldTruncate = !expanded && messageLines > 2;
+
+  return (
+    <TouchableOpacity
+      style={styles.inquiryCard}
+      onPress={() => onMarkAsViewed(item.id)}
+      activeOpacity={0.9}>
+      <View style={styles.inquiryHeader}>
+        <View style={styles.inquiryHeaderLeft}>
+          <View style={styles.buyerAvatarPlaceholder}>
+            <Text style={styles.buyerAvatarText}>
+              {item.buyer_name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.inquiryInfo}>
+            <Text style={styles.buyerName}>{item.buyer_name}</Text>
+            <Text style={styles.propertyTitle}>{capitalize(item.property_title)}</Text>
+            <Text style={styles.inquiryDate}>
+              {formatters.timeAgo(item.created_at)}
+            </Text>
+          </View>
+        </View>
+        {item.status === 'new' && (
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>New</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.inquiryMessage} numberOfLines={expanded ? undefined : 2}>
+        {item.message}
+      </Text>
+      {shouldTruncate && (
+        <TouchableOpacity
+          onPress={() => setExpanded(true)}
+          style={styles.readMoreButton}>
+          <Text style={styles.readMoreText}>Read more</Text>
+        </TouchableOpacity>
+      )}
+      <View style={styles.inquiryActions}>
+        {item.buyer_phone && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              // Handle phone call
+            }}
+            activeOpacity={0.7}>
+            <Text style={styles.actionButtonText}>📞 Call</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.actionButton, styles.replyButton]}
+          onPress={() => onReply(item)}
+          activeOpacity={0.7}>
+          <Text style={[styles.actionButtonText, styles.replyButtonText]}>💬 Chat</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
   const {logout} = useAuth();
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
@@ -237,68 +305,13 @@ const SellerInquiriesScreen: React.FC<Props> = ({navigation}) => {
     });
   };
 
-  const renderInquiry = ({item}: {item: Inquiry}) => {
-    const [expanded, setExpanded] = React.useState(false);
-    const messageLines = item.message.split('\n').length;
-    const shouldTruncate = !expanded && messageLines > 2;
-    
-    return (
-      <TouchableOpacity
-        style={styles.inquiryCard}
-        onPress={() => handleMarkAsViewed(item.id)}
-        activeOpacity={0.9}>
-        <View style={styles.inquiryHeader}>
-          <View style={styles.inquiryHeaderLeft}>
-            <View style={styles.buyerAvatarPlaceholder}>
-              <Text style={styles.buyerAvatarText}>
-                {item.buyer_name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.inquiryInfo}>
-              <Text style={styles.buyerName}>{item.buyer_name}</Text>
-              <Text style={styles.propertyTitle}>{capitalize(item.property_title)}</Text>
-              <Text style={styles.inquiryDate}>
-                {formatters.timeAgo(item.created_at)}
-              </Text>
-            </View>
-          </View>
-          {item.status === 'new' && (
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>New</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.inquiryMessage} numberOfLines={expanded ? undefined : 2}>
-          {item.message}
-        </Text>
-        {shouldTruncate && (
-          <TouchableOpacity
-            onPress={() => setExpanded(true)}
-            style={styles.readMoreButton}>
-            <Text style={styles.readMoreText}>Read more</Text>
-          </TouchableOpacity>
-        )}
-        <View style={styles.inquiryActions}>
-          {item.buyer_phone && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                // Handle phone call
-              }}
-              activeOpacity={0.7}>
-              <Text style={styles.actionButtonText}>📞 Call</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[styles.actionButton, styles.replyButton]}
-            onPress={() => handleReply(item)}
-            activeOpacity={0.7}>
-            <Text style={[styles.actionButtonText, styles.replyButtonText]}>💬 Chat</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderInquiry = ({item}: {item: Inquiry}) => (
+    <InquiryCard
+      item={item}
+      onMarkAsViewed={handleMarkAsViewed}
+      onReply={handleReply}
+    />
+  );
 
   if (loading && inquiries.length === 0) {
     return (
