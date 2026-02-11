@@ -25,6 +25,7 @@ import {propertyService} from '../../services/property.service';
 import {favoriteService} from '../../services/favorite.service';
 import CustomAlert from '../../utils/alertHelper';
 import {buyerService} from '../../services/buyer.service';
+import {createLead} from '../../services/leadsService';
 import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
 import BuyerHeader from '../../components/BuyerHeader';
 import {useAuth} from '../../context/AuthContext';
@@ -651,6 +652,20 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       try {
         await buyerService.recordInteraction(property.id, 'view_owner');
       } catch (_) {}
+      // Create lead entry for seller (non-blocking)
+      try {
+        const sellerId = property.seller?.id ?? property.seller_id ?? property.user_id;
+        if (sellerId != null && user?.id != null) {
+          await createLead({
+            property_id: property.id,
+            seller_id: sellerId,
+            buyer_id: user.id,
+            buyer_name: user.full_name ?? '',
+            buyer_phone: user.phone ?? '',
+            buyer_email: user.email ?? '',
+          });
+        }
+      } catch (_) {}
       return;
     }
 
@@ -685,6 +700,20 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       // Record "view owner" interaction for lead tracking (non-blocking)
       try {
         await buyerService.recordInteraction(property.id, 'view_owner');
+      } catch (_) {}
+      // Create lead entry for seller (non-blocking)
+      try {
+        const sellerId = property.seller?.id ?? property.seller_id ?? property.user_id;
+        if (sellerId != null && user?.id != null) {
+          await createLead({
+            property_id: property.id,
+            seller_id: sellerId,
+            buyer_id: user.id,
+            buyer_name: user.full_name ?? '',
+            buyer_phone: user.phone ?? '',
+            buyer_email: user.email ?? '',
+          });
+        }
       } catch (_) {}
       console.log('[PropertyDetails] Property unlocked for contact view:', property.id);
     } catch (error: any) {

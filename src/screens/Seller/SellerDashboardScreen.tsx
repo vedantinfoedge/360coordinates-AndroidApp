@@ -355,7 +355,7 @@ const AnimatedInquiryCard = React.memo(({
       }}>
       <TouchableOpacity
         style={styles.inquiryCard}
-        onPress={() => navigation.navigate('Inquiries', {inquiryId: item.id} as never)}
+        onPress={() => navigation.navigate('Leads')}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.8}>
@@ -1172,14 +1172,14 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             delay={100}
           />
 
-          {/* Card 3: Total Inquiries */}
+          {/* Card 3: Total Leads */}
           <AnimatedStatCard
             icon="💬"
             number={stats.total_inquiries}
-            label="Total Inquiries"
+            label="Total Leads"
             badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
             badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F3F4F6'}
-            onPress={() => navigation.navigate('Inquiries')}
+            onPress={() => navigation.navigate('Leads')}
             delay={200}
           />
 
@@ -1244,9 +1244,9 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
           <AnimatedQuickActionCard
             icon="💬"
-            title="View Inquiries"
-            description="Respond to buyer inquiries"
-            onPress={() => navigation.navigate('Inquiries')}
+            title="View Leads"
+            description="See leads from buyers who viewed contact"
+            onPress={() => navigation.navigate('Leads')}
             delay={200}
           />
 
@@ -1301,7 +1301,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           )}
         </View>
 
-        {/* Recent Inquiries Section */}
+        {/* Recent Leads Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
@@ -1309,7 +1309,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.sectionIcon}>💬</Text>
               </View>
               <View style={styles.sectionTitleRow}>
-                <Text style={styles.sectionTitle}>Recent Inquiries</Text>
+                <Text style={styles.sectionTitle}>Recent Leads</Text>
                 {stats.new_inquiries > 0 && (
                   <View style={styles.sectionBadge}>
                     <Text style={styles.sectionBadgeText}>
@@ -1320,7 +1320,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
               </View>
             </View>
             <AnimatedSeeAllButton
-              onPress={() => navigation.navigate('Inquiries')}>
+              onPress={() => navigation.navigate('Leads')}>
               <Text style={styles.viewAllText}>View All</Text>
               <Text style={styles.viewAllArrow}>›</Text>
             </AnimatedSeeAllButton>
@@ -1340,9 +1340,9 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.emptyStateIconContainer}>
                 <Text style={styles.emptyStateIcon}>💬</Text>
               </View>
-              <Text style={styles.emptyStateTitle}>No New Inquiries</Text>
+              <Text style={styles.emptyStateTitle}>No New Leads</Text>
               <Text style={styles.emptyStateText}>
-                You'll see buyer inquiries here when they contact you
+                You'll see leads here when buyers view your contact
               </Text>
             </View>
           )}

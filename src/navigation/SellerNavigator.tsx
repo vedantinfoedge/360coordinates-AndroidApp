@@ -4,7 +4,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useAuth} from '../context/AuthContext';
 import {DEBUG_SELLER_CRASH} from '../config/debugCrash';
 import SellerTabNavigator from '../components/navigation/SellerTabNavigator';
-import SellerInquiriesScreen from '../screens/Seller/SellerInquiriesScreen';
+import LeadsScreen from '../screens/Seller/LeadsScreen';
 import SellerPropertiesScreen from '../screens/Seller/SellerPropertiesScreen';
 import SellerPropertyDetailsScreen from '../screens/Seller/SellerPropertyDetailsScreen';
 import AddPropertyScreen from '../screens/Seller/AddPropertyScreen';
@@ -20,7 +20,7 @@ export type SellerStackParamList = {
   Profile: undefined;
   PropertyDetails: {propertyId: string};
   AddProperty: undefined;
-  Inquiries: undefined;
+  Leads: undefined;
   Support: undefined;
   Subscription: undefined;
 };
@@ -78,7 +78,7 @@ const SellerNavigator = () => {
         initialRouteName="SellerTabs">
         <Stack.Screen name="SellerTabs" component={SellerTabNavigator} />
         <Stack.Screen name="MyProperties" component={SellerPropertiesScreen} />
-        <Stack.Screen name="Inquiries" component={SellerInquiriesScreen} />
+        <Stack.Screen name="Leads" component={LeadsScreen} />
         <Stack.Screen name="PropertyDetails" component={SellerPropertyDetailsScreen} />
         <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
         <Stack.Screen name="Support" component={SellerSupportScreen} />
