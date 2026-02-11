@@ -531,6 +531,12 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const accessDeniedPopupShownRef = useRef<boolean>(false);
+
+  // Registered role: canonical account type (buyer/seller/agent/builder/admin). Agents see dashboard; Buyer/Seller see Access Denied popup.
+  const registeredRole = (user?.registered_role ?? user?.user_type ?? 'buyer').toString().toLowerCase();
+  const isAgentRegistered = registeredRole === 'agent' || registeredRole === 'builder' || registeredRole === 'admin';
+  const isBuyerOrSeller = registeredRole === 'buyer' || registeredRole === 'seller';
   
   // Performance optimization
   const lastFetchTimeRef = useRef<number>(0);
@@ -677,19 +683,47 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
     }
   }, [dashboardStats]);
 
+  // Show Access Denied popup only when user is registered as Buyer or Seller (not for actual Agents)
   useFocusEffect(
     useCallback(() => {
-      if (user && (user.user_type || '').toLowerCase() === 'agent') {
+      if (!user || !isBuyerOrSeller) {
+        accessDeniedPopupShownRef.current = false;
+        return;
+      }
+      if (accessDeniedPopupShownRef.current) return;
+      accessDeniedPopupShownRef.current = true;
+      const rootNav = navigation.getParent()?.getParent();
+      const targetRoute = registeredRole === 'buyer' ? 'Buyer' : 'Seller';
+      CustomAlert.alert(
+        'Access Denied',
+        `You are registered as ${registeredRole === 'buyer' ? 'Buyer/Tenant' : 'Seller/Owner'}. You cannot access the Agent dashboard.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (rootNav && typeof (rootNav as any).reset === 'function') {
+                (rootNav as any).reset({ index: 0, routes: [{ name: targetRoute as never }] });
+              }
+            },
+          },
+        ]
+      );
+    }, [user, isBuyerOrSeller, registeredRole, navigation])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user && isAgentRegistered) {
         const task = InteractionManager.runAfterInteractions(() => {
           loadDashboardData(false, false);
         });
         return () => task.cancel();
       }
-    }, [user, loadDashboardData])
+    }, [user, isAgentRegistered, loadDashboardData])
   );
 
   useEffect(() => {
-    if (user && (user.user_type || '').toLowerCase() === 'agent') {
+    if (user && isAgentRegistered) {
       const task = InteractionManager.runAfterInteractions(() => {
         loadDashboardData(true, true);
       });
@@ -706,15 +740,15 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         }
       };
     }
-  }, [user?.user_type, loadDashboardData]);
+  }, [user?.user_type, isAgentRegistered, loadDashboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);
     loadDashboardData(false, true);
   };
 
-  // Show access denied message if user is not an agent (case-insensitive)
-  if (user && (user.user_type || '').toLowerCase() !== 'agent') {
+  // Show access denied UI only when user is registered as Buyer or Seller (actual Agents never see this)
+  if (user && isBuyerOrSeller) {
     return (
       <View style={styles.container}>
         <AgentHeader
@@ -729,7 +763,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
           <Text style={styles.errorIcon}>🚫</Text>
           <Text style={styles.errorTitle}>Access Denied</Text>
           <Text style={styles.errorText}>
-            You are registered as {user.user_type === 'buyer' ? 'Buyer/Tenant' : user.user_type === 'seller' ? 'Seller/Owner' : 'User'}. You cannot access this dashboard.
+            You are registered as {registeredRole === 'buyer' ? 'Buyer/Tenant' : 'Seller/Owner'}. You cannot access this dashboard.
           </Text>
         </View>
       </View>
