@@ -580,6 +580,18 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         showError('Error', 'Please select facing direction');
         return;
       }
+      if (fieldVisibility.showBalconies && balconies === null) {
+        showError('Error', 'Please select number of balconies');
+        return;
+      }
+      if (fieldVisibility.showFloor && !floor.trim()) {
+        showError('Error', 'Please enter floor number');
+        return;
+      }
+      if (fieldVisibility.showTotalFloors && !totalFloors.trim()) {
+        showError('Error', 'Please enter total floors');
+        return;
+      }
       if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment') {
         showError('Error', 'Please select number of bedrooms');
         return;
@@ -1367,7 +1379,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             {fieldVisibility.showBalconies && (
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Balconies</Text>
+                <Text style={styles.label}>Balconies <Text style={styles.required}>*</Text></Text>
                 <View style={styles.numberButtonsContainer}>
                   {[0, 1, 2, 3].map(num => (
                     <TouchableOpacity
@@ -1455,7 +1467,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             {fieldVisibility.showFloor && (
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Floor Number</Text>
+                <Text style={styles.label}>Floor Number <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={styles.input}
                   placeholder="e.g., 5"
@@ -1469,7 +1481,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             {fieldVisibility.showTotalFloors && (
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Total Floors</Text>
+                <Text style={styles.label}>Total Floors <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Total floors in building"
@@ -2423,7 +2435,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: spacing.sm,
-    marginHorizontal: -spacing.xs,
   },
   amenityButton: {
     width: '25%',
@@ -2439,6 +2450,8 @@ const styles = StyleSheet.create({
     minHeight: 80,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.xs,
+    marginHorizontal: spacing.xs,
+    marginTop: spacing.xs,
   },
   amenityButtonActive: {
     borderColor: '#0077C0',
@@ -2464,33 +2477,33 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderStyle: 'dashed',
     borderRadius: borderRadius.md,
-    padding: spacing.xxl,
+    padding: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 200,
+    minHeight: 120,
     backgroundColor: '#FAFAFA',
   },
   photoUploadIcon: {
-    fontSize: 48,
+    fontSize: 32,
     marginBottom: spacing.md,
   },
   photoUploadText: {
     ...typography.body,
     color: colors.text,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: spacing.xs,
   },
   photoUploadSubtext: {
     ...typography.body,
     color: colors.text,
-    fontSize: 14,
+    fontSize: 12,
     marginBottom: spacing.sm,
   },
   photoUploadHint: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
   },
   photoCameraButton: {
     alignItems: 'center',
