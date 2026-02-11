@@ -366,6 +366,17 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     );
   };
 
+  // Always show row (use "—" when empty) so all fields are visible
+  const renderDetailRow = (label: string, value: string | number | null | undefined) => {
+    const display = value != null && value !== '' ? String(value) : '—';
+    return (
+      <View style={styles.detailItem} key={label}>
+        <Text style={styles.detailLabel}>{label}</Text>
+        <Text style={[styles.detailValue, display === '—' && styles.detailValueEmpty]}>{display}</Text>
+      </View>
+    );
+  };
+
   const formatDate = (d: any) => {
     if (!d) return null;
     if (typeof d === 'string') {
@@ -553,50 +564,54 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           <Text style={styles.description}>{property.description || 'No description available'}</Text>
         </View>
 
-        {/* Project details grid: only when value exists (website order) */}
+        {/* Project details grid: all fields always visible (— when empty) */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Project Details</Text>
           <View style={styles.detailsGrid}>
-            {renderDetail('Builder / Developer', property.builder)}
-            {renderDetail('Project Type', property.property_type || property.project_type)}
-            {renderDetail('Project Status', property.project_status)}
-            {renderDetail('RERA Number', property.rera_number)}
-            {bhkTypeText && renderDetail('Configuration', bhkTypeText)}
-            {renderDetail('Carpet Area Range', property.carpet_area_range || property.carpet_area)}
-            {renderDetail('Number of Towers', property.number_of_towers)}
-            {renderDetail('Total Units', property.total_units)}
-            {renderDetail('Floors', property.floors_count)}
-            {renderDetail('Location', property.location)}
-            {renderDetail('City', property.city)}
-            {renderDetail('State', property.state)}
-            {renderDetail('Address', property.fullAddress || property.address || property.additional_address)}
-            {renderDetail('Pincode', property.pincode)}
-            {property.starting_price != null && property.starting_price !== '' && renderDetail('Starting Price', formatters.price(Number(property.starting_price), false))}
-            {pricePerSqft && renderDetail('Price per Sqft', pricePerSqft)}
-            {bookingAmount && renderDetail('Booking Amount', bookingAmount)}
-            {renderDetail('Expected Launch', formatDate(property.launch_date))}
-            {renderDetail('Possession', formatDate(property.possession_date))}
-            {renderDetail('RERA Status', property.rera_status)}
-            {renderDetail('Land Ownership', property.land_ownership_type)}
-            {renderDetail('Bank Approved', property.bank_approved)}
-            {approvedBanks.length > 0 && (
-              <View style={styles.detailItemFull}>
-                <Text style={styles.detailLabel}>Approved Banks</Text>
-                <Text style={styles.detailValue}>{approvedBanks.join(', ')}</Text>
-              </View>
-            )}
-            {property.other_bank_names && renderDetail('Other Banks', property.other_bank_names)}
-            {property.mapLink ? (
-              <View style={styles.detailItemFull}>
-                <Text style={styles.detailLabel}>Map Link</Text>
+            {renderDetailRow('Builder / Developer', property.builder)}
+            {renderDetailRow('Project Type', property.property_type || property.project_type)}
+            {renderDetailRow('Project Status', property.project_status)}
+            {renderDetailRow('RERA Number', property.rera_number)}
+            {renderDetailRow('Configuration', bhkTypeText)}
+            {renderDetailRow('Area (sq ft)', property.area != null && property.area !== '' ? String(property.area) : null)}
+            {renderDetailRow('Carpet Area Range', property.carpet_area_range || property.carpet_area)}
+            {renderDetailRow('Number of Towers', property.number_of_towers)}
+            {renderDetailRow('Total Units', property.total_units)}
+            {renderDetailRow('Floors', property.floors_count)}
+            {renderDetailRow('Location', property.location)}
+            {renderDetailRow('City', property.city)}
+            {renderDetailRow('State', property.state)}
+            {renderDetailRow('Address', property.fullAddress || property.address || property.additional_address)}
+            {renderDetailRow('Additional Address', property.additional_address)}
+            {renderDetailRow('Pincode', property.pincode)}
+            {renderDetailRow('Starting Price', property.starting_price != null && property.starting_price !== '' ? formatters.price(Number(property.starting_price), false) : (property.price != null && property.price !== '' ? formatters.price(Number(property.price), false) : null))}
+            {renderDetailRow('Price per Sqft', pricePerSqft ?? (property.price_per_sqft != null && property.price_per_sqft !== '' ? formatters.price(Number(property.price_per_sqft), false) + ' / sq ft' : null))}
+            {renderDetailRow('Booking Amount', bookingAmount ?? (property.booking_amount != null && property.booking_amount !== '' ? formatters.price(Number(property.booking_amount), false) : null))}
+            {renderDetailRow('Expected Launch', formatDate(property.launch_date))}
+            {renderDetailRow('Expected Possession', formatDate(property.possession_date))}
+            {renderDetailRow('RERA Status', property.rera_status)}
+            {renderDetailRow('Land Ownership', property.land_ownership_type)}
+            {renderDetailRow('Bank Approved', property.bank_approved)}
+            <View style={styles.detailItemFull}>
+              <Text style={styles.detailLabel}>Approved Banks</Text>
+              <Text style={[styles.detailValue, (!approvedBanks || approvedBanks.length === 0) && styles.detailValueEmpty]}>
+                {approvedBanks && approvedBanks.length > 0 ? approvedBanks.join(', ') : '—'}
+              </Text>
+            </View>
+            {renderDetailRow('Other Banks', property.other_bank_names)}
+            <View style={styles.detailItemFull}>
+              <Text style={styles.detailLabel}>Map Link</Text>
+              {property.mapLink ? (
                 <TouchableOpacity onPress={() => {
                   const url = String(property.mapLink).startsWith('http') ? property.mapLink : `https://${property.mapLink}`;
                   Linking.openURL(url).catch(() => CustomAlert.alert('Error', 'Could not open map link'));
                 }}>
                   <Text style={[styles.detailValue, styles.linkText]}>View on Map</Text>
                 </TouchableOpacity>
-              </View>
-            ) : null}
+              ) : (
+                <Text style={[styles.detailValue, styles.detailValueEmpty]}>—</Text>
+              )}
+            </View>
           </View>
         </View>
 
@@ -635,17 +650,17 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           )}
         </View>
 
-        {/* Contact & Sales */}
+        {/* Contact & Sales - all fields always visible */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact & Sales</Text>
           <View style={styles.detailsGrid}>
-            {renderDetail('Sales Person Name', property.sales_name)}
-            {renderDetail('Phone', property.sales_number)}
-            {renderDetail('Mobile', property.mobile_number)}
-            {renderDetail('Email', property.email_id)}
-            {renderDetail('WhatsApp', property.whatsapp_number)}
-            {renderDetail('Alternative Number', property.alternative_number)}
-            {renderDetail('Office Address', property.office_address)}
+            {renderDetailRow('Sales Person Name', property.sales_name)}
+            {renderDetailRow('Phone', property.sales_number)}
+            {renderDetailRow('Mobile', property.mobile_number)}
+            {renderDetailRow('Email', property.email_id)}
+            {renderDetailRow('WhatsApp', property.whatsapp_number)}
+            {renderDetailRow('Alternative Number', property.alternative_number)}
+            {renderDetailRow('Office Address', property.office_address)}
           </View>
         </View>
 
@@ -758,6 +773,7 @@ const styles = StyleSheet.create({
   detailItemFull: { width: '100%', padding: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, marginTop: spacing.xs },
   detailLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, fontSize: 12, fontWeight: '500', textTransform: 'uppercase' },
   detailValue: { ...typography.body, color: colors.text, fontWeight: '600', fontSize: 14 },
+  detailValueEmpty: { color: colors.textSecondary, fontWeight: '400' },
   amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   amenityItem: { flexDirection: 'row', alignItems: 'center', width: '47%', backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
   amenityIcon: { fontSize: 16, color: colors.primary, fontWeight: 'bold' },
