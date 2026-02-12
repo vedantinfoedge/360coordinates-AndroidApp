@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,21 +13,21 @@ import {
   Animated,
   Share,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CompositeNavigationProp} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {MainStackParamList} from '../../navigation/MainStackNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {scale, verticalScale, moderateScale} from '../../utils/responsive';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList } from '../../navigation/MainStackNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
-import {buyerService, Property} from '../../services/buyer.service';
-import {propertyService} from '../../services/property.service';
-import {fixImageUrl} from '../../utils/imageHelper';
+import { buyerService, Property } from '../../services/buyer.service';
+import { propertyService } from '../../services/property.service';
+import { fixImageUrl } from '../../utils/imageHelper';
 import CustomAlert from '../../utils/alertHelper';
-import {formatters} from '../../utils/formatters';
-import {useAuth} from '../../context/AuthContext';
+import { formatters } from '../../utils/formatters';
+import { useAuth } from '../../context/AuthContext';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<MainStackParamList, 'Home'>;
 
@@ -42,22 +42,22 @@ interface TopCity {
 }
 
 const TOP_CITIES: TopCity[] = [
-  {id: 'mumbai', name: 'Mumbai', image: require('../../assets/Mumbai.png')},
-  {id: 'delhi', name: 'Delhi', image: require('../../assets/Delhi.png')},
-  {id: 'bangalore', name: 'Bangalore', image: require('../../assets/Bangalore.png')},
-  {id: 'hyderabad', name: 'Hyderabad', image: require('../../assets/Hyderabad.png')},
-  {id: 'chennai', name: 'Chennai', image: require('../../assets/Chennai.png')},
-  {id: 'pune', name: 'Pune', image: require('../../assets/Pune.png')},
-  {id: 'kolkata', name: 'Kolkata', image: require('../../assets/kolkata.png')},
-  {id: 'ahmedabad', name: 'Ahmedabad', image: require('../../assets/Ahmedabad.png')},
+  { id: 'mumbai', name: 'Mumbai', image: require('../../assets/Mumbai.png') },
+  { id: 'delhi', name: 'Delhi', image: require('../../assets/Delhi.png') },
+  { id: 'bangalore', name: 'Bangalore', image: require('../../assets/Bangalore.png') },
+  { id: 'hyderabad', name: 'Hyderabad', image: require('../../assets/Hyderabad.png') },
+  { id: 'chennai', name: 'Chennai', image: require('../../assets/Chennai.png') },
+  { id: 'pune', name: 'Pune', image: require('../../assets/Pune.png') },
+  { id: 'kolkata', name: 'Kolkata', image: require('../../assets/kolkata.png') },
+  { id: 'ahmedabad', name: 'Ahmedabad', image: require('../../assets/Ahmedabad.png') },
 ];
 
 type ListingType = 'sale' | 'rent' | 'pg';
 
-const HomeScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, isAuthenticated} = useAuth();
+const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  const { user, logout, isAuthenticated } = useAuth();
   const insets = useSafeAreaInsets();
-  
+
   // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
   const isGuest = !isLoggedIn;
@@ -70,15 +70,15 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLocation, setSearchLocation] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
-  
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
-  
+
   // Header animation values
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerHeight = insets.top + verticalScale(70);
-  
+
   // Smooth marquee auto-scroll refs
   const carouselScrollRef = useRef<ScrollView>(null);
   const scrollPosition = useRef(0);
@@ -92,7 +92,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
 
   useEffect(() => {
     loadDashboardData();
-    
+
     // Entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -115,45 +115,45 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   // Smooth marquee animation using requestAnimationFrame
   const startSmoothScroll = useCallback(() => {
     if (properties.length <= 1) return;
-    
+
     const totalWidth = properties.length * ITEM_WIDTH;
-    
+
     const animate = (timestamp: number) => {
       if (!lastTimestamp.current) {
         lastTimestamp.current = timestamp;
       }
-      
+
       const deltaTime = timestamp - lastTimestamp.current;
       lastTimestamp.current = timestamp;
-      
+
       // Only scroll if user is not interacting
       if (!isUserScrolling.current && carouselScrollRef.current) {
         // Move based on time delta for consistent speed across devices
         scrollPosition.current += SCROLL_SPEED * (deltaTime / 16.67); // Normalize to 60fps
-        
+
         // Reset to beginning when we've scrolled past half (seamless loop)
         if (scrollPosition.current >= totalWidth) {
           scrollPosition.current = 0;
         }
-        
+
         carouselScrollRef.current.scrollTo({
           x: scrollPosition.current,
           animated: false,
         });
       }
-      
+
       animationRef.current = requestAnimationFrame(animate);
     };
-    
+
     animationRef.current = requestAnimationFrame(animate);
   }, [properties.length]);
-  
+
   // Start/stop smooth scroll animation
   useEffect(() => {
     if (properties.length > 1) {
       startSmoothScroll();
     }
-    
+
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
@@ -161,22 +161,22 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
       }
     };
   }, [properties.length, startSmoothScroll]);
-  
+
   // Handle user scroll interaction
   const handleScrollBeginDrag = useCallback(() => {
     isUserScrolling.current = true;
   }, []);
-  
+
   const handleScrollEndDrag = useCallback((event: any) => {
     // Update scroll position to where user left off
     scrollPosition.current = event.nativeEvent.contentOffset.x;
-    
+
     // Resume auto-scroll after a short delay
     setTimeout(() => {
       isUserScrolling.current = false;
     }, 2000); // 2 second pause after user interaction
   }, []);
-  
+
   // Create duplicated data for seamless infinite scroll
   const getMarqueeData = useCallback(() => {
     if (properties.length === 0) return [];
@@ -189,7 +189,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
       if (showLoading) {
         setLoading(true);
       }
-      
+
       // PG tab: same as website - two API calls then merge
       if (listingType === 'pg') {
         const base = { limit: 10, status: 'rent' };
@@ -218,7 +218,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         }
       }
 
-      const allResponse = await buyerService.getProperties({limit: 50});
+      const allResponse = await buyerService.getProperties({ limit: 50 });
       if (allResponse.success && allResponse.data?.properties) {
         const allList = allResponse.data.properties as Property[];
         setUpcomingProjects(allList.filter(p => p.project_type === 'upcoming').slice(0, 15));
@@ -258,11 +258,11 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   const handleSearch = () => {
     try {
       setShowLocationSuggestions(false);
-      
+
       // PART A: Safely get location input with trim() - handle null/empty/spaces
       // Empty location is VALID and should navigate to show ALL properties
       const searchLocationText = (searchLocation || searchQuery || '').trim();
-      
+
       // PART A: Always allow Search click - NO validation blocking empty input
       // Empty location is valid - will show ALL properties in SearchResults
       // Navigate to Search tab which has the search functionality
@@ -270,16 +270,16 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         query: searchLocationText, // Always pass query param (even if empty string)
         location: searchLocationText, // Always pass location param (even if empty string)
       };
-      
+
       // If location has value, add additional params for backward compatibility
       if (searchLocationText) {
         params.searchQuery = searchLocationText;
       }
-      
+
       // Pass listing type (Buy, Rent, PG only - no All)
       params.listingType = listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent';
       params.status = listingType === 'sale' ? 'sale' : 'rent';
-      
+
       navigation.navigate('Search' as never, {
         screen: 'SearchResults',
         params: params,
@@ -293,14 +293,14 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
   const handleCityPress = (cityName: string) => {
     navigation.navigate('Search' as never, {
       screen: 'SearchResults',
-      params: {location: cityName},
+      params: { location: cityName },
     } as never);
   };
 
   const handlePropertyPress = (property: Property) => {
     navigation.navigate('Search' as never, {
       screen: property.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
-      params: {propertyId: String(property.id)},
+      params: { propertyId: String(property.id) },
     } as never);
   };
 
@@ -319,7 +319,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const renderPropertyCard = ({item, index}: {item: Property; index: number}) => {
+  const renderPropertyCard = ({ item, index }: { item: Property; index: number }) => {
     const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
     const images = item.images?.length
       ? item.images.map((url: string) => fixImageUrl(url)).filter(Boolean)
@@ -328,9 +328,9 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
       <Animated.View
         style={{
           opacity: fadeAnim,
-          transform: [{translateY: slideAnim}],
+          transform: [{ translateY: slideAnim }],
         }}>
-          <PropertyCard
+        <PropertyCard
           image={imageUrl || undefined}
           images={images}
           name={item.title}
@@ -346,13 +346,13 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     );
   };
 
-  const renderCityCard = ({item}: {item: TopCity}) => (
+  const renderCityCard = ({ item }: { item: TopCity }) => (
     <TouchableOpacity
       style={styles.cityCard}
       onPress={() => handleCityPress(item.name)}>
       <View style={styles.cityImageContainer}>
-        <Image 
-          source={item.image} 
+        <Image
+          source={item.image}
           style={styles.cityImage}
           resizeMode="cover"
         />
@@ -369,12 +369,12 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={
           isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
             : undefined
         }
         onSignUpPress={
           isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
             : undefined
         }
         showLogout={isLoggedIn}
@@ -389,14 +389,14 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
           styles.content,
           {
             opacity: fadeAnim,
-            transform: [{translateY: slideAnim}],
+            transform: [{ translateY: slideAnim }],
           },
         ]}>
         <Animated.ScrollView
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + spacing.md}]}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.md }]}
           showsVerticalScrollIndicator={false}
-          onScroll={(event: {nativeEvent: {contentOffset: {y: number}}}) => {
+          onScroll={(event: { nativeEvent: { contentOffset: { y: number } } }) => {
             const offsetY = event.nativeEvent.contentOffset.y;
             scrollY.setValue(offsetY);
           }}
@@ -490,9 +490,6 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                 }
               }}
               activeOpacity={0.8}>
-              <View style={styles.mapSearchIconWrap}>
-                <Text style={styles.mapSearchIcon}>📍</Text>
-              </View>
               <Text style={styles.mapSearchText}>Search on Map</Text>
             </TouchableOpacity>
           </View>
@@ -561,7 +558,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
                         styles.carouselCard,
                         {
                           opacity: fadeAnim,
-                          transform: [{translateY: slideAnim}],
+                          transform: [{ translateY: slideAnim }],
                         },
                       ]}>
                       <PropertyCard
@@ -725,7 +722,7 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
               contentContainerStyle={styles.citiesList}
               renderItem={renderCityCard}
             />
-      </View>
+          </View>
         </Animated.ScrollView>
       </Animated.View>
     </View>
@@ -786,7 +783,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 3,
@@ -812,7 +809,7 @@ const styles = StyleSheet.create({
     borderRadius: scale(12),
     marginLeft: scale(12),
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 3,
@@ -832,38 +829,19 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   mapSearchButton: {
-    flexDirection: 'row',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: scale(12),
-    paddingVertical: verticalScale(12),
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    minHeight: verticalScale(48),
-    gap: spacing.sm,
-    borderWidth: 0,
-    shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  mapSearchIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapSearchIcon: {
-    fontSize: moderateScale(16),
+    borderWidth: 1,
+    borderColor: colors.primary + '40', // Purple border with opacity
+    marginTop: spacing.md,
   },
   mapSearchText: {
-    fontSize: moderateScale(15),
+    ...typography.body,
+    color: colors.primary, // Purple text
     fontWeight: '700',
-    color: colors.surface,
+    fontSize: 16,
   },
   // Toggle Section - Pill-shaped buttons
   toggleSection: {
@@ -889,7 +867,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 3,
@@ -969,7 +947,7 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(10),
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
@@ -1005,7 +983,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     borderRadius: scale(16),
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,

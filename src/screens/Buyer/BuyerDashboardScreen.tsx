@@ -662,9 +662,6 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
               }
             }}
             activeOpacity={0.8}>
-            <View style={styles.mapSearchIconWrap}>
-              <Text style={styles.mapSearchIcon}>📍</Text>
-            </View>
             <Text style={styles.mapSearchText}>Search on Map</Text>
           </TouchableOpacity>
         </View>
@@ -1021,39 +1018,19 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
   mapSearchButton: {
-    flexDirection: 'row',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: scale(12),
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    minHeight: verticalScale(48),
-    gap: spacing.sm,
-    borderWidth: 0,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  mapSearchIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapSearchIcon: {
-    fontSize: moderateScale(16),
+    borderWidth: 1,
+    borderColor: colors.primary + '40', // Purple border with opacity
+    marginTop: spacing.md,
   },
   mapSearchText: {
     ...typography.body,
-    color: colors.surface,
+    color: colors.primary, // Purple text
     fontWeight: '700',
-    fontSize: moderateScale(15),
+    fontSize: 16,
   },
   section: {
     marginTop: verticalScale(28),
