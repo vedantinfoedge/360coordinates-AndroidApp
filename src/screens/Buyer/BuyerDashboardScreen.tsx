@@ -669,6 +669,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 <Path d="M8 2v16" />
                 <Path d="M16 6v16" />
               </Svg>
+              <Text style={{
+                color: 'white',
+                fontSize: 10,
+                marginTop: 4,
+                fontWeight: '600'
+              }}>View Map</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -952,7 +958,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: scale(12),
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
+    minHeight: verticalScale(50),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -1025,8 +1032,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.primary,
     borderRadius: scale(12),
-    width: scale(48),
-    height: scale(48),
+    width: scale(70),
+    height: scale(70),
     marginTop: spacing.sm,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
