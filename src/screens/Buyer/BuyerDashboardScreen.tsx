@@ -13,7 +13,6 @@ import {
   Share,
   Animated,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -650,33 +649,24 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
 
           {/* Search on Map Button */}
           {/* Search on Map Button */}
-          <View style={{ alignItems: 'flex-end' }}>
-            <TouchableOpacity
-              style={styles.mapSearchButton}
-              onPress={() => {
-                try {
-                  navigation.navigate('PropertyMap', {
-                    listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
-                  } as never);
-                } catch (error: any) {
-                  console.error('Error navigating to map:', error);
-                  CustomAlert.alert('Error', 'Map feature is not available. Please check Mapbox integration.');
-                }
-              }}
-              activeOpacity={0.8}>
-              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <Path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-1 4z" />
-                <Path d="M8 2v16" />
-                <Path d="M16 6v16" />
-              </Svg>
-              <Text style={{
-                color: 'white',
-                fontSize: 10,
-                marginTop: 4,
-                fontWeight: '600'
-              }}>View Map</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.mapSearchButton}
+            onPress={() => {
+              try {
+                navigation.navigate('PropertyMap', {
+                  listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
+                } as never);
+              } catch (error: any) {
+                console.error('Error navigating to map:', error);
+                CustomAlert.alert('Error', 'Map feature is not available. Please check Mapbox integration.');
+              }
+            }}
+            activeOpacity={0.8}>
+            <View style={styles.mapSearchIconWrap}>
+              <Text style={styles.mapSearchIcon}>📍</Text>
+            </View>
+            <Text style={styles.mapSearchText}>Search on Map</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Upcoming Projects Section (by Agent/Builder) */}
@@ -1031,18 +1021,39 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
   mapSearchButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
     borderRadius: scale(12),
-    width: scale(70),
-    height: scale(70),
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     marginTop: spacing.sm,
+    minHeight: verticalScale(48),
+    gap: spacing.sm,
+    borderWidth: 0,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 3,
+  },
+  mapSearchIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapSearchIcon: {
+    fontSize: moderateScale(16),
+  },
+  mapSearchText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: moderateScale(15),
   },
   section: {
     marginTop: verticalScale(28),
