@@ -5,9 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { DEBUG_SELLER_CRASH } from '../config/debugCrash';
 import SellerTabNavigator from '../components/navigation/SellerTabNavigator';
 import { colors } from '../theme';
+import SellerPropertyDetailsScreen from '../screens/Seller/SellerPropertyDetailsScreen';
+import AddPropertyScreen from '../screens/Seller/AddPropertyScreen';
 
 export type SellerStackParamList = {
   SellerTabs: undefined;
+  PropertyDetails: { propertyId: string };
+  AddProperty: { propertyId?: string; isLimitedEdit?: boolean; createdAt?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<SellerStackParamList>();
@@ -62,6 +66,8 @@ const SellerNavigator = () => {
         screenOptions={{ headerShown: false }}
         initialRouteName="SellerTabs">
         <Stack.Screen name="SellerTabs" component={SellerTabNavigator} />
+        <Stack.Screen name="PropertyDetails" component={SellerPropertyDetailsScreen} />
+        <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
       </Stack.Navigator>
     );
   } catch (err: any) {

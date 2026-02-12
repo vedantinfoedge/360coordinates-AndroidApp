@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useMemo, useRef} from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,16 +14,16 @@ import {
   Animated,
 } from 'react-native';
 import CustomAlert from '../../utils/alertHelper';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useFocusEffect} from '@react-navigation/native';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {useAuth} from '../../context/AuthContext';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { useAuth } from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
-import {sellerService, DashboardStats} from '../../services/seller.service';
-import {fixImageUrl} from '../../utils/imageHelper';
-import {formatters, capitalize} from '../../utils/formatters';
+import { sellerService, DashboardStats } from '../../services/seller.service';
+import { fixImageUrl } from '../../utils/imageHelper';
+import { formatters, capitalize } from '../../utils/formatters';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -41,8 +41,8 @@ interface Property {
 type StatusFilter = 'all' | 'sale' | 'rent';
 type SortOption = 'newest' | 'oldest' | 'price-high' | 'price-low';
 
-const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout} = useAuth();
+const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
+  const { user, logout } = useAuth();
   const [properties, setProperties] = useState<any[]>([]);
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
-  
+
   // Scroll animation for header hide/show
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -70,25 +70,25 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       if (statsResponse && statsResponse.success && statsResponse.data) {
         const stats = statsResponse.data;
         const currentCount = stats.total_properties || 0;
-        
+
         // Get subscription plan type (defaults to 'free' if no subscription)
         const planType = stats.subscription?.plan_type || 'free';
-        
+
         // Property limits based on subscription plan
-        const limits: {[key: string]: number} = {
+        const limits: { [key: string]: number } = {
           'free': 3,
           'basic': 10,
           'pro': 10,
           'premium': 10,
         };
-        
+
         const limit = limits[planType] || limits['free'];
-        
+
         if (limit > 0 && currentCount >= limit) {
           CustomAlert.alert(
             'Property limit reached',
             `Property limit reached. You can list up to ${limit} properties in your current plan.`,
-            [{text: 'OK'}]
+            [{ text: 'OK' }]
           );
           return false;
         }
@@ -99,7 +99,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           CustomAlert.alert(
             'Property limit reached',
             `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
-            [{text: 'OK'}]
+            [{ text: 'OK' }]
           );
           return false;
         }
@@ -114,7 +114,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           CustomAlert.alert(
             'Property limit reached',
             `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
-            [{text: 'OK'}]
+            [{ text: 'OK' }]
           );
           return false;
         }
@@ -127,7 +127,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         CustomAlert.alert(
           'Property limit reached',
           `You have reached the maximum limit of ${defaultLimit} properties. You cannot add more properties.`,
-          [{text: 'OK'}]
+          [{ text: 'OK' }]
         );
         return false;
       }
@@ -139,12 +139,12 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   const canEditProperty = (property: any): boolean => {
     const createdAt = property.created_at || property.created_date || property.date_created;
     if (!createdAt) return true; // Allow if no date available
-    
+
     const createdDate = new Date(createdAt);
     const now = new Date();
     const diffMs = now.getTime() - createdDate.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    
+
     return diffHours < 24;
   };
 
@@ -153,7 +153,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       if (showLoading) {
         setLoading(true);
       }
-      
+
       // Load dashboard stats for property limit check
       try {
         const statsResponse: any = await sellerService.getDashboardStats();
@@ -167,18 +167,18 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           console.warn('Error loading dashboard stats:', error);
         }
       }
-      
+
       // Use seller service endpoint (correct endpoint for sellers)
       const response = await sellerService.getProperties({
         page: 1,
         limit: 100, // Get all properties
       });
-      
+
       console.log('[SellerProperties] Response:', JSON.stringify(response, null, 2));
-      
+
       // Handle different response structures
       let propertiesData: any[] = [];
-      
+
       // Check if response exists (might be array or object)
       const responseData: any = response;
       if (responseData) {
@@ -221,57 +221,57 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
             console.log('[SellerProperties] Response is array (no success field):', propertiesData.length);
           }
         }
-        
+
         console.log('[SellerProperties] Total extracted properties:', propertiesData.length);
-        
+
         // Only process if we have properties
         if (propertiesData.length > 0) {
           // Fix image URLs and ensure all required fields are present
           const fixedProperties = propertiesData.map((prop: any, index: number) => {
-          // Determine status/active state
-          let isActive = prop.is_active;
-          if (isActive === undefined || isActive === null) {
-            // Try to infer from status field
-            if (prop.status === 'active' || prop.status === 1 || prop.status === '1') {
-              isActive = 1;
-            } else if (prop.status === 'inactive' || prop.status === 'sold' || prop.status === 0 || prop.status === '0') {
-              isActive = 0;
-            } else {
-              // Default to active if not specified
-              isActive = 1;
+            // Determine status/active state
+            let isActive = prop.is_active;
+            if (isActive === undefined || isActive === null) {
+              // Try to infer from status field
+              if (prop.status === 'active' || prop.status === 1 || prop.status === '1') {
+                isActive = 1;
+              } else if (prop.status === 'inactive' || prop.status === 'sold' || prop.status === 0 || prop.status === '0') {
+                isActive = 0;
+              } else {
+                // Default to active if not specified
+                isActive = 1;
+              }
             }
-          }
-          
-          // Try multiple image fields - backend might store images in different formats
-          const rawImage = prop.cover_image || prop.image || prop.images?.[0] || prop.property_image || 
-                          (Array.isArray(prop.images) && prop.images.length > 0 ? prop.images[0] : null);
-          const imageUrl = fixImageUrl(rawImage);
-          const propId = prop.id || prop.property_id;
-          
-          console.log(`[SellerProperties] Property ${propId} image check:`, {
-            cover_image: prop.cover_image,
-            image: prop.image,
-            images: prop.images,
-            property_image: prop.property_image,
-            fixedUrl: imageUrl,
+
+            // Try multiple image fields - backend might store images in different formats
+            const rawImage = prop.cover_image || prop.image || prop.images?.[0] || prop.property_image ||
+              (Array.isArray(prop.images) && prop.images.length > 0 ? prop.images[0] : null);
+            const imageUrl = fixImageUrl(rawImage);
+            const propId = prop.id || prop.property_id;
+
+            console.log(`[SellerProperties] Property ${propId} image check:`, {
+              cover_image: prop.cover_image,
+              image: prop.image,
+              images: prop.images,
+              property_image: prop.property_image,
+              fixedUrl: imageUrl,
+            });
+
+            return {
+              ...prop, // Spread first to preserve all backend data
+              id: propId ? String(propId) : `prop-${index}-${Date.now()}`, // Ensure valid ID
+              property_id: prop.property_id || prop.id || propId,
+              title: prop.title || prop.property_title || 'Untitled Property',
+              location: prop.location || prop.city || prop.address || 'Location not specified',
+              price: prop.price ? String(prop.price) : '0',
+              status: prop.status || (isActive ? 'sale' : 'sold'), // status is sale/rent, not active/pending
+              is_active: isActive,
+              cover_image: imageUrl, // Override with fixed URL - must come after spread
+              views_count: prop.views_count || prop.views || prop.view_count || 0,
+              inquiry_count: prop.inquiry_count || prop.inquiries || prop.inquiry_count || 0,
+              favorite_count: prop.favorite_count || prop.favorites || prop.favorite_count || 0,
+            };
           });
-          
-          return {
-            ...prop, // Spread first to preserve all backend data
-            id: propId ? String(propId) : `prop-${index}-${Date.now()}`, // Ensure valid ID
-            property_id: prop.property_id || prop.id || propId,
-            title: prop.title || prop.property_title || 'Untitled Property',
-            location: prop.location || prop.city || prop.address || 'Location not specified',
-            price: prop.price ? String(prop.price) : '0',
-            status: prop.status || (isActive ? 'sale' : 'sold'), // status is sale/rent, not active/pending
-            is_active: isActive,
-            cover_image: imageUrl, // Override with fixed URL - must come after spread
-            views_count: prop.views_count || prop.views || prop.view_count || 0,
-            inquiry_count: prop.inquiry_count || prop.inquiries || prop.inquiry_count || 0,
-            favorite_count: prop.favorite_count || prop.favorites || prop.favorite_count || 0,
-          };
-          });
-          
+
           console.log('[SellerProperties] Loaded and fixed properties:', fixedProperties.length);
           setAllProperties(fixedProperties);
           setProperties(fixedProperties);
@@ -305,10 +305,10 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         data: error?.data,
         success: error?.success,
       });
-      
+
       // Check if error has already been formatted by API interceptor
       let errorMessage = 'Failed to load properties. Please check your connection.';
-      
+
       // Handle error from API interceptor (already parsed)
       if (error?.message && typeof error.message === 'string') {
         errorMessage = error.message;
@@ -334,7 +334,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       } else if (error?.message) {
         errorMessage = error.message;
       }
-      
+
       console.error('[SellerProperties] Final error message:', errorMessage);
 
       const status = error?.response?.status || error?.status;
@@ -349,8 +349,8 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           'Error Loading Properties',
           errorMessage + (is403 || isAccessDenied ? '' : '\n\nPlease try refreshing or contact support if the issue persists.'),
           [
-            {text: 'Retry', onPress: () => loadMyProperties(true)},
-            {text: 'OK', style: 'cancel'}
+            { text: 'Retry', onPress: () => loadMyProperties(true) },
+            { text: 'OK', style: 'cancel' }
           ]
         );
       }
@@ -390,21 +390,21 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   // Filter and sort properties
   const filteredAndSortedProperties = useMemo(() => {
     let filtered = [...allProperties];
-    
+
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(prop => 
+      filtered = filtered.filter(prop =>
         (prop.title || '').toLowerCase().includes(query) ||
         (prop.location || '').toLowerCase().includes(query)
       );
     }
-    
+
     // Apply status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(prop => prop.status === statusFilter);
     }
-    
+
     // Apply sort
     filtered.sort((a, b) => {
       switch (sortBy) {
@@ -424,28 +424,28 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           return 0;
       }
     });
-    
+
     return filtered;
   }, [allProperties, searchQuery, statusFilter, sortBy]);
 
   const handleEdit = async (propertyId: string | number) => {
     const property = allProperties.find(p => String(p.id) === String(propertyId));
-    
+
     if (!property) {
       CustomAlert.alert('Error', 'Property not found');
       return;
     }
-    
+
     const limitedEdit = !canEditProperty(property);
-    
+
     if (limitedEdit) {
       CustomAlert.alert(
         'Limited Edit Mode',
         'This property was created more than 24 hours ago.\n\nOnly the Title and Pricing fields (price, negotiable, deposit, maintenance) can be edited. Other details are locked.',
-        [{text: 'OK'}],
+        [{ text: 'OK' }],
       );
     }
-    
+
     // Navigate to AddProperty screen with edit params
     (navigation as any).navigate('AddProperty', {
       propertyId: String(propertyId),
@@ -466,7 +466,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
       'Delete Property',
       'Are you sure you want to delete this property? This action cannot be undone and the property will be removed from the database and website.',
       [
-        {text: 'Cancel', style: 'cancel'},
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -497,12 +497,12 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
               }
             } catch (error: any) {
               loadMyProperties(true);
-              
+
               // Show error message
-              const errorMessage = error?.message || 
-                                  error?.response?.data?.message ||
-                                  error?.response?.message ||
-                                  'Failed to delete property. Please check your connection and try again.';
+              const errorMessage = error?.message ||
+                error?.response?.data?.message ||
+                error?.response?.message ||
+                'Failed to delete property. Please check your connection and try again.';
               CustomAlert.alert('Delete Failed', errorMessage);
             }
           },
@@ -512,31 +512,31 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleViewDetails = (propertyId: string) => {
-    navigation.navigate('PropertyDetails', {propertyId});
+    navigation.navigate('PropertyDetails', { propertyId });
   };
 
-  const renderProperty = ({item}: {item: any}) => {
+  const renderProperty = ({ item }: { item: any }) => {
     // Safety check for item
     if (!item || !item.id) {
       console.warn('[SellerProperties] Invalid item in renderProperty:', item);
       return null;
     }
-    
+
     // Image URL is already fixed when loading properties (line 132), so use directly
     // If it's a relative path that wasn't fixed, fix it now
-    const imageUrl = item.cover_image 
+    const imageUrl = item.cover_image
       ? (item.cover_image.startsWith('http') ? item.cover_image : fixImageUrl(item.cover_image))
       : null;
     const isActive = item.is_active === 1 || item.is_active === true;
     const statusColor = isActive ? getStatusColor('active') : getStatusColor('sold');
-    
+
     return (
       <TouchableOpacity
         style={styles.propertyCard}
-        onPress={() => navigation.navigate('PropertyDetails', {propertyId: item.id})}>
+        onPress={() => navigation.navigate('PropertyDetails', { propertyId: item.id })}>
         {imageUrl ? (
           <Image
-            source={{uri: imageUrl}}
+            source={{ uri: imageUrl }}
             style={styles.propertyImage}
             resizeMode="cover"
             onError={(error: any) => {
@@ -557,70 +557,70 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
             <Text style={styles.placeholderText}>🏠</Text>
           </View>
         )}
-      <View style={styles.propertyInfo}>
-        <View style={styles.propertyHeader}>
-          <Text style={styles.propertyTitle} numberOfLines={2}>
-            {capitalize(item.title || 'Untitled Property')}
-          </Text>
-          <View
-            style={[
-              styles.statusBadge,
-              {backgroundColor: statusColor},
-            ]}>
-            <Text style={styles.statusText}>
-              {isActive ? 'ACTIVE' : 'INACTIVE'}
+        <View style={styles.propertyInfo}>
+          <View style={styles.propertyHeader}>
+            <Text style={styles.propertyTitle} numberOfLines={2}>
+              {capitalize(item.title || 'Untitled Property')}
+            </Text>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusColor },
+              ]}>
+              <Text style={styles.statusText}>
+                {isActive ? 'ACTIVE' : 'INACTIVE'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.propertyLocationRow}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <Text style={styles.propertyLocation} numberOfLines={1}>
+              {item.location || 'Location not specified'}
             </Text>
           </View>
-        </View>
-        <View style={styles.propertyLocationRow}>
-          <Text style={styles.locationIcon}>📍</Text>
-          <Text style={styles.propertyLocation} numberOfLines={1}>
-            {item.location || 'Location not specified'}
-          </Text>
-        </View>
-        <View style={styles.propertyStatsRow}>
-          <View style={styles.propertyStatItem}>
-            <Text style={styles.propertyStatIcon}>👁️</Text>
-            <Text style={styles.propertyStatText}>{item.views_count || item.views || 0}</Text>
+          <View style={styles.propertyStatsRow}>
+            <View style={styles.propertyStatItem}>
+              <Text style={styles.propertyStatIcon}>👁️</Text>
+              <Text style={styles.propertyStatText}>{item.views_count || item.views || 0}</Text>
+            </View>
+            <View style={styles.propertyStatItem}>
+              <Text style={styles.propertyStatIcon}>💬</Text>
+              <Text style={styles.propertyStatText}>{item.inquiry_count || item.inquiries || 0}</Text>
+            </View>
           </View>
-          <View style={styles.propertyStatItem}>
-            <Text style={styles.propertyStatIcon}>💬</Text>
-            <Text style={styles.propertyStatText}>{item.inquiry_count || item.inquiries || 0}</Text>
-          </View>
-        </View>
-        <View style={styles.propertyFooter}>
-          <Text style={styles.propertyPrice}>
-            {formatters.price(
-              typeof item.price === 'string' 
-                ? (parseFloat(item.price) || 0) 
-                : (typeof item.price === 'number' ? item.price : 0),
-              item.status === 'rent'
-            )}
-          </Text>
-          <View style={styles.propertyActions}>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={(e: any) => {
-                e.stopPropagation();
-                handleEdit(item.id);
-              }}
-              activeOpacity={0.7}>
-              <Text style={styles.editButtonIcon}>✏</Text>
-              <Text style={styles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={(e: any) => {
-                e.stopPropagation();
-                handleDelete(item.id);
-              }}
-              activeOpacity={0.7}>
-              <Text style={styles.deleteButtonIcon}>🗑</Text>
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
+          <View style={styles.propertyFooter}>
+            <Text style={styles.propertyPrice}>
+              {formatters.price(
+                typeof item.price === 'string'
+                  ? (parseFloat(item.price) || 0)
+                  : (typeof item.price === 'number' ? item.price : 0),
+                item.status === 'rent'
+              )}
+            </Text>
+            <View style={styles.propertyActions}>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={(e: any) => {
+                  e.stopPropagation();
+                  handleEdit(item.id);
+                }}
+                activeOpacity={0.7}>
+                <Text style={styles.editButtonIcon}>✏</Text>
+                <Text style={styles.editButtonText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={(e: any) => {
+                  e.stopPropagation();
+                  handleDelete(item.id);
+                }}
+                activeOpacity={0.7}>
+                <Text style={styles.deleteButtonIcon}>🗑</Text>
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
       </TouchableOpacity>
     );
   };
@@ -634,11 +634,11 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
         onLogoutPress={logout}
         scrollY={scrollY}
       />
-      <View style={[styles.header, {marginTop: spacing.xxl}]}>
+      <View style={[styles.header, { marginTop: spacing.xxl }]}>
         <Text style={styles.headerTitle}>My Properties</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity
-            style={[styles.viewPlansButton, {marginRight: spacing.sm}]}
+            style={[styles.viewPlansButton, { marginRight: spacing.sm }]}
             onPress={() => navigation.navigate('Subscription')}>
             <Text style={styles.viewPlansButtonText}>View Plans</Text>
           </TouchableOpacity>
@@ -649,7 +649,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           </TouchableOpacity>
         </View>
       </View>
-      
+
       {/* Search and Filter Bar */}
       <View style={styles.searchBar}>
         <View style={styles.searchInputContainer}>
@@ -671,7 +671,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
           <Text style={styles.filterButtonIcon}>⚙</Text>
         </TouchableOpacity>
       </View>
-      
+
       {/* Filter Modal */}
       <Modal
         visible={showFilterModal}
@@ -686,7 +686,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.filterSection}>
               <Text style={styles.filterLabel}>Status</Text>
               <View style={styles.filterOptions}>
@@ -715,9 +715,9 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                 ))}
               </View>
             </View>
-            
+
             <View style={styles.filterDivider} />
-            
+
             <View style={styles.filterSection}>
               <Text style={styles.filterLabel}>Sort By</Text>
               {(['newest', 'oldest', 'price-high', 'price-low'] as SortOption[]).map(option => (
@@ -747,7 +747,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
                 </TouchableOpacity>
               ))}
             </View>
-            
+
             <TouchableOpacity
               style={styles.applyButton}
               onPress={() => setShowFilterModal(false)}>
@@ -803,13 +803,24 @@ const SellerPropertiesScreen: React.FC<Props> = ({navigation}) => {
               }
               showsVerticalScrollIndicator={false}
               onScroll={Animated.event(
-                [{nativeEvent: {contentOffset: {y: scrollY}}}],
-                {useNativeDriver: true}
+                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                { useNativeDriver: true }
               )}
               scrollEventThrottle={16}
             />
           )}
         </>
+      )}
+
+      {/* Floating Action Button - Same as Agent */}
+      {allProperties.length > 0 && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={handleAddProperty}
+          activeOpacity={0.8}>
+          <Text style={styles.fabIcon}>+</Text>
+          <Text style={styles.fabText}>Add Property</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -830,7 +841,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
@@ -985,7 +996,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
@@ -1044,7 +1055,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
@@ -1317,7 +1328,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.lg,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 3,

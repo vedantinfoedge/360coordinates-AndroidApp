@@ -8,8 +8,6 @@ import SellerPropertiesScreen from '../../screens/Seller/SellerPropertiesScreen'
 import SellerProfileScreen from '../../screens/Seller/SellerProfileScreen';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import LeadsScreen from '../../screens/Seller/LeadsScreen';
-import SellerPropertyDetailsScreen from '../../screens/Seller/SellerPropertyDetailsScreen';
-import AddPropertyScreen from '../../screens/Seller/AddPropertyScreen';
 import SellerSupportScreen from '../../screens/Seller/SellerSupportScreen';
 import SubscriptionScreen from '../../screens/Seller/SubscriptionScreen';
 import SellerCustomTabBar from './SellerCustomTabBar';
@@ -21,8 +19,6 @@ export type SellerTabParamList = {
   Chat: undefined;
   Profile: undefined;
   Leads: undefined;
-  PropertyDetails: { propertyId: string };
-  AddProperty: { propertyId?: string; isLimitedEdit?: boolean; createdAt?: string } | undefined;
   Support: undefined;
   Subscription: undefined;
 };
@@ -77,22 +73,7 @@ const SellerTabNavigator = () => {
           tabBarButton: () => null,
         }}
       />
-      <Tab.Screen
-        name="PropertyDetails"
-        component={SellerPropertyDetailsScreen}
-        options={{
-          title: 'Property Details',
-          tabBarButton: () => null,
-        }}
-      />
-      <Tab.Screen
-        name="AddProperty"
-        component={AddPropertyScreen}
-        options={{
-          title: 'Add Property',
-          tabBarButton: () => null,
-        }}
-      />
+
       <Tab.Screen
         name="Support"
         component={SellerSupportScreen}
