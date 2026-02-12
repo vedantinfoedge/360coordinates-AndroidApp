@@ -1147,24 +1147,26 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             </Text>
             <Text style={styles.dropdownChevron}>{openDropdown === 'property' ? '▲' : '▼'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.dropdownTrigger}
-            onPress={() => setOpenDropdown(openDropdown === 'budget' ? null : 'budget')}>
-            <Text style={styles.dropdownLabel}>Price</Text>
-            <Text style={styles.dropdownValue} numberOfLines={1}>
-              {minBudget === 0 && maxBudget === maxBudgetForType
-                ? 'Any'
-                : findBudgetLabelForRange({
-                  listingType,
-                  propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
-                  min: minBudget,
-                  max: maxBudget,
-                  excludeLowestRentOption: listingType === 'rent',
-                }) ||
-                `${formatBudgetDisplay(minBudget)}-${formatBudgetDisplay(maxBudget)}`}
-            </Text>
-            <Text style={styles.dropdownChevron}>{openDropdown === 'budget' ? '▲' : '▼'}</Text>
-          </TouchableOpacity>
+          {searchMode !== 'projects' && (
+            <TouchableOpacity
+              style={styles.dropdownTrigger}
+              onPress={() => setOpenDropdown(openDropdown === 'budget' ? null : 'budget')}>
+              <Text style={styles.dropdownLabel}>Price</Text>
+              <Text style={styles.dropdownValue} numberOfLines={1}>
+                {minBudget === 0 && maxBudget === maxBudgetForType
+                  ? 'Any'
+                  : findBudgetLabelForRange({
+                    listingType,
+                    propertyType: selectedPropertyType === 'all' ? undefined : selectedPropertyType,
+                    min: minBudget,
+                    max: maxBudget,
+                    excludeLowestRentOption: listingType === 'rent',
+                  }) ||
+                  `${formatBudgetDisplay(minBudget)}-${formatBudgetDisplay(maxBudget)}`}
+              </Text>
+              <Text style={styles.dropdownChevron}>{openDropdown === 'budget' ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
         {/* Dropdown options modal */}
         <Modal visible={openDropdown !== null} transparent animationType="fade">
@@ -1488,36 +1490,39 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
 
               {/* Budget Range - preset options only (no slider) */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Budget Range</Text>
-                <View style={styles.filterOptions}>
-                  {[
-                    { label: 'Any', min: 0, max: maxBudgetForType, budgetLabel: '' },
-                    ...getBudgetOptions(activeBudgetSet, listingType === 'rent').map((opt) => ({
-                      label: opt.label,
-                      min: opt.min,
-                      max: opt.max,
-                      budgetLabel: opt.label,
-                    })),
-                  ].map(({ label, min, max, budgetLabel }) => {
-                    const isActive = minBudget === min && maxBudget === max;
-                    return (
-                      <TouchableOpacity
-                        key={label}
-                        style={[styles.filterChip, isActive && styles.filterChipActive]}
-                        onPress={() => {
-                          setMinBudget(min);
-                          setMaxBudget(max);
-                          setBudget(budgetLabel);
-                        }}>
-                        <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+              {/* Budget Range - preset options only (no slider) - Hidden in Project Mode */}
+              {searchMode !== 'projects' && (
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterLabel}>Budget Range</Text>
+                  <View style={styles.filterOptions}>
+                    {[
+                      { label: 'Any', min: 0, max: maxBudgetForType, budgetLabel: '' },
+                      ...getBudgetOptions(activeBudgetSet, listingType === 'rent').map((opt) => ({
+                        label: opt.label,
+                        min: opt.min,
+                        max: opt.max,
+                        budgetLabel: opt.label,
+                      })),
+                    ].map(({ label, min, max, budgetLabel }) => {
+                      const isActive = minBudget === min && maxBudget === max;
+                      return (
+                        <TouchableOpacity
+                          key={label}
+                          style={[styles.filterChip, isActive && styles.filterChipActive]}
+                          onPress={() => {
+                            setMinBudget(min);
+                            setMaxBudget(max);
+                            setBudget(budgetLabel);
+                          }}>
+                          <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
+              )}
 
               {/* Area - Only show for area-based property types */}
               {isAreaBased && (
