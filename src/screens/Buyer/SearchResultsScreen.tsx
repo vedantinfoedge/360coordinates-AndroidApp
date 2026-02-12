@@ -80,6 +80,7 @@ interface Property {
   is_favorite: boolean;
   availableForBachelors?: boolean;
   availabilityStatus?: string;
+  project_type?: string;
 }
 
 const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
@@ -694,6 +695,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
           city: prop.city || '',
           state: prop.state || '',
           bhk: prop.bedrooms || 0,
+          project_type: prop.project_type,
           cover_image: coverUrl,
           images: imagesList,
           is_favorite: prop.is_favorite || false,
