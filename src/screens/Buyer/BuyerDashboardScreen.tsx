@@ -669,7 +669,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Upcoming Projects Section (by Agent/Builder) */}
+        {/* Explore Projects Section (by Agent/Builder) */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View>
@@ -686,6 +686,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                   listingType: 'buy',
                   status: 'sale',
                   project_type: 'upcoming',
+                  searchMode: 'projects',
                 } as never);
               }}>
               <Text style={styles.seeAllText}>See All</Text>
