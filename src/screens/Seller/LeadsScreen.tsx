@@ -14,6 +14,7 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { SellerStackParamList } from '../../navigation/SellerNavigator';
+import { SellerTabParamList } from '../../components/navigation/SellerTabNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { verticalScale } from '../../utils/responsive';
 import SellerHeader from '../../components/SellerHeader';
@@ -22,7 +23,7 @@ import { formatters } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type LeadsScreenNavigationProp = CompositeNavigationProp<
-  NativeStackNavigationProp<SellerStackParamList, 'Leads'>,
+  NativeStackNavigationProp<SellerTabParamList, 'Leads'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -257,7 +258,7 @@ const styles = StyleSheet.create({
   titleWrap: {
     paddingHorizontal: spacing.xs,
     paddingBottom: spacing.md,
-    marginTop: spacing.sm,
+    marginTop: spacing.xl + spacing.lg,
   },
   screenTitle: {
     ...typography.h2,
