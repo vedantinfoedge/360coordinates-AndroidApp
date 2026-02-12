@@ -466,7 +466,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         onFavoritePress={() => handleToggleFavorite(item.id)}
         onSharePress={() => handleShareProperty(item)}
         isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
-        property={item}
+        property={{
+          ...item,
+          project_status: item.project_status || item.upcoming_project_data?.project_status
+        }}
         style={styles.propertyCardStyle}
       />
     );
@@ -718,7 +721,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                       onFavoritePress={() => handleToggleFavorite(item.id)}
                       onSharePress={() => handleShareProperty(item)}
                       isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
-                      property={item}
+                      property={{
+                        ...item,
+                        project_status: item.project_status || item.upcoming_project_data?.project_status
+                      }}
                       style={styles.carouselPropertyCard}
                     />
                   </View>
@@ -801,7 +807,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                       onFavoritePress={() => handleToggleFavorite(item.id)}
                       onSharePress={() => handleShareProperty(item)}
                       isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
-                      property={item}
+                      property={{
+                        ...item,
+                        project_status: item.project_status || item.upcoming_project_data?.project_status
+                      }}
                       style={styles.carouselPropertyCard}
                       onImageCarouselScrollStart={handleImageCarouselScrollStart}
                       onImageCarouselScrollEnd={handleImageCarouselScrollEnd}
@@ -871,7 +880,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                       onFavoritePress={() => handleToggleFavorite(item.id)}
                       onSharePress={() => handleShareProperty(item)}
                       isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
-                      property={item}
+                      property={{
+                        ...item,
+                        project_status: item.project_status || item.upcoming_project_data?.project_status
+                      }}
                       style={styles.carouselPropertyCard}
                     />
                   </View>

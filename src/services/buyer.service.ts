@@ -1,5 +1,5 @@
 import api from './api.service';
-import {API_ENDPOINTS} from '../config/api.config';
+import { API_ENDPOINTS } from '../config/api.config';
 
 export interface Property {
   id: number;
@@ -42,6 +42,8 @@ export interface Property {
   inquiry_count: number;
   is_favorite?: boolean;
   project_type?: 'upcoming' | null;
+  project_status?: string; // New field
+  upcoming_project_data?: any; // New field
   created_at: string;
 }
 
@@ -133,7 +135,7 @@ export const buyerService = {
     propertyId: number | string,
   ): Promise<PropertyDetailsResponse> => {
     const response = await api.get(API_ENDPOINTS.BUYER_PROPERTY_DETAILS, {
-      params: {id: propertyId},
+      params: { id: propertyId },
     });
     return response;
   },

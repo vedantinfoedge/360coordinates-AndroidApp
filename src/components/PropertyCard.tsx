@@ -1,9 +1,9 @@
-import React, {useState, useEffect, useRef, useMemo} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, Image, Animated, ScrollView} from 'react-native';
-import {colors, spacing, typography, borderRadius} from '../theme';
-import {scale, verticalScale, moderateScale} from '../utils/responsive';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, ScrollView } from 'react-native';
+import { colors, spacing, typography, borderRadius } from '../theme';
+import { scale, verticalScale, moderateScale } from '../utils/responsive';
 import CustomAlert from '../utils/alertHelper';
-import {capitalize} from '../utils/formatters';
+import { capitalize } from '../utils/formatters';
 
 interface PropertyCardProps {
   image?: string;
@@ -96,18 +96,18 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   }, [image, imageUrls.length, imageUrls[0]]);
 
   const [imageErrorIndices, setImageErrorIndices] = useState<Set<number>>(new Set());
-  const scrollViewRef = useRef<{scrollTo: (opts: {x: number; animated?: boolean}) => void} | null>(null);
+  const scrollViewRef = useRef<{ scrollTo: (opts: { x: number; animated?: boolean }) => void } | null>(null);
   React.useEffect(() => {
     setImageErrorIndices(new Set());
     setCurrentIndex(0);
   }, [imageUrls.length]);
 
-  const onImageContainerLayout = (e: {nativeEvent: {layout: {width: number}}}) => {
-    const {width} = e.nativeEvent.layout;
+  const onImageContainerLayout = (e: { nativeEvent: { layout: { width: number } } }) => {
+    const { width } = e.nativeEvent.layout;
     if (width > 0) setSlideWidth(width);
   };
 
-  const onScrollEnd = (e: {nativeEvent: {contentOffset: {x: number}}}) => {
+  const onScrollEnd = (e: { nativeEvent: { contentOffset: { x: number } } }) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     if (slideWidth > 0) {
       const index = Math.round(offsetX / slideWidth);
@@ -118,14 +118,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const goToPrev = () => {
     if (currentIndex <= 0 || slideWidth <= 0) return;
     const nextIndex = currentIndex - 1;
-    scrollViewRef.current?.scrollTo({x: nextIndex * slideWidth, animated: true});
+    scrollViewRef.current?.scrollTo({ x: nextIndex * slideWidth, animated: true });
     setCurrentIndex(nextIndex);
   };
 
   const goToNext = () => {
     if (currentIndex >= imageUrls.length - 1 || slideWidth <= 0) return;
     const nextIndex = currentIndex + 1;
-    scrollViewRef.current?.scrollTo({x: nextIndex * slideWidth, animated: true});
+    scrollViewRef.current?.scrollTo({ x: nextIndex * slideWidth, animated: true });
     setCurrentIndex(nextIndex);
   };
 
@@ -153,6 +153,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     }
   };
 
+  // Project Status Badge
+  const getProjectStatusBadgeStyle = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case 'PRE-LAUNCH': return styles.preLaunchBadge;
+      case 'UNDER CONSTRUCTION': return styles.underConstructionBadge;
+      case 'COMPLETED': return styles.completedBadge;
+      default: return styles.defaultProjectBadge;
+    }
+  };
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -161,7 +171,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       activeOpacity={1}
       style={style}>
       <Animated.View
-        style={[styles.card, style, {transform: [{scale: scaleAnim}]}]}>
+        style={[styles.card, style, { transform: [{ scale: scaleAnim }] }]}>
         {/* Property Image - carousel when multiple images */}
         <View style={styles.imageContainer} onLayout={onImageContainerLayout}>
           {hasMultipleImages && slideWidth > 0 ? (
@@ -184,7 +194,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 style={styles.imageCarousel}
                 contentContainerStyle={styles.imageCarouselContent}>
                 {imageUrls.map((uri, index) => (
-                  <View key={`img-${index}`} style={[styles.slide, {width: slideWidth}]}>
+                  <View key={`img-${index}`} style={[styles.slide, { width: slideWidth }]}>
                     {imageErrorIndices.has(index) ? (
                       <View style={styles.imagePlaceholder}>
                         <Text style={styles.imagePlaceholderText}>🏠</Text>
@@ -192,7 +202,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                       </View>
                     ) : (
                       <Image
-                        source={{uri}}
+                        source={{ uri }}
                         style={styles.image}
                         resizeMode="cover"
                         onLoadEnd={() => index === 0 && setImageLoaded(true)}
@@ -207,7 +217,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               {/* Left / Right navigator arrows */}
               <TouchableOpacity
                 style={[styles.navArrow, styles.navArrowLeft]}
-                onPress={(e: {stopPropagation: () => void}) => {
+                onPress={(e: { stopPropagation: () => void }) => {
                   e.stopPropagation();
                   onImageCarouselScrollStart?.();
                   goToPrev();
@@ -221,7 +231,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.navArrow, styles.navArrowRight]}
-                onPress={(e: {stopPropagation: () => void}) => {
+                onPress={(e: { stopPropagation: () => void }) => {
                   e.stopPropagation();
                   onImageCarouselScrollStart?.();
                   goToNext();
@@ -256,7 +266,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 </View>
               )}
               <Image
-                source={{uri: imageUrls[0]}}
+                source={{ uri: imageUrls[0] }}
                 style={[styles.image, !imageLoaded && styles.imageWhileLoading]}
                 resizeMode="cover"
                 onLoadEnd={() => setImageLoaded(true)}
@@ -281,7 +291,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <View style={styles.actionsOverlay} pointerEvents="box-none">
             <TouchableOpacity
               style={[styles.actionButton, styles.shareButton]}
-              onPress={(e: {stopPropagation: () => void}) => {
+              onPress={(e: { stopPropagation: () => void }) => {
                 e.stopPropagation();
                 handleSharePress();
               }}
@@ -292,7 +302,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={(e: {stopPropagation: () => void}) => {
+              onPress={(e: { stopPropagation: () => void }) => {
                 e.stopPropagation();
                 handleFavoritePress();
               }}
@@ -315,6 +325,15 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               {type === 'buy' ? 'Buy' : type === 'rent' ? 'Rent' : 'PG/Hostel'}
             </Text>
           </View>
+
+          {/* Project Status Badge */}
+          {property?.project_status && (
+            <View style={[styles.badge, styles.projectBadge, getProjectStatusBadgeStyle(property.project_status)]}>
+              <Text style={styles.badgeText}>
+                {property.project_status}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Property Info */}
@@ -326,11 +345,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             {location}
           </Text>
           <Text style={styles.price}>{price}</Text>
-          
+
           {/* View Details Button */}
           <TouchableOpacity
             style={styles.viewDetailsButton}
-            onPress={(e: {stopPropagation: () => void}) => {
+            onPress={(e: { stopPropagation: () => void }) => {
               e.stopPropagation();
               if (onPress) {
                 onPress();
@@ -349,10 +368,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 const CARD_RADIUS = scale(16);
 const CARD_SHADOW = {
   shadowColor: '#000',
-  shadowOffset: {width: 0, height: 4},
+  shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.08,
   shadowRadius: 16,
   elevation: 4,
+  backgroundColor: '#fff', // Ensure shadow works on iOS
 };
 
 const styles = StyleSheet.create({
@@ -363,6 +383,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.lg,
     overflow: 'hidden',
     ...CARD_SHADOW,
+    marginBottom: 8, // Add margin bottom to avoid cutting off shadow
   },
   imageContainer: {
     position: 'relative',
@@ -416,7 +437,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 30,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     overflow: 'hidden',
@@ -476,7 +497,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 3,
@@ -503,6 +524,10 @@ const styles = StyleSheet.create({
     zIndex: 5,
     pointerEvents: 'none',
   },
+  projectBadge: {
+    left: 'auto',
+    right: scale(12),
+  },
   buyBadge: {
     backgroundColor: colors.primary,
   },
@@ -511,6 +536,19 @@ const styles = StyleSheet.create({
   },
   pgBadge: {
     backgroundColor: '#F59E0B',
+  },
+  // Project Status Colors
+  preLaunchBadge: {
+    backgroundColor: '#8B5CF6', // Purple
+  },
+  underConstructionBadge: {
+    backgroundColor: '#F59E0B', // Amber
+  },
+  completedBadge: {
+    backgroundColor: '#10B981', // Emerald
+  },
+  defaultProjectBadge: {
+    backgroundColor: colors.primary, // Blue
   },
   badgeText: {
     fontSize: moderateScale(11),
