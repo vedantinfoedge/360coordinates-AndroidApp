@@ -990,7 +990,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
         isFavorite={item.is_favorite || false}
         onPress={() =>
           navigation.navigate(
-            (item as any).project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+            item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
             { propertyId: String(item.id) },
           )
         }

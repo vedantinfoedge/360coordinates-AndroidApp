@@ -468,6 +468,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
         property={{
           ...item,
+          project_type: item.project_type,
           project_status: item.project_status || item.upcoming_project_data?.project_status
         }}
         style={styles.propertyCardStyle}
