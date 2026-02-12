@@ -7,56 +7,72 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  Modal,
   Platform,
   ActivityIndicator,
   Share,
-  Alert,
+  Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
 import { SellerTabParamList } from '../../components/navigation/SellerTabNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { verticalScale, moderateScale, scale } from '../../utils/responsive';
 import { propertyService } from '../../services/property.service';
+import CustomAlert from '../../utils/alertHelper';
 import { validateAndProcessPropertyImages, PropertyImage } from '../../utils/imageHelper';
 import SellerHeader from '../../components/SellerHeader';
 import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
-import { formatters, capitalize, capitalizeAmenity } from '../../utils/formatters';
+import { Linking } from 'react-native';
+import { capitalize, capitalizeAmenity } from '../../utils/formatters';
 
-type SellerPropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
-  SellerTabParamList,
-  'PropertyDetails'
->;
+// Import WebView with error handling
+let WebView: any = null;
+try {
+  WebView = require('react-native-webview').WebView;
+} catch (error) {
+  console.warn('[PropertyDetails] WebView not available:', error);
+}
 
-type SellerPropertyDetailsScreenRouteProp = RouteProp<SellerTabParamList, 'PropertyDetails'>;
+type SellerPropertyDetailsScreenNavigationProp = NativeStackNavigationProp<SellerTabParamList, 'PropertyDetails'>;
 
 type Props = {
   navigation: SellerPropertyDetailsScreenNavigationProp;
-  route: SellerPropertyDetailsScreenRouteProp;
+  route: {
+    params: {
+      propertyId: string;
+    };
+  };
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Calculate image carousel width accounting for container margins
 const IMAGE_CAROUSEL_WIDTH = SCREEN_WIDTH - (spacing.md * 2);
 
-const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
+const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const { logout } = useAuth();
+  const headerHeight = insets.top + verticalScale(70);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const { logout, user } = useAuth();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
-  const imageScrollViewRef = useRef<ScrollView>(null);
-  const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageScrollViewRef = useRef<any>(null);
 
   useEffect(() => {
     loadPropertyDetails();
   }, [route.params.propertyId]);
 
+  // Reset image index when property changes
   useEffect(() => {
     if (property && property.images && property.images.length > 0) {
       setCurrentImageIndex(0);
-      setFailedImages(new Set());
+      // Reset scroll position to first image
       setTimeout(() => {
         imageScrollViewRef.current?.scrollTo({
           x: 0,
@@ -82,17 +98,20 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => 
     try {
       setLoading(true);
       const response = await propertyService.getPropertyDetails(route.params.propertyId);
+
       const responseData = response as any;
 
       if (responseData && responseData.success && responseData.data) {
         const propData = responseData.data.property || responseData.data;
 
+        // Use helper function to validate and process images (EXACTLY like website/Buyer)
         let propertyImages: PropertyImage[] = validateAndProcessPropertyImages(
           propData.images,
           propData.title || 'Property',
           propData.cover_image
         );
 
+        // Final fallback
         if (propertyImages.length === 0) {
           propertyImages = [{
             id: 1,
@@ -101,40 +120,22 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => 
           }];
         }
 
+        // Store images as objects
         propData.images = propertyImages;
+
         setProperty(propData);
         setCurrentImageIndex(0);
       } else {
-        Alert.alert('Error', 'Failed to load property details');
+        CustomAlert.alert('Error', 'Failed to load property details');
         navigation.goBack();
       }
     } catch (error: any) {
-      console.error('[SellerPropertyDetails] Error loading property:', error);
-      Alert.alert('Error', error.message || 'Failed to load property details');
+      console.error('[PropertyDetails] Error loading property:', error);
+      CustomAlert.alert('Error', error.message || 'Failed to load property details');
       navigation.goBack();
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleEdit = () => {
-    if (!property) return;
-
-    const limitedEdit = !canEditProperty(property);
-
-    if (limitedEdit) {
-      Alert.alert(
-        'Limited Edit Mode',
-        'This property was created more than 24 hours ago.\n\nOnly the Title and Pricing fields can be edited.',
-        [{ text: 'OK' }],
-      );
-    }
-
-    navigation.navigate('AddProperty', {
-      propertyId: String(property.id),
-      isLimitedEdit: limitedEdit,
-      createdAt: property.created_at || property.created_date || property.date_created,
-    });
   };
 
   const handleShareProperty = async () => {
@@ -153,37 +154,69 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => 
     } catch (error: any) {
       if (error.message !== 'User did not share') {
         console.error('Error sharing property:', error);
-        Alert.alert('Error', 'Failed to share property. Please try again.');
+        CustomAlert.alert('Error', 'Failed to share property. Please try again.');
       }
     }
   };
 
+  const handleEdit = () => {
+    if (!property) return;
+    navigation.navigate('AddProperty', {
+      propertyId: property.id,
+      isLimitedEdit: !canEditProperty(property),
+      createdAt: property.created_at || property.created_date,
+    });
+  };
+
+  // Check if video URL is valid
+  const isValidVideoUrl = (url: string | null | undefined): boolean => {
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      return false;
+    }
+    const trimmedUrl = url.trim();
+    return (
+      trimmedUrl.includes('youtube.com') ||
+      trimmedUrl.includes('youtu.be') ||
+      trimmedUrl.includes('vimeo.com') ||
+      trimmedUrl.endsWith('.mp4') ||
+      trimmedUrl.endsWith('.mov') ||
+      trimmedUrl.endsWith('.webm') ||
+      trimmedUrl.startsWith('http://') ||
+      trimmedUrl.startsWith('https://')
+    );
+  };
+
+  // Convert video URL to embed format
+  const getVideoEmbedUrl = (url: string): string => {
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.includes('youtube.com/watch?v=')) {
+      const videoId = trimmedUrl.split('v=')[1]?.split('&')[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (trimmedUrl.includes('youtu.be/')) {
+      const videoId = trimmedUrl.split('youtu.be/')[1]?.split('?')[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (trimmedUrl.includes('vimeo.com/')) {
+      const videoId = trimmedUrl.split('vimeo.com/')[1]?.split('?')[0];
+      return `https://player.vimeo.com/video/${videoId}`;
+    }
+    return trimmedUrl;
+  };
+
   if (loading || !property) {
     return (
-      <View style={styles.container}>
-        <SellerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onSubscriptionPress={() => navigation.navigate('Subscription')}
-          onLogoutPress={logout}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading property details...</Text>
-        </View>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading property details...</Text>
       </View>
     );
   }
 
-  const propertyImages: PropertyImage[] = property.images && Array.isArray(property.images)
-    ? property.images
-    : [];
-
-  const formattedPrice = property.price
-    ? formatters.price(parseFloat(property.price), property.status === 'rent')
-    : 'Price not available';
-
   const amenities = property.amenities || [];
+  const propertyImages = property.images || [];
+  const videoUrl = property.video_url || property.video;
+  const hasVideo = isValidVideoUrl(videoUrl);
 
   return (
     <View style={styles.container}>
@@ -192,175 +225,152 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => 
         onSupportPress={() => navigation.navigate('Support')}
         onSubscriptionPress={() => navigation.navigate('Subscription')}
         onLogoutPress={logout}
+        scrollY={scrollY}
       />
 
-      <View style={[styles.actionButtonsTop, { top: (insets.top + 60) }]}>
-        <TouchableOpacity
-          style={styles.shareButtonTop}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleShareProperty();
-          }}
-          activeOpacity={0.7}>
-          <View style={styles.actionButtonInner}>
-            <Text style={styles.shareIcon}>🔗</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
+      <Animated.ScrollView
+        ref={imageScrollViewRef as any}
         style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + spacing.md }]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}>
-
-        {/* Image Slider/Carousel - Matches Buyer UI */}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false } // headerHeight interpolation might need false, or stick to just opacity
+        )}
+      >
+        {/* Modern Image Carousel - Identical to Buyer */}
         <View style={styles.imageCarouselContainer}>
-          {propertyImages.length > 0 ? (
+          <ScrollView
+            ref={imageScrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.imageCarousel}
+            contentContainerStyle={styles.imageCarouselContent}
+            onMomentumScrollEnd={(event: any) => {
+              const slideSize = event.nativeEvent.layoutMeasurement.width;
+              const index = event.nativeEvent.contentOffset.x / slideSize;
+              const roundIndex = Math.round(index);
+              setCurrentImageIndex(roundIndex);
+            }}
+          >
+            {propertyImages.map((img: PropertyImage, index: number) => (
+              <TouchableOpacity
+                key={img.id || index}
+                activeOpacity={0.9}
+                onPress={() => setShowImageGallery(true)}
+                style={styles.imageContainer}
+              >
+                <Image
+                  source={{ uri: img.url }}
+                  style={styles.image}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Image Navigation Buttons */}
+          {propertyImages.length > 1 && (
             <>
-              <ScrollView
-                ref={imageScrollViewRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={(event) => {
-                  const index = Math.round(
-                    event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
-                  );
-                  if (index >= 0 && index < propertyImages.length) {
-                    setCurrentImageIndex(index);
-                  }
-                }}
-                onScroll={(event) => {
-                  const index = Math.round(
-                    event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
-                  );
-                  if (index >= 0 && index < propertyImages.length && index !== currentImageIndex) {
-                    setCurrentImageIndex(index);
-                  }
-                }}
-                scrollEventThrottle={16}
-                style={styles.imageCarousel}
-                contentContainerStyle={{
-                  ...styles.imageCarouselContent,
-                  width: IMAGE_CAROUSEL_WIDTH * propertyImages.length,
-                }}
-                decelerationRate="fast"
-                snapToInterval={IMAGE_CAROUSEL_WIDTH}
-                snapToAlignment="center">
-                {propertyImages.map((image, index) => (
-                  <TouchableOpacity
-                    key={image.id}
-                    style={styles.imageContainer}
-                    onPress={() => {
-                      setCurrentImageIndex(index);
-                      setShowImageGallery(true);
-                    }}
-                    activeOpacity={0.9}>
-                    {failedImages.has(image.id) ? (
-                      <View style={[styles.image, styles.imagePlaceholder]}>
-                        <Text style={styles.imagePlaceholderText}>🏠</Text>
-                        <Text style={styles.imagePlaceholderSubtext}>Image unavailable</Text>
-                      </View>
-                    ) : (
-                      <Image
-                        source={{ uri: image.url }}
-                        style={styles.image}
-                        resizeMode="cover"
-                        onError={(error) => {
-                          console.error(`[SellerPropertyDetails] Image ${index} failed:`, image.url);
-                          setFailedImages(prev => new Set(prev).add(image.id));
-                        }}
-                        onLoadStart={() => {
-                          setFailedImages(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete(image.id);
-                            return newSet;
-                          });
-                        }}
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {propertyImages.length > 1 && (
-                <View style={styles.imageIndicators}>
-                  {propertyImages.map((_, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => {
-                        setCurrentImageIndex(index);
-                        imageScrollViewRef.current?.scrollTo({
-                          x: index * IMAGE_CAROUSEL_WIDTH,
-                          animated: true,
-                        });
-                      }}
-                      activeOpacity={0.7}>
-                      <View
-                        style={[
-                          styles.indicator,
-                          index === currentImageIndex && styles.indicatorActive,
-                        ]}
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </View>
+              {currentImageIndex > 0 && (
+                <TouchableOpacity
+                  style={[styles.carouselNavButton, styles.carouselNavButtonLeft]}
+                  onPress={() => {
+                    const newIndex = currentImageIndex - 1;
+                    imageScrollViewRef.current?.scrollTo({
+                      x: newIndex * IMAGE_CAROUSEL_WIDTH, // Approximate width
+                      animated: true
+                    });
+                    setCurrentImageIndex(newIndex);
+                  }}
+                >
+                  <Text style={styles.carouselNavButtonText}>‹</Text>
+                </TouchableOpacity>
               )}
-
-              {propertyImages.length > 1 && (
-                <View style={styles.swipeHint}>
-                  <Text style={styles.swipeHintText}>← Swipe to view more →</Text>
-                </View>
+              {currentImageIndex < propertyImages.length - 1 && (
+                <TouchableOpacity
+                  style={[styles.carouselNavButton, styles.carouselNavButtonRight]}
+                  onPress={() => {
+                    const newIndex = currentImageIndex + 1;
+                    imageScrollViewRef.current?.scrollTo({
+                      x: newIndex * IMAGE_CAROUSEL_WIDTH,
+                      animated: true
+                    });
+                    setCurrentImageIndex(newIndex);
+                  }}
+                >
+                  <Text style={styles.carouselNavButtonText}>›</Text>
+                </TouchableOpacity>
               )}
             </>
-          ) : (
-            <View style={styles.imageContainer}>
-              <Image
-                source={require('../../assets/logo.png')}
-                style={styles.image}
-                resizeMode="cover"
-              />
+          )}
+
+          {/* Indicators */}
+          {propertyImages.length > 1 && (
+            <View style={styles.imageIndicators}>
+              {propertyImages.map((img: any, index: number) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.indicator,
+                    index === currentImageIndex && styles.indicatorActive,
+                  ]}
+                />
+              ))}
             </View>
+          )}
+
+          <TouchableOpacity style={styles.shareButton} onPress={handleShareProperty}>
+            <Text style={styles.shareButtonText}>Share</Text>
+          </TouchableOpacity>
+
+          {hasVideo && (
+            <TouchableOpacity style={styles.videoButton} onPress={() => setShowVideoModal(true)}>
+              <Text style={styles.videoButtonIcon}>▶</Text>
+              <Text style={styles.videoButtonText}>Video Tour</Text>
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* Content Sections - Matches Buyer UI */}
-        <View style={styles.headerSection}>
-          <Text style={styles.title}>{capitalize(property.title || property.property_title || 'Property Title')}</Text>
-          <View style={styles.locationContainer}>
-            <Text style={styles.locationIcon}>📍</Text>
-            <Text style={styles.location}>{property.location || property.city || property.address || 'Location not specified'}</Text>
+        {/* Property Info Header */}
+        <View style={styles.header}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{property.title || 'Property Title'}</Text>
+            <View style={styles.priceBadge}>
+              <Text style={styles.price}>
+                {property.price ? `₹${parseFloat(property.price).toLocaleString('en-IN')}` : 'Price on Request'}
+              </Text>
+              {property.status === 'rent' && <Text style={styles.perMonth}>/mo</Text>}
+            </View>
           </View>
-          <Text style={styles.price}>{formattedPrice}</Text>
-        </View>
 
-        {/* Quick Info */}
-        <View style={styles.quickInfo}>
-          <View style={styles.infoCard}>
-            <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🛏</Text>
-            </View>
-            <Text style={styles.infoText}>{property.bedrooms || 'N/A'} Beds</Text>
+          <View style={styles.locationRow}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <Text style={styles.location}>{property.location || property.city || 'Location not available'}</Text>
           </View>
-          <View style={styles.infoCard}>
-            <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🚿</Text>
-            </View>
-            <Text style={styles.infoText}>{property.bathrooms || 'N/A'} Baths</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>📐</Text>
-            </View>
-            <Text style={styles.infoText}>
-              {property.area ? (typeof property.area === 'number' ? `${property.area} sq ft` : property.area) : 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.infoCard}>
-            <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🏢</Text>
-            </View>
-            <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground' : (property.floor || 'N/A')}</Text>
+
+          {/* Key Specs Row */}
+          <View style={styles.specsRow}>
+            {property.bedrooms && (
+              <View style={styles.specItem}>
+                <Text style={styles.specIcon}>🛏</Text>
+                <Text style={styles.specValue}>{property.bedrooms} Beds</Text>
+              </View>
+            )}
+            {property.bathrooms && (
+              <View style={styles.specItem}>
+                <Text style={styles.specIcon}>🚿</Text>
+                <Text style={styles.specValue}>{property.bathrooms} Baths</Text>
+              </View>
+            )}
+            {property.area && (
+              <View style={styles.specItem}>
+                <Text style={styles.specIcon}>📐</Text>
+                <Text style={styles.specValue}>{property.area} sqft</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -368,52 +378,42 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => 
         <View style={styles.section}>
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionIcon}>📝</Text>
-            <Text style={styles.sectionTitle}>About this property</Text>
+            <Text style={styles.sectionTitle}>Description</Text>
           </View>
-          <Text style={styles.description}>{property.description || 'No description available'}</Text>
+          <Text style={styles.description}>
+            {property.description || 'No description available for this property.'}
+          </Text>
         </View>
 
-        {/* Property Details */}
+        {/* Details Grid */}
         <View style={styles.section}>
           <View style={styles.sectionTitleContainer}>
-            <Text style={styles.sectionIcon}>🏠</Text>
-            <Text style={styles.sectionTitle}>Property Details</Text>
+            <Text style={styles.sectionIcon}>ℹ️</Text>
+            <Text style={styles.sectionTitle}>Details</Text>
           </View>
           <View style={styles.detailsGrid}>
-            {property.age && (
+            {property.property_type && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Property Age</Text>
-                <Text style={styles.detailValue}>{property.age}</Text>
-              </View>
-            )}
-            {property.total_floors && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Total Floors</Text>
-                <Text style={styles.detailValue}>{property.total_floors}</Text>
-              </View>
-            )}
-            {property.facing && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Facing</Text>
-                <Text style={styles.detailValue}>{property.facing}</Text>
+                <Text style={styles.detailLabel}>Type</Text>
+                <Text style={styles.detailValue}>{property.property_type}</Text>
               </View>
             )}
             <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Type</Text>
+              <Text style={styles.detailLabel}>Status</Text>
               <Text style={styles.detailValue}>
                 {property.status === 'rent' ? 'For Rent' : 'For Sale'}
               </Text>
             </View>
-            {property.property_type && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Property Type</Text>
-                <Text style={styles.detailValue}>{property.property_type}</Text>
-              </View>
-            )}
             {property.furnishing && (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Furnishing</Text>
                 <Text style={styles.detailValue}>{property.furnishing}</Text>
+              </View>
+            )}
+            {property.possession_status && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Possession</Text>
+                <Text style={styles.detailValue}>{property.possession_status}</Text>
               </View>
             )}
           </View>
@@ -436,26 +436,10 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => 
             </View>
           </View>
         )}
+      </Animated.ScrollView>
 
-        {/* Location */}
-        <View style={styles.section}>
-          <View style={styles.sectionTitleContainer}>
-            <Text style={styles.sectionIcon}>📍</Text>
-            <Text style={styles.sectionTitle}>Location</Text>
-          </View>
-          <Text style={styles.address}>
-            {property.address || property.fullAddress || property.location || property.city || 'Address not available'}
-          </Text>
-          {property.latitude && property.longitude && (
-            <Text style={styles.coordinates}>
-              Coordinates: {property.latitude}, {property.longitude}
-            </Text>
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Fixed Action Buttons - Edit Only */}
-      <View style={[styles.actionButtons, { paddingBottom: insets.bottom }]}>
+      {/* Seller Actions - Edit Button */}
+      <View style={[styles.actionButtons, { paddingBottom: insets.bottom + spacing.sm }]}>
         <TouchableOpacity
           style={styles.editButton}
           onPress={handleEdit}>
@@ -465,10 +449,40 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => 
 
       <ImageGallery
         visible={showImageGallery}
-        images={propertyImages.map(img => img.url)}
+        images={propertyImages.map((img: PropertyImage) => img.url)}
         initialIndex={currentImageIndex}
         onClose={() => setShowImageGallery(false)}
       />
+
+      {/* Video Modal */}
+      {WebView && (
+        <Modal
+          visible={showVideoModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowVideoModal(false)}
+        >
+          <View style={styles.videoModalContainer}>
+            <View style={styles.videoModalContent}>
+              <TouchableOpacity
+                style={styles.videoCloseButton}
+                onPress={() => setShowVideoModal(false)}
+              >
+                <Text style={styles.videoCloseText}>Close</Text>
+              </TouchableOpacity>
+              <View style={styles.webViewContainer}>
+                <WebView
+                  source={{ uri: getVideoEmbedUrl(videoUrl) }}
+                  style={styles.webView}
+                  allowsFullscreenVideo={true}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -494,7 +508,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 120, // Space for bottom buttons
   },
   imageCarouselContainer: {
     height: 450,
@@ -503,7 +517,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     overflow: 'hidden',
     marginHorizontal: spacing.md,
-    marginTop: spacing.xl + spacing.xl, // Extra space to show top rounded corners below header
+    marginTop: spacing.sm,
     backgroundColor: colors.surfaceSecondary,
   },
   imageCarousel: {
@@ -517,8 +531,12 @@ const styles = StyleSheet.create({
     width: IMAGE_CAROUSEL_WIDTH,
     height: 410,
     borderRadius: borderRadius.xl,
-    paddingTop: spacing.md,
     overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    borderRadius: borderRadius.xl,
   },
   carouselNavButton: {
     position: 'absolute',
@@ -543,27 +561,6 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: 'bold',
   },
-  image: {
-    width: '100%',
-    height: '100%',
-    borderRadius: borderRadius.xl,
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imagePlaceholderText: {
-    fontSize: 48,
-    marginBottom: spacing.xs,
-  },
-  imagePlaceholderSubtext: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
   imageIndicators: {
     position: 'absolute',
     bottom: spacing.md,
@@ -585,263 +582,199 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     width: 32,
   },
-  swipeHint: {
+  shareButton: {
     position: 'absolute',
-    bottom: spacing.lg + spacing.md,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  swipeHintText: {
-    ...typography.caption,
-    color: colors.surface,
-    fontSize: 12,
-    fontWeight: '600',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    top: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: borderRadius.md,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  imageCounter: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    zIndex: 3,
-  },
-  imageCounterText: {
-    ...typography.caption,
-    color: colors.surface,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  actionButtonsTop: {
-    position: 'absolute',
-    right: spacing.md,
-    zIndex: 100,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    elevation: 10,
-  },
-  shareButtonTop: {
-    zIndex: 101,
-    elevation: 10,
-  },
-  actionButtonInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: borderRadius.round,
+    zIndex: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3,
   },
-  shareIcon: {
-    fontSize: 18,
+  shareButtonText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.text,
   },
-  headerSection: {
+  videoButton: {
+    position: 'absolute',
+    bottom: spacing.xl + spacing.sm,
+    right: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+    zIndex: 10,
+  },
+  videoButtonIcon: {
+    color: '#FFF',
+    fontSize: 12,
+    marginRight: 6,
+  },
+  videoButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  header: {
+    padding: spacing.md,
     backgroundColor: colors.surface,
-    padding: spacing.xl,
-    paddingTop: spacing.xl + spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginTop: spacing.md,
+    marginHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.secondary, // Dark Charcoal #1D242B
-    marginBottom: spacing.sm,
-    lineHeight: 36,
+    ...typography.h2,
+    flex: 1,
+    color: colors.text,
+    minWidth: 200,
   },
-  locationContainer: {
+  priceBadge: {
+    backgroundColor: colors.primary + '15', // 15% opacity
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  price: {
+    ...typography.h3,
+    color: colors.primary,
+  },
+  perMonth: {
+    ...typography.caption,
+    color: colors.primary,
+    marginLeft: 2,
+  },
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.md,
-    gap: spacing.xs,
   },
   locationIcon: {
     fontSize: 16,
+    marginRight: 4,
   },
   location: {
-    fontSize: 16,
-    fontWeight: '500',
+    ...typography.body,
     color: colors.textSecondary,
     flex: 1,
   },
-  price: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: colors.primary, // Blue #0077C0
-    marginTop: spacing.xs,
-  },
-  quickInfo: {
+  specsRow: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    justifyContent: 'space-around',
-    gap: spacing.md,
-  },
-  infoCard: {
-    flex: 1,
-    alignItems: 'center',
     backgroundColor: colors.surfaceSecondary,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    minHeight: 100,
-    justifyContent: 'center',
-    gap: spacing.xs,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    justifyContent: 'space-around',
   },
-  infoIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary + '15', // 15% opacity purple
-    justifyContent: 'center',
+  specItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xs,
   },
-  infoIcon: {
-    fontSize: 20,
+  specIcon: {
+    fontSize: 18,
+    marginRight: 6,
   },
-  infoText: {
-    ...typography.caption,
-    color: colors.text,
-    fontSize: 13,
+  specValue: {
+    ...typography.body,
     fontWeight: '600',
-    textAlign: 'center',
+    color: colors.text,
   },
   section: {
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
     marginTop: spacing.lg,
-    marginHorizontal: spacing.md,
-    borderRadius: borderRadius.xl,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
   },
   sectionTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.primary + '30',
-    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   sectionIcon: {
     fontSize: 20,
+    marginRight: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.secondary, // Navy
+    ...typography.h3,
+    color: colors.text,
   },
   description: {
     ...typography.body,
     color: colors.textSecondary,
-    lineHeight: 25.6, // 1.6 * 16px
-    fontSize: 16,
+    lineHeight: 24,
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
+    marginTop: spacing.xs,
   },
   detailItem: {
-    width: '47%',
-    padding: spacing.lg,
-    backgroundColor: colors.surfaceSecondary,
+    width: '47%', // 2 columns with gap
+    backgroundColor: colors.surface,
+    padding: spacing.md,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    ...Platform.select({
-      android: {
-        elevation: 2,
-      },
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-      },
-    }),
   },
   detailLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    fontSize: 12,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   detailValue: {
     ...typography.body,
+    fontWeight: '600',
     color: colors.text,
-    fontWeight: '700',
-    fontSize: 16,
   },
   amenitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   amenityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '47%',
     backgroundColor: colors.surfaceSecondary,
-    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.round,
     borderWidth: 1,
-    borderColor: colors.borderLight,
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
+    borderColor: colors.border,
   },
   amenityIcon: {
-    fontSize: 16,
-    color: colors.primary, // Purple checkmark
-    fontWeight: 'bold',
+    fontSize: 14,
+    marginRight: 6,
+    color: colors.primary,
   },
   amenityText: {
     ...typography.body,
-    color: colors.text,
     fontSize: 14,
-    fontWeight: '500',
-  },
-  address: {
-    ...typography.body,
-    color: colors.textSecondary,
-    lineHeight: 25.6, // 1.6 * 16px
-    fontSize: 16,
-    marginBottom: spacing.xs,
-  },
-  coordinates: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontStyle: 'italic',
+    color: colors.text,
   },
   actionButtons: {
     position: 'absolute',
@@ -849,51 +782,48 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.surface,
-    borderTopWidth: 2,
-    borderTopColor: colors.border,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    flexDirection: 'row',
-    gap: spacing.md,
-    ...Platform.select({
-      android: {
-        elevation: 8,
-      },
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-    }),
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   editButton: {
-    flex: 1,
-    backgroundColor: colors.primary, // Purple background
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
-    paddingVertical: spacing.lg,
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-    ...Platform.select({
-      android: {
-        elevation: 6,
-      },
-      ios: {
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-      },
-    }),
   },
   editButtonText: {
-    ...typography.body,
+    ...typography.h3,
     color: colors.surface,
-    fontWeight: '700',
     fontSize: 16,
+  },
+  videoModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+  },
+  videoModalContent: {
+    width: '100%',
+    height: '60%',
+    backgroundColor: '#000',
+  },
+  videoCloseButton: {
+    padding: 15,
+    alignItems: 'flex-end',
+  },
+  videoCloseText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  webViewContainer: {
+    flex: 1,
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: '#000',
   },
 });
 
-export default SellerPropertyDetailsScreen;
+export default PropertyDetailsScreen;
