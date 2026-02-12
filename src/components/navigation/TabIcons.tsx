@@ -20,7 +20,9 @@ export type TabIconName =
   | 'building'
   | 'inquiries'
   | 'chevron-right'
-  | 'leads';
+  | 'leads'
+  | 'edit'
+  | 'location';
 
 type Props = { name: TabIconName; color: string; size?: number };
 
@@ -135,6 +137,20 @@ export function TabIcon({ name, color, size = SIZE }: Props) {
           <Path d="M9 7a4 4 0 100-8 4 4 0 000 8z" />
           <Path d="M23 21v-2a4 4 0 00-3-3.87" />
           <Path d="M16 3.13a4 4 0 010 7.75" />
+        </Svg>
+      );
+    case 'edit':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+          <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </Svg>
+      );
+    case 'location':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+          <Path d="M12 10a3 3 0 100-6 3 3 0 000 6z" />
         </Svg>
       );
     default:
