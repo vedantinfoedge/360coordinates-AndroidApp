@@ -32,10 +32,22 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const { logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<DashboardStats['subscription'] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    // Simulate refresh
+    setTimeout(() => setRefreshing(false), 2000);
+  }, []);
+
+  const handleSubscribe = (planId: string) => {
+    // TODO: Implement payment gateway integration
+    console.log('Subscribe to:', planId);
+  };
 
   useEffect(() => {
     Animated.parallel([
@@ -102,19 +114,6 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       </View>
     );
   }
-
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => setRefreshing(false), 2000);
-  }, []);
-
-  const handleSubscribe = (planId: string) => {
-    // TODO: Implement payment gateway integration
-    console.log('Subscribe to:', planId);
-  };
 
   return (
     <View style={styles.container}>

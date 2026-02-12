@@ -170,10 +170,12 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Check if video URL is valid
   const isValidVideoUrl = (url: string | null | undefined): boolean => {
-    if (!url || typeof url !== 'string' || url.trim() === '') {
+    if (!url || typeof url !== 'string') {
       return false;
     }
     const trimmedUrl = url.trim();
+    if (trimmedUrl === '') return false;
+
     return (
       trimmedUrl.includes('youtube.com') ||
       trimmedUrl.includes('youtu.be') ||
@@ -187,7 +189,9 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   // Convert video URL to embed format
-  const getVideoEmbedUrl = (url: string): string => {
+  const getVideoEmbedUrl = (url: string | null | undefined): string => {
+    if (!url || typeof url !== 'string') return '';
+
     const trimmedUrl = url.trim();
     if (trimmedUrl.includes('youtube.com/watch?v=')) {
       const videoId = trimmedUrl.split('v=')[1]?.split('&')[0];
