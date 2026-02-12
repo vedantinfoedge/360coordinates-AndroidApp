@@ -1980,8 +1980,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <SafeAreaView>
-            <View style={styles.safeArea}>
+          {/* @ts-expect-error - SafeAreaView style typing mismatch in this project */}
+          <SafeAreaView style={styles.safeArea}>
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Add Project</Text>
@@ -2084,7 +2084,6 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 )}
               </TouchableOpacity>
-            </View>
             </View>
           </SafeAreaView>
         </View>
