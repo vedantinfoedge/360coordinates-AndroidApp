@@ -237,10 +237,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       if (allResponse.success && allResponse.data?.properties) {
         const allList = allResponse.data.properties as Property[];
 
-        // Explore Projects: Only show projects uploaded by AGENTS
+        // Explore Projects: Show projects from AGENTS and SELLERS (Builders)
         setUpcomingProjects(allList.filter(p =>
-          p.project_type === 'upcoming' &&
-          p.seller?.user_type === 'agent'
+          p.project_type === 'upcoming'
         ).slice(0, 15));
 
         setBuyNewHomeProperties(
