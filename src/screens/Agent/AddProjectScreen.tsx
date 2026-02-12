@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,22 +12,22 @@ import {
   PermissionsAndroid,
   ActivityIndicator,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {AgentStackParamList} from '../../navigation/AgentNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType } from 'react-native-image-picker';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AgentStackParamList } from '../../navigation/AgentNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
-import {propertyService} from '../../services/property.service';
-import {uploadPropertyImageWithModeration, moderateFirebaseUrlForProperty} from '../../services/imageUpload.service';
-import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
-import {isFirebaseStorageAvailable} from '../../services/firebaseStorageProperty.service';
+import { propertyService } from '../../services/property.service';
+import { uploadPropertyImageWithModeration, moderateFirebaseUrlForProperty } from '../../services/imageUpload.service';
+import { USE_FIREBASE_STORAGE } from '../../config/firebaseStorage.config';
+import { isFirebaseStorageAvailable } from '../../services/firebaseStorageProperty.service';
 import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
-import {extractStateFromContext} from '../../utils/geocoding';
-import {useAuth} from '../../context/AuthContext';
-import {formatters} from '../../utils/formatters';
-import {Alert} from 'react-native';
+import { extractStateFromContext } from '../../utils/geocoding';
+import { useAuth } from '../../context/AuthContext';
+import { formatters } from '../../utils/formatters';
+import { Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import CustomAlert from '../../utils/alertHelper';
 
@@ -42,66 +42,66 @@ type Props = {
 
 // Project Type Options
 const PROJECT_TYPES = [
-  {id: 'apartment', label: 'Apartment', icon: '🏢'},
-  {id: 'villa', label: 'Villa', icon: '🏡'},
-  {id: 'plot', label: 'Plot', icon: '📐'},
-  {id: 'commercial', label: 'Commercial', icon: '🏢'},
+  { id: 'apartment', label: 'Apartment', icon: '🏢' },
+  { id: 'villa', label: 'Villa', icon: '🏡' },
+  { id: 'plot', label: 'Plot', icon: '📐' },
+  { id: 'commercial', label: 'Commercial', icon: '🏢' },
 ];
 
 // Project Status Options
 const PROJECT_STATUSES = [
-  {label: 'UNDER CONSTRUCTION', value: 'UNDER CONSTRUCTION'},
-  {label: 'PRE-LAUNCH', value: 'PRE-LAUNCH'},
-  {label: 'COMPLETED', value: 'COMPLETED'},
+  { label: 'UNDER CONSTRUCTION', value: 'UNDER CONSTRUCTION' },
+  { label: 'PRE-LAUNCH', value: 'PRE-LAUNCH' },
+  { label: 'COMPLETED', value: 'COMPLETED' },
 ];
 
 // Configuration Options
 const CONFIGURATIONS = [
-  {id: '1bhk', label: '1 BHK'},
-  {id: '2bhk', label: '2 BHK'},
-  {id: '3bhk', label: '3 BHK'},
-  {id: '4bhk', label: '4 BHK'},
-  {id: '5bhk', label: '5+ BHK'},
-  {id: 'villa', label: 'Villa'},
-  {id: 'plot', label: 'Plot'},
+  { id: '1bhk', label: '1 BHK' },
+  { id: '2bhk', label: '2 BHK' },
+  { id: '3bhk', label: '3 BHK' },
+  { id: '4bhk', label: '4 BHK' },
+  { id: '5bhk', label: '5+ BHK' },
+  { id: 'villa', label: 'Villa' },
+  { id: 'plot', label: 'Plot' },
 ];
 
 // Amenities Options
 const AMENITIES = [
-  {id: 'lift', label: 'Lift', icon: '🛗'},
-  {id: 'parking', label: 'Parking', icon: '🚗'},
-  {id: 'power_backup', label: 'Power Backup', icon: '⚡'},
-  {id: 'garden', label: 'Garden / Open Space', icon: '🌳'},
-  {id: 'gym', label: 'Gym', icon: '🏋️'},
-  {id: 'swimming_pool', label: 'Swimming Pool', icon: '🏊'},
-  {id: 'play_area', label: 'Children Play Area', icon: '🎢'},
-  {id: 'club_house', label: 'Club House', icon: '🏛️'},
-  {id: 'security', label: 'Security / CCTV', icon: '👮'},
+  { id: 'lift', label: 'Lift', icon: '🛗' },
+  { id: 'parking', label: 'Parking', icon: '🚗' },
+  { id: 'power_backup', label: 'Power Backup', icon: '⚡' },
+  { id: 'garden', label: 'Garden / Open Space', icon: '🌳' },
+  { id: 'gym', label: 'Gym', icon: '🏋️' },
+  { id: 'swimming_pool', label: 'Swimming Pool', icon: '🏊' },
+  { id: 'play_area', label: 'Children Play Area', icon: '🎢' },
+  { id: 'club_house', label: 'Club House', icon: '🏛️' },
+  { id: 'security', label: 'Security / CCTV', icon: '👮' },
 ];
 
 // Bank Options
 const BANKS = [
-  {id: 'sbi', label: 'SBI'},
-  {id: 'hdfc', label: 'HDFC Bank'},
-  {id: 'kotak', label: 'Kotak Mahindra Bank'},
-  {id: 'icici', label: 'ICICI Bank'},
-  {id: 'axis', label: 'Axis Bank'},
-  {id: 'bob', label: 'Bank of Baroda (BoB)'},
-  {id: 'other', label: 'Other'},
+  { id: 'sbi', label: 'SBI' },
+  { id: 'hdfc', label: 'HDFC Bank' },
+  { id: 'kotak', label: 'Kotak Mahindra Bank' },
+  { id: 'icici', label: 'ICICI Bank' },
+  { id: 'axis', label: 'Axis Bank' },
+  { id: 'bob', label: 'Bank of Baroda (BoB)' },
+  { id: 'other', label: 'Other' },
 ];
 
-const AddProjectScreen: React.FC<Props> = ({navigation}) => {
-  const {user} = useAuth();
+const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Step 1: Basic Project Information
   const [projectName, setProjectName] = useState('');
   const [projectType, setProjectType] = useState('');
   const [projectStatus, setProjectStatus] = useState('UNDER CONSTRUCTION');
   const [reraNumber, setReraNumber] = useState('');
   const [description, setDescription] = useState('');
-  
+
   // Step 2: Location Details
   const [location, setLocation] = useState('');
   const [locationQuery, setLocationQuery] = useState('');
@@ -116,14 +116,14 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [additionalAddress, setAdditionalAddress] = useState('');
   const [pincode, setPincode] = useState('');
-  
+
   // Step 3: Configuration & Inventory
   const [selectedConfigurations, setSelectedConfigurations] = useState<string[]>([]);
   const [carpetAreaRange, setCarpetAreaRange] = useState('');
   const [numberOfTowers, setNumberOfTowers] = useState('');
   const [totalUnits, setTotalUnits] = useState('');
   const [floorsCount, setFloorsCount] = useState('');
-  
+
   // Step 4: Pricing & Timeline
   const [startingPrice, setStartingPrice] = useState('');
   const [pricePerSqft, setPricePerSqft] = useState('');
@@ -132,19 +132,19 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
   const [possessionDate, setPossessionDate] = useState('');
   const [showLaunchDatePicker, setShowLaunchDatePicker] = useState(false);
   const [showPossessionDatePicker, setShowPossessionDatePicker] = useState(false);
-  
+
   // Step 5: Amenities
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-  
+
   // Step 6: Legal & Approval
   const [reraStatus, setReraStatus] = useState('');
   const [landOwnershipType, setLandOwnershipType] = useState('');
   const [bankApproved, setBankApproved] = useState('');
   const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
   const [otherBankNames, setOtherBankNames] = useState('');
-  
+
   // Step 7: Media Uploads
-  const [coverImage, setCoverImage] = useState<{uri: string; base64?: string} | null>(null);
+  const [coverImage, setCoverImage] = useState<{ uri: string; base64?: string } | null>(null);
   const [projectImages, setProjectImages] = useState<Array<{
     uri: string;
     base64?: string;
@@ -152,10 +152,10 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
     moderationReason?: string;
     imageUrl?: string;
   }>>([]);
-  const [floorPlans, setFloorPlans] = useState<Array<{uri: string; name: string}>>([]);
-  const [brochure, setBrochure] = useState<{uri: string; name: string} | null>(null);
-  const [masterPlan, setMasterPlan] = useState<{uri: string; base64?: string} | null>(null);
-  
+  const [floorPlans, setFloorPlans] = useState<Array<{ uri: string; name: string }>>([]);
+  const [brochure, setBrochure] = useState<{ uri: string; name: string } | null>(null);
+  const [masterPlan, setMasterPlan] = useState<{ uri: string; base64?: string } | null>(null);
+
   // Step 8: Contact & Sales
   const [salesName, setSalesName] = useState('');
   const [salesNumber, setSalesNumber] = useState('');
@@ -163,23 +163,23 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
   const [mobileNumber, setMobileNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [alternativeNumber, setAlternativeNumber] = useState('');
-  
+
   // Step 9: Marketing Highlights
   const [projectHighlights, setProjectHighlights] = useState('');
   const [usp, setUsp] = useState('');
 
   const totalSteps = 10;
   const steps = [
-    {id: 1, name: 'Basic Info', icon: '📝'},
-    {id: 2, name: 'Location', icon: '📍'},
-    {id: 3, name: 'Config', icon: '🏗️'},
-    {id: 4, name: 'Pricing', icon: '💰'},
-    {id: 5, name: 'Amenities', icon: '✨'},
-    {id: 6, name: 'Legal', icon: '📋'},
-    {id: 7, name: 'Media', icon: '📷'},
-    {id: 8, name: 'Contact', icon: '📞'},
-    {id: 9, name: 'Marketing', icon: '📢'},
-    {id: 10, name: 'Preview', icon: '👁️'},
+    { id: 1, name: 'Basic Info', icon: '📝' },
+    { id: 2, name: 'Location', icon: '📍' },
+    { id: 3, name: 'Config', icon: '🏗️' },
+    { id: 4, name: 'Pricing', icon: '💰' },
+    { id: 5, name: 'Amenities', icon: '✨' },
+    { id: 6, name: 'Legal', icon: '📋' },
+    { id: 7, name: 'Media', icon: '📷' },
+    { id: 8, name: 'Contact', icon: '📞' },
+    { id: 9, name: 'Marketing', icon: '📢' },
+    { id: 10, name: 'Preview', icon: '👁️' },
   ];
 
   // Price formatting helper
@@ -201,7 +201,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
   const clearFieldError = useCallback((field: string) => {
     setFieldErrors(prev => {
       if (!prev[field]) return prev;
-      const next = {...prev};
+      const next = { ...prev };
       delete next[field];
       return next;
     });
@@ -213,7 +213,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
     setLocationQuery(locationData.placeName || locationData.name);
     setShowLocationSuggestions(false);
     clearFieldError('location');
-    
+
     // Extract state from context
     const extractedState = extractStateFromContext(locationData.context);
     if (extractedState) {
@@ -221,15 +221,15 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       setStateAutoFilled(true);
       clearFieldError('state');
     }
-    
+
     // Set coordinates if available
     if (locationData.coordinates) {
       setLongitude(locationData.coordinates[0]);
       setLatitude(locationData.coordinates[1]);
     }
-    
+
     // Extract city/area
-    const cityContext = locationData.context?.find((ctx: any) => 
+    const cityContext = locationData.context?.find((ctx: any) =>
       ctx.id?.startsWith('place')
     );
     if (cityContext) {
@@ -384,14 +384,14 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       if (response.assets && response.assets.length > 0) {
         const remainingSlots = 20 - projectImages.length;
         const assetsToAdd = response.assets.slice(0, remainingSlots);
-        
+
         // Add images with "checking" status
         const newImages = assetsToAdd.map(asset => ({
           uri: asset.uri || '',
           base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
           moderationStatus: 'checking' as const,
         }));
-        
+
         setProjectImages(prev => [...prev, ...newImages]);
 
         // Storage workflow: Device → Firebase Storage → backend receives URL for moderation only; images stored in Firebase
@@ -402,9 +402,9 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
           const message = !user?.id
             ? 'You must be signed in to upload images.'
             : !firebaseAvailable
-            ? 'Firebase Storage is not available. Please rebuild the app to enable image uploads.'
-            : 'Firebase Storage is required for project images. Please enable it and rebuild the app.';
-          CustomAlert.alert('Image Upload Unavailable', message, [{text: 'OK'}]);
+              ? 'Firebase Storage is not available. Please rebuild the app to enable image uploads.'
+              : 'Firebase Storage is required for project images. Please enable it and rebuild the app.';
+          CustomAlert.alert('Image Upload Unavailable', message, [{ text: 'OK' }]);
           setProjectImages(prev => {
             const updated = [...prev];
             newImages.forEach((_, index) => {
@@ -441,7 +441,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                     return updated;
                   });
                   if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
-                    CustomAlert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.', [{text: 'OK'}]);
+                    CustomAlert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.', [{ text: 'OK' }]);
                   }
                 })
                 .catch(error => {
@@ -462,7 +462,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   if (errorMessage.includes('not available') || errorMessage.includes('not installed')) {
                     errorMessage = 'Firebase Storage is not available. Please rebuild the app.';
                   }
-                  CustomAlert.alert('Upload Failed', errorMessage, [{text: 'OK'}]);
+                  CustomAlert.alert('Upload Failed', errorMessage, [{ text: 'OK' }]);
                 });
             }
           });
@@ -604,7 +604,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         .filter((url): url is string => url !== undefined && url !== '');
 
       if (approvedImages.length < 2) {
-        Alert.alert('Error', 'Please upload at least 2 approved images', [{text: 'OK'}]);
+        Alert.alert('Error', 'Please upload at least 2 approved images', [{ text: 'OK' }]);
         setIsSubmitting(false);
         return;
       }
@@ -687,50 +687,60 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         }
         console.error('[AddProject] Property creation failed:', errorMessage);
         console.error('[AddProject] Full error response:', JSON.stringify(createResponse, null, 2));
-        Alert.alert('Error', errorMessage, [{text: 'OK'}]);
+        Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
         return;
       }
 
       const propertyId =
+        createResponse.data?.property?.id ||
+        createResponse.data?.property?.property_id ||
+        createResponse.data?.property?.propertyId ||
         createResponse.data?.property_id ||
         createResponse.data?.id ||
         createResponse.property_id ||
         createResponse.id;
 
-      if (!propertyId) {
-        console.error('[AddProject] No property_id in response:', JSON.stringify(createResponse, null, 2));
-        Alert.alert('Error', 'Property created but no ID returned. Please contact support.', [{text: 'OK'}]);
-        return;
-      }
+      let failedCount = 0;
 
-      console.log('[Agent AddProject] Step 1 done – property_id:', propertyId);
+      if (propertyId && approvedImages.length > 0) {
+        console.log('[Agent AddProject] Step 1 done – property_id:', propertyId);
 
-      // ── Step 2: Moderate + watermark each Firebase URL with property_id ──
-      console.log('[Agent AddProject] Step 2: Watermarking', approvedImages.length, 'images…');
-      const watermarkedUrls: string[] = [];
-      for (const firebaseUrl of approvedImages) {
-        try {
-          const result = await moderateFirebaseUrlForProperty(firebaseUrl, propertyId);
-          watermarkedUrls.push(result.imageUrl || firebaseUrl);
-          console.log('[Agent AddProject] Watermarked:', (result.imageUrl || firebaseUrl).substring(0, 80));
-        } catch (wmErr: any) {
-          console.warn('[Agent AddProject] Watermark failed for image, using original URL:', wmErr.message);
-          watermarkedUrls.push(firebaseUrl); // Fallback to original Firebase URL
+        // ── Step 2: Moderate + watermark each Firebase URL with property_id ──
+        console.log('[Agent AddProject] Step 2: Watermarking', approvedImages.length, 'images…');
+        const watermarkedUrls: string[] = [];
+        for (const firebaseUrl of approvedImages) {
+          try {
+            const result = await moderateFirebaseUrlForProperty(firebaseUrl, propertyId);
+            watermarkedUrls.push(result.imageUrl || firebaseUrl);
+            console.log('[Agent AddProject] Watermarked:', (result.imageUrl || firebaseUrl).substring(0, 80));
+          } catch (wmErr: any) {
+            failedCount += 1;
+            console.warn('[Agent AddProject] Watermark failed for image, using original URL:', wmErr.message);
+            watermarkedUrls.push(firebaseUrl); // Fallback to original Firebase URL
+          }
         }
+
+        // ── Step 3: Update property with watermarked image URLs ──
+        console.log('[Agent AddProject] Step 3: Updating property with watermarked URLs…');
+        await propertyService.updateProperty(propertyId, {
+          images: watermarkedUrls,
+          cover_image: watermarkedUrls[0] || null,
+        });
+
+        console.log('[Agent AddProject] ✅ Project created and images watermarked successfully');
+      } else {
+        console.warn('[AddProject] Could not watermark images (missing property_id or images).', {
+          hasPropertyId: !!propertyId,
+          approvedImagesCount: approvedImages.length,
+          fullResponse: JSON.stringify(createResponse, null, 2),
+        });
       }
 
-      // ── Step 3: Update property with watermarked image URLs ──
-      console.log('[Agent AddProject] Step 3: Updating property with watermarked URLs…');
-      await propertyService.updateProperty(propertyId, {
-        images: watermarkedUrls,
-        cover_image: watermarkedUrls[0] || null,
-      });
-
-      console.log('[Agent AddProject] ✅ Project created and images watermarked successfully');
       Alert.alert(
         'Success',
-        'Upcoming project published successfully! It is now visible to buyers.',
-        [{text: 'OK', onPress: () => navigation.goBack()}]
+        `Upcoming project published successfully!${approvedImages.length > 0 ? ` ${approvedImages.length} image(s) uploaded.` : ''}${failedCount > 0 ? ` (${failedCount} image(s) failed to watermark; you can re-upload in Edit.)` : ''
+        }`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error: any) {
       console.error('Submit error:', error);
@@ -747,7 +757,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       } else if (typeof error === 'string') {
         errorMessage = error;
       }
-      Alert.alert('Error', errorMessage, [{text: 'OK'}]);
+      Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
     } finally {
       setIsSubmitting(false);
     }
@@ -758,8 +768,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       'Cancel Project',
       'Are you sure you want to cancel? Your progress will be lost.',
       [
-        {text: 'Continue Editing', style: 'cancel'},
-        {text: 'Cancel', style: 'destructive', onPress: () => navigation.goBack()},
+        { text: 'Continue Editing', style: 'cancel' },
+        { text: 'Cancel', style: 'destructive', onPress: () => navigation.goBack() },
       ],
     );
   };
@@ -780,7 +790,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Basic Project Information</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
                 Project Name <Text style={styles.required}>*</Text>
@@ -895,7 +905,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Location Details</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
                 Location <Text style={styles.required}>*</Text>
@@ -989,7 +999,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
 
             <LocationPicker
               visible={locationPickerVisible}
-              initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
+              initialLocation={latitude && longitude ? { latitude, longitude } : undefined}
               onLocationSelect={(locationData) => {
                 setLatitude(locationData.latitude);
                 setLongitude(locationData.longitude);
@@ -1075,7 +1085,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Configuration & Inventory Details</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
                 Property Configurations <Text style={styles.required}>*</Text>
@@ -1189,7 +1199,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Pricing & Timeline</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
                 Starting Price <Text style={styles.required}>*</Text>
@@ -1320,7 +1330,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Amenities</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Amenities (All Optional)</Text>
               <View style={styles.amenitiesGrid}>
@@ -1357,14 +1367,14 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Legal & Approval Information</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>RERA Status (Optional)</Text>
               <Dropdown
                 placeholder="Select RERA Status"
                 options={[
-                  {label: 'Applied', value: 'Applied'},
-                  {label: 'Approved', value: 'Approved'},
+                  { label: 'Applied', value: 'Applied' },
+                  { label: 'Approved', value: 'Approved' },
                 ]}
                 value={reraStatus}
                 onSelect={(value) => setReraStatus(value)}
@@ -1376,10 +1386,10 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               <Dropdown
                 placeholder="Select Ownership Type"
                 options={[
-                  {label: 'Freehold', value: 'Freehold'},
-                  {label: 'Leasehold', value: 'Leasehold'},
-                  {label: 'Power of Attorney', value: 'Power of Attorney'},
-                  {label: 'Co-operative Society', value: 'Co-operative Society'},
+                  { label: 'Freehold', value: 'Freehold' },
+                  { label: 'Leasehold', value: 'Leasehold' },
+                  { label: 'Power of Attorney', value: 'Power of Attorney' },
+                  { label: 'Co-operative Society', value: 'Co-operative Society' },
                 ]}
                 value={landOwnershipType}
                 onSelect={(value) => setLandOwnershipType(value)}
@@ -1391,8 +1401,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               <Dropdown
                 placeholder="Select"
                 options={[
-                  {label: 'Yes', value: 'Yes'},
-                  {label: 'No', value: 'No'},
+                  { label: 'Yes', value: 'Yes' },
+                  { label: 'No', value: 'No' },
                 ]}
                 value={bankApproved}
                 onSelect={(value) => {
@@ -1461,11 +1471,11 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
 
       case 7:
         const approvedImagesCount = projectImages.filter(img => img.moderationStatus === 'APPROVED').length;
-        
+
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Media Uploads</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Project Cover Image (Optional)</Text>
               <View style={styles.coverImageActions}>
@@ -1474,7 +1484,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   onPress={async () => {
                     const hasPermission = await requestCameraPermission();
                     if (!hasPermission) return;
-                    launchImageLibrary({mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true}, (response) => {
+                    launchImageLibrary({ mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true }, (response) => {
                       if (response.assets && response.assets[0]) {
                         const asset = response.assets[0];
                         setCoverImage({
@@ -1484,21 +1494,21 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                       }
                     });
                   }}>
-                {coverImage ? (
-                  <Image source={{uri: coverImage.uri}} style={styles.imagePreview} />
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>📷</Text>
-                    <Text style={styles.imagePlaceholderLabel}>Upload Cover Image</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                  {coverImage ? (
+                    <Image source={{ uri: coverImage.uri }} style={styles.imagePreview} />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Text style={styles.imagePlaceholderText}>📷</Text>
+                      <Text style={styles.imagePlaceholderLabel}>Upload Cover Image</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.uploadButton, styles.uploadButtonSecondary]}
                   onPress={async () => {
                     const ok = await requestCameraPermissionForCapture();
                     if (!ok) return;
-                    launchCamera({mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true}, (response) => {
+                    launchCamera({ mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true }, (response) => {
                       if (response.assets && response.assets[0]) {
                         const asset = response.assets[0];
                         setCoverImage({
@@ -1544,14 +1554,14 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               {!!fieldErrors.projectImages && (
                 <Text style={styles.fieldErrorText}>{fieldErrors.projectImages}</Text>
               )}
-              
+
               {projectImages.length > 0 && (
                 <View style={styles.imagesGrid}>
                   {projectImages.map((img, index) => {
                     const status = img.moderationStatus;
                     return (
                       <View key={index} style={styles.imageItem}>
-                        <Image source={{uri: img.uri}} style={styles.projectImage} />
+                        <Image source={{ uri: img.uri }} style={styles.projectImage} />
                         {status === 'checking' && (
                           <View style={styles.imageStatusOverlay}>
                             <ActivityIndicator size="small" color={colors.surface} />
@@ -1598,8 +1608,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 onPress={async () => {
                   const hasPermission = await requestCameraPermission();
                   if (!hasPermission) return;
-                  
-                  launchImageLibrary({mediaType: 'photo', quality: 0.8}, (response) => {
+
+                  launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
                     if (response.assets) {
                       const newPlans = response.assets.map(asset => ({
                         uri: asset.uri || '',
@@ -1633,8 +1643,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 onPress={async () => {
                   const hasPermission = await requestCameraPermission();
                   if (!hasPermission) return;
-                  
-                  launchImageLibrary({mediaType: 'photo', quality: 0.8}, (response) => {
+
+                  launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
                     if (response.assets && response.assets[0]) {
                       const asset = response.assets[0];
                       setBrochure({
@@ -1664,7 +1674,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   onPress={async () => {
                     const hasPermission = await requestCameraPermission();
                     if (!hasPermission) return;
-                    launchImageLibrary({mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true}, (response) => {
+                    launchImageLibrary({ mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true }, (response) => {
                       if (response.assets && response.assets[0]) {
                         const asset = response.assets[0];
                         setMasterPlan({
@@ -1675,7 +1685,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                     });
                   }}>
                   {masterPlan ? (
-                    <Image source={{uri: masterPlan.uri}} style={styles.imagePreview} />
+                    <Image source={{ uri: masterPlan.uri }} style={styles.imagePreview} />
                   ) : (
                     <View style={styles.imagePlaceholder}>
                       <Text style={styles.imagePlaceholderText}>🗺️</Text>
@@ -1688,7 +1698,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   onPress={async () => {
                     const ok = await requestCameraPermissionForCapture();
                     if (!ok) return;
-                    launchCamera({mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true}, (response) => {
+                    launchCamera({ mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true }, (response) => {
                       if (response.assets && response.assets[0]) {
                         const asset = response.assets[0];
                         setMasterPlan({
@@ -1709,7 +1719,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Contact & Sales Information</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
                 Sales Name <Text style={styles.required}>*</Text>
@@ -1826,7 +1836,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Marketing Highlights</Text>
-            
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Project Highlights (Optional but recommended)</Text>
               <TextInput
@@ -1861,7 +1871,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Preview & Submit</Text>
-            
+
             <ScrollView style={styles.previewScroll}>
               <View style={styles.previewSection}>
                 <Text style={styles.previewSectionTitle}>Basic Information</Text>
@@ -1922,7 +1932,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 <View style={styles.previewRow}>
                   <Text style={styles.previewLabel}>Configurations:</Text>
                   <Text style={styles.previewValue}>
-                    {selectedConfigurations.map(id => 
+                    {selectedConfigurations.map(id =>
                       CONFIGURATIONS.find(c => c.id === id)?.label
                     ).filter(Boolean).join(', ') || 'N/A'}
                   </Text>
@@ -2024,8 +2034,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             {/* Progress Steps */}
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.progressContainer}
               contentContainerStyle={styles.progressContent}>
@@ -2087,16 +2097,16 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.nextButton,
-                  (isSubmitting || 
-                   (currentStep === 7 && projectImages.filter(img => img.moderationStatus === 'APPROVED').length < 2) ||
-                   (currentStep === 7 && projectImages.length > 20)
+                  (isSubmitting ||
+                    (currentStep === 7 && projectImages.filter(img => img.moderationStatus === 'APPROVED').length < 2) ||
+                    (currentStep === 7 && projectImages.length > 20)
                   ) && styles.nextButtonDisabled
                 ]}
                 onPress={handleNext}
-                disabled={isSubmitting || 
+                disabled={isSubmitting ||
                   (currentStep === 7 && projectImages.filter(img => img.moderationStatus === 'APPROVED').length < 2) ||
                   (currentStep === 7 && projectImages.length > 20)
                 }>
