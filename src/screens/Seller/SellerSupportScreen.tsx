@@ -1,4 +1,4 @@
-import React, {useState, useRef} from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,18 @@ import {
   Linking,
   Platform,
   Animated,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CompositeNavigationProp} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerStackParamList} from '../../navigation/SellerNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
+import functions from '@react-native-firebase/functions';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { SellerStackParamList } from '../../navigation/SellerNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
 import SellerHeader from '../../components/SellerHeader';
-import {useAuth} from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 type SupportScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<SellerStackParamList>,
@@ -79,10 +82,11 @@ const faqs = [
   },
 ];
 
-const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
+const SellerSupportScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const {logout} = useAuth();
+  const { logout } = useAuth();
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -96,7 +100,7 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
     const subject = 'Support Query';
     const body = '';
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url).catch(err => console.error('Error opening email:', err));
+    Linking.openURL(url).catch((err: any) => console.error('Error opening email:', err));
   };
 
   const handlePhonePress = () => {
@@ -111,24 +115,35 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
       android: `geo:0,0?q=${encodeURIComponent(address)}`,
     });
     if (url) {
-      Linking.openURL(url).catch(err =>
+      Linking.openURL(url).catch((err: any) =>
         console.error('Error opening maps:', err),
       );
     }
   };
 
-  const handleSubmitContact = () => {
+  const handleSubmitContact = async () => {
     if (!contactForm.name || !contactForm.email || !contactForm.message) {
+      Alert.alert('Error', 'Please fill in all required fields (Name, Email, Message).');
       return;
     }
-    // In real app, send to backend
-    const email = 'info@360coordinates.com';
-    const subject = contactForm.subject || 'Contact Form Query';
-    const body = `Name: ${contactForm.name}\nEmail: ${contactForm.email}\n\nMessage:\n${contactForm.message}`;
-    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url).catch(err => console.error('Error opening email:', err));
-    // Reset form
-    setContactForm({name: '', email: '', subject: '', message: ''});
+
+    setLoading(true);
+    try {
+      const result = await functions().httpsCallable('sendContactEmail')(contactForm);
+      const data = result.data as { success: boolean; message: string };
+
+      if (data.success) {
+        Alert.alert('Success', 'Your message has been sent successfully!');
+        setContactForm({ name: '', email: '', subject: '', message: '' });
+      } else {
+        throw new Error(data.message || 'Failed to send message.');
+      }
+    } catch (error: any) {
+      console.error('Contact Form Error:', error);
+      Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -148,8 +163,8 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true}
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
         )}
         scrollEventThrottle={16}>
         {/* Contact Information Section */}
@@ -226,8 +241,8 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter your name"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.name}
-                onChangeText={text =>
-                  setContactForm({...contactForm, name: text})
+                onChangeText={(text: string) =>
+                  setContactForm({ ...contactForm, name: text })
                 }
               />
             </View>
@@ -239,8 +254,8 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter your email"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.email}
-                onChangeText={text =>
-                  setContactForm({...contactForm, email: text})
+                onChangeText={(text: string) =>
+                  setContactForm({ ...contactForm, email: text })
                 }
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -254,8 +269,8 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter subject"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.subject}
-                onChangeText={text =>
-                  setContactForm({...contactForm, subject: text})
+                onChangeText={(text: string) =>
+                  setContactForm({ ...contactForm, subject: text })
                 }
               />
             </View>
@@ -267,8 +282,8 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter your message"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.message}
-                onChangeText={text =>
-                  setContactForm({...contactForm, message: text})
+                onChangeText={(text: string) =>
+                  setContactForm({ ...contactForm, message: text })
                 }
                 multiline
                 numberOfLines={5}
@@ -277,9 +292,14 @@ const SellerSupportScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleSubmitContact}>
-              <Text style={styles.submitButtonText}>Send Message</Text>
+              style={[styles.submitButton, loading && { opacity: 0.7 }]}
+              onPress={handleSubmitContact}
+              disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <Text style={styles.submitButtonText}>Send Message</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -450,7 +470,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.lg,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
