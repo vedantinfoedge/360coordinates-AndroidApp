@@ -819,7 +819,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           onPress={handleAddProperty}
           activeOpacity={0.8}>
           <Text style={styles.fabIcon}>+</Text>
-          <Text style={styles.fabText}>Add Property</Text>
+          <Text style={styles.fabText}>New Property</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -1342,6 +1342,39 @@ const styles = StyleSheet.create({
   actionButtonDisabled: {
     opacity: 0.5,
     backgroundColor: '#9CA3AF',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: spacing.xl,
+    right: spacing.lg,
+    backgroundColor: colors.cta || '#0066CC', // Fallback to blue if cta not defined
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.primaryDark || '#004C99',
+    shadowColor: colors.primaryDark || '#004C99',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  fabIcon: {
+    fontSize: 24,
+    color: colors.accentLight || '#FFFFFF',
+    fontWeight: 'bold',
+    lineHeight: 28,
+  },
+  fabText: {
+    ...typography.body,
+    color: colors.accentLight || '#FFFFFF', // White text
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
 
