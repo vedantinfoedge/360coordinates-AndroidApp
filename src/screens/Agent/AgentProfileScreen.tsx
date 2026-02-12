@@ -604,7 +604,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}>
+            onPress={() => (navigation as any).navigate('Chat', {screen: 'ChatList'})}>
             <Text style={styles.menuIcon}>💬</Text>
             <Text style={styles.menuText}>My Inquiries</Text>
             <Text style={styles.menuArrow}>→</Text>

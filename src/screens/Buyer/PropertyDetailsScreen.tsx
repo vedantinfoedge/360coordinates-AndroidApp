@@ -573,6 +573,11 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyDetailsScreen.tsx:handleChatWithOwner',message:'Navigate to Chat',data:{targetTab:'Chats',screen:'ChatConversation',userId:Number(sellerId),propertyId:Number(propId),propertyTitle:propTitle},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
       // #endregion
       // Navigate to the visible Chats tab (not the hidden Chat tab) so the conversation opens in the correct stack
+      const sellerPhone =
+        property?.seller_phone ||
+        property?.seller?.phone ||
+        property?.owner?.phone ||
+        undefined;
       (navigation as any).navigate('Chats', {
         screen: 'ChatConversation',
         params: {
@@ -580,7 +585,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           userName: '', // Don't pass owner name - will show as "Property Owner"
           propertyId: Number(propId),
           propertyTitle: propTitle,
-          receiverRole: 'seller', // Property owner is seller; use 'agent' only when listing is by agent
+          receiverRole: 'seller',
+          counterpartyPhone: sellerPhone ? String(sellerPhone).trim() : undefined,
         },
       });
     } finally {

@@ -9,6 +9,8 @@ import {
   Dimensions,
   ActivityIndicator,
   Share,
+  Platform,
+  Linking,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -22,6 +24,7 @@ import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import {verticalScale, moderateScale, scale} from '../../utils/responsive';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
   AgentStackParamList,
@@ -36,6 +39,8 @@ type Props = {
 };
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
+// Calculate image carousel width accounting for container margins (match Buyer UI)
+const IMAGE_CAROUSEL_WIDTH = SCREEN_WIDTH - (spacing.md * 2);
 
 // PropertyImage type is imported from imageHelper
 
@@ -46,7 +51,8 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
-  const imageScrollViewRef = useRef<ScrollView>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageScrollViewRef = useRef<any>(null);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set()); // Track failed image IDs
 
   useEffect(() => {
@@ -161,7 +167,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     return (
       <View style={styles.container}>
         <AgentHeader
-          onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
+          onProfilePress={() => (navigation as any).navigate('AgentTabs', {screen: 'Profile'})}
           onSupportPress={() => navigation.navigate('Support' as never)}
           onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
           onLogoutPress={logout}
@@ -193,10 +199,41 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   
   const amenities = property.amenities || [];
 
+  const normalizedStatus = String(property.status || property.listing_type || property.type || '')
+    .trim()
+    .toLowerCase();
+  const isRentListing = normalizedStatus === 'rent';
+  const isSaleListing = normalizedStatus === 'sale';
+
+  const hasBachelorsFlag =
+    property.available_for_bachelors !== undefined &&
+    property.available_for_bachelors !== null;
+  const availableForBachelors =
+    property.available_for_bachelors === true ||
+    property.available_for_bachelors === 'true' ||
+    property.available_for_bachelors === 1 ||
+    property.available_for_bachelors === '1';
+
+  const handleOpenMap = async () => {
+    const lat = property?.latitude;
+    const lng = property?.longitude;
+    if (!lat || !lng) {
+      CustomAlert.alert('Location unavailable', 'This property does not have map coordinates.');
+      return;
+    }
+
+    const url = `https://www.google.com/maps?q=${encodeURIComponent(String(lat))},${encodeURIComponent(String(lng))}`;
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      CustomAlert.alert('Error', 'Unable to open maps.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <AgentHeader
-        onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
+        onProfilePress={() => (navigation as any).navigate('AgentTabs', {screen: 'Profile'})}
         onSupportPress={() => navigation.navigate('Support' as never)}
         onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
         onLogoutPress={logout}
@@ -206,7 +243,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       <View style={[styles.actionButtonsTop, {top: (insets.top + 60)}]}>
         <TouchableOpacity
           style={styles.shareButtonTop}
-          onPress={(e) => {
+          onPress={(e: any) => {
             e.stopPropagation();
             handleShareProperty();
           }}
@@ -231,17 +268,17 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={event => {
+                onMomentumScrollEnd={(event: any) => {
                   const index = Math.round(
-                    event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
+                    event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
                   );
                   if (index >= 0 && index < propertyImages.length) {
                     setCurrentImageIndex(index);
                   }
                 }}
-                onScroll={event => {
+                onScroll={(event: any) => {
                   const index = Math.round(
-                    event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
+                    event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
                   );
                   if (index >= 0 && index < propertyImages.length && index !== currentImageIndex) {
                     setCurrentImageIndex(index);
@@ -251,10 +288,10 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 style={styles.imageCarousel}
                 contentContainerStyle={{
                   ...styles.imageCarouselContent,
-                  width: SCREEN_WIDTH * propertyImages.length,
+                  width: IMAGE_CAROUSEL_WIDTH * propertyImages.length, // account for container margins
                 }}
                 decelerationRate="fast"
-                snapToInterval={SCREEN_WIDTH}
+                snapToInterval={IMAGE_CAROUSEL_WIDTH}
                 snapToAlignment="center">
                 {propertyImages.map((image: PropertyImage, index: number) => (
                   <TouchableOpacity
@@ -275,7 +312,8 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                         source={{uri: image.url}}
                         style={styles.image}
                         resizeMode="cover"
-                        onError={(error) => {
+                        defaultSource={require('../../assets/logo.png')}
+                        onError={(error: any) => {
                           console.error(`[AgentPropertyDetails] Image ${index} failed to load:`, image.url, error);
                           // Mark this image as failed
                           setFailedImages(prev => new Set(prev).add(image.id));
@@ -294,51 +332,6 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 ))}
               </ScrollView>
               
-              {/* Image Counter */}
-              {propertyImages.length > 1 && (
-                <View style={styles.imageCounter}>
-                  <Text style={styles.imageCounterText}>
-                    {currentImageIndex + 1} / {propertyImages.length}
-                  </Text>
-                </View>
-              )}
-          
-              {/* Navigation Arrows */}
-              {propertyImages.length > 1 && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.carouselNavButton, styles.carouselNavButtonLeft]}
-                    onPress={() => {
-                      const newIndex = currentImageIndex > 0 
-                        ? currentImageIndex - 1 
-                        : propertyImages.length - 1;
-                      setCurrentImageIndex(newIndex);
-                      imageScrollViewRef.current?.scrollTo({
-                        x: newIndex * SCREEN_WIDTH,
-                        animated: true,
-                      });
-                    }}
-                    activeOpacity={0.7}>
-                    <Text style={styles.carouselNavButtonText}>‹</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.carouselNavButton, styles.carouselNavButtonRight]}
-                    onPress={() => {
-                      const newIndex = currentImageIndex < propertyImages.length - 1 
-                        ? currentImageIndex + 1 
-                        : 0;
-                      setCurrentImageIndex(newIndex);
-                      imageScrollViewRef.current?.scrollTo({
-                        x: newIndex * SCREEN_WIDTH,
-                        animated: true,
-                      });
-                    }}
-                    activeOpacity={0.7}>
-                    <Text style={styles.carouselNavButtonText}>›</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
               {/* Image Indicators/Dots */}
               {propertyImages.length > 1 && (
                 <View style={styles.imageIndicators}>
@@ -348,7 +341,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       onPress={() => {
                         setCurrentImageIndex(index);
                         imageScrollViewRef.current?.scrollTo({
-                          x: index * SCREEN_WIDTH,
+                          x: index * IMAGE_CAROUSEL_WIDTH,
                           animated: true,
                         });
                       }}
@@ -379,38 +372,53 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         {/* Title and Price */}
         <View style={styles.headerSection}>
           <Text style={styles.title}>{capitalize(property.title || property.property_title || 'Property Title')}</Text>
-          <Text style={styles.location}>📍 {property.location || property.city || property.address || 'Location not specified'}</Text>
+          <View style={styles.locationContainer}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <Text style={styles.location} numberOfLines={2}>
+              {property.location || property.city || property.address || 'Location not specified'}
+            </Text>
+          </View>
           <Text style={styles.price}>{formattedPrice}</Text>
         </View>
 
         {/* Quick Info */}
         <View style={styles.quickInfo}>
-          {property.bedrooms && (
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>🛏️</Text>
-              <Text style={styles.infoText}>{property.bedrooms} Beds</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Text style={styles.infoIcon}>🛏</Text>
             </View>
-          )}
-          {property.bathrooms && (
-            <View style={styles.infoItem}>
+            <Text style={styles.infoText}>
+              {(property.bedrooms ?? '—')} Beds
+            </Text>
+          </View>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>🚿</Text>
-              <Text style={styles.infoText}>{property.bathrooms} Baths</Text>
             </View>
-          )}
-          {property.area && (
-            <View style={styles.infoItem}>
+            <Text style={styles.infoText}>
+              {(property.bathrooms ?? '—')} Baths
+            </Text>
+          </View>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>📐</Text>
-              <Text style={styles.infoText}>
-                {typeof property.area === 'number' ? `${property.area} sq ft` : property.area}
-              </Text>
             </View>
-          )}
-          {(property.floor !== undefined && property.floor !== null && property.floor !== '') && (
-            <View style={styles.infoItem}>
+            <Text style={styles.infoText} numberOfLines={1}>
+              {property.area
+                ? (typeof property.area === 'number' ? `${property.area} sq ft` : String(property.area))
+                : '—'}
+            </Text>
+          </View>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>🏢</Text>
-              <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground floor' : String(property.floor)}</Text>
             </View>
-          )}
+            <Text style={styles.infoText} numberOfLines={1}>
+              {(property.floor === '0' || property.floor === 0)
+                ? 'Ground floor'
+                : (property.floor ?? '—')}
+            </Text>
+          </View>
         </View>
 
         {/* Description */}
@@ -444,7 +452,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Type</Text>
               <Text style={styles.detailValue}>
-                {property.status === 'rent' ? 'For Rent' : 'For Sale'}
+                {isSaleListing ? 'For Sale' : isRentListing ? 'For Rent' : property.type === 'buy' ? 'For Sale' : 'For Rent'}
               </Text>
             </View>
             {property.property_type && (
@@ -459,23 +467,73 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 <Text style={styles.detailValue}>{property.furnishing}</Text>
               </View>
             )}
+            {isRentListing && hasBachelorsFlag ? (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Available for bachelors</Text>
+                <Text style={styles.detailValue}>
+                  {availableForBachelors ? 'Yes' : 'No'}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
         {/* Amenities */}
-        {amenities.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Amenities</Text>
-            <View style={styles.amenitiesGrid}>
-              {amenities.map((amenity: string, index: number) => (
-                <View key={index} style={styles.amenityItem}>
-                  <Text style={styles.amenityIcon}>✓</Text>
-                  <Text style={styles.amenityText}>{capitalizeAmenity(amenity)}</Text>
-                </View>
-              ))}
-            </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Amenities</Text>
+          <View style={styles.amenitiesGrid}>
+            {amenities.length > 0 ? (
+              amenities.map((amenity: string, index: number) => {
+                const getAmenityIcon = (name: string): string => {
+                  const lowerName = name.toLowerCase();
+                  if (lowerName.includes('parking') || lowerName.includes('car')) return '🚗';
+                  if (lowerName.includes('gym') || lowerName.includes('fitness')) return '💪';
+                  if (lowerName.includes('pool') || lowerName.includes('swimming')) return '🏊';
+                  if (lowerName.includes('garden') || lowerName.includes('park')) return '🌳';
+                  if (lowerName.includes('lift') || lowerName.includes('elevator')) return '🛗';
+                  if (lowerName.includes('security') || lowerName.includes('guard')) return '🛡️';
+                  if (lowerName.includes('wifi') || lowerName.includes('internet')) return '📶';
+                  if (lowerName.includes('ac') || lowerName.includes('air condition')) return '❄️';
+                  if (lowerName.includes('power') || lowerName.includes('backup') || lowerName.includes('generator')) return '⚡';
+                  if (lowerName.includes('water') || lowerName.includes('supply')) return '💧';
+                  if (lowerName.includes('cctv') || lowerName.includes('camera')) return '📹';
+                  if (lowerName.includes('club') || lowerName.includes('community')) return '🏛️';
+                  if (lowerName.includes('play') || lowerName.includes('children')) return '🎮';
+                  if (lowerName.includes('balcony') || lowerName.includes('terrace')) return '🏠';
+                  if (lowerName.includes('modular') || lowerName.includes('kitchen')) return '🍳';
+                  if (lowerName.includes('wardrobe') || lowerName.includes('closet')) return '🚪';
+                  if (lowerName.includes('fire') || lowerName.includes('safety')) return '🔥';
+                  if (lowerName.includes('intercom')) return '📞';
+                  if (lowerName.includes('gas') || lowerName.includes('pipeline')) return '🔥';
+                  if (lowerName.includes('rain') || lowerName.includes('harvest')) return '🌧️';
+                  if (lowerName.includes('solar')) return '☀️';
+                  if (lowerName.includes('servant') || lowerName.includes('maid')) return '🧹';
+                  if (lowerName.includes('visitor')) return '👥';
+                  if (lowerName.includes('sport') || lowerName.includes('court')) return '🎾';
+                  if (lowerName.includes('jogging') || lowerName.includes('track')) return '🏃';
+                  if (lowerName.includes('laundry')) return '🧺';
+                  if (lowerName.includes('pet')) return '🐕';
+                  if (lowerName.includes('furnished')) return '🛋️';
+                  if (lowerName.includes('vastu')) return '🧭';
+                  return '✓';
+                };
+
+                return (
+                  <View key={index} style={styles.amenityItem}>
+                    <View style={styles.amenityIconContainer}>
+                      <Text style={styles.amenityIcon}>{getAmenityIcon(amenity)}</Text>
+                    </View>
+                    <Text style={styles.amenityText} numberOfLines={2}>
+                      {capitalizeAmenity(amenity)}
+                    </Text>
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={styles.amenityText}>No amenities listed</Text>
+            )}
           </View>
-        )}
+        </View>
 
         {/* Location */}
         <View style={styles.section}>
@@ -483,11 +541,9 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           <Text style={styles.address}>
             {property.address || property.fullAddress || property.location || property.city || 'Address not available'}
           </Text>
-          {property.latitude && property.longitude && (
-            <Text style={styles.coordinates}>
-              Coordinates: {property.latitude}, {property.longitude}
-            </Text>
-          )}
+          <TouchableOpacity style={styles.mapButton} onPress={handleOpenMap} activeOpacity={0.85}>
+            <Text style={styles.mapButtonText}>View on Map</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -532,33 +588,54 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: verticalScale(100),
   },
   imageCarouselContainer: {
-    height: 300,
+    height: verticalScale(450),
     position: 'relative',
+    paddingTop: spacing.md,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xl + spacing.xl,
+    backgroundColor: colors.surfaceSecondary,
   },
   imageCarousel: {
-    height: 300,
+    height: verticalScale(410),
+    borderRadius: borderRadius.xl,
   },
   imageCarouselContent: {
     alignItems: 'center',
   },
   imageContainer: {
-    width: SCREEN_WIDTH,
-    height: 300,
+    width: IMAGE_CAROUSEL_WIDTH,
+    height: verticalScale(410),
+    borderRadius: borderRadius.xl,
+    paddingTop: spacing.md,
+    overflow: 'hidden',
   },
   carouselNavButton: {
     position: 'absolute',
     top: '50%',
-    marginTop: -20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    marginTop: verticalScale(-24),
+    width: scale(48),
+    height: scale(48),
+    borderRadius: scale(24),
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+    ...Platform.select({
+      android: {
+        elevation: 6,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+    }),
   },
   carouselNavButtonLeft: {
     left: spacing.md,
@@ -567,13 +644,14 @@ const styles = StyleSheet.create({
     right: spacing.md,
   },
   carouselNavButtonText: {
-    fontSize: 24,
-    color: colors.surface,
+    fontSize: moderateScale(28),
+    color: colors.primary,
     fontWeight: 'bold',
   },
   image: {
     width: '100%',
     height: '100%',
+    borderRadius: borderRadius.xl,
   },
   imagePlaceholder: {
     width: '100%',
@@ -603,33 +681,47 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   indicatorActive: {
     backgroundColor: colors.surface,
-    width: 24,
+    width: scale(24),
   },
   imageCounter: {
     position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    top: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: 'rgba(2, 43, 95, 0.85)',
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     zIndex: 3,
+    ...Platform.select({
+      android: {
+        elevation: 4,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+    }),
   },
   imageCounterText: {
     ...typography.caption,
     color: colors.surface,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   actionButtonsTop: {
     position: 'absolute',
+    paddingTop: spacing.xl,
+    paddingRight: spacing.xs,
     right: spacing.md,
     zIndex: 100,
     flexDirection: 'row',
@@ -658,65 +750,103 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: colors.surface,
-    padding: spacing.lg,
+    padding: spacing.xl,
+    paddingTop: spacing.xl + spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   title: {
-    ...typography.h1,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: 28,
     fontWeight: '700',
+    color: colors.secondary,
+    marginBottom: spacing.sm,
+    lineHeight: 36,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  locationIcon: {
+    fontSize: 16,
   },
   location: {
-    ...typography.body,
+    fontSize: 16,
+    fontWeight: '500',
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    flex: 1,
   },
   price: {
-    ...typography.h2,
-    color: colors.accent,
+    fontSize: 32,
     fontWeight: '700',
+    color: colors.primary,
+    marginTop: spacing.xs,
   },
   quickInfo: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    justifyContent: 'space-around',
+    gap: spacing.sm,
   },
-  infoItem: {
+  infoCard: {
+    flex: 1,
     alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    minHeight: 80,
+    justifyContent: 'center',
     gap: spacing.xs,
   },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
   infoIcon: {
-    fontSize: 24,
+    fontSize: 20,
   },
   infoText: {
     ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 12,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   section: {
     backgroundColor: colors.surface,
-    padding: spacing.lg,
-    marginTop: spacing.md,
+    padding: spacing.xl,
+    marginTop: spacing.lg,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: colors.border,
   },
   sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.md,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.secondary,
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary + '30',
   },
   description: {
     ...typography.body,
     color: colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: 26,
+    fontSize: 16,
   },
   detailsGrid: {
     flexDirection: 'row',
@@ -724,18 +854,38 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   detailItem: {
-    width: '48%',
-    marginBottom: spacing.md,
+    width: '47%',
+    padding: spacing.lg,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...Platform.select({
+      android: {
+        elevation: 2,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 1},
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+    }),
   },
   detailLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   detailValue: {
     ...typography.body,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
   amenitiesGrid: {
     flexDirection: 'row',
@@ -745,29 +895,55 @@ const styles = StyleSheet.create({
   amenityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '48%',
-    gap: spacing.xs,
+    width: '47%',
+    backgroundColor: colors.surfaceSecondary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    minHeight: 50,
+  },
+  amenityIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   amenityIcon: {
     fontSize: 16,
-    color: colors.success,
   },
   amenityText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '500',
     flex: 1,
+    flexShrink: 1,
   },
   address: {
     ...typography.body,
     color: colors.textSecondary,
-    lineHeight: 24,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.md,
   },
-  coordinates: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontStyle: 'italic',
+  mapButton: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary + '40',
+    marginTop: spacing.md,
+  },
+  mapButtonText: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 16,
   },
   actionButtons: {
     position: 'absolute',

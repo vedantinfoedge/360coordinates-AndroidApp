@@ -6,6 +6,7 @@ import {colors} from '../../theme';
 import AgentDashboardScreen from '../../screens/Agent/AgentDashboardScreen';
 import AgentPropertiesScreen from '../../screens/Agent/AgentPropertiesScreen';
 import AgentProfileScreen from '../../screens/Agent/AgentProfileScreen';
+import AgentLeadsScreen from '../../screens/Agent/AgentLeadsScreen';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import AgentCustomTabBar from './AgentCustomTabBar';
 
@@ -15,6 +16,7 @@ export type AgentTabParamList = {
   Add: undefined;
   Chat: undefined;
   Profile: undefined;
+  Leads: undefined;
 };
 
 const Tab = createBottomTabNavigator<AgentTabParamList>();
@@ -41,7 +43,7 @@ const AgentTabNavigator = () => {
           borderTopWidth: 1,
           paddingTop: 4,
           paddingBottom: insets.bottom,
-          paddingHorizontal: 8,
+          paddingHorizontal: 10,
           height: TAB_BAR_HEIGHT + insets.bottom,
           elevation: 8,
           shadowColor: '#000',
@@ -57,6 +59,15 @@ const AgentTabNavigator = () => {
       <Tab.Screen name="Add" component={PlaceholderScreen} options={{title: ''}} />
       <Tab.Screen name="Chat" component={ChatNavigator} options={{title: 'Chat'}} />
       <Tab.Screen name="Profile" component={AgentProfileScreen} options={{title: 'Profile'}} />
+      <Tab.Screen
+        name="Leads"
+        component={AgentLeadsScreen}
+        options={{
+          // Keep this route navigable but not visible as a tab
+          tabBarButton: () => null,
+          title: 'Leads',
+        }}
+      />
     </Tab.Navigator>
   );
 };

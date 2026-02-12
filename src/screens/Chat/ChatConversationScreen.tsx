@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   RefreshControl,
+  Linking,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -22,6 +23,8 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {useAuth} from '../../context/AuthContext';
 import {chatService} from '../../services/chat.service';
 import {buyerService} from '../../services/buyer.service';
+import {sellerService} from '../../services/seller.service';
+import {propertyService} from '../../services/property.service';
 import CustomAlert from '../../utils/alertHelper';
 import {generateChatRoomId, markChatAsRead} from '../../services/firebase.service';
 
@@ -55,8 +58,22 @@ type FlatListScrollRef = {
   scrollToEnd: (options?: {animated?: boolean}) => void;
 };
 
+const QUICK_REPLIES_BUYER = [
+  'Can we negotiate price?',
+  'Is it still available?',
+  'I need more information',
+  'When can I visit?',
+];
+
+const QUICK_REPLIES_SELLER_AGENT = [
+  'When would you like to schedule a visit?',
+  'I can share more details',
+  'The property is available for viewing',
+  'Let me know your preferred time',
+];
+
 const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
-  const {conversationId, userId, userName, propertyId, propertyTitle, receiverRole} = route.params || {};
+  const {conversationId, userId, userName, propertyId, propertyTitle, receiverRole, counterpartyPhone: paramCounterpartyPhone} = route.params || {};
   const {user} = useAuth();
   const insets = useSafeAreaInsets();
   // #region agent log
@@ -80,6 +97,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const [actualConversationId, setActualConversationId] = useState<string | number | null>(null);
   const [firebaseUnsubscribe, setFirebaseUnsubscribe] = useState<(() => void) | null>(null);
   const [participantName, setParticipantName] = useState<string>(userName || '');
+  const [counterpartyPhone, setCounterpartyPhone] = useState<string | null>(null);
   const flatListRef = useRef<FlatListScrollRef | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inquirySentForPropertyRef = useRef<number | null>(null);
@@ -122,6 +140,63 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       setParticipantName(isBuyer ? 'Property Owner' : 'Buyer');
     }
   }, [userName, user?.user_type]);
+
+  // Use passed-in counterparty phone (e.g. buyer coming from property details with seller phone)
+  useEffect(() => {
+    const raw = (paramCounterpartyPhone ?? '').trim();
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length >= 10) setCounterpartyPhone(raw);
+  }, [paramCounterpartyPhone]);
+
+  // Fetch counterparty phone when not provided: buyer → seller/agent phone; agent/seller → buyer phone
+  useEffect(() => {
+    if (paramCounterpartyPhone?.trim()) return;
+    let cancelled = false;
+    const currentUserType = (user?.user_type || '').toLowerCase();
+    const isBuyer = currentUserType === 'buyer';
+
+    const fetchPhone = async () => {
+      try {
+        if (isBuyer && propertyId) {
+          const res = await buyerService.getPropertyDetails(propertyId);
+          const data = (res as any)?.data;
+          const property = data?.property ?? data;
+          const phone =
+            property?.seller_phone ||
+            property?.owner?.phone ||
+            property?.seller?.phone ||
+            null;
+          if (!cancelled && phone) setCounterpartyPhone(String(phone).trim() || null);
+          else if (!cancelled) setCounterpartyPhone(null);
+        } else if (!isBuyer && userId) {
+          const res: any = await sellerService.getBuyer(userId);
+          const payload = res?.data?.buyer ?? res?.data?.user ?? res?.data ?? res?.buyer ?? res ?? null;
+          const phone =
+            payload?.phone || payload?.mobile || payload?.buyer_phone || null;
+          if (!cancelled && phone) setCounterpartyPhone(String(phone).trim() || null);
+          else if (!cancelled) setCounterpartyPhone(null);
+        } else if (!cancelled && !paramCounterpartyPhone) {
+          setCounterpartyPhone(null);
+        }
+      } catch (_) {
+        if (!cancelled) setCounterpartyPhone(null);
+      }
+    };
+    fetchPhone();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.user_type, userId, propertyId, paramCounterpartyPhone]);
+
+  const handlePhonePress = () => {
+    const raw = counterpartyPhone?.trim();
+    const digits = raw?.replace(/\D/g, '') || '';
+    if (digits.length >= 10) {
+      Linking.openURL(`tel:${raw}`);
+    } else {
+      CustomAlert.alert('Info', 'Phone number not available.');
+    }
+  };
 
   const initializeConversation = async (): Promise<(() => void) | null> => {
     try {
@@ -334,55 +409,94 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
-  const handleSend = async () => {
-    if (!inputText.trim() || sending || !user?.id) return;
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:handleSend',message:'handleSend entry',data:{hasActualConversationId:!!actualConversationId,actualConversationId,textLen:inputText.trim().length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
-    // #endregion
-    const messageText = inputText.trim();
-    setInputText('');
+  const sendMessage = async (messageText: string, restoreInput?: string) => {
+    if (!messageText.trim() || sending || !user?.id) return;
     setSending(true);
-    
     if (!actualConversationId) {
       CustomAlert.alert('Error', 'Conversation not initialized. Please try again.');
       setSending(false);
-      setInputText(messageText); // Restore message
+      if (restoreInput !== undefined) setInputText(restoreInput);
       return;
     }
-    
     try {
-      // Determine senderRole from user's role
-      const senderRole: 'buyer' | 'seller' | 'agent' = (user.user_type === 'buyer' || user.user_type === 'seller' || user.user_type === 'agent')
-        ? user.user_type
-        : 'buyer'; // Default to buyer if not specified
-      
-      // Send message via Firebase only (no API fallback)
+      const senderRole: 'buyer' | 'seller' | 'agent' =
+        user.user_type === 'buyer' || user.user_type === 'seller' || user.user_type === 'agent'
+          ? user.user_type
+          : 'buyer';
       const firebaseSuccess = await chatService.sendChatMessage(
         String(actualConversationId),
         Number(user.id),
         senderRole,
-        messageText,
+        messageText.trim(),
       );
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:handleSend',message:'sendChatMessage result',data:{firebaseSuccess},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       if (!firebaseSuccess) {
         CustomAlert.alert(
           'Cannot Send Message',
           'Firebase is not available. Please rebuild the app to enable chat functionality.\n\nRun: cd android && ./gradlew clean && cd .. && npm run android',
         );
-        setInputText(messageText); // Restore text
+        if (restoreInput !== undefined) setInputText(restoreInput);
       }
     } catch (error: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/46268aef-e207-4f37-bc15-922b8a7a4be9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatConversationScreen.tsx:handleSend',message:'send error',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       console.error('Error sending message:', error);
       CustomAlert.alert('Error', error.message || 'Failed to send message. Please try again.');
-      setInputText(messageText); // Restore text
+      if (restoreInput !== undefined) setInputText(restoreInput);
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSend = async () => {
+    if (!inputText.trim() || sending || !user?.id) return;
+    const messageText = inputText.trim();
+    setInputText('');
+    await sendMessage(messageText, messageText);
+  };
+
+  const handleQuickReply = (text: string) => {
+    if (sending || !user?.id) return;
+    sendMessage(text);
+  };
+
+  const handleDeleteMessage = (item: Message) => {
+    if (!actualConversationId || !item.id) return;
+    CustomAlert.alert(
+      'Delete message?',
+      'This message will be removed for everyone.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await chatService.deleteMessage(String(actualConversationId), item.id);
+            if (!ok) CustomAlert.alert('Error', 'Could not delete message.');
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteConversation = () => {
+    if (!actualConversationId) return;
+    CustomAlert.alert(
+      'Delete conversation?',
+      'This will remove the entire chat and all messages for both participants. This cannot be undone.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await chatService.deleteConversation(String(actualConversationId));
+            if (ok) {
+              navigation.goBack();
+            } else {
+              CustomAlert.alert('Error', 'Could not delete conversation.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleRefresh = () => {
@@ -395,26 +509,15 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   const renderMessage = ({item}: {item: Message}) => {
-    const isBuyer = user?.user_type === 'buyer';
-    
-    // Determine sender label based on user role (like website)
-    // Buyer: "You" vs "Property Owner"
-    // Seller: "You" vs "Buyer Name"
-    const senderLabel = item.isSent 
-      ? 'You' 
-      : (isBuyer 
-          ? (userName || 'Property Owner')
-          : (userName || 'Buyer'));
-    
     return (
-      <View
+      <TouchableOpacity
         style={[
           styles.messageContainer,
           item.isSent ? styles.sentMessage : styles.receivedMessage,
-        ]}>
-        {!item.isSent && (
-          <Text style={styles.senderLabel}>{senderLabel}</Text>
-        )}
+        ]}
+        onLongPress={() => item.isSent && handleDeleteMessage(item)}
+        activeOpacity={1}
+        delayLongPress={400}>
         <View
           style={[
             styles.messageBubble,
@@ -435,7 +538,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
             {item.timestamp}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -459,30 +562,45 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
 
   return (
     <View style={[styles.container, {paddingTop: insets.top, paddingBottom: insets.bottom}]}>
-      {/* Custom Header with Owner Name */}
+      {/* Custom Header: back, avatar, name, phone */}
       <View style={styles.chatHeader}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
+        <View style={styles.headerAvatar}>
+          <Text style={styles.headerAvatarText} numberOfLines={1}>
+            {participantName
+              .trim()
+              .split(/\s+/)
+              .slice(0, 2)
+              .map((w) => (w[0] || '').toUpperCase())
+              .join('') || '?'}
+          </Text>
+        </View>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName} numberOfLines={1}>
             {participantName}
           </Text>
           {receiverRole && (
             <Text style={styles.headerRole} numberOfLines={1}>
-              {receiverRole === 'agent' ? 'Agent' : 'Seller'}
+              {receiverRole === 'agent' ? 'Agent' : receiverRole === 'seller' ? 'Seller' : 'Buyer'}
             </Text>
           )}
         </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerActionButton}
-            onPress={() => navigation.navigate('Profile')}>
-            <Text style={styles.headerActionText}>⚙️</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.headerActionButton}
+          onPress={handlePhonePress}
+          accessibilityLabel="Call">
+          <Text style={styles.headerActionText}>📞</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.headerActionButton}
+          onPress={handleDeleteConversation}
+          accessibilityLabel="Delete conversation">
+          <Text style={styles.headerActionText}>⋮</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Messages List */}
@@ -521,6 +639,25 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
               </View>
             }
           />
+        )}
+
+        {/* Quick replies when conversation is new (same UI for buyer/seller/agent) */}
+        {!loading && messages.length === 0 && (
+          <View style={styles.quickRepliesContainer}>
+            {(user?.user_type === 'buyer' ? QUICK_REPLIES_BUYER : QUICK_REPLIES_SELLER_AGENT).map(
+              (text) => (
+                <TouchableOpacity
+                  key={text}
+                  style={styles.quickReplyChip}
+                  onPress={() => handleQuickReply(text)}
+                  disabled={sending}>
+                  <Text style={styles.quickReplyText} numberOfLines={1}>
+                    {text}
+                  </Text>
+                </TouchableOpacity>
+              ),
+            )}
+          </View>
         )}
 
         {/* Input Area */}
@@ -597,9 +734,20 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  headerActions: {
-    flexDirection: 'row',
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  headerAvatarText: {
+    ...typography.body,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.surface,
   },
   headerActionButton: {
     width: 40,
@@ -627,25 +775,17 @@ const styles = StyleSheet.create({
   receivedMessage: {
     justifyContent: 'flex-start',
   },
-  senderLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginBottom: spacing.xs,
-    marginLeft: spacing.xs,
-  },
   messageBubble: {
-    maxWidth: '75%',
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
+    maxWidth: '78%',
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 18,
   },
   sentBubble: {
     backgroundColor: colors.primary,
-    borderBottomRightRadius: borderRadius.xs,
   },
   receivedBubble: {
     backgroundColor: colors.surface,
-    borderBottomLeftRadius: borderRadius.xs,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -671,7 +811,8 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: spacing.md,
+    padding: spacing.sm,
+    paddingBottom: spacing.md,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -681,9 +822,10 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: borderRadius.lg,
+    borderRadius: 22,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
     maxHeight: 100,
     ...typography.body,
     color: colors.text,
@@ -691,9 +833,10 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    borderRadius: 22,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    minWidth: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -731,6 +874,31 @@ const styles = StyleSheet.create({
   emptySubtext: {
     ...typography.body,
     color: colors.textSecondary,
+  },
+  quickRepliesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  quickReplyChip: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxWidth: '100%',
+  },
+  quickReplyText: {
+    ...typography.body,
+    fontSize: 14,
+    color: colors.text,
   },
 });
 

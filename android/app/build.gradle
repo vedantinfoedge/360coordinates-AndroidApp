@@ -89,10 +89,9 @@ android {
         applicationId "Indiapropertys.com"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
+        versionCode 3
         versionName "1.7"
     }
-
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

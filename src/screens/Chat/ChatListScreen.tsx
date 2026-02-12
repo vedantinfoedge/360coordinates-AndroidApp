@@ -7,6 +7,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   Animated,
+  ScrollView,
+  TextInput,
+  Modal,
+  Pressable,
+  Image,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
@@ -22,11 +27,12 @@ import {propertyService} from '../../services/property.service';
 import {markChatAsRead} from '../../services/firebase.service';
 import {notificationService} from '../../services/notification.service';
 import {sellerService} from '../../services/seller.service';
+import {buyerService} from '../../services/buyer.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {capitalize} from '../../utils/formatters';
+import CustomAlert from '../../utils/alertHelper';
 import firestore from '@react-native-firebase/firestore';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
-import {Image} from 'react-native';
 
 type ChatListScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<ChatStackParamList, 'ChatList'>,
@@ -77,6 +83,23 @@ interface ChatListItem {
   price?: string;
 }
 
+type BuyerDetails = {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  profile_image?: string;
+  created_at?: string;
+};
+
+type OwnerDetails = {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  profile_image?: string;
+};
+
 const ChatListScreen: React.FC<Props> = ({navigation}) => {
   const {logout, user, isAuthenticated} = useAuth();
   const insets = useSafeAreaInsets();
@@ -86,8 +109,18 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [chatFilter, setChatFilter] = useState<'all' | 'unread'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [propertyCache, setPropertyCache] = useState<Record<string, any>>({});
   const [buyerCache, setBuyerCache] = useState<Record<string, {name: string; profile_image?: string}>>({});
+  const [buyerDetailsCache, setBuyerDetailsCache] = useState<Record<string, BuyerDetails>>({});
+  const [buyerCardVisible, setBuyerCardVisible] = useState(false);
+  const [buyerCardLoading, setBuyerCardLoading] = useState(false);
+  const [buyerCardError, setBuyerCardError] = useState<string | null>(null);
+  const [selectedBuyerId, setSelectedBuyerId] = useState<string | null>(null);
+  const [ownerDetailsCache, setOwnerDetailsCache] = useState<Record<string, OwnerDetails>>({});
+  const [cardMode, setCardMode] = useState<'buyer' | 'owner'>('buyer');
+  const [selectedOwnerPropertyId, setSelectedOwnerPropertyId] = useState<string | null>(null);
+  const [selectedOwnerRole, setSelectedOwnerRole] = useState<'agent' | 'seller' | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const previousUserTypeRef = useRef<string | undefined>(undefined);
   
@@ -933,7 +966,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
                     const fixedImageUrl = buyerProfileImage ? fixImageUrl(buyerProfileImage) : undefined;
                     buyerInfo = {
                       name: buyerName,
-                      profile_image: fixedImageUrl,
+                      profile_image: fixedImageUrl ?? undefined,
                     };
                     
                     // Cache buyer info
@@ -1210,6 +1243,158 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
       .toUpperCase()
       .slice(0, 2);
 
+    const openBuyerCard = async () => {
+      const buyerIdRaw = item.buyerId;
+      if (!buyerIdRaw) return;
+
+      const buyerId = String(buyerIdRaw);
+      setCardMode('buyer');
+      setSelectedOwnerPropertyId(null);
+      setSelectedOwnerRole(null);
+      setSelectedBuyerId(buyerId);
+      setBuyerCardVisible(true);
+      setBuyerCardError(null);
+
+      if (buyerDetailsCache[buyerId]) return;
+
+      try {
+        setBuyerCardLoading(true);
+        const resp: any = await sellerService.getBuyer(buyerId);
+        const payload =
+          resp?.data?.buyer ??
+          resp?.data?.user ??
+          resp?.data ??
+          resp?.buyer ??
+          null;
+
+        const fallback = buyerCache[buyerId];
+        const name =
+          payload?.name ||
+          payload?.full_name ||
+          fallback?.name ||
+          item.name ||
+          'Buyer';
+        const email = payload?.email || payload?.buyer_email || undefined;
+        const phone = payload?.phone || payload?.mobile || payload?.buyer_phone || undefined;
+        const profile_image_raw =
+          payload?.profile_image ||
+          payload?.profileImage ||
+          payload?.buyer_profile_image ||
+          fallback?.profile_image ||
+          item.image ||
+          undefined;
+        const created_at =
+          payload?.created_at ||
+          payload?.createdAt ||
+          payload?.created_date ||
+          payload?.joined_at ||
+          payload?.member_since ||
+          undefined;
+
+        const normalized: BuyerDetails = {
+          id: buyerId,
+          name: String(name),
+          email: email ? String(email) : undefined,
+          phone: phone ? String(phone) : undefined,
+          profile_image: profile_image_raw ? (fixImageUrl(String(profile_image_raw)) ?? undefined) : undefined,
+          created_at: created_at ? String(created_at) : undefined,
+        };
+
+        setBuyerDetailsCache(prev => ({...prev, [buyerId]: normalized}));
+      } catch (e: any) {
+        setBuyerCardError(e?.message ?? 'Failed to load buyer details');
+      } finally {
+        setBuyerCardLoading(false);
+      }
+    };
+
+    const openOwnerCard = async () => {
+      const propertyIdRaw = item.propertyId;
+      if (!propertyIdRaw) return;
+      const propertyIdStr = String(propertyIdRaw);
+      setCardMode('owner');
+      setSelectedOwnerPropertyId(propertyIdStr);
+      setSelectedOwnerRole(item.receiverRole ?? null);
+      setSelectedBuyerId(null);
+      setBuyerCardVisible(true);
+      setBuyerCardError(null);
+
+      if (ownerDetailsCache[propertyIdStr]) return;
+
+      try {
+        setBuyerCardLoading(true);
+        const res: any = await buyerService.getPropertyDetails(propertyIdRaw);
+        const data = res?.data;
+        const property = data?.property ?? data;
+        const owner = property?.owner ?? property?.seller;
+        const name =
+          property?.seller_name ||
+          owner?.name ||
+          owner?.full_name ||
+          item.name ||
+          'Property Owner';
+        const email =
+          property?.seller_email ||
+          owner?.email ||
+          undefined;
+        const phone =
+          property?.seller_phone ||
+          owner?.phone ||
+          property?.sales_number ||
+          property?.mobile_number ||
+          undefined;
+        const profile_image_raw =
+          owner?.profile_image ? fixImageUrl(owner.profile_image) ?? undefined : undefined;
+
+        const normalized: OwnerDetails = {
+          id: propertyIdStr,
+          name: String(name),
+          email: email ? String(email) : undefined,
+          phone: phone ? String(phone) : undefined,
+          profile_image: profile_image_raw,
+        };
+
+        setOwnerDetailsCache(prev => ({...prev, [propertyIdStr]: normalized}));
+      } catch (e: any) {
+        setBuyerCardError(e?.message ?? 'Failed to load owner details');
+      } finally {
+        setBuyerCardLoading(false);
+      }
+    };
+
+    const handleAvatarPress = () => {
+      const isBuyer = (user?.user_type || '').toLowerCase() === 'buyer';
+      if (isBuyer) {
+        openOwnerCard();
+      } else {
+        openBuyerCard();
+      }
+    };
+
+    const handleDeleteConversation = () => {
+      const roomId = item.chatRoomId || item.id;
+      if (!roomId) return;
+      CustomAlert.alert(
+        'Delete conversation?',
+        'This will remove the entire chat and all messages for both participants. This cannot be undone.',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              const ok = await chatService.deleteConversation(roomId);
+              if (ok) {
+                loadChatRooms();
+              } else {
+                CustomAlert.alert('Error', 'Could not delete conversation.');
+              }
+            },
+          },
+        ],
+      );
+    };
+
     return (
       <TouchableOpacity
         style={styles.chatItem}
@@ -1225,9 +1410,6 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           }
           
           // Navigate to chat conversation.
-          // IMPORTANT: `userId` here is the *counterparty* user ID (website-style),
-          // not "receiverId". ChatConversationScreen will compute the Firestore roomId
-          // deterministically using generateChatRoomId(buyerId, posterId, propertyId).
           const isBuyer = (user?.user_type || '').toLowerCase() === 'buyer';
           const counterpartyId = isBuyer ? item.receiverId : item.buyerId;
 
@@ -1237,13 +1419,20 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
             userName: item.name,
             propertyId: item.propertyId ? Number(item.propertyId) : undefined,
             propertyTitle: item.propertyTitle,
-            // Only buyers need receiverRole to label the poster as Seller/Agent.
             receiverRole: isBuyer ? item.receiverRole : undefined,
           });
         }}
+        onLongPress={handleDeleteConversation}
+        delayLongPress={400}
         activeOpacity={0.7}>
         {/* Avatar - Show image or initials */}
-        <View style={styles.avatarContainer}>
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={(e: any) => {
+            e?.stopPropagation?.();
+            handleAvatarPress();
+          }}
+          activeOpacity={0.8}>
           {item.image ? (
             <Image 
               source={{ uri: item.image }} 
@@ -1254,7 +1443,7 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.avatarText}>{initials}</Text>
             </View>
           )}
-        </View>
+        </TouchableOpacity>
 
         {/* Chat Info - WhatsApp style */}
         <View style={styles.chatInfo}>
@@ -1392,11 +1581,63 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
     );
   }
 
-  const isAgentOrSeller = (user?.user_type || '').toLowerCase() === 'seller' || (user?.user_type || '').toLowerCase() === 'agent';
-  const filteredChatList = chatFilter === 'unread' ? chatList.filter(item => (item.unreadCount || 0) > 0) : chatList;
+  const userType = (user?.user_type || '').toLowerCase();
+  const isAgent = userType === 'agent';
+  const isSeller = userType === 'seller';
+  const isAgentOrSeller = isSeller || isAgent;
+
+  // Keep existing chatFilter behavior, but allow search for agent UI.
+  const filterByUnread = (list: ChatListItem[]) =>
+    chatFilter === 'unread' ? list.filter(item => (item.unreadCount || 0) > 0) : list;
+
+  const filterBySearch = (list: ChatListItem[]) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(item => {
+      const name = (item.name || '').toLowerCase();
+      const last = (item.lastMessage || '').toLowerCase();
+      const prop = (item.propertyTitle || '').toLowerCase();
+      return name.includes(q) || last.includes(q) || prop.includes(q);
+    });
+  };
+
+  const filteredChatList = filterByUnread(chatList);
+  const agentFilteredChatList = filterBySearch(filterByUnread(chatList));
+
+  const chatStats = {
+    total: chatList.length,
+    unread: chatList.filter(i => (i.unreadCount || 0) > 0).length,
+    read: chatList.filter(i => (i.unreadCount || 0) === 0).length,
+    active: chatList.filter(i => {
+      const ms = i.timestampMs ?? 0;
+      if (!ms) return false;
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      return Date.now() - ms <= sevenDays;
+    }).length,
+  };
+
+  const selectedBuyer = selectedBuyerId ? buyerDetailsCache[selectedBuyerId] : undefined;
+  const selectedOwner = selectedOwnerPropertyId ? ownerDetailsCache[selectedOwnerPropertyId] : undefined;
+  const memberSinceText = (() => {
+    const raw = selectedBuyer?.created_at;
+    if (!raw) return '—';
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'});
+  })();
+  const cardTitle =
+    cardMode === 'owner'
+      ? selectedOwnerRole === 'agent'
+        ? 'Agent Details'
+        : selectedOwnerRole === 'seller'
+        ? 'Seller Details'
+        : 'Property Owner'
+      : 'Buyer Details';
+  const cardPerson = cardMode === 'owner' ? selectedOwner : selectedBuyer;
 
   return (
     <View style={styles.container}>
+      {/* Buyer UI: keep existing header */}
       {!isAgentOrSeller && (
         <BuyerHeader
           onProfilePress={() => navigation.navigate('Profile')}
@@ -1424,7 +1665,62 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           headerHeight={headerHeight}
         />
       )}
-      {isAgentOrSeller && (
+
+      {/* Agent UI: mirror "My Inquiries" layout (search + stat pills) */}
+      {isAgent && (
+        <>
+          <View style={[styles.searchBar, {paddingTop: insets.top + spacing.md}]}>
+            <View style={styles.searchInputContainer}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by buyer, message, or property..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setChatFilter(prev => (prev === 'all' ? 'unread' : 'all'))}
+              activeOpacity={0.85}>
+              <Text style={styles.filterButtonText}>
+                {chatFilter === 'all' ? 'All' : 'Unread'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.statsGrid}>
+            <View style={styles.statsGridItem}>
+              <View style={[styles.statPill, styles.statPillPrimary]}>
+                <Text style={styles.statPillNumber}>{chatStats.total}</Text>
+                <Text style={styles.statPillLabel}>Total</Text>
+              </View>
+            </View>
+            <View style={styles.statsGridItem}>
+              <View style={[styles.statPill, styles.statPillDanger]}>
+                <Text style={styles.statPillNumber}>{chatStats.unread}</Text>
+                <Text style={styles.statPillLabel}>New / Unread</Text>
+              </View>
+            </View>
+            <View style={styles.statsGridItem}>
+              <View style={[styles.statPill, styles.statPillNeutral]}>
+                <Text style={styles.statPillNumber}>{chatStats.read}</Text>
+                <Text style={styles.statPillLabel}>Read</Text>
+              </View>
+            </View>
+            <View style={styles.statsGridItem}>
+              <View style={[styles.statPill, styles.statPillSuccess]}>
+                <Text style={styles.statPillNumber}>{chatStats.active}</Text>
+                <Text style={styles.statPillLabel}>Active (7d)</Text>
+              </View>
+            </View>
+          </View>
+        </>
+      )}
+
+      {/* Seller UI: keep existing simple filter bar */}
+      {isSeller && (
         <View style={[styles.chatFilterBar, {paddingTop: insets.top + spacing.sm, paddingBottom: spacing.sm}]}>
           <TouchableOpacity
             style={[styles.chatFilterOption, chatFilter === 'all' && styles.chatFilterOptionActive]}
@@ -1440,14 +1736,23 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
           </TouchableOpacity>
         </View>
       )}
-      {chatList.length > 0 ? (
+
+      {(isAgent ? agentFilteredChatList.length > 0 : chatList.length > 0) ? (
         <Animated.FlatList
-          data={isAgentOrSeller ? filteredChatList : chatList}
+          data={isAgent ? agentFilteredChatList : (isSeller ? filteredChatList : chatList)}
           renderItem={renderChatItem}
           keyExtractor={(item: ChatListItem) => item.id}
           contentContainerStyle={[
             styles.listContent,
-            {paddingTop: isAgentOrSeller ? spacing.md : insets.top + 60 + spacing.md * 2},
+            {
+              paddingTop: isAgent
+                ? spacing.md
+                : isAgentOrSeller
+                ? spacing.md
+                : insets.top + 60 + spacing.md * 2,
+              paddingHorizontal: isAgent ? spacing.md : undefined,
+              paddingBottom: isAgent ? spacing.xl : undefined,
+            },
           ]}
           showsVerticalScrollIndicator={false}
           onScroll={Animated.event(
@@ -1467,10 +1772,86 @@ const ChatListScreen: React.FC<Props> = ({navigation}) => {
       ) : (
         <View style={[styles.emptyContainer, {paddingTop: isAgentOrSeller ? spacing.xl : insets.top + 60 + spacing.md * 2}]}>
           <Text style={styles.emptyIcon}>💬</Text>
-          <Text style={styles.emptyText}>{chatFilter === 'unread' ? 'No unread chats' : 'No chats yet'}</Text>
-          <Text style={styles.emptySubtext}>{chatFilter === 'unread' ? 'You have no unread messages' : 'Start a conversation by chatting with a property owner'}</Text>
+          <Text style={styles.emptyText}>
+            {chatFilter === 'unread' ? 'No unread chats' : searchQuery.trim() ? 'No chats found' : 'No chats yet'}
+          </Text>
+          <Text style={styles.emptySubtext}>
+            {chatFilter === 'unread'
+              ? 'You have no unread messages'
+              : searchQuery.trim()
+              ? 'Try adjusting your search'
+              : 'Start a conversation by chatting with a buyer or property owner'}
+          </Text>
         </View>
       )}
+
+      {/* Buyer or Owner details popup card (opens on avatar tap) */}
+      <Modal
+        visible={buyerCardVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBuyerCardVisible(false)}>
+        <Pressable style={styles.buyerCardOverlay} onPress={() => setBuyerCardVisible(false)}>
+          <Pressable style={styles.buyerCard} onPress={() => {}}>
+            <View style={styles.buyerCardHeader}>
+              <Text style={styles.buyerCardTitle}>{cardTitle}</Text>
+              <TouchableOpacity onPress={() => setBuyerCardVisible(false)} activeOpacity={0.7}>
+                <Text style={styles.buyerCardClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {buyerCardLoading ? (
+              <View style={styles.buyerCardLoading}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.buyerCardLoadingText}>Loading...</Text>
+              </View>
+            ) : buyerCardError ? (
+              <Text style={styles.buyerCardError}>{buyerCardError}</Text>
+            ) : cardPerson ? (
+              <View style={styles.buyerCardBody}>
+                <View style={styles.buyerCardTopRow}>
+                  {cardPerson.profile_image ? (
+                    <Image source={{uri: cardPerson.profile_image}} style={styles.buyerCardAvatar} />
+                  ) : (
+                    <View style={[styles.buyerCardAvatar, styles.buyerCardAvatarFallback]}>
+                      <Text style={styles.buyerCardAvatarText}>
+                        {String(cardPerson.name || '?')
+                          .trim()
+                          .split(' ')
+                          .map(n => n[0])
+                          .join('')
+                          .toUpperCase()
+                          .slice(0, 2)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.buyerCardTopInfo}>
+                    <Text style={styles.buyerCardName} numberOfLines={2}>
+                      {cardPerson.name || (cardMode === 'buyer' ? 'Buyer' : 'Property Owner')}
+                    </Text>
+                    {cardMode === 'buyer' && (
+                      <Text style={styles.buyerCardMeta}>Member since: {memberSinceText}</Text>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.buyerCardField}>
+                  <Text style={styles.buyerCardLabel}>Phone</Text>
+                  <Text style={styles.buyerCardValue}>{cardPerson.phone || '—'}</Text>
+                </View>
+                <View style={styles.buyerCardField}>
+                  <Text style={styles.buyerCardLabel}>Email</Text>
+                  <Text style={styles.buyerCardValue}>{cardPerson.email || '—'}</Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.buyerCardError}>
+                {cardMode === 'owner' ? 'Owner details not available.' : 'Buyer details not available.'}
+              </Text>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -1504,6 +1885,211 @@ const styles = StyleSheet.create({
   },
   chatFilterTextActive: {
     color: '#FFFFFF',
+  },
+  // Agent (My Inquiries style) header controls
+  searchBar: {
+    flexDirection: 'row',
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: spacing.sm,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    rowGap: spacing.sm,
+    columnGap: spacing.sm,
+  },
+  statsGridItem: {
+    width: '48%',
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    paddingVertical: spacing.sm,
+  },
+  filterButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+  },
+  filterButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
+  },
+  topInsights: {
+    maxHeight: 62,
+    marginTop: spacing.md,
+  },
+  topInsightsContent: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  statPill: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minWidth: 120,
+  },
+  statPillPrimary: {
+    backgroundColor: '#E3F6FF',
+    borderColor: '#BFE7FF',
+  },
+  statPillDanger: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FECACA',
+  },
+  statPillNeutral: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  statPillSuccess: {
+    backgroundColor: '#D1FAE5',
+    borderColor: '#A7F3D0',
+  },
+  statPillNumber: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  statPillLabel: {
+    ...typography.caption,
+    color: colors.text,
+    opacity: 0.8,
+    marginTop: 2,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+
+  // Buyer details popup card
+  buyerCardOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  buyerCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  buyerCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  buyerCardTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontWeight: '800',
+  },
+  buyerCardClose: {
+    fontSize: 22,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.xs,
+  },
+  buyerCardLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  buyerCardLoadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  buyerCardError: {
+    ...typography.body,
+    color: '#c00',
+    fontWeight: '600',
+  },
+  buyerCardBody: {
+    gap: spacing.md,
+  },
+  buyerCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  buyerCardAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  buyerCardAvatarFallback: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+  },
+  buyerCardAvatarText: {
+    color: colors.surface,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  buyerCardTopInfo: {
+    flex: 1,
+  },
+  buyerCardName: {
+    ...typography.h3,
+    color: colors.text,
+    fontWeight: '800',
+  },
+  buyerCardMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  buyerCardField: {
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    paddingTop: spacing.md,
+  },
+  buyerCardLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
+  },
+  buyerCardValue: {
+    ...typography.body,
+    color: colors.text,
+    marginTop: 4,
+    fontWeight: '600',
   },
   listContent: {
     paddingBottom: spacing.xs,

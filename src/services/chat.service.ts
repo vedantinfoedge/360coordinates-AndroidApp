@@ -102,7 +102,7 @@ export const chatService = {
       const response = await api.post(API_ENDPOINTS.CHAT_CREATE_ROOM, {
         receiverId: receiverId.toString(),
         propertyId: propertyId.toString(),
-      });
+      }) as { success?: boolean; data?: unknown; [key: string]: unknown };
       
       console.log('[ChatService] Chat room API response received:', {
         success: response?.success,
@@ -616,6 +616,69 @@ export const chatService = {
       console.error('[ChatService] Error getting conversations from Firebase:', error);
       // Return empty array - no backend API fallback
       return { success: true, data: [] };
+    }
+  },
+
+  
+  /**
+   * Delete a single message from Firebase. Removes the document at chats/{chatRoomId}/messages/{messageId}.
+   */
+  deleteMessage: async (chatRoomId: string, messageId: string): Promise<boolean> => {
+    try {
+      const db = getFirestore();
+      if (!db) {
+        console.warn('[Firebase Chat] Firestore not available - cannot delete message');
+        return false;
+      }
+      const messageRef = db.collection('chats').doc(chatRoomId).collection('messages').doc(messageId);
+      await messageRef.delete();
+      console.log('[Firebase Chat] Message deleted:', messageId);
+      return true;
+    } catch (error: any) {
+      console.error('[Firebase Chat] Error deleting message:', error?.message);
+      return false;
+    }
+  },
+
+  /**
+   * Delete the entire conversation (chat room and all its messages) from Firebase.
+   * Deletes all message docs in the subcollection, then the chat document.
+   */
+  deleteConversation: async (chatRoomId: string): Promise<boolean> => {
+    try {
+      const db = getFirestore();
+      if (!db) {
+        console.warn('[Firebase Chat] Firestore not available - cannot delete conversation');
+        return false;
+      }
+      const chatRef = db.collection('chats').doc(chatRoomId);
+      const messagesRef = chatRef.collection('messages');
+      const BATCH_SIZE = 500;
+      let lastDoc: FirebaseFirestoreTypes.QueryDocumentSnapshot | null = null;
+      let totalDeleted = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        let query = messagesRef.orderBy('timestamp', 'asc').limit(BATCH_SIZE);
+        if (lastDoc) {
+          query = query.startAfter(lastDoc) as any;
+        }
+        const snapshot = await query.get();
+        if (snapshot.empty) break;
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+          totalDeleted += 1;
+        });
+        await batch.commit();
+        lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        if (snapshot.docs.length < BATCH_SIZE) break;
+      }
+      await chatRef.delete();
+      console.log('[Firebase Chat] Conversation deleted:', chatRoomId, 'messages removed:', totalDeleted);
+      return true;
+    } catch (error: any) {
+      console.error('[Firebase Chat] Error deleting conversation:', error?.message);
+      return false;
     }
   },
 

@@ -26,6 +26,7 @@ import {sellerService, DashboardStats} from '../../services/seller.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import {getLeads, Lead} from '../../services/leadsService';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -63,6 +64,8 @@ interface RecentInquiry {
   status: string;
   created_at: string;
 }
+
+type DashboardLead = Lead;
 
 // Direct Add Property / Add Project buttons for dashboard
 const AddActionButtons = React.memo(({
@@ -528,6 +531,9 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
   const [recentInquiries, setRecentInquiries] = useState<RecentInquiry[]>([]);
+  const [recentLeads, setRecentLeads] = useState<DashboardLead[]>([]);
+  const [leadsCount, setLeadsCount] = useState(0);
+  const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -607,6 +613,27 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         if (statsError?.status !== 404 && statsError?.response?.status !== 404) {
           console.warn('[AgentDashboard] Error loading API stats:', statsError);
         }
+      }
+
+      // Leads (buyers who clicked "View Contact")
+      try {
+        const leads = await getLeads();
+        const list = Array.isArray(leads) ? leads : [];
+        setLeadsCount(list.length);
+        setRecentLeads(list.slice(0, 4));
+
+        const now = Date.now();
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        const newCount = list.filter(l => {
+          const ts = l?.created_at ? new Date(l.created_at).getTime() : 0;
+          return ts > 0 && now - ts <= oneDayMs;
+        }).length;
+        setNewLeadsCount(newCount);
+      } catch (leadErr: any) {
+        // Don't crash dashboard if leads endpoint isn't available for agent.
+        setLeadsCount(0);
+        setNewLeadsCount(0);
+        setRecentLeads([]);
       }
 
       const propertiesResponse: any = await sellerService.getProperties({
@@ -870,11 +897,11 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
 
             <AnimatedStatCard
               icon="💬"
-              number={stats.total_inquiries}
-              label="Total Inquiries"
-              badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
-              badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F3F4F6'}
-              onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}
+              number={leadsCount}
+              label="Total Leads"
+              badge={newLeadsCount > 0 ? `${newLeadsCount} New` : 'No New'}
+              badgeColor={newLeadsCount > 0 ? '#FEE2E2' : '#F3F4F6'}
+              onPress={() => (navigation as any).navigate('Leads')}
               delay={200}
             />
 
@@ -910,17 +937,17 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
 
             <AnimatedQuickActionCard
               icon="💬"
-              title="View Inquiries"
-              description="Respond to buyer inquiries"
-              onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}
+              title="View Leads"
+              description="See buyers who viewed contact"
+              onPress={() => (navigation as any).navigate('Leads')}
               delay={200}
             />
 
             <AnimatedQuickActionCard
-              icon="👤"
-              title="Update Profile"
-              description="Manage your account settings"
-              onPress={() => navigation.navigate('Profile')}
+              icon="🧾"
+              title="View Inquiries"
+              description="Respond to buyer inquiries"
+              onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}
               delay={300}
             />
           </View>
@@ -969,52 +996,59 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
             )}
           </View>
 
-          {/* Recent Inquiries Section */}
+          {/* Recent Leads Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
                 <View style={styles.sectionIconContainer}>
-                  <Text style={styles.sectionIcon}>💬</Text>
+                  <Text style={styles.sectionIcon}>📋</Text>
                 </View>
                 <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionTitle}>Recent Inquiries</Text>
-                  {stats.new_inquiries > 0 && (
+                  <Text style={styles.sectionTitle}>Recent Leads</Text>
+                  {newLeadsCount > 0 && (
                     <View style={styles.sectionBadge}>
                       <Text style={styles.sectionBadgeText}>
-                        {stats.new_inquiries} New
+                        {newLeadsCount} New
                       </Text>
                     </View>
                   )}
                 </View>
               </View>
-              <AnimatedSeeAllButton
-                onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}>
+              <AnimatedSeeAllButton onPress={() => (navigation as any).navigate('Leads')}>
                 <Text style={styles.viewAllText}>View All</Text>
                 <Text style={styles.viewAllArrow}>›</Text>
               </AnimatedSeeAllButton>
             </View>
-            {recentInquiries.length > 0 ? (
-              <FlatList
-                data={recentInquiries.slice(0, 4)}
-                renderItem={({item, index}: {item: RecentInquiry; index: number}) => (
-                  <AnimatedInquiryCard item={item} index={index} navigation={navigation} />
-                )}
-                keyExtractor={(item: RecentInquiry) => String(item.id)}
-                scrollEnabled={false}
-                showsVerticalScrollIndicator={false}
-              />
+
+            {recentLeads.length > 0 ? (
+              <View>
+                {recentLeads.map((lead, idx) => (
+                  <View key={`${lead.created_at}-${idx}`} style={styles.inquiryCard}>
+                    <Text style={styles.inquiryBuyerName} numberOfLines={1}>
+                      {lead.buyer_name || 'Buyer'}
+                    </Text>
+                    <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
+                      {lead.property_title || '—'}
+                    </Text>
+                    <Text style={styles.inquiryTime}>
+                      {lead.created_at ? formatters.timeAgo(lead.created_at) : ''}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             ) : (
               <View style={styles.emptyState}>
                 <View style={styles.emptyStateIconContainer}>
-                  <Text style={styles.emptyStateIcon}>💬</Text>
+                  <Text style={styles.emptyStateIcon}>📋</Text>
                 </View>
-                <Text style={styles.emptyStateTitle}>No New Inquiries</Text>
+                <Text style={styles.emptyStateTitle}>No Leads Yet</Text>
                 <Text style={styles.emptyStateText}>
-                  You'll see buyer inquiries here when they contact you
+                  When buyers click "View Contact" on your listings, they will appear here.
                 </Text>
               </View>
             )}
           </View>
+
         </Animated.View>
       </Animated.ScrollView>
     </View>
