@@ -281,8 +281,21 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       if (filteredProperties.length >= 0) {
-        setProperties(filteredProperties);
-        const favorites = (filteredProperties as Property[])
+        // Filter "Explorer Properties" to show only normal properties (not upcoming) 
+        // and only from 'seller' or 'agent'
+        const validProperties = filteredProperties.filter(p => {
+          const isNotProject = p.project_type !== 'upcoming';
+          const validUserType = p.seller?.user_type === 'seller' || p.seller?.user_type === 'agent';
+          // If seller info is missing, we assume it's valid for now or strictly filter? 
+          // Let's strictly filter if user_type is present, or allow if missing (legacy data) but 'Explore Projects' rule is strict.
+          // User request: "only normal properties which uploaded from seller and agent dashboard"
+          // We'll require user_type for strict compliance if available, or pass if unknown but look like normal property.
+          // For now, let's trust the 'seller' object if it exists.
+          return isNotProject && (!p.seller || validUserType);
+        });
+
+        setProperties(validProperties as Property[]);
+        const favorites = (validProperties as Property[])
           .filter(p => p.is_favorite)
           .map(p => p.id);
         setFavoriteIds(new Set(favorites));
@@ -292,11 +305,18 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       const allResponse = await buyerService.getProperties({ limit: 50 });
       if (allResponse.success && allResponse.data?.properties) {
         const allList = allResponse.data.properties as Property[];
-        const upcoming = allList.filter(p => p.project_type === 'upcoming').slice(0, 15);
+
+        // Explore Projects: Only show projects uploaded by AGENTS
+        const upcoming = allList.filter(p =>
+          p.project_type === 'upcoming' &&
+          p.seller?.user_type === 'agent'
+        ).slice(0, 15);
+
         const forSale = allList
           .filter(
             p =>
               p.status === 'sale' &&
+              p.project_type !== 'upcoming' && // Ensure not duplicates of projects
               (p.property_type || '').toLowerCase().includes('apartment'),
           )
           .slice(0, 15);

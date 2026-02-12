@@ -207,26 +207,48 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           const forBachelors = p.available_for_bachelors === true || p.available_for_bachelors === 'true' || p.available_for_bachelors === 1 || p.available_for_bachelors === '1';
           return isPG || forBachelors;
         });
-        setProperties(filteredProperties);
+
+        // Filter "Explorer Properties" to show only normal properties (not upcoming) 
+        // and only from 'seller' or 'agent'
+        const validProperties = filteredProperties.filter((p: any) => {
+          const isNotProject = p.project_type !== 'upcoming';
+          const validUserType = p.seller?.user_type === 'seller' || p.seller?.user_type === 'agent';
+          return isNotProject && (!p.seller || validUserType);
+        });
+        setProperties(validProperties);
       } else {
         const listParams: any = { limit: 10 };
         if (listingType === 'sale') listParams.status = 'sale';
         else if (listingType === 'rent') listParams.status = 'rent';
         const propertiesResponse = await buyerService.getProperties(listParams);
         if (propertiesResponse.success && propertiesResponse.data) {
-          setProperties(propertiesResponse.data.properties || []);
+          const rawProps = propertiesResponse.data.properties || [];
+          // Apply same filtering
+          const validProperties = rawProps.filter((p: Property) => {
+            const isNotProject = p.project_type !== 'upcoming';
+            const validUserType = p.seller?.user_type === 'seller' || p.seller?.user_type === 'agent';
+            return isNotProject && (!p.seller || validUserType);
+          });
+          setProperties(validProperties as Property[]);
         }
       }
 
       const allResponse = await buyerService.getProperties({ limit: 50 });
       if (allResponse.success && allResponse.data?.properties) {
         const allList = allResponse.data.properties as Property[];
-        setUpcomingProjects(allList.filter(p => p.project_type === 'upcoming').slice(0, 15));
+
+        // Explore Projects: Only show projects uploaded by AGENTS
+        setUpcomingProjects(allList.filter(p =>
+          p.project_type === 'upcoming' &&
+          p.seller?.user_type === 'agent'
+        ).slice(0, 15));
+
         setBuyNewHomeProperties(
           allList
             .filter(
               p =>
                 p.status === 'sale' &&
+                p.project_type !== 'upcoming' &&
                 (p.property_type || '').toLowerCase().includes('apartment'),
             )
             .slice(0, 15),
