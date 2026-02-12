@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,24 +13,25 @@ import {
   Share,
   Animated,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CompositeNavigationProp} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {scale, verticalScale, moderateScale} from '../../utils/responsive';
-import {useAuth} from '../../context/AuthContext';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { BuyerStackParamList } from '../../navigation/BuyerNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { scale, verticalScale, moderateScale } from '../../utils/responsive';
+import { useAuth } from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
-import {buyerService, Property} from '../../services/buyer.service';
-import {propertyService} from '../../services/property.service';
-import {favoriteService} from '../../services/favorite.service';
-import {fixImageUrl} from '../../utils/imageHelper';
-import {formatters} from '../../utils/formatters';
+import { buyerService, Property } from '../../services/buyer.service';
+import { propertyService } from '../../services/property.service';
+import { favoriteService } from '../../services/favorite.service';
+import { fixImageUrl } from '../../utils/imageHelper';
+import { formatters } from '../../utils/formatters';
 
 type DashboardScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<BuyerStackParamList, 'Home'>,
@@ -48,20 +49,20 @@ interface TopCity {
 }
 
 const TOP_CITIES: TopCity[] = [
-  {id: 'mumbai', name: 'Mumbai', image: require('../../assets/Mumbai.png')},
-  {id: 'delhi', name: 'Delhi', image: require('../../assets/Delhi.png')},
-  {id: 'bangalore', name: 'Bangalore', image: require('../../assets/Bangalore.png')},
-  {id: 'hyderabad', name: 'Hyderabad', image: require('../../assets/Hyderabad.png')},
-  {id: 'chennai', name: 'Chennai', image: require('../../assets/Chennai.png')},
-  {id: 'pune', name: 'Pune', image: require('../../assets/Pune.png')},
-  {id: 'kolkata', name: 'Kolkata', image: require('../../assets/kolkata.png')},
-  {id: 'ahmedabad', name: 'Ahmedabad', image: require('../../assets/Ahmedabad.png')},
+  { id: 'mumbai', name: 'Mumbai', image: require('../../assets/Mumbai.png') },
+  { id: 'delhi', name: 'Delhi', image: require('../../assets/Delhi.png') },
+  { id: 'bangalore', name: 'Bangalore', image: require('../../assets/Bangalore.png') },
+  { id: 'hyderabad', name: 'Hyderabad', image: require('../../assets/Hyderabad.png') },
+  { id: 'chennai', name: 'Chennai', image: require('../../assets/Chennai.png') },
+  { id: 'pune', name: 'Pune', image: require('../../assets/Pune.png') },
+  { id: 'kolkata', name: 'Kolkata', image: require('../../assets/kolkata.png') },
+  { id: 'ahmedabad', name: 'Ahmedabad', image: require('../../assets/Ahmedabad.png') },
 ];
 
 type ListingType = 'sale' | 'rent' | 'pg';
 
-const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, isAuthenticated, switchUserRole} = useAuth();
+const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
+  const { user, logout, isAuthenticated, switchUserRole } = useAuth();
   const [switchingRole, setSwitchingRole] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
@@ -111,7 +112,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerHeight = insets.top + verticalScale(70);
-  
+
   // Smooth marquee auto-scroll refs
   const carouselScrollRef = useRef<any>(null);
   const scrollPosition = useRef(0);
@@ -135,12 +136,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             onPress: () => {
               navigation.reset({
                 index: 0,
-                routes: [{name: 'Agent' as never}],
+                routes: [{ name: 'Agent' as never }],
               });
             },
           },
         ],
-        {cancelable: false}
+        { cancelable: false }
       );
       return;
     }
@@ -167,45 +168,45 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   // Smooth marquee animation using requestAnimationFrame
   const startSmoothScroll = useCallback(() => {
     if (properties.length <= 1) return;
-    
+
     const totalWidth = properties.length * ITEM_WIDTH;
-    
+
     const animate = (timestamp: number) => {
       if (!lastTimestamp.current) {
         lastTimestamp.current = timestamp;
       }
-      
+
       const deltaTime = timestamp - lastTimestamp.current;
       lastTimestamp.current = timestamp;
-      
+
       // Only scroll if user is not interacting
       if (!isUserScrolling.current && carouselScrollRef.current) {
         // Move based on time delta for consistent speed across devices
         scrollPosition.current += SCROLL_SPEED * (deltaTime / 16.67); // Normalize to 60fps
-        
+
         // Reset to beginning when we've scrolled past half (seamless loop)
         if (scrollPosition.current >= totalWidth) {
           scrollPosition.current = 0;
         }
-        
+
         carouselScrollRef.current.scrollTo({
           x: scrollPosition.current,
           animated: false,
         });
       }
-      
+
       animationRef.current = requestAnimationFrame(animate);
     };
-    
+
     animationRef.current = requestAnimationFrame(animate);
   }, [properties.length]);
-  
+
   // Start/stop smooth scroll animation
   useEffect(() => {
     if (properties.length > 1) {
       startSmoothScroll();
     }
-    
+
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
@@ -213,16 +214,16 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
     };
   }, [properties.length, startSmoothScroll]);
-  
+
   // Handle user scroll interaction
   const handleScrollBeginDrag = useCallback(() => {
     isUserScrolling.current = true;
   }, []);
-  
+
   const handleScrollEndDrag = useCallback((event: any) => {
     // Update scroll position to where user left off
     scrollPosition.current = event.nativeEvent.contentOffset.x;
-    
+
     // Resume auto-scroll after a short delay
     setTimeout(() => {
       isUserScrolling.current = false;
@@ -238,7 +239,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       isUserScrolling.current = false;
     }, 6000);
   }, []);
-  
+
   // Create duplicated data for seamless infinite scroll
   const getMarqueeData = useCallback(() => {
     if (properties.length === 0) return [];
@@ -251,7 +252,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       if (showLoading) {
         setLoading(true);
       }
-      
+
       // PG tab: same as website - two API calls then merge
       let filteredProperties: any[] = [];
       if (listingType === 'pg') {
@@ -289,7 +290,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
 
       // Fetch extra data for Upcoming Projects and Buy New Home sections (all statuses, larger set)
-      const allResponse = await buyerService.getProperties({limit: 50});
+      const allResponse = await buyerService.getProperties({ limit: 50 });
       if (allResponse.success && allResponse.data?.properties) {
         const allList = allResponse.data.properties as Property[];
         const upcoming = allList.filter(p => p.project_type === 'upcoming').slice(0, 15);
@@ -330,23 +331,23 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     try {
       // Close location suggestions
       setShowLocationSuggestions(false);
-      
+
       // PART A: Safely get location input with trim() - handle null/empty/spaces
       // Empty location is VALID and should navigate to show ALL properties
       const location = (searchLocation || searchQuery || '').trim();
-      
+
       // PART A: Always allow Search click - NO validation blocking empty input
       // Empty location is valid - will show ALL properties in SearchResults
       const params: any = {
         query: location, // Always pass query param (even if empty string)
         location: location, // Always pass location param (even if empty string)
       };
-      
+
       // If location has value, add additional params for filtering
       if (location) {
         // Also set searchQuery for backward compatibility
         params.searchQuery = location;
-        
+
         // Extract city from location if it's a city name (optional, for better filtering)
         const locationText = location.toLowerCase();
         const matchedCity = TOP_CITIES.find(city => city.name.toLowerCase() === locationText);
@@ -356,7 +357,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
       // If location is empty, params.location will be empty string
       // SearchResults screen will detect empty location and load ALL properties
-      
+
       // Listing type (Buy, Rent, PG only)
       if (listingType === 'sale') {
         params.status = 'sale';
@@ -368,7 +369,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         params.status = 'rent';
         params.listingType = 'pg-hostel';
       }
-      
+
       console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
       // Navigate to Search tab (SearchResultsScreen) so tab selection updates correctly
       navigation.navigate('Search' as never, params as never);
@@ -384,7 +385,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
       if (response && response.success) {
         // Determine favorite status from response
         const isFavorite = response.data?.is_favorite ?? response.data?.favorite ?? !favoriteIds.has(propertyId);
-        
+
         const newFavoriteIds = new Set(favoriteIds);
         if (isFavorite) {
           newFavoriteIds.add(propertyId);
@@ -392,16 +393,16 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           newFavoriteIds.delete(propertyId);
         }
         setFavoriteIds(newFavoriteIds);
-        
+
         // Update property in list
         setProperties(prev =>
           prev.map(p =>
             p.id === propertyId
-              ? {...p, is_favorite: isFavorite}
+              ? { ...p, is_favorite: isFavorite }
               : p,
           ),
         );
-        
+
         console.log(`Property ${propertyId} ${isFavorite ? 'added to' : 'removed from'} favorites`);
       } else {
         CustomAlert.alert('Error', (response as any)?.message || 'Failed to update favorite');
@@ -429,7 +430,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const handleShareProperty = async (property: Property) => {
     try {
       const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
-      
+
       await Share.share({
         message: shareMessage,
         title: property.title,
@@ -442,12 +443,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const renderPropertyCard = ({item}: {item: Property}) => {
+  const renderPropertyCard = ({ item }: { item: Property }) => {
     const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
     const images: string[] | undefined = item.images?.length
       ? item.images
-          .map((url: string) => fixImageUrl(url))
-          .filter((url): url is string => Boolean(url))
+        .map((url: string) => fixImageUrl(url))
+        .filter((url): url is string => Boolean(url))
       : undefined;
     return (
       <PropertyCard
@@ -460,7 +461,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         onPress={() =>
           navigation.navigate(
             item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
-            {propertyId: String(item.id)},
+            { propertyId: String(item.id) },
           )
         }
         onFavoritePress={() => handleToggleFavorite(item.id)}
@@ -472,13 +473,13 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
     );
   };
 
-  const renderCityCard = ({item}: {item: TopCity}) => (
+  const renderCityCard = ({ item }: { item: TopCity }) => (
     <TouchableOpacity
       style={styles.cityCard}
       onPress={() => handleCityPress(item.name)}>
       <View style={styles.cityImageContainer}>
-        <Image 
-          source={item.image} 
+        <Image
+          source={item.image}
           style={styles.cityImage}
           resizeMode="cover"
         />
@@ -497,11 +498,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
           onLogoutPress={isLoggedIn ? logout : undefined}
           onSignInPress={() => {
             console.log('[BuyerDashboard] Navigating to Login screen');
-            (navigation as any).navigate('Auth', {screen: 'Login'});
+            (navigation as any).navigate('Auth', { screen: 'Login' });
           }}
           onSignUpPress={() => {
             console.log('[BuyerDashboard] Navigating to Register screen');
-            (navigation as any).navigate('Auth', {screen: 'Register'});
+            (navigation as any).navigate('Auth', { screen: 'Register' });
           }}
           onAddPropertyPress={isLoggedIn ? async () => {
             // Set dashboard preference and navigate to Seller dashboard
@@ -509,7 +510,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
             await AsyncStorage.setItem('@user_dashboard_preference', 'seller');
             (navigation as any).reset({
               index: 0,
-              routes: [{name: 'Seller'}],
+              routes: [{ name: 'Seller' }],
             });
           } : undefined}
           showProfile={isLoggedIn}
@@ -536,28 +537,28 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={() => {
           console.log('[BuyerDashboard] Navigating to Login screen');
-          (navigation as any).navigate('Auth', {screen: 'Login'});
+          (navigation as any).navigate('Auth', { screen: 'Login' });
         }}
         onSignUpPress={() => {
           console.log('[BuyerDashboard] Navigating to Register screen');
-          (navigation as any).navigate('Auth', {screen: 'Register'});
+          (navigation as any).navigate('Auth', { screen: 'Register' });
         }}
         onAddPropertyPress={isLoggedIn ? async () => {
-            // Switch role to seller - AppNavigator will handle navigation when user state updates
-            if (switchingRole) return; // Prevent multiple clicks
-            try {
-              setSwitchingRole(true);
-              await switchUserRole('seller');
-            } catch (error: any) {
-              console.error('[BuyerDashboard] Error switching role:', error);
-              CustomAlert.alert(
-                'Role Switch Failed',
-                error?.message || 'Failed to switch to seller dashboard. Please try again.',
-              );
-            } finally {
-              setSwitchingRole(false);
-            }
-          } : undefined}
+          // Switch role to seller - AppNavigator will handle navigation when user state updates
+          if (switchingRole) return; // Prevent multiple clicks
+          try {
+            setSwitchingRole(true);
+            await switchUserRole('seller');
+          } catch (error: any) {
+            console.error('[BuyerDashboard] Error switching role:', error);
+            CustomAlert.alert(
+              'Role Switch Failed',
+              error?.message || 'Failed to switch to seller dashboard. Please try again.',
+            );
+          } finally {
+            setSwitchingRole(false);
+          }
+        } : undefined}
         showProfile={isLoggedIn}
         showLogout={isLoggedIn}
         showSignIn={isGuest}
@@ -568,11 +569,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
 
       <Animated.ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, {paddingTop: headerHeight}]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight }]}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true},
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true },
         )}
         scrollEventThrottle={16}
         refreshControl={
@@ -646,26 +647,30 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               </View>
             )}
           </View>
-          
+
           {/* Search on Map Button */}
-          <TouchableOpacity
-            style={styles.mapSearchButton}
-            onPress={() => {
-              try {
-                navigation.navigate('PropertyMap', {
-                  listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
-                } as never);
-              } catch (error: any) {
-                console.error('Error navigating to map:', error);
-                CustomAlert.alert('Error', 'Map feature is not available. Please check Mapbox integration.');
-              }
-            }}
-            activeOpacity={0.8}>
-            <View style={styles.mapSearchIconWrap}>
-              <Text style={styles.mapSearchIcon}>📍</Text>
-            </View>
-            <Text style={styles.mapSearchText}>Search on Map</Text>
-          </TouchableOpacity>
+          {/* Search on Map Button */}
+          <View style={{ alignItems: 'flex-end' }}>
+            <TouchableOpacity
+              style={styles.mapSearchButton}
+              onPress={() => {
+                try {
+                  navigation.navigate('PropertyMap', {
+                    listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
+                  } as never);
+                } catch (error: any) {
+                  console.error('Error navigating to map:', error);
+                  CustomAlert.alert('Error', 'Map feature is not available. Please check Mapbox integration.');
+                }
+              }}
+              activeOpacity={0.8}>
+              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <Path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-1 4z" />
+                <Path d="M8 2v16" />
+                <Path d="M16 6v16" />
+              </Svg>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Explore Properties Section */}
@@ -678,16 +683,16 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               </Text>
             </View>
             <TouchableOpacity
-                onPress={() => {
-                  try {
-                    const params: any = {
-                      query: '',
-                      location: '',
-                      listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent',
-                      status: listingType === 'sale' ? 'sale' : 'rent',
-                    };
+              onPress={() => {
+                try {
+                  const params: any = {
+                    query: '',
+                    location: '',
+                    listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent',
+                    status: listingType === 'sale' ? 'sale' : 'rent',
+                  };
 
-                    // Navigate directly to SearchResults screen
+                  // Navigate directly to SearchResults screen
                   console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
                   navigation.navigate('Search' as never, params as never);
                 } catch (error: any) {
@@ -713,15 +718,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
               contentContainerStyle={styles.carouselList}
               onScrollBeginDrag={handleScrollBeginDrag}
               onScrollEndDrag={handleScrollEndDrag}
-              onMomentumScrollEnd={(event: {nativeEvent: {contentOffset: {x: number}}}) => {
+              onMomentumScrollEnd={(event: { nativeEvent: { contentOffset: { x: number } } }) => {
                 scrollPosition.current = event.nativeEvent.contentOffset.x;
               }}>
               {getMarqueeData().map((item: Property, index: number) => {
                 const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
                 const images: string[] | undefined = item.images?.length
                   ? item.images
-                      .map((url: string) => fixImageUrl(url))
-                      .filter((url): url is string => Boolean(url))
+                    .map((url: string) => fixImageUrl(url))
+                    .filter((url): url is string => Boolean(url))
                   : undefined;
                 return (
                   <View key={`${item.id}-${index}`} style={styles.carouselCard}>
@@ -732,7 +737,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                       location={item.location}
                       price={formatters.price(item.price, item.status === 'rent')}
                       type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-                      onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+                      onPress={() => navigation.navigate('PropertyDetails', { propertyId: String(item.id) })}
                       onFavoritePress={() => handleToggleFavorite(item.id)}
                       onSharePress={() => handleShareProperty(item)}
                       isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
@@ -783,8 +788,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                 const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
                 const images: string[] | undefined = item.images?.length
                   ? item.images
-                      .map((url: string) => fixImageUrl(url))
-                      .filter((url): url is string => Boolean(url))
+                    .map((url: string) => fixImageUrl(url))
+                    .filter((url): url is string => Boolean(url))
                   : undefined;
                 return (
                   <View key={item.id} style={styles.carouselCard}>
@@ -798,7 +803,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                       onPress={() =>
                         navigation.navigate(
                           item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
-                          {propertyId: String(item.id)},
+                          { propertyId: String(item.id) },
                         )
                       }
                       onFavoritePress={() => handleToggleFavorite(item.id)}
@@ -849,8 +854,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                 const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
                 const images: string[] | undefined = item.images?.length
                   ? item.images
-                      .map((url: string) => fixImageUrl(url))
-                      .filter((url): url is string => Boolean(url))
+                    .map((url: string) => fixImageUrl(url))
+                    .filter((url): url is string => Boolean(url))
                   : undefined;
                 return (
                   <View key={item.id} style={styles.carouselCard}>
@@ -864,7 +869,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({navigation}) => {
                       onPress={() =>
                         navigation.navigate(
                           item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
-                          {propertyId: String(item.id)},
+                          { propertyId: String(item.id) },
                         )
                       }
                       onFavoritePress={() => handleToggleFavorite(item.id)}
@@ -949,7 +954,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
@@ -1016,39 +1021,18 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
   mapSearchButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
     borderRadius: scale(12),
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    width: scale(48),
+    height: scale(48),
     marginTop: spacing.sm,
-    minHeight: verticalScale(48),
-    gap: spacing.sm,
-    borderWidth: 0,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 3,
-  },
-  mapSearchIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapSearchIcon: {
-    fontSize: moderateScale(16),
-  },
-  mapSearchText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: moderateScale(15),
   },
   section: {
     marginTop: verticalScale(28),
@@ -1119,7 +1103,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
