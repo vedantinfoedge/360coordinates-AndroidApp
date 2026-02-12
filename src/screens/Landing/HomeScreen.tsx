@@ -494,6 +494,72 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
+
+          {/* Explore Projects Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Explore Projects</Text>
+                <Text style={styles.sectionSubtitle}>
+                  New projects from Agents & Builders
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  navigation.navigate('Search' as never, {
+                    screen: 'SearchResults',
+                    params: {
+                      query: '',
+                      location: '',
+                      listingType: 'buy',
+                      status: 'sale',
+                      project_type: 'upcoming',
+                      searchMode: 'projects',
+                    },
+                  } as never);
+                }}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            {upcomingProjects.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.propertiesList}>
+                {upcomingProjects.map((item: Property) => {
+                  const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+                  const images = item.images?.length
+                    ? (item.images.map((url: string) => fixImageUrl(url)).filter((u): u is string => Boolean(u)) as string[])
+                    : undefined;
+                  return (
+                    <View key={item.id} style={styles.carouselCard}>
+                      <PropertyCard
+                        image={imageUrl || undefined}
+                        images={images}
+                        name={item.title}
+                        location={item.location}
+                        price={formatters.price(item.price, item.status === 'rent')}
+                        type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
+                        onPress={() => handlePropertyPress(item)}
+                        onSharePress={() => handleShareProperty(item)}
+                        isFavorite={false}
+                        property={item}
+                        style={styles.carouselPropertyCard}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No Explore projects at the moment</Text>
+              </View>
+            )}
+          </View>
+
+
+
+
           {/* Explore Properties Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -585,66 +651,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             )}
           </View>
 
-          {/* Upcoming Projects Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Upcoming Projects</Text>
-                <Text style={styles.sectionSubtitle}>
-                  New projects from Agents & Builders
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  navigation.navigate('Search' as never, {
-                    screen: 'SearchResults',
-                    params: {
-                      query: '',
-                      location: '',
-                      listingType: 'buy',
-                      status: 'sale',
-                      project_type: 'upcoming',
-                    },
-                  } as never);
-                }}>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            {upcomingProjects.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.propertiesList}>
-                {upcomingProjects.map((item: Property) => {
-                  const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
-                  const images = item.images?.length
-                    ? (item.images.map((url: string) => fixImageUrl(url)).filter((u): u is string => Boolean(u)) as string[])
-                    : undefined;
-                  return (
-                    <View key={item.id} style={styles.carouselCard}>
-                      <PropertyCard
-                        image={imageUrl || undefined}
-                        images={images}
-                        name={item.title}
-                        location={item.location}
-                        price={formatters.price(item.price, item.status === 'rent')}
-                        type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-                        onPress={() => handlePropertyPress(item)}
-                        onSharePress={() => handleShareProperty(item)}
-                        isFavorite={false}
-                        property={item}
-                        style={styles.carouselPropertyCard}
-                      />
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No upcoming projects at the moment</Text>
-              </View>
-            )}
-          </View>
+
 
           {/* Buy New Home Section */}
           <View style={styles.section}>
