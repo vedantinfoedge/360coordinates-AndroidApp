@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,21 +14,22 @@ import {
   Easing,
   InteractionManager,
 } from 'react-native';
-import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {useAuth} from '../../context/AuthContext';
+import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { AgentTabParamList } from '../../components/navigation/AgentTabNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon, TabIconName } from '../../components/navigation/TabIcons';
+import { useAuth } from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
-import {sellerService, DashboardStats} from '../../services/seller.service';
-import {fixImageUrl} from '../../utils/imageHelper';
-import {formatters} from '../../utils/formatters';
+import { sellerService, DashboardStats } from '../../services/seller.service';
+import { fixImageUrl } from '../../utils/imageHelper';
+import { formatters } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
-import {getLeads, Lead} from '../../services/leadsService';
+import { getLeads, Lead } from '../../services/leadsService';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type AgentDashboardScreenNavigationProp = CompositeNavigationProp<
   BottomTabScreenProps<AgentTabParamList, 'Home'>['navigation'],
@@ -71,7 +72,7 @@ type DashboardLead = Lead;
 const AddActionButtons = React.memo(({
   onAddProperty,
   onAddProject,
-}: {onAddProperty: () => void; onAddProject: () => void}) => (
+}: { onAddProperty: () => void; onAddProject: () => void }) => (
   <View style={styles.actionButtonsRow}>
     <TouchableOpacity style={styles.addPropertyButton} onPress={onAddProperty} activeOpacity={0.9}>
       <Text style={styles.addPropertyButtonText}>+ Add Property</Text>
@@ -84,7 +85,9 @@ const AddActionButtons = React.memo(({
 
 // Animated Stat Card Component
 const AnimatedStatCard = React.memo(({
-  icon,
+  iconName,
+  iconColor = colors.primary,
+  iconBgColor = colors.surfaceSecondary,
   number,
   label,
   badge,
@@ -93,12 +96,14 @@ const AnimatedStatCard = React.memo(({
   onPress,
   delay = 0,
 }: {
-  icon: string;
+  iconName: TabIconName;
+  iconColor?: string;
+  iconBgColor?: string;
   number?: string | number;
   label: string;
   badge?: string;
   badgeColor?: string;
-  statusPills?: {sale: number; rent: number};
+  statusPills?: { sale: number; rent: number };
   onPress?: () => void;
   delay?: number;
 }) => {
@@ -147,30 +152,30 @@ const AnimatedStatCard = React.memo(({
   const CardWrapper = onPress ? TouchableOpacity : View;
   const cardProps = onPress
     ? {
-        onPress,
-        onPressIn: handlePressIn,
-        onPressOut: handlePressOut,
-        activeOpacity: 0.8,
-      }
+      onPress,
+      onPressIn: handlePressIn,
+      onPressOut: handlePressOut,
+      activeOpacity: 0.8,
+    }
     : {};
 
   return (
     <Animated.View
       style={[
-        {opacity: cardAnim, transform: [{scale: scaleAnim}]},
-        {width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2},
+        { opacity: cardAnim, transform: [{ scale: scaleAnim }] },
+        { width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2 },
       ]}>
       <CardWrapper style={styles.statCard} {...cardProps}>
-        <View style={styles.statCardIcon}>
-          <Text style={styles.statIcon}>{icon}</Text>
+        <View style={[styles.statCardIcon, { backgroundColor: iconBgColor }]}>
+          <TabIcon name={iconName} color={iconColor} size={24} />
         </View>
         {number !== undefined && (
           <Text style={styles.statNumber}>{number}</Text>
         )}
         <Text style={styles.statLabel}>{label}</Text>
         {badge && (
-          <View style={[styles.activeBadge, badgeColor && {backgroundColor: badgeColor}]}>
-            <Text style={[styles.activeBadgeText, {color: getBadgeTextColor()}]}>{badge}</Text>
+          <View style={[styles.activeBadge, badgeColor && { backgroundColor: badgeColor }]}>
+            <Text style={[styles.activeBadgeText, { color: getBadgeTextColor() }]}>{badge}</Text>
           </View>
         )}
         {statusPills && (
@@ -190,13 +195,13 @@ const AnimatedStatCard = React.memo(({
 
 // Animated Quick Action Card
 const AnimatedQuickActionCard = React.memo(({
-  icon,
+  iconName,
   title,
   description,
   onPress,
   delay = 0,
 }: {
-  icon: string;
+  iconName: TabIconName;
   title: string;
   description: string;
   onPress: () => void;
@@ -236,7 +241,7 @@ const AnimatedQuickActionCard = React.memo(({
       style={[
         {
           opacity: cardAnim,
-          transform: [{scale: scaleAnim}],
+          transform: [{ scale: scaleAnim }],
           width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2,
         },
       ]}>
@@ -245,9 +250,9 @@ const AnimatedQuickActionCard = React.memo(({
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        activeOpacity={0.8}>
+        activeOpacity={0.9}>
         <View style={styles.quickActionIconContainer}>
-          <Text style={styles.quickActionIcon}>{icon}</Text>
+          <TabIcon name={iconName} color={colors.primary} size={20} />
         </View>
         <Text style={styles.quickActionTitle}>{title}</Text>
         <Text style={styles.quickActionDescription}>{description}</Text>
@@ -257,7 +262,7 @@ const AnimatedQuickActionCard = React.memo(({
 });
 
 // Animated See All Button
-const AnimatedSeeAllButton = React.memo(({onPress, children}: {
+const AnimatedSeeAllButton = React.memo(({ onPress, children }: {
   onPress: () => void;
   children: React.ReactNode;
 }) => {
@@ -280,7 +285,7 @@ const AnimatedSeeAllButton = React.memo(({onPress, children}: {
   };
 
   return (
-    <Animated.View style={{transform: [{scale: scaleAnim}]}}>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
         style={styles.seeAllButton}
         onPress={onPress}
@@ -336,18 +341,18 @@ const AnimatedInquiryCard = React.memo(({
     <Animated.View
       style={{
         opacity: cardAnim,
-        transform: [{scale: scaleAnim}],
+        transform: [{ scale: scaleAnim }],
       }}>
       <TouchableOpacity
         style={styles.inquiryCard}
-        onPress={() => navigation.getParent()?.navigate('Inquiries' as never, {inquiryId: item.id} as never)}
+        onPress={() => navigation.getParent()?.navigate('Inquiries' as never, { inquiryId: item.id } as never)}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.8}>
         <View style={styles.inquiryCardHeader}>
           {item.buyer_profile_image ? (
             <Image
-              source={{uri: fixImageUrl(item.buyer_profile_image)}}
+              source={{ uri: fixImageUrl(item.buyer_profile_image) }}
               style={styles.inquiryAvatar}
             />
           ) : (
@@ -388,7 +393,7 @@ const AnimatedPropertyCard = React.memo(({
   navigation: AgentDashboardScreenNavigationProp;
 }) => {
   let imageUrl: string | null = null;
-  
+
   if (item.cover_image) {
     const trimmed = String(item.cover_image).trim();
     if (trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') {
@@ -408,7 +413,7 @@ const AnimatedPropertyCard = React.memo(({
       }
     }
   }
-  
+
   const cardAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const [hasImageError, setHasImageError] = useState(false);
@@ -443,24 +448,24 @@ const AnimatedPropertyCard = React.memo(({
     <Animated.View
       style={{
         opacity: cardAnim,
-        transform: [{scale: scaleAnim}],
+        transform: [{ scale: scaleAnim }],
       }}>
-      <TouchableOpacity 
-        style={styles.propertyCard} 
-        onPress={() => (navigation.getParent() as any)?.navigate(item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails', {propertyId: String(item.id)})}
+      <TouchableOpacity
+        style={styles.propertyCard}
+        onPress={() => (navigation.getParent() as any)?.navigate(item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails', { propertyId: String(item.id) })}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.9}>
         {imageUrl && !hasImageError ? (
           <Image
-            source={{uri: imageUrl}}
+            source={{ uri: imageUrl }}
             style={styles.propertyImage}
             resizeMode="cover"
             onError={() => setHasImageError(true)}
           />
         ) : (
           <View style={styles.propertyImagePlaceholder}>
-            <Text style={styles.propertyImagePlaceholderText}>🏠</Text>
+            <TabIcon name="image" color={colors.textSecondary} size={44} />
           </View>
         )}
         <View style={styles.propertyCardContent}>
@@ -501,15 +506,15 @@ const AnimatedPropertyCard = React.memo(({
           <View style={styles.propertyCardStats}>
             <View style={styles.propertyStatItem}>
               <View style={styles.propertyStatIconContainer}>
-                <Text style={styles.propertyStatIcon}>👁</Text>
+                <TabIcon name="eye" color={colors.primary} size={14} />
               </View>
               <Text style={styles.propertyStatText}>
-                {item.views} people interested
+                {item.views} interested
               </Text>
             </View>
             <View style={styles.propertyStatItem}>
               <View style={styles.propertyStatIconContainer}>
-                <Text style={styles.propertyStatIcon}>💬</Text>
+                <TabIcon name="inquiries" color={colors.primary} size={14} />
               </View>
               <Text style={styles.propertyStatText}>
                 {item.inquiries} inquiries
@@ -525,8 +530,8 @@ const AnimatedPropertyCard = React.memo(({
   );
 });
 
-const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout} = useAuth();
+const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
+  const { user, logout } = useAuth();
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
@@ -537,14 +542,14 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Performance optimization
   const lastFetchTimeRef = useRef<number>(0);
   const isFetchingRef = useRef<boolean>(false);
   const hasAnimatedRef = useRef<boolean>(false);
   const welcomeShownRef = useRef<boolean>(false);
   const CACHE_DURATION = 30000;
-  
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -581,20 +586,20 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
   const loadDashboardData = useCallback(async (showLoading: boolean = true, forceRefresh: boolean = false) => {
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchTimeRef.current;
-    
+
     if (isFetchingRef.current) return;
-    
+
     if (!forceRefresh && timeSinceLastFetch < CACHE_DURATION && dashboardStats) {
       return;
     }
-    
+
     isFetchingRef.current = true;
-    
+
     try {
       if (showLoading) setLoading(true);
-      
+
       let apiStats: DashboardStats | null = null;
-      
+
       try {
         const statsResponse: any = await sellerService.getDashboardStats();
         if (statsResponse && statsResponse.success && statsResponse.data) {
@@ -643,29 +648,29 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
 
       if (propertiesResponse && propertiesResponse.success && propertiesResponse.data) {
         const properties = propertiesResponse.data.properties || propertiesResponse.data || [];
-        
+
         setAllProperties(properties);
-        
+
         const totalProperties = properties.length;
         const activeProperties = properties.filter((prop: any) => {
-          const isActive = prop.is_active === 1 || prop.is_active === true || 
-                          prop.status === 'active' || prop.status === 1;
+          const isActive = prop.is_active === 1 || prop.is_active === true ||
+            prop.status === 'active' || prop.status === 1;
           return isActive;
         }).length;
-        
+
         const totalViews = properties.reduce((sum: number, prop: any) => {
           return sum + (prop.views_count || prop.views || prop.view_count || 0);
         }, 0);
-        
+
         const totalInquiries = properties.reduce((sum: number, prop: any) => {
           return sum + (prop.inquiry_count || prop.inquiries || prop.inquiry_count || 0);
         }, 0);
-        
+
         const propertiesByStatus = {
           sale: properties.filter((prop: any) => prop.status === 'sale' || prop.status === 'sell').length,
           rent: properties.filter((prop: any) => prop.status === 'rent').length,
         };
-        
+
         const finalStats: DashboardStats = apiStats ? {
           ...apiStats,
           total_properties: totalProperties,
@@ -684,9 +689,9 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
           recent_inquiries: [],
           subscription: null,
         };
-        
+
         setDashboardStats(finalStats);
-        
+
         const formattedProperties: RecentProperty[] = properties.slice(0, 3).map((prop: any) => ({
           id: prop.id || prop.property_id,
           title: prop.title || prop.property_title || 'Untitled Property',
@@ -731,7 +736,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
       const task = InteractionManager.runAfterInteractions(() => {
         loadDashboardData(true, true);
       });
-      
+
       refreshIntervalRef.current = setInterval(() => {
         loadDashboardData(false, true);
       }, 60000);
@@ -768,7 +773,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         <AgentHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
-        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
+          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -790,7 +795,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
         <AgentHeader
           onProfilePress={() => navigation.navigate('Profile')}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
-        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
+          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={async () => {
             await logout();
           }}
@@ -810,7 +815,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
     new_inquiries: 0,
     total_views: 0,
     views_percentage_change: 0,
-    properties_by_status: {sale: 0, rent: 0},
+    properties_by_status: { sale: 0, rent: 0 },
     recent_inquiries: [],
   };
 
@@ -839,14 +844,14 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true}
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
         )}
         scrollEventThrottle={16}>
         <Animated.View
           style={{
             opacity: fadeAnim,
-            transform: [{translateY: slideAnim}],
+            transform: [{ translateY: slideAnim }],
           }}>
           {/* Agent Header Box */}
           <View style={styles.agentHeaderContainer}>
@@ -867,52 +872,50 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
           </View>
 
           {/* Statistics Cards (2x2 Grid) with Animations */}
-          <Animated.View 
+          <Animated.View
             style={[
               styles.statsGrid,
-              {opacity: statsAnim},
+              { opacity: statsAnim },
             ]}>
             <AnimatedStatCard
-              icon="🏠"
-              number={stats.total_properties}
-              label="Total Properties"
-              badge={`${stats.active_properties} Active`}
-              badgeColor="#D1FAE5"
+              iconName="building"
+              number={dashboardStats?.active_properties || 0}
+              label="Active Properties"
+              iconBgColor="#E0F2FE"
+              iconColor="#0284C7"
               onPress={() => navigation.navigate('Listings')}
               delay={0}
             />
-
             <AnimatedStatCard
-              icon="👁"
-              number={formatters.formatNumber(stats.total_views)}
-              label="Views"
-              badge={stats.views_percentage_change > 0 
-                ? `+${stats.views_percentage_change}%` 
-                : stats.views_percentage_change < 0 
-                ? `${stats.views_percentage_change}%` 
-                : 'Active'}
-              badgeColor={stats.views_percentage_change > 0 ? '#D1FAE5' : stats.views_percentage_change < 0 ? '#FEE2E2' : '#E3F6FF'}
+              iconName="eye"
+              number={formatters.number(dashboardStats?.total_views || 0)}
+              label="Total Views"
+              iconBgColor="#FEF3C7"
+              iconColor="#D97706"
               delay={100}
             />
-
             <AnimatedStatCard
-              icon="💬"
+              iconName="leads"
               number={leadsCount}
               label="Total Leads"
-              badge={newLeadsCount > 0 ? `${newLeadsCount} New` : 'No New'}
-              badgeColor={newLeadsCount > 0 ? '#FEE2E2' : '#F3F4F6'}
-              onPress={() => (navigation as any).navigate('Leads')}
+              badge={newLeadsCount > 0 ? `+${newLeadsCount} New` : undefined}
+              badgeColor="#FEE2E2"
+              iconBgColor="#DCFCE7"
+              iconColor="#16A34A"
+              onPress={() => navigation.navigate('Leads')}
               delay={200}
             />
-
             <AnimatedStatCard
-              icon="📊"
-              number={stats.properties_by_status.sale + stats.properties_by_status.rent}
-              label="Listing Status"
+              iconName="inquiries"
+              number={dashboardStats?.total_inquiries || 0}
+              label="Total Inquiries"
+              iconBgColor="#F3E8FF"
+              iconColor="#7C3AED"
               statusPills={{
-                sale: stats.properties_by_status.sale,
-                rent: stats.properties_by_status.rent,
+                sale: dashboardStats?.properties_by_status?.sale || 0,
+                rent: dashboardStats?.properties_by_status?.rent || 0,
               }}
+              onPress={() => navigation.navigate('Chat', { screen: 'ChatList' })}
               delay={300}
             />
           </Animated.View>
@@ -920,7 +923,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
           {/* Quick Actions Grid (2x2) with Animations */}
           <View style={styles.quickActionsGrid}>
             <AnimatedQuickActionCard
-              icon="➕"
+              iconName="plus"
               title="Add New Property"
               description="List a new property for sale or rent"
               onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
@@ -928,7 +931,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
             />
 
             <AnimatedQuickActionCard
-              icon="✏"
+              iconName="list"
               title="Manage Properties"
               description="Edit, update or remove listings"
               onPress={() => navigation.navigate('Listings')}
@@ -936,7 +939,7 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
             />
 
             <AnimatedQuickActionCard
-              icon="💬"
+              iconName="leads"
               title="View Leads"
               description="See buyers who viewed contact"
               onPress={() => (navigation as any).navigate('Leads')}
@@ -944,114 +947,115 @@ const AgentDashboardScreen: React.FC<Props> = ({navigation}) => {
             />
 
             <AnimatedQuickActionCard
-              icon="🧾"
+              iconName="inquiries"
               title="View Inquiries"
               description="Respond to buyer inquiries"
-              onPress={() => navigation.getParent()?.navigate('Inquiries' as never)}
+              onPress={() => navigation.navigate('Chat', { screen: 'ChatList' })}
               delay={300}
             />
           </View>
+        </Animated.View>
 
-          {/* Recent Properties Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <View style={styles.sectionIconContainer}>
-                  <Text style={styles.sectionIcon}>🏠</Text>
-                </View>
-                <Text style={styles.sectionTitle}>Your Properties</Text>
+        {/* Recent Properties Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderLeft}>
+              <View style={styles.sectionIconContainer}>
+                <Text style={styles.sectionIcon}>🏠</Text>
               </View>
-              <AnimatedSeeAllButton
-                onPress={() => navigation.navigate('Listings')}>
-                <Text style={styles.viewAllText}>View All</Text>
-                <Text style={styles.viewAllArrow}>›</Text>
-              </AnimatedSeeAllButton>
+              <Text style={styles.sectionTitle}>Your Properties</Text>
             </View>
-            {recentProperties.length > 0 ? (
-              <FlatList
-                data={recentProperties}
-                renderItem={({item, index}: {item: RecentProperty; index: number}) => (
-                  <AnimatedPropertyCard item={item} index={index} navigation={navigation} />
-                )}
-                keyExtractor={(item: RecentProperty) => String(item.id)}
-                scrollEnabled={false}
-                showsVerticalScrollIndicator={false}
-              />
-            ) : (
-              <View style={styles.emptyState}>
-                <View style={styles.emptyStateIconContainer}>
-                  <Text style={styles.emptyStateIcon}>🏠</Text>
-                </View>
-                <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
-                <Text style={styles.emptyStateText}>
-                  Start by adding your first property to get started
-                </Text>
-                <TouchableOpacity
-                  style={styles.emptyStateButton}
-                  onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
-                  activeOpacity={0.8}>
-                  <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <AnimatedSeeAllButton
+              onPress={() => navigation.navigate('Listings')}>
+              <Text style={styles.viewAllText}>View All</Text>
+              <Text style={styles.viewAllArrow}>›</Text>
+            </AnimatedSeeAllButton>
           </View>
-
-          {/* Recent Leads Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <View style={styles.sectionIconContainer}>
-                  <Text style={styles.sectionIcon}>📋</Text>
-                </View>
-                <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionTitle}>Recent Leads</Text>
-                  {newLeadsCount > 0 && (
-                    <View style={styles.sectionBadge}>
-                      <Text style={styles.sectionBadgeText}>
-                        {newLeadsCount} New
-                      </Text>
-                    </View>
-                  )}
-                </View>
+          {recentProperties.length > 0 ? (
+            <FlatList
+              data={recentProperties}
+              renderItem={({ item, index }: { item: RecentProperty; index: number }) => (
+                <AnimatedPropertyCard item={item} index={index} navigation={navigation} />
+              )}
+              keyExtractor={(item: RecentProperty) => String(item.id)}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyStateIconContainer}>
+                <Text style={styles.emptyStateIcon}>🏠</Text>
               </View>
-              <AnimatedSeeAllButton onPress={() => (navigation as any).navigate('Leads')}>
-                <Text style={styles.viewAllText}>View All</Text>
-                <Text style={styles.viewAllArrow}>›</Text>
-              </AnimatedSeeAllButton>
+              <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
+              <Text style={styles.emptyStateText}>
+                Start by adding your first property to get started
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyStateButton}
+                onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
+                activeOpacity={0.8}>
+                <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
+              </TouchableOpacity>
             </View>
+          )}
+        </View>
 
-            {recentLeads.length > 0 ? (
-              <View>
-                {recentLeads.map((lead, idx) => (
-                  <View key={`${lead.created_at}-${idx}`} style={styles.inquiryCard}>
-                    <Text style={styles.inquiryBuyerName} numberOfLines={1}>
-                      {lead.buyer_name || 'Buyer'}
-                    </Text>
-                    <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
-                      {lead.property_title || '—'}
-                    </Text>
-                    <Text style={styles.inquiryTime}>
-                      {lead.created_at ? formatters.timeAgo(lead.created_at) : ''}
+        {/* Recent Leads Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderLeft}>
+              <View style={styles.sectionIconContainer}>
+                <Text style={styles.sectionIcon}>📋</Text>
+              </View>
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.sectionTitle}>Recent Leads</Text>
+                {newLeadsCount > 0 && (
+                  <View style={styles.sectionBadge}>
+                    <Text style={styles.sectionBadgeText}>
+                      {newLeadsCount} New
                     </Text>
                   </View>
-                ))}
+                )}
               </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <View style={styles.emptyStateIconContainer}>
-                  <Text style={styles.emptyStateIcon}>📋</Text>
-                </View>
-                <Text style={styles.emptyStateTitle}>No Leads Yet</Text>
-                <Text style={styles.emptyStateText}>
-                  When buyers click "View Contact" on your listings, they will appear here.
-                </Text>
-              </View>
-            )}
+            </View>
+            <AnimatedSeeAllButton onPress={() => (navigation as any).navigate('Leads')}>
+              <Text style={styles.viewAllText}>View All</Text>
+              <Text style={styles.viewAllArrow}>›</Text>
+            </AnimatedSeeAllButton>
           </View>
 
-        </Animated.View>
-      </Animated.ScrollView>
-    </View>
+          {recentLeads.length > 0 ? (
+            <View>
+              {recentLeads.map((lead, idx) => (
+                <View key={`${lead.created_at}-${idx}`} style={styles.inquiryCard}>
+                  <Text style={styles.inquiryBuyerName} numberOfLines={1}>
+                    {lead.buyer_name || 'Buyer'}
+                  </Text>
+                  <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
+                    {lead.property_title || '—'}
+                  </Text>
+                  <Text style={styles.inquiryTime}>
+                    {lead.created_at ? formatters.timeAgo(lead.created_at) : ''}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyStateIconContainer}>
+                <Text style={styles.emptyStateIcon}>📋</Text>
+              </View>
+              <Text style={styles.emptyStateTitle}>No Leads Yet</Text>
+              <Text style={styles.emptyStateText}>
+                When buyers click "View Contact" on your listings, they will appear here.
+              </Text>
+            </View>
+          )}
+        </View>
+
+      </Animated.View>
+    </Animated.ScrollView>
+    </View >
   );
 };
 
@@ -1102,7 +1106,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 6},
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
@@ -1116,7 +1120,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
@@ -1150,7 +1154,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 4,
@@ -1176,7 +1180,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: 4,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
@@ -1258,7 +1262,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
@@ -1369,7 +1373,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
@@ -1507,7 +1511,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
@@ -1611,7 +1615,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: 10,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,

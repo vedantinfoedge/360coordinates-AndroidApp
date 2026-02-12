@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,19 +12,21 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
-import {CompositeNavigationProp} from '@react-navigation/native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {useAuth} from '../../context/AuthContext';
+import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType } from 'react-native-image-picker';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { AgentTabParamList } from '../../components/navigation/AgentTabNavigator';
+import { colors, typography, spacing } from '../../theme';
+import { moderateScale } from '../../utils/responsive';
+import { TabIcon } from '../../components/navigation/TabIcons';
+import { useAuth } from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
-import {userService} from '../../services/user.service';
-import {sellerService} from '../../services/seller.service';
-import {fixImageUrl} from '../../utils/imageHelper';
-import {formatters} from '../../utils/formatters';
+import { userService } from '../../services/user.service';
+import { sellerService } from '../../services/seller.service';
+import { fixImageUrl } from '../../utils/imageHelper';
+import { formatters } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
@@ -36,8 +38,8 @@ type Props = {
   navigation: ProfileScreenNavigationProp;
 };
 
-const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, setUser} = useAuth();
+const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
+  const { user, logout, setUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -58,7 +60,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
     website: '',
   });
 
-  const [originalData, setOriginalData] = useState({...formData});
+  const [originalData, setOriginalData] = useState({ ...formData });
 
   // Load profile data on mount
   useEffect(() => {
@@ -106,7 +108,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
       if (response && response.success && response.data) {
         const profile = response.data.profile || response.data;
         const userData = response.data.user || user;
-        
+
         setFormData({
           full_name: profile.full_name || userData?.full_name || '',
           email: userData?.email || user?.email || '',
@@ -143,19 +145,19 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleEdit = () => {
-    setOriginalData({...formData});
+    setOriginalData({ ...formData });
     setIsEditing(true);
   };
 
   const handleCancel = () => {
-    setFormData({...originalData});
+    setFormData({ ...originalData });
     setIsEditing(false);
   };
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      
+
       // Validation: full_name (2-50 chars, letters/spaces only)
       const fullName = formData.full_name?.trim() || '';
       if (fullName && (fullName.length < 2 || fullName.length > 50)) {
@@ -168,7 +170,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         setSaving(false);
         return;
       }
-      
+
       // Validation: company_name (2-100 chars, optional for agents)
       const companyName = formData.company_name?.trim() || '';
       if (companyName && (companyName.length < 2 || companyName.length > 100)) {
@@ -176,7 +178,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         setSaving(false);
         return;
       }
-      
+
       // Validation: address (max 500 chars)
       const address = formData.address?.trim() || '';
       if (address && address.length > 500) {
@@ -184,7 +186,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         setSaving(false);
         return;
       }
-      
+
       // Validation: website URL format
       const website = formData.website?.trim() || '';
       if (website && !formatters.validateWebsiteUrl(website)) {
@@ -192,7 +194,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         setSaving(false);
         return;
       }
-      
+
       // Normalize phone numbers: extract digits only, validate 10-15 digits
       const whatsappNumber = formData.whatsapp_number?.trim() || '';
       const normalizedWhatsApp = formatters.normalizePhoneNumber(whatsappNumber);
@@ -201,7 +203,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         setSaving(false);
         return;
       }
-      
+
       const alternateMobile = formData.alternate_mobile?.trim() || '';
       const normalizedAlternate = formatters.normalizePhoneNumber(alternateMobile);
       if (alternateMobile && !formatters.validatePhoneNumber(alternateMobile)) {
@@ -209,7 +211,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         setSaving(false);
         return;
       }
-      
+
       // Build payload to match website seller profile update API
       // Method: PUT /seller/profile/update.php
       // Fields: full_name, address, company_name, license_number, website, gst_number (optional)
@@ -234,7 +236,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
 
       if (response && response.success) {
         CustomAlert.alert('Success', 'Profile updated successfully');
-        setOriginalData({...formData});
+        setOriginalData({ ...formData });
         setIsEditing(false);
         // Reload profile to get updated data
         await loadProfile();
@@ -332,14 +334,14 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
           ? raw
           : null;
     if (!parsed || isNaN(parsed.getTime())) return null;
-    return parsed.toLocaleDateString('en-IN', {month: 'short', year: 'numeric'});
+    return parsed.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
   })();
 
   if (loading) {
     return (
       <View style={styles.container}>
         <AgentHeader
-          onProfilePress={() => {}}
+          onProfilePress={() => { }}
           onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
           onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
           onLogoutPress={handleLogout}
@@ -366,14 +368,18 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 style={styles.imagePickerOption}
                 onPress={() => handleImagePicker('camera')}
                 activeOpacity={0.7}>
-                <Text style={styles.imagePickerOptionIcon}>📷</Text>
+                <View style={styles.imagePickerIconContainer}>
+                  <TabIcon name="camera" color={colors.primary} size={32} />
+                </View>
                 <Text style={styles.imagePickerOptionText}>Camera</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.imagePickerOption}
                 onPress={() => handleImagePicker('gallery')}
                 activeOpacity={0.7}>
-                <Text style={styles.imagePickerOptionIcon}>🖼️</Text>
+                <View style={styles.imagePickerIconContainer}>
+                  <TabIcon name="image" color={colors.primary} size={32} />
+                </View>
                 <Text style={styles.imagePickerOptionText}>Gallery</Text>
               </TouchableOpacity>
             </View>
@@ -388,33 +394,33 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
       </Modal>
 
       <AgentHeader
-        onProfilePress={() => {}}
+        onProfilePress={() => { }}
         onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
         onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
         onLogoutPress={handleLogout}
         scrollY={scrollY}
       />
 
-      <Animated.ScrollView 
-        style={styles.scrollView} 
+      <Animated.ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         contentInsetAdjustmentBehavior="never"
         onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true}
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
         )}
         scrollEventThrottle={16}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             {profileImage ? (
-              <Image source={{uri: profileImage}} style={styles.avatarImage} />
+              <Image source={{ uri: profileImage }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{getInitials(formData.full_name || 'Agent')}</Text>
               </View>
             )}
             <TouchableOpacity style={styles.editPhotoButton} onPress={showImagePicker}>
-              <Text style={styles.editPhotoText}>📷</Text>
+              <TabIcon name="camera" color={colors.surface} size={18} />
             </TouchableOpacity>
           </View>
           <Text style={styles.profileName}>{formData.full_name || 'Agent'}</Text>
@@ -458,7 +464,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.full_name}
-                  onChangeText={(text: string) => setFormData({...formData, full_name: text})}
+                  onChangeText={(text: string) => setFormData({ ...formData, full_name: text })}
                   placeholder="Enter your full name"
                 />
               ) : (
@@ -494,7 +500,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.whatsapp_number}
-                  onChangeText={(text: string) => setFormData({...formData, whatsapp_number: text})}
+                  onChangeText={(text: string) => setFormData({ ...formData, whatsapp_number: text })}
                   placeholder="Enter WhatsApp number"
                   keyboardType="phone-pad"
                 />
@@ -509,7 +515,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.alternate_mobile}
-                  onChangeText={(text: string) => setFormData({...formData, alternate_mobile: text})}
+                  onChangeText={(text: string) => setFormData({ ...formData, alternate_mobile: text })}
                   placeholder="Enter alternate mobile number"
                   keyboardType="phone-pad"
                 />
@@ -524,7 +530,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={formData.address}
-                  onChangeText={(text: string) => setFormData({...formData, address: text})}
+                  onChangeText={(text: string) => setFormData({ ...formData, address: text })}
                   placeholder="Enter your address"
                   multiline
                   numberOfLines={3}
@@ -546,7 +552,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.company_name}
-                  onChangeText={(text: string) => setFormData({...formData, company_name: text})}
+                  onChangeText={(text: string) => setFormData({ ...formData, company_name: text })}
                   placeholder="Enter company name"
                 />
               ) : (
@@ -560,7 +566,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.license_number}
-                  onChangeText={(text: string) => setFormData({...formData, license_number: text})}
+                  onChangeText={(text: string) => setFormData({ ...formData, license_number: text })}
                   placeholder="Enter RERA id"
                 />
               ) : (
@@ -574,7 +580,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.gst_number}
-                  onChangeText={(text: string) => setFormData({...formData, gst_number: text})}
+                  onChangeText={(text: string) => setFormData({ ...formData, gst_number: text })}
                   placeholder="Enter GST number"
                 />
               ) : (
@@ -588,7 +594,7 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
                 <TextInput
                   style={styles.input}
                   value={formData.website}
-                  onChangeText={(text: string) => setFormData({...formData, website: text})}
+                  onChangeText={(text: string) => setFormData({ ...formData, website: text })}
                   placeholder="Enter website URL"
                   keyboardType="url"
                   autoCapitalize="none"
@@ -604,10 +610,12 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => (navigation as any).navigate('Chat', {screen: 'ChatList'})}>
-            <Text style={styles.menuIcon}>💬</Text>
+            onPress={() => (navigation as any).navigate('Chat', { screen: 'ChatList' })}>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <TabIcon name="inquiries" color="#0284C7" size={20} />
+            </View>
             <Text style={styles.menuText}>My Inquiries</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
@@ -615,9 +623,11 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => navigation.getParent()?.navigate('Subscription' as never)}>
-            <Text style={styles.menuIcon}>💎</Text>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <TabIcon name="subscription" color="#D97706" size={20} />
+            </View>
             <Text style={styles.menuText}>Subscription</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
@@ -625,17 +635,21 @@ const AgentProfileScreen: React.FC<Props> = ({navigation}) => {
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => navigation.getParent()?.navigate('Support' as never)}>
-            <Text style={styles.menuIcon}>🆘</Text>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#DCFCE7' }]}>
+              <TabIcon name="support" color="#16A34A" size={20} />
+            </View>
             <Text style={styles.menuText}>Support</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-            <Text style={styles.menuIcon}>🚪</Text>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#FEE2E2' }]}>
+              <TabIcon name="logout" color="#DC2626" size={20} />
+            </View>
             <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
         </View>
       </Animated.ScrollView>
@@ -670,7 +684,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginHorizontal: spacing.md,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
@@ -748,8 +762,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.primary,
   },
-  imagePickerOptionIcon: {
-    fontSize: 32,
+  imagePickerIconContainer: {
     marginBottom: spacing.sm,
   },
   imagePickerOptionText: {
@@ -788,7 +801,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: borderRadius.md,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
@@ -802,7 +815,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.h3,
     color: colors.text,
-    fontWeight: '700',
+    fontWeight: '600',
+    fontSize: moderateScale(16),
   },
   editButtonText: {
     ...typography.body,
@@ -814,22 +828,20 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   cancelButton: {
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   cancelButtonText: {
     ...typography.body,
     color: colors.textSecondary,
-    fontWeight: '600',
   },
   saveButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
     minWidth: 60,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   saveButtonText: {
     ...typography.body,
@@ -837,65 +849,64 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   form: {
-    marginTop: spacing.md,
+    gap: spacing.md,
   },
   inputGroup: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
   label: {
     ...typography.caption,
     color: colors.textSecondary,
     marginBottom: spacing.xs,
-    fontWeight: '600',
   },
   input: {
-    ...typography.body,
-    backgroundColor: colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+    ...typography.body,
     color: colors.text,
+    backgroundColor: colors.surface,
   },
   inputLocked: {
     backgroundColor: colors.surfaceSecondary,
-    opacity: 0.5,
+    color: colors.textSecondary,
+    borderColor: 'transparent',
   },
   lockedText: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: spacing.xs,
+    marginTop: 2,
+    fontSize: 10,
     fontStyle: 'italic',
   },
   value: {
     ...typography.body,
     color: colors.text,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
+    minHeight: 24,
   },
   textArea: {
     minHeight: 80,
-    textAlignVertical: 'top',
   },
   subsectionHeader: {
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     marginBottom: spacing.md,
-    paddingTop: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    paddingTop: spacing.lg,
   },
   subsectionTitle: {
-    ...typography.h3,
+    ...typography.bodySemibold,
     color: colors.text,
-    fontWeight: '700',
-    fontSize: 16,
+    fontSize: moderateScale(15),
   },
   menuSection: {
     backgroundColor: colors.surface,
     marginBottom: spacing.xl,
     borderRadius: borderRadius.md,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
