@@ -1,4 +1,4 @@
-import React, {useState, useRef} from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,18 @@ import {
   Linking,
   Platform,
   Animated,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CompositeNavigationProp} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
+import functions from '@react-native-firebase/functions';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { BuyerStackParamList } from '../../navigation/BuyerNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
 import BuyerHeader from '../../components/BuyerHeader';
-import {useAuth} from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 type SupportScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<BuyerStackParamList>,
@@ -79,15 +82,16 @@ const faqs = [
   },
 ];
 
-const SupportScreen: React.FC<Props> = ({navigation}) => {
+const SupportScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
-  const {logout, user, isAuthenticated} = useAuth();
+  const { logout, user, isAuthenticated } = useAuth();
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
-  
+
   // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
   const isGuest = !isLoggedIn;
+  const [loading, setLoading] = useState(false);
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -100,7 +104,7 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
     const subject = 'Support Query';
     const body = '';
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url).catch(err => console.error('Error opening email:', err));
+    Linking.openURL(url).catch((err: any) => console.error('Error opening email:', err));
   };
 
   const handlePhonePress = () => {
@@ -115,24 +119,35 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
       android: `geo:0,0?q=${encodeURIComponent(address)}`,
     });
     if (url) {
-      Linking.openURL(url).catch(err =>
+      Linking.openURL(url).catch((err: any) =>
         console.error('Error opening maps:', err),
       );
     }
   };
 
-  const handleSubmitContact = () => {
+  const handleSubmitContact = async () => {
     if (!contactForm.name || !contactForm.email || !contactForm.message) {
+      Alert.alert('Error', 'Please fill in all required fields (Name, Email, Message).');
       return;
     }
-    // In real app, send to backend
-    const email = 'info@360coordinates.com';
-    const subject = contactForm.subject || 'Contact Form Query';
-    const body = `Name: ${contactForm.name}\nEmail: ${contactForm.email}\n\nMessage:\n${contactForm.message}`;
-    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url).catch(err => console.error('Error opening email:', err));
-    // Reset form
-    setContactForm({name: '', email: '', subject: '', message: ''});
+
+    setLoading(true);
+    try {
+      const result = await functions().httpsCallable('sendContactEmail')(contactForm);
+      const data = result.data as { success: boolean; message: string };
+
+      if (data.success) {
+        Alert.alert('Success', 'Your message has been sent successfully!');
+        setContactForm({ name: '', email: '', subject: '', message: '' });
+      } else {
+        throw new Error(data.message || 'Failed to send message.');
+      }
+    } catch (error: any) {
+      console.error('Contact Form Error:', error);
+      Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -145,12 +160,12 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={
           isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
             : undefined
         }
         onSignUpPress={
           isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
             : undefined
         }
         showLogout={isLoggedIn}
@@ -163,10 +178,10 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
       <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, {paddingTop: spacing.md}]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: spacing.md }]}
         onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true},
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true },
         )}
         scrollEventThrottle={16}>
         {/* Contact Information Section */}
@@ -243,8 +258,8 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter your name"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.name}
-                onChangeText={text =>
-                  setContactForm({...contactForm, name: text})
+                onChangeText={(text: string) =>
+                  setContactForm({ ...contactForm, name: text })
                 }
               />
             </View>
@@ -256,8 +271,8 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter your email"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.email}
-                onChangeText={text =>
-                  setContactForm({...contactForm, email: text})
+                onChangeText={(text: string) =>
+                  setContactForm({ ...contactForm, email: text })
                 }
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -271,8 +286,8 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter subject"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.subject}
-                onChangeText={text =>
-                  setContactForm({...contactForm, subject: text})
+                onChangeText={(text: string) =>
+                  setContactForm({ ...contactForm, subject: text })
                 }
               />
             </View>
@@ -284,8 +299,8 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter your message"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.message}
-                onChangeText={text =>
-                  setContactForm({...contactForm, message: text})
+                onChangeText={(text: string) =>
+                  setContactForm({ ...contactForm, message: text })
                 }
                 multiline
                 numberOfLines={5}
@@ -294,9 +309,14 @@ const SupportScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleSubmitContact}>
-              <Text style={styles.submitButtonText}>Send Message</Text>
+              style={[styles.submitButton, loading && { opacity: 0.7 }]}
+              onPress={handleSubmitContact}
+              disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <Text style={styles.submitButtonText}>Send Message</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
