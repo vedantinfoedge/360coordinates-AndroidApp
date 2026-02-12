@@ -785,6 +785,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                     location: '',
                     listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent',
                     status: listingType === 'sale' ? 'sale' : 'rent',
+                    searchMode: 'properties', // Explicitly set search mode to properties
                   };
 
                   // Navigate directly to SearchResults screen
