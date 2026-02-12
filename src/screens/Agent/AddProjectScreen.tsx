@@ -19,7 +19,7 @@ import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
-import {uploadPropertyImageWithModeration} from '../../services/imageUpload.service';
+import {uploadPropertyImageWithModeration, moderateFirebaseUrlForProperty} from '../../services/imageUpload.service';
 import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
 import {isFirebaseStorageAvailable} from '../../services/firebaseStorageProperty.service';
 import LocationPicker from '../../components/map/LocationPicker';
@@ -615,6 +615,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       const formattedBookingAmount = bookingAmount ? formatPriceInput(bookingAmount) : null;
       const parsedArea = parseFloat(area.replace(/[^0-9.]/g, ''));
 
+      // ── Build property payload WITHOUT images ──
       const propertyData: any = {
         title: projectName.trim(),
         property_type: projectType,
@@ -631,7 +632,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         price: formattedStartingPrice,
         // Backend expects amenities as an array (not a comma-separated string)
         amenities: selectedAmenities,
-        images: approvedImages,
+        // NOTE: images intentionally omitted – they are added in Step 3
         // Store upcoming-project-only fields inside upcoming_project_data (backend persists this JSON)
         upcoming_project_data: {
           project_status: projectStatus,
@@ -667,38 +668,70 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
         },
       };
 
-      console.log('[Agent AddProject] Submitting project:', propertyData);
+      // ── Step 1: Create property WITHOUT images → get property_id ──
+      console.log('[Agent AddProject] Step 1: Creating property (without images)…');
+      const createResponse: any = await propertyService.createProperty(propertyData, 'agent');
 
-      const response: any = await propertyService.createProperty(propertyData, 'agent');
-      
-      if (response && response.success) {
-        Alert.alert(
-          'Success',
-          'Upcoming project published successfully! It is now visible to buyers.',
-          [{text: 'OK', onPress: () => navigation.goBack()}]
-        );
-      } else {
+      if (!createResponse?.success) {
         let errorMessage = 'Failed to create project';
-        // Check multiple possible error message locations
-        if (response?.message) {
-          errorMessage = response.message;
-        } else if (response?.error) {
-          if (typeof response.error === 'string') {
-            errorMessage = response.error;
-          } else if (response.error?.message) {
-            errorMessage = response.error.message;
-          }
-        } else if (response?.data?.message) {
-          errorMessage = response.data.message;
-        } else if (response?.data?.error) {
-          errorMessage = typeof response.data.error === 'string' ? response.data.error : response.data.error?.message || errorMessage;
-        } else if (typeof response === 'string') {
-          errorMessage = response;
+        if (createResponse?.message) {
+          errorMessage = createResponse.message;
+        } else if (createResponse?.error) {
+          errorMessage = typeof createResponse.error === 'string' ? createResponse.error : createResponse.error?.message || errorMessage;
+        } else if (createResponse?.data?.message) {
+          errorMessage = createResponse.data.message;
+        } else if (createResponse?.data?.error) {
+          errorMessage = typeof createResponse.data.error === 'string' ? createResponse.data.error : createResponse.data.error?.message || errorMessage;
+        } else if (typeof createResponse === 'string') {
+          errorMessage = createResponse;
         }
         console.error('[AddProject] Property creation failed:', errorMessage);
-        console.error('[AddProject] Full error response:', JSON.stringify(response, null, 2));
+        console.error('[AddProject] Full error response:', JSON.stringify(createResponse, null, 2));
         Alert.alert('Error', errorMessage, [{text: 'OK'}]);
+        return;
       }
+
+      const propertyId =
+        createResponse.data?.property_id ||
+        createResponse.data?.id ||
+        createResponse.property_id ||
+        createResponse.id;
+
+      if (!propertyId) {
+        console.error('[AddProject] No property_id in response:', JSON.stringify(createResponse, null, 2));
+        Alert.alert('Error', 'Property created but no ID returned. Please contact support.', [{text: 'OK'}]);
+        return;
+      }
+
+      console.log('[Agent AddProject] Step 1 done – property_id:', propertyId);
+
+      // ── Step 2: Moderate + watermark each Firebase URL with property_id ──
+      console.log('[Agent AddProject] Step 2: Watermarking', approvedImages.length, 'images…');
+      const watermarkedUrls: string[] = [];
+      for (const firebaseUrl of approvedImages) {
+        try {
+          const result = await moderateFirebaseUrlForProperty(firebaseUrl, propertyId);
+          watermarkedUrls.push(result.imageUrl || firebaseUrl);
+          console.log('[Agent AddProject] Watermarked:', (result.imageUrl || firebaseUrl).substring(0, 80));
+        } catch (wmErr: any) {
+          console.warn('[Agent AddProject] Watermark failed for image, using original URL:', wmErr.message);
+          watermarkedUrls.push(firebaseUrl); // Fallback to original Firebase URL
+        }
+      }
+
+      // ── Step 3: Update property with watermarked image URLs ──
+      console.log('[Agent AddProject] Step 3: Updating property with watermarked URLs…');
+      await propertyService.updateProperty(propertyId, {
+        images: watermarkedUrls,
+        cover_image: watermarkedUrls[0] || null,
+      });
+
+      console.log('[Agent AddProject] ✅ Project created and images watermarked successfully');
+      Alert.alert(
+        'Success',
+        'Upcoming project published successfully! It is now visible to buyers.',
+        [{text: 'OK', onPress: () => navigation.goBack()}]
+      );
     } catch (error: any) {
       console.error('Submit error:', error);
       let errorMessage = 'Failed to create project. Please try again.';
