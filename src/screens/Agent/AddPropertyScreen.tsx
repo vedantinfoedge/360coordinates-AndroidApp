@@ -1,4 +1,4 @@
-import React, {useState, useMemo, useEffect, useRef} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,10 @@ const AMENITY_ITEM_WIDTH = (SCREEN_WIDTH - 2 * spacing.xl - (AMENITY_COLS - 1) *
 import Dropdown from '../../components/common/Dropdown';
 import {propertyService} from '../../services/property.service';
 import {sellerService} from '../../services/seller.service';
-import {uploadPropertyImageWithModeration} from '../../services/imageUpload.service';
+import {
+  uploadPropertyImageWithModeration,
+  moderateFirebaseUrlForProperty,
+} from '../../services/imageUpload.service';
 import {formatters} from '../../utils/formatters';
 import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
 import {isFirebaseStorageAvailable, uploadPropertyVideoToFirebase, uploadPropertyPdfToFirebase} from '../../services/firebaseStorageProperty.service';
@@ -105,6 +108,22 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [maintenance, setMaintenance] = useState('');
   const [availableForBachelors, setAvailableForBachelors] = useState(false);
   const stepScrollViewRef = useRef<{scrollTo: (opts: {y: number; animated?: boolean}) => void} | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = useCallback((field: string) => {
+    setFieldErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = {...prev};
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const renderFieldError = useCallback((field: string) => {
+    const msg = fieldErrors[field];
+    if (!msg) return null;
+    return <Text style={styles.errorText}>{msg}</Text>;
+  }, [fieldErrors]);
 
   const showError = (title: string, message: string) => {
     Alert.alert(title, message, [{text: 'OK'}]);
@@ -419,12 +438,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       else if (status === 'REJECTED' || status === 'UNSAFE') moderationStatus = 'REJECTED';
                       else if (status === 'PENDING' || status === 'NEEDS_REVIEW') moderationStatus = 'PENDING';
                       else moderationStatus = 'PENDING';
-                      const firebaseUrl = result.firebaseUrl || result.imageUrl || '';
+                      // Prefer backend-returned URL (watermarked + cache-busted), fallback to original Firebase URL
+                      const finalUrl = result.imageUrl || result.firebaseUrl || '';
                       updated[imgIndex] = {
                         ...updated[imgIndex],
                         moderationStatus,
                         moderationReason: result.moderationReason || undefined,
-                        imageUrl: firebaseUrl,
+                        imageUrl: finalUrl,
                       };
                     }
                     return updated;
@@ -534,7 +554,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 if (status === 'SAFE' || status === 'APPROVED') moderationStatus = 'APPROVED';
                 else if (status === 'REJECTED' || status === 'UNSAFE') moderationStatus = 'REJECTED';
                 else moderationStatus = 'APPROVED';
-                updated[imgIndex] = { ...updated[imgIndex], moderationStatus, moderationReason: result.moderationReason ?? undefined, imageUrl: result.firebaseUrl || result.imageUrl || '' };
+                updated[imgIndex] = {
+                  ...updated[imgIndex],
+                  moderationStatus,
+                  moderationReason: result.moderationReason ?? undefined,
+                  imageUrl: result.imageUrl || result.firebaseUrl || '',
+                };
               }
               return updated;
             });
@@ -606,161 +631,112 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleNext = () => {
-    // Validation
+    const nextErrors: Record<string, string> = {};
+
     if (currentStep === 1) {
-      if (!propertyTitle.trim()) {
-        showError('Error', 'Please enter property title');
-        return;
-      }
-      if (!propertyType) {
-        showError('Error', 'Please select property type');
-        return;
-      }
-      if (propertyTitle.length > 200) {
-        showError('Error', 'Title must be between 1 and 200 characters');
-        return;
-      }
-      if (propertyTitle.length < 1) {
-        showError('Error', 'Title is required (1-200 characters)');
-        return;
-      }
+      if (!propertyTitle.trim()) nextErrors.propertyTitle = 'Please enter property title';
+      if (!propertyType) nextErrors.propertyType = 'Please select property type';
+      if (propertyTitle.length > 200) nextErrors.propertyTitle = 'Title must be between 1 and 200 characters';
+      if (propertyTitle.length < 1) nextErrors.propertyTitle = 'Title is required (1-200 characters)';
     }
+
     if (currentStep === 2) {
-      if (!location.trim()) {
-        showError('Error', 'Please enter location');
-        return;
-      }
-      if (!state.trim()) {
-        showError('Error', 'Please enter state');
-        return;
-      }
-      if (fieldVisibility.showFacing && !facing) {
-        showError('Error', 'Please select facing direction');
-        return;
-      }
-      if (fieldVisibility.showBalconies && balconies === null) {
-        showError('Error', 'Please select number of balconies');
-        return;
-      }
-      if (fieldVisibility.showFloor && !floor.trim()) {
-        showError('Error', 'Please enter floor number');
-        return;
-      }
-      if (fieldVisibility.showTotalFloors && !totalFloors.trim()) {
-        showError('Error', 'Please enter total floors');
-        return;
-      }
+      if (!location.trim()) nextErrors.location = 'Please enter location';
+      if (!state.trim()) nextErrors.state = 'Please enter state';
+      if (fieldVisibility.showFacing && !facing) nextErrors.facing = 'Please select facing direction';
+      if (fieldVisibility.showBalconies && balconies === null) nextErrors.balconies = 'Please select number of balconies';
+      if (fieldVisibility.showFloor && !floor.trim()) nextErrors.floor = 'Please enter floor number';
+      if (fieldVisibility.showTotalFloors && !totalFloors.trim()) nextErrors.totalFloors = 'Please enter total floors';
       if (fieldVisibility.bedroomsRequired && bedrooms === null && propertyType !== 'Studio Apartment') {
-        showError('Error', 'Please select number of bedrooms');
-        return;
+        nextErrors.bedrooms = 'Please select number of bedrooms';
       }
-      if (fieldVisibility.bathroomsRequired && bathrooms === null) {
-        showError('Error', 'Please select number of bathrooms');
-        return;
-      }
-      if (fieldVisibility.showAge && !propertyAge.trim()) {
-        showError('Error', 'Please select property age');
-        return;
-      }
-      if (fieldVisibility.showFurnishing && !furnishing.trim()) {
-        showError('Error', 'Please select furnishing status');
-        return;
-      }
+      if (fieldVisibility.bathroomsRequired && bathrooms === null) nextErrors.bathrooms = 'Please select number of bathrooms';
+      if (fieldVisibility.showAge && !propertyAge.trim()) nextErrors.propertyAge = 'Please select property age';
+      if (fieldVisibility.showFurnishing && !furnishing.trim()) nextErrors.furnishing = 'Please select furnishing status';
+
       if (!builtUpArea.trim()) {
-        showError('Error', `Please enter ${fieldVisibility.areaLabel}`);
-        return;
+        nextErrors.builtUpArea = `Please enter ${fieldVisibility.areaLabel}`;
       }
+
       const areaValue = parseFloat(builtUpArea.replace(/[^0-9.]/g, ''));
-      if (isNaN(areaValue) || areaValue <= 0) {
-        showError('Error', `${fieldVisibility.areaLabel} must be a positive number`);
-        return;
+      if (builtUpArea.trim() && (isNaN(areaValue) || areaValue <= 0)) {
+        nextErrors.builtUpArea = `${fieldVisibility.areaLabel} must be a positive number`;
       }
+
       // Validate carpet_area <= area
       if (carpetArea.trim()) {
         const carpetValue = parseFloat(carpetArea.replace(/[^0-9.]/g, ''));
         if (isNaN(carpetValue) || carpetValue <= 0) {
-          showError('Error', 'Carpet area must be a positive number');
-          return;
-        }
-        if (carpetValue > areaValue) {
-          showError('Error', 'Carpet area cannot be greater than built-up area');
-          return;
+          nextErrors.carpetArea = 'Carpet area must be a positive number';
+        } else if (!isNaN(areaValue) && areaValue > 0 && carpetValue > areaValue) {
+          nextErrors.carpetArea = 'Carpet area cannot be greater than built-up area';
         }
       }
+
       // Validate floor <= total_floors (if both provided)
       if (floor.trim() && totalFloors.trim()) {
-        const floorNum = parseInt(floor);
-        const totalFloorsNum = parseInt(totalFloors);
+        const floorNum = parseInt(floor, 10);
+        const totalFloorsNum = parseInt(totalFloors, 10);
         if (!isNaN(floorNum) && !isNaN(totalFloorsNum) && floorNum > totalFloorsNum) {
-          showError('Error', 'Floor number cannot be greater than total floors');
-          return;
+          nextErrors.floor = 'Floor number cannot be greater than total floors';
         }
       }
     }
+
     if (currentStep === 3) {
-      if (selectedAmenities.length < 1) {
-        showError('Error', 'Please select at least one amenity');
-        return;
+      if (selectedAmenities.length < 1) nextErrors.selectedAmenities = 'Please select at least one amenity';
+      if (!description.trim()) nextErrors.description = 'Please enter property description';
+      if (description.length > 0 && description.length < 100) nextErrors.description = 'Description must be at least 100 characters';
+      if (description.trim().length > 1000) nextErrors.description = 'Description cannot exceed 1000 characters';
+
+      const mobileRegex = /(\+91[\s-]?)?[6-9]\d{9}/g;
+      if (description && mobileRegex.test(description)) {
+        nextErrors.description = 'Description cannot contain mobile numbers';
       }
-      if (!description.trim()) {
-        showError('Error', 'Please enter property description');
-        return;
-      }
-      if (description.length < 100) {
-        showError('Error', 'Description must be at least 100 characters');
-        return;
-      }
-      if (description.trim().length > 1000) {
-        showError('Error', 'Description cannot exceed 1000 characters');
-        return;
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      if (description && emailRegex.test(description)) {
+        nextErrors.description = 'Description cannot contain email addresses';
       }
     }
+
     if (currentStep === 4) {
-      if (photos.length < 4) {
-        showError('Error', 'Please upload at least 4 images');
-        return;
-      }
+      if (photos.length < 4) nextErrors.photos = 'Please upload at least 4 images';
       const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
       if (checkingImages.length > 0) {
-        showError('Error', 'Please wait for all images to be validated before proceeding');
-        return;
+        nextErrors.photos = 'Please wait for all images to be validated before proceeding';
       }
       const rejectedImages = photos.filter(p => p.moderationStatus === 'REJECTED');
       const approvedImagesStep4 = photos.filter(p => p.moderationStatus === 'APPROVED');
       if (rejectedImages.length > 0) {
-        const msg = approvedImagesStep4.length > 0
-          ? `Some images are rejected. Remove ${rejectedImages.length} rejected image(s) to move forward. You have ${approvedImagesStep4.length} approved image(s).`
-          : `Please remove all rejected images and upload valid images to continue.`;
-        showError('Remove Rejected Images', msg);
-        return;
+        nextErrors.photos =
+          approvedImagesStep4.length > 0
+            ? `Some images are rejected. Remove ${rejectedImages.length} rejected image(s) to move forward. You have ${approvedImagesStep4.length} approved image(s).`
+            : 'Please remove all rejected images and upload valid images to continue.';
       }
       const approvedImagesCount = photos.filter(p => p.moderationStatus === 'APPROVED').length;
-      if (approvedImagesCount < 4) {
-        showError('Error', 'Please ensure at least 4 images are approved');
-        return;
-      }
-      const mobileRegex = /(\+91[\s-]?)?[6-9]\d{9}/g;
-      if (mobileRegex.test(description)) {
-        showError('Error', 'Description cannot contain mobile numbers');
-        return;
-      }
-      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-      if (emailRegex.test(description)) {
-        showError('Error', 'Description cannot contain email addresses');
-        return;
+      if (approvedImagesCount > 0 && approvedImagesCount < 4) {
+        nextErrors.photos = 'Please ensure at least 4 images are approved';
       }
     }
+
     if (currentStep === 5) {
       if (!expectedPrice.trim()) {
-        showError('Error', propertyStatus === 'sell' ? 'Please enter expected price' : 'Please enter monthly rent');
-        return;
-      }
-      const priceValue = parseFloat(expectedPrice.replace(/[^0-9.]/g, ''));
-      if (isNaN(priceValue) || priceValue <= 0) {
-        showError('Error', 'Price must be a positive number');
-        return;
+        nextErrors.expectedPrice =
+          propertyStatus === 'sell' ? 'Please enter expected price' : 'Please enter monthly rent';
+      } else {
+        const priceValue = parseFloat(expectedPrice.replace(/[^0-9.]/g, ''));
+        if (isNaN(priceValue) || priceValue <= 0) {
+          nextErrors.expectedPrice = 'Price must be a positive number';
+        }
       }
     }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      return;
+    }
+
+    setFieldErrors({});
 
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
@@ -930,17 +906,16 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           return;
         }
 
+        const firebaseImageUrls = validImages
+          .map(p => p.imageUrl)
+          .filter(
+            (url): url is string =>
+              !!url && (url.startsWith('http://') || url.startsWith('https://')),
+          );
+
+        // Non-Firebase fallback: send base64 images directly in create request (no watermark flow).
         let imagesPayload: string[] | undefined;
-        if (USE_FIREBASE_STORAGE) {
-          const imageUrls = validImages
-            .map(p => p.imageUrl)
-            .filter((url): url is string => !!url && (url.startsWith('http://') || url.startsWith('https://')));
-          if (imageUrls.length > 0) {
-            imagesPayload = imageUrls;
-            console.log('[AddProperty] Sending Firebase image URLs (images stay in Firebase):', imageUrls.length);
-          }
-        }
-        if (!imagesPayload) {
+        if (!USE_FIREBASE_STORAGE) {
           const imageBase64Strings = validImages
             .map(p => {
               if (!p.base64) return null;
@@ -952,23 +927,38 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               return `data:image/jpeg;base64,${base64}`;
             })
             .filter((base64): base64 is string => base64 !== null && base64 !== '');
+
           if (imageBase64Strings.length === 0) {
             Alert.alert(
               'Image Data Missing',
-              USE_FIREBASE_STORAGE
-                ? 'Please wait for images to finish uploading to Firebase, or try removing and re-adding them.'
-                : 'Approved images are missing image data. Please try removing and re-uploading the images.',
-              [{text: 'OK'}]
+              'Approved images are missing image data. Please try removing and re-uploading the images.',
+              [{text: 'OK'}],
             );
             setIsSubmitting(false);
             return;
           }
           imagesPayload = imageBase64Strings;
-          console.log('[AddProperty] Sending images as base64 (fallback):', imageBase64Strings.length);
+        } else if (firebaseImageUrls.length < 4) {
+          Alert.alert(
+            'Images Not Ready',
+            'Please wait for all images to finish uploading before submitting.',
+            [{text: 'OK'}],
+          );
+          setIsSubmitting(false);
+          return;
         }
 
-        const imageCount = imagesPayload.length;
-        console.log('[AddProperty] Total photos:', photos.length, 'Valid (approved/pending):', validImages.length, 'Images to send:', imageCount);
+        const imageCount = USE_FIREBASE_STORAGE
+          ? firebaseImageUrls.length
+          : imagesPayload?.length || 0;
+        console.log(
+          '[AddProperty] Total photos:',
+          photos.length,
+          'Valid (approved/pending):',
+          validImages.length,
+          USE_FIREBASE_STORAGE ? 'Firebase URLs to watermark:' : 'Images to send:',
+          imageCount,
+        );
 
         // Property type is already in the correct format from guide
         const propertyData: any = {
@@ -997,20 +987,57 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           amenities: selectedAmenities,
           deposit_amount: propertyStatus === 'rent' && depositAmount ? parseFloat(depositAmount.replace(/[^0-9.]/g, '')) : undefined,
           available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel') ? availableForBachelors : undefined,
-          images: imagesPayload.length > 0 ? imagesPayload : undefined,
+          ...(USE_FIREBASE_STORAGE
+            ? {
+                // Important: images are uploaded via Firebase and finalized (watermark + DB save) after property creation.
+                // Do NOT send raw Firebase URLs here, otherwise backend may store unwatermarked URLs and create duplicates later.
+              }
+            : {
+                images: imagesPayload && imagesPayload.length > 0 ? imagesPayload : undefined,
+              }),
           video_url: videoUrl || undefined,
           pdf_url: pdfUrl || undefined,
         };
 
         console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
-        console.log('[AddProperty] Images:', imageCount, imagesPayload[0]?.startsWith('http') ? '(Firebase URLs)' : '(base64)');
+        console.log(
+          '[AddProperty] Images:',
+          imageCount,
+          USE_FIREBASE_STORAGE
+            ? '(Firebase URLs; will watermark after create)'
+            : '(base64 fallback)',
+        );
 
         const response: any = await propertyService.createProperty(propertyData, 'agent');
         
         if (response && response.success) {
+          const createdPropertyId =
+            response?.data?.property?.id ||
+            response?.data?.property?.property_id ||
+            response?.data?.property?.propertyId ||
+            response?.data?.id;
+
+          let failedCount = 0;
+          if (USE_FIREBASE_STORAGE && createdPropertyId && firebaseImageUrls.length > 0) {
+            console.log('[AddProperty] Property created. Watermarking images with property_id:', createdPropertyId);
+            for (const url of firebaseImageUrls) {
+              try {
+                await moderateFirebaseUrlForProperty(url, createdPropertyId);
+              } catch (e: any) {
+                failedCount += 1;
+                console.error('[AddProperty] Watermark/mode-rate failed for image:', {
+                  message: e?.message,
+                  url: url?.substring?.(0, 80),
+                });
+              }
+            }
+          }
+
           Alert.alert(
             'Success', 
-            `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) included.` : ''}`, 
+            `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) uploaded.` : ''}${
+              failedCount > 0 ? ` (${failedCount} image(s) failed to watermark; you can re-upload in Edit.)` : ''
+            }`, 
             [{text: 'OK', onPress: () => navigation.goBack()}]
           );
         } else {
@@ -1087,8 +1114,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="e.g., Spacious 3BHK Apartment with Sea View"
                 placeholderTextColor={colors.textSecondary}
                 value={propertyTitle}
-                onChangeText={setPropertyTitle}
+                onChangeText={(text: string) => {
+                  setPropertyTitle(text);
+                  clearFieldError('propertyTitle');
+                }}
               />
+              {renderFieldError('propertyTitle')}
             </View>
 
             {/* Lock non-pricing fields in limited edit mode */}
@@ -1157,6 +1188,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     ]}
                     onPress={() => {
                       setPropertyType(type.value);
+                      clearFieldError('propertyType');
                       // Auto-set bedrooms to 0 for Studio Apartment
                       if (type.value === 'Studio Apartment') {
                         setBedrooms(0);
@@ -1179,6 +1211,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {renderFieldError('propertyType')}
             </View>
 
             {propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel' || propertyType === 'Studio Apartment') && (
@@ -1215,6 +1248,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   value={location}
                   onChangeText={(text: string) => {
                     setLocation(text);
+                    clearFieldError('location');
                     // Reset locationSelected when user starts typing/editing
                     if (locationSelected) {
                       setLocationSelected(false);
@@ -1233,6 +1267,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   onSelect={(locationData) => {
                     setLocation(locationData.placeName || locationData.name);
                     setLocationSelected(true); // Mark location as selected
+                    clearFieldError('location');
                     if (locationData.coordinates) {
                       setLatitude(locationData.coordinates[1]);
                       setLongitude(locationData.coordinates[0]);
@@ -1247,6 +1282,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   visible={location.length >= 2 && !locationSelected}
                 />
               </View>
+              {renderFieldError('location')}
               
               {/* Property Location on Map - Below Location Input */}
               <View style={styles.mapContainer}>
@@ -1309,16 +1345,19 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   onChangeText={(text: string) => {
                     stateAutoFilledFromLocation.current = false;
                     setState(text);
+                    clearFieldError('state');
                   }}
                 />
                 <StateAutoSuggest
                   query={state}
                   onSelect={(stateData) => {
                     setState(stateData.name || stateData.placeName);
+                    clearFieldError('state');
                   }}
                   visible={state.length >= 2 && !stateAutoFilledFromLocation.current}
                 />
               </View>
+              {renderFieldError('state')}
             </View>
 
             <View style={styles.inputContainer}>
@@ -1352,7 +1391,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                         styles.numberButton,
                         bedrooms === 0 && styles.numberButtonActive,
                       ]}
-                      onPress={() => setBedrooms(0)}>
+                      onPress={() => {
+                        setBedrooms(0);
+                        clearFieldError('bedrooms');
+                      }}>
                       <Text
                         style={[
                           styles.numberButtonText,
@@ -1368,7 +1410,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                           styles.numberButton,
                           bedrooms === num && styles.numberButtonActive,
                         ]}
-                        onPress={() => setBedrooms(num)}>
+                        onPress={() => {
+                          setBedrooms(num);
+                          clearFieldError('bedrooms');
+                        }}>
                         <Text
                           style={[
                             styles.numberButtonText,
@@ -1383,7 +1428,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                         styles.numberButton,
                         bedrooms === 6 && styles.numberButtonActive,
                       ]}
-                      onPress={() => setBedrooms(6)}>
+                      onPress={() => {
+                        setBedrooms(6);
+                        clearFieldError('bedrooms');
+                      }}>
                       <Text
                         style={[
                           styles.numberButtonText,
@@ -1394,6 +1442,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     </TouchableOpacity>
                   </View>
                 )}
+                {renderFieldError('bedrooms')}
               </View>
             )}
 
@@ -1410,7 +1459,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                         styles.numberButton,
                         bathrooms === num && styles.numberButtonActive,
                       ]}
-                      onPress={() => setBathrooms(num)}>
+                      onPress={() => {
+                        setBathrooms(num);
+                        clearFieldError('bathrooms');
+                      }}>
                       <Text
                         style={[
                           styles.numberButtonText,
@@ -1425,7 +1477,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       styles.numberButton,
                       bathrooms === 5 && styles.numberButtonActive,
                     ]}
-                    onPress={() => setBathrooms(5)}>
+                    onPress={() => {
+                      setBathrooms(5);
+                      clearFieldError('bathrooms');
+                    }}>
                     <Text
                       style={[
                         styles.numberButtonText,
@@ -1435,6 +1490,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                {renderFieldError('bathrooms')}
               </View>
             )}
 
@@ -1449,7 +1505,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                         styles.numberButton,
                         balconies === num && styles.numberButtonActive,
                       ]}
-                      onPress={() => setBalconies(num)}>
+                      onPress={() => {
+                        setBalconies(num);
+                        clearFieldError('balconies');
+                      }}>
                       <Text
                         style={[
                           styles.numberButtonText,
@@ -1464,7 +1523,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       styles.numberButton,
                       balconies === 4 && styles.numberButtonActive,
                     ]}
-                    onPress={() => setBalconies(4)}>
+                    onPress={() => {
+                      setBalconies(4);
+                      clearFieldError('balconies');
+                    }}>
                     <Text
                       style={[
                         styles.numberButtonText,
@@ -1474,6 +1536,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                {renderFieldError('balconies')}
               </View>
             )}
 
@@ -1492,16 +1555,21 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     if (fieldVisibility.areaLabel === 'Plot Area') {
                       const numValue = parseFloat(text.replace(/[^0-9.]/g, ''));
                       if (!isNaN(numValue) && numValue > 300000) {
-                        showError('Error', 'Plot area cannot exceed 3 lac sq ft (300,000 sq ft)');
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          builtUpArea: 'Plot area cannot exceed 3 lac sq ft (300,000 sq ft)',
+                        }));
                         return;
                       }
                     }
                     setBuiltUpArea(text);
+                    clearFieldError('builtUpArea');
                   }}
                   keyboardType="numeric"
                 />
                 <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
+              {renderFieldError('builtUpArea')}
               {fieldVisibility.areaLabel === 'Plot Area' && (
                 <Text style={styles.hintText}>
                   Maximum: 3 lac sq ft (300,000 sq ft)
@@ -1518,11 +1586,15 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     placeholder="Enter area"
                     placeholderTextColor={colors.textSecondary}
                     value={carpetArea}
-                    onChangeText={setCarpetArea}
+                    onChangeText={(text: string) => {
+                      setCarpetArea(text);
+                      clearFieldError('carpetArea');
+                    }}
                     keyboardType="numeric"
                   />
                   <Text style={styles.areaUnit}>sq.ft</Text>
                 </View>
+                {renderFieldError('carpetArea')}
               </View>
             )}
 
@@ -1534,9 +1606,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="e.g., 5"
                   placeholderTextColor={colors.textSecondary}
                   value={floor}
-                  onChangeText={(text: string) => setFloor(text.replace(/[^0-9]/g, ''))}
+                  onChangeText={(text: string) => {
+                    setFloor(text.replace(/[^0-9]/g, ''));
+                    clearFieldError('floor');
+                  }}
                   keyboardType="number-pad"
                 />
+                {renderFieldError('floor')}
               </View>
             )}
 
@@ -1548,9 +1624,13 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Total floors in building"
                   placeholderTextColor={colors.textSecondary}
                   value={totalFloors}
-                  onChangeText={(text: string) => setTotalFloors(text.replace(/[^0-9]/g, ''))}
+                  onChangeText={(text: string) => {
+                    setTotalFloors(text.replace(/[^0-9]/g, ''));
+                    clearFieldError('totalFloors');
+                  }}
                   keyboardType="number-pad"
                 />
+                {renderFieldError('totalFloors')}
               </View>
             )}
 
@@ -1569,37 +1649,53 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 {label: 'South-West', value: 'South-West'},
               ]}
               value={facing}
-              onSelect={setFacing}
+              onSelect={(value) => {
+                setFacing(value);
+                clearFieldError('facing');
+              }}
             />
+            {renderFieldError('facing')}
 
             {fieldVisibility.showAge && (
-              <Dropdown
-                label="Property Age"
-                placeholder="Select property age"
-                options={[
-                  {label: 'New Construction', value: 'New Construction'},
-                  {label: 'Less than 1 Year', value: 'Less than 1 Year'},
-                  {label: '1-5 Years', value: '1-5 Years'},
-                  {label: '5-10 Years', value: '5-10 Years'},
-                  {label: '10+ Years', value: '10+ Years'},
-                ]}
-                value={propertyAge}
-                onSelect={setPropertyAge}
-              />
+              <>
+                <Dropdown
+                  label="Property Age"
+                  placeholder="Select property age"
+                  options={[
+                    {label: 'New Construction', value: 'New Construction'},
+                    {label: 'Less than 1 Year', value: 'Less than 1 Year'},
+                    {label: '1-5 Years', value: '1-5 Years'},
+                    {label: '5-10 Years', value: '5-10 Years'},
+                    {label: '10+ Years', value: '10+ Years'},
+                  ]}
+                  value={propertyAge}
+                  onSelect={(value) => {
+                    setPropertyAge(value);
+                    clearFieldError('propertyAge');
+                  }}
+                />
+                {renderFieldError('propertyAge')}
+              </>
             )}
 
             {fieldVisibility.showFurnishing && (
-              <Dropdown
-                label="Furnishing"
-                placeholder="Select furnishing status"
-                options={[
-                  {label: 'Unfurnished', value: 'Unfurnished'},
-                  {label: 'Semi-Furnished', value: 'Semi-Furnished'},
-                  {label: 'Fully-Furnished', value: 'Fully-Furnished'},
-                ]}
-                value={furnishing}
-                onSelect={setFurnishing}
-              />
+              <>
+                <Dropdown
+                  label="Furnishing"
+                  placeholder="Select furnishing status"
+                  options={[
+                    {label: 'Unfurnished', value: 'Unfurnished'},
+                    {label: 'Semi-Furnished', value: 'Semi-Furnished'},
+                    {label: 'Fully-Furnished', value: 'Fully-Furnished'},
+                  ]}
+                  value={furnishing}
+                  onSelect={(value) => {
+                    setFurnishing(value);
+                    clearFieldError('furnishing');
+                  }}
+                />
+                {renderFieldError('furnishing')}
+              </>
             )}
           </View>
         );
@@ -1623,7 +1719,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       selectedAmenities.includes(amenity.id) &&
                         styles.amenityButtonActive,
                     ]}
-                    onPress={() => toggleAmenity(amenity.id)}>
+                    onPress={() => {
+                      toggleAmenity(amenity.id);
+                      clearFieldError('selectedAmenities');
+                    }}>
                     <Text style={styles.amenityIcon}>{amenity.icon}</Text>
                     <Text
                       style={[
@@ -1636,6 +1735,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {renderFieldError('selectedAmenities')}
             </View>
 
             <View style={styles.inputContainer}>
@@ -1647,7 +1747,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Describe your property in detail (minimum 100 characters required). Mention unique features, nearby landmarks, connectivity, etc. Note: Mobile numbers and email addresses are not allowed."
                 placeholderTextColor={colors.textSecondary}
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(text: string) => {
+                  setDescription(text);
+                  clearFieldError('description');
+                }}
                 multiline
                 numberOfLines={6}
                 textAlignVertical="top"
@@ -1656,6 +1759,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.charCount}>
                 Characters: {description.length}/1000 (min: 100)
               </Text>
+              {renderFieldError('description')}
               {description.length > 0 && description.length < 100 && (
                 <Text style={styles.errorText}>
                   Description must be at least 100 characters
@@ -1675,7 +1779,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <TouchableOpacity 
               style={styles.photoUploadArea}
-              onPress={handleImagePicker}
+              onPress={() => {
+                clearFieldError('photos');
+                handleImagePicker();
+              }}
               activeOpacity={0.7}>
               <Text style={styles.photoUploadIcon}>📤</Text>
               <Text style={styles.photoUploadText}>Tap to select photos from gallery</Text>
@@ -1688,11 +1795,15 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.photoCameraButton}
-              onPress={handleCameraCapture}
+              onPress={() => {
+                clearFieldError('photos');
+                handleCameraCapture();
+              }}
               activeOpacity={0.7}>
               <Text style={styles.photoUploadIcon}>📷</Text>
               <Text style={styles.photoUploadText}>Take photo with camera</Text>
             </TouchableOpacity>
+            {renderFieldError('photos')}
 
             {photos.length > 0 && (
               <View style={styles.photosPreview}>
@@ -1805,13 +1916,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder={propertyStatus === 'sell' ? 'Enter expected price' : 'Enter monthly rent'}
                   placeholderTextColor={colors.textSecondary}
                   value={expectedPrice}
-                  onChangeText={setExpectedPrice}
+                  onChangeText={(text: string) => {
+                    setExpectedPrice(text);
+                    clearFieldError('expectedPrice');
+                  }}
                   keyboardType="numeric"
                 />
               </View>
               {formatPriceShort(expectedPrice) && (
                 <Text style={styles.priceSuggestionText}>≈ ₹{formatPriceShort(expectedPrice)}</Text>
               )}
+              {renderFieldError('expectedPrice')}
               <TouchableOpacity
                 style={styles.checkboxContainer}
                 onPress={() => setPriceNegotiable(!priceNegotiable)}>

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -105,6 +105,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
   // Step 2: Location Details
   const [location, setLocation] = useState('');
   const [locationQuery, setLocationQuery] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [area, setArea] = useState('');
   const [city, setCity] = useState('');
@@ -197,17 +198,28 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
     return parseFloat(cleaned) || 0;
   };
 
+  const clearFieldError = useCallback((field: string) => {
+    setFieldErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = {...prev};
+      delete next[field];
+      return next;
+    });
+  }, []);
+
   // Handle location selection from autosuggest
   const handleLocationSelect = (locationData: any) => {
     setLocation(locationData.placeName || locationData.name);
     setLocationQuery(locationData.placeName || locationData.name);
     setShowLocationSuggestions(false);
+    clearFieldError('location');
     
     // Extract state from context
     const extractedState = extractStateFromContext(locationData.context);
     if (extractedState) {
       setState(extractedState);
       setStateAutoFilled(true);
+      clearFieldError('state');
     }
     
     // Set coordinates if available
@@ -317,7 +329,12 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               if (updated[imgIndex]) {
                 const status = String(result.moderationStatus || '').toUpperCase();
                 const moderationStatus = (status === 'SAFE' || status === 'APPROVED' ? 'APPROVED' : status === 'REJECTED' || status === 'UNSAFE' ? 'REJECTED' : 'PENDING') as 'APPROVED' | 'REJECTED' | 'PENDING';
-                updated[imgIndex] = { ...updated[imgIndex], moderationStatus, moderationReason: result.moderationReason, imageUrl: result.firebaseUrl || result.imageUrl || '' };
+                updated[imgIndex] = {
+                  ...updated[imgIndex],
+                  moderationStatus,
+                  moderationReason: result.moderationReason ?? undefined,
+                  imageUrl: result.imageUrl || result.firebaseUrl || '',
+                };
               }
               return updated;
             });
@@ -413,12 +430,12 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                     if (updated[imgIndex]) {
                       const status = String(result.moderationStatus || '').toUpperCase();
                       const moderationStatus = (status === 'SAFE' || status === 'APPROVED' || status === 'PENDING' || status === 'NEEDS_REVIEW' ? 'APPROVED' : 'REJECTED') as 'APPROVED' | 'REJECTED' | 'PENDING';
-                      const firebaseUrl = result.firebaseUrl || result.imageUrl || '';
+                      const finalUrl = result.imageUrl || result.firebaseUrl || '';
                       updated[imgIndex] = {
                         ...updated[imgIndex],
                         moderationStatus: moderationStatus as 'APPROVED' | 'REJECTED' | 'PENDING',
                         moderationReason: result.moderationReason || undefined,
-                        imageUrl: firebaseUrl,
+                        imageUrl: finalUrl,
                       };
                     }
                     return updated;
@@ -458,93 +475,98 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        if (!projectName.trim()) {
-          CustomAlert.alert('Error', 'Please enter project name');
-          return false;
+        {
+          const nextErrors: Record<string, string> = {};
+          if (!projectName.trim()) nextErrors.projectName = 'Please enter project name';
+          if (!projectType) nextErrors.projectType = 'Please select project type';
+          if (!description.trim()) nextErrors.description = 'Please enter project description';
+          if (description.length > 1000) nextErrors.description = 'Description cannot exceed 1000 characters';
+          if (Object.keys(nextErrors).length > 0) {
+            setFieldErrors(nextErrors);
+            return false;
+          }
+          setFieldErrors({});
+          return true;
         }
-        if (!projectType) {
-          CustomAlert.alert('Error', 'Please select project type');
-          return false;
-        }
-        if (!description.trim()) {
-          CustomAlert.alert('Error', 'Please enter project description');
-          return false;
-        }
-        if (description.length > 1000) {
-          CustomAlert.alert('Error', 'Description cannot exceed 1000 characters');
-          return false;
-        }
-        return true;
       case 2:
-        if (!location.trim()) {
-          CustomAlert.alert('Error', 'Please enter location');
-          return false;
+        {
+          const nextErrors: Record<string, string> = {};
+          if (!location.trim()) nextErrors.location = 'Please enter location';
+          if (!area.trim()) nextErrors.area = 'Please enter area (sq ft)';
+          const areaNum = parseFloat(area.replace(/[^0-9.]/g, ''));
+          if (area.trim() && (isNaN(areaNum) || areaNum <= 0)) {
+            nextErrors.area = 'Area must be a positive number (sq ft)';
+          }
+          if (!state.trim()) nextErrors.state = 'Please enter state';
+          if (Object.keys(nextErrors).length > 0) {
+            setFieldErrors(nextErrors);
+            return false;
+          }
+          setFieldErrors({});
+          return true;
         }
-        if (!area.trim()) {
-          CustomAlert.alert('Error', 'Please enter area (sq ft)');
-          return false;
-        }
-        const areaNum = parseFloat(area.replace(/[^0-9.]/g, ''));
-        if (isNaN(areaNum) || areaNum <= 0) {
-          CustomAlert.alert('Error', 'Area must be a positive number (sq ft)');
-          return false;
-        }
-        if (!state.trim()) {
-          CustomAlert.alert('Error', 'Please enter state');
-          return false;
-        }
-        return true;
       case 3:
-        if (selectedConfigurations.length === 0) {
-          CustomAlert.alert('Error', 'Please select at least one configuration');
-          return false;
+        {
+          const nextErrors: Record<string, string> = {};
+          if (selectedConfigurations.length === 0) {
+            nextErrors.configurations = 'Please select at least one configuration';
+          }
+          if (!carpetAreaRange.trim()) {
+            nextErrors.carpetAreaRange = 'Please enter carpet area (numbers only)';
+          } else {
+            const carpetNum = parseFloat(carpetAreaRange);
+            if (isNaN(carpetNum) || carpetNum <= 0) {
+              nextErrors.carpetAreaRange = 'Carpet area must be a positive number';
+            }
+          }
+          if (Object.keys(nextErrors).length > 0) {
+            setFieldErrors(nextErrors);
+            return false;
+          }
+          setFieldErrors({});
+          return true;
         }
-        if (!carpetAreaRange.trim()) {
-          CustomAlert.alert('Error', 'Please enter carpet area (numbers only)');
-          return false;
-        }
-        const carpetNum = parseFloat(carpetAreaRange);
-        if (isNaN(carpetNum) || carpetNum <= 0) {
-          CustomAlert.alert('Error', 'Carpet area must be a positive number');
-          return false;
-        }
-        return true;
       case 4:
-        if (!startingPrice.trim()) {
-          CustomAlert.alert('Error', 'Please enter starting price');
-          return false;
+        {
+          const nextErrors: Record<string, string> = {};
+          if (!startingPrice.trim()) nextErrors.startingPrice = 'Please enter starting price';
+          if (Object.keys(nextErrors).length > 0) {
+            setFieldErrors(nextErrors);
+            return false;
+          }
+          setFieldErrors({});
+          return true;
         }
-        return true;
       case 7:
-        const approvedImages = projectImages.filter(img => img.moderationStatus === 'APPROVED');
-        if (approvedImages.length < 2) {
-          CustomAlert.alert('Error', 'Please upload at least 2 approved images');
-          return false;
+        {
+          const nextErrors: Record<string, string> = {};
+          const approvedImages = projectImages.filter(img => img.moderationStatus === 'APPROVED');
+          if (approvedImages.length < 2) nextErrors.projectImages = 'Please upload at least 2 approved images';
+          if (projectImages.length > 20) nextErrors.projectImages = 'Maximum 20 images allowed';
+          const checkingImages = projectImages.filter(img => img.moderationStatus === 'checking');
+          if (checkingImages.length > 0) nextErrors.projectImages = 'Please wait for all images to be processed';
+          if (Object.keys(nextErrors).length > 0) {
+            setFieldErrors(nextErrors);
+            return false;
+          }
+          setFieldErrors({});
+          return true;
         }
-        if (projectImages.length > 20) {
-          CustomAlert.alert('Error', 'Maximum 20 images allowed');
-          return false;
-        }
-        const checkingImages = projectImages.filter(img => img.moderationStatus === 'checking');
-        if (checkingImages.length > 0) {
-          CustomAlert.alert('Error', 'Please wait for all images to be processed');
-          return false;
-        }
-        return true;
       case 8:
-        if (!salesName.trim()) {
-          CustomAlert.alert('Error', 'Please enter sales person name');
-          return false;
+        {
+          const nextErrors: Record<string, string> = {};
+          if (!salesName.trim()) nextErrors.salesName = 'Please enter sales person name';
+          if (!salesNumber.trim() || salesNumber.length !== 10) {
+            nextErrors.salesNumber = 'Please enter valid 10-digit sales number';
+          }
+          if (!emailId.trim() || !emailId.includes('@')) nextErrors.emailId = 'Please enter valid email address';
+          if (Object.keys(nextErrors).length > 0) {
+            setFieldErrors(nextErrors);
+            return false;
+          }
+          setFieldErrors({});
+          return true;
         }
-        if (!salesNumber.trim() || salesNumber.length !== 10) {
-          CustomAlert.alert('Error', 'Please enter valid 10-digit sales number');
-          return false;
-        }
-        if (!emailId.trim() || !emailId.includes('@')) {
-          CustomAlert.alert('Error', 'Please enter valid email address');
-          return false;
-        }
-        return true;
       default:
         return true;
     }
@@ -735,8 +757,14 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="e.g., Green Valley Residency"
                 placeholderTextColor={colors.textSecondary}
                 value={projectName}
-                onChangeText={setProjectName}
+                onChangeText={(text: string) => {
+                  setProjectName(text);
+                  clearFieldError('projectName');
+                }}
               />
+              {!!fieldErrors.projectName && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.projectName}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -762,7 +790,10 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                       styles.typeButton,
                       projectType === type.id && styles.typeButtonActive,
                     ]}
-                    onPress={() => setProjectType(type.id)}>
+                    onPress={() => {
+                      setProjectType(type.id);
+                      clearFieldError('projectType');
+                    }}>
                     <Text style={styles.typeButtonIcon}>{type.icon}</Text>
                     <Text style={[
                       styles.typeButtonText,
@@ -771,6 +802,9 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {!!fieldErrors.projectType && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.projectType}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -805,7 +839,10 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Provide a short overview of your project (500-1000 characters)"
                 placeholderTextColor={colors.textSecondary}
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(text: string) => {
+                  setDescription(text);
+                  clearFieldError('description');
+                }}
                 multiline
                 numberOfLines={6}
                 textAlignVertical="top"
@@ -814,6 +851,9 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.charCount}>
                 {description.length}/1000
               </Text>
+              {!!fieldErrors.description && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.description}</Text>
+              )}
             </View>
           </View>
         );
@@ -833,9 +873,11 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter locality, area or landmark"
                   placeholderTextColor={colors.textSecondary}
                   value={locationQuery}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setLocationQuery(text);
+                    setLocation(text);
                     setShowLocationSuggestions(text.length >= 2);
+                    clearFieldError('location');
                     if (!text) {
                       setLocation('');
                     }
@@ -849,6 +891,35 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   />
                 )}
               </View>
+              {!!fieldErrors.location && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.location}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>
+                Area (sq ft) <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.areaInputContainer}>
+                <TextInput
+                  style={[styles.input, styles.areaInput]}
+                  placeholder="e.g., 1200"
+                  placeholderTextColor={colors.textSecondary}
+                  value={area}
+                  onChangeText={(text: string) => {
+                    const cleaned = text.replace(/[^0-9.]/g, '');
+                    const parts = cleaned.split('.');
+                    const next = parts.length <= 2 ? (parts[0] + (parts[1] != null ? '.' + parts[1] : '')) : parts[0];
+                    setArea(next);
+                    clearFieldError('area');
+                  }}
+                  keyboardType="decimal-pad"
+                />
+                <Text style={styles.areaUnit}>sq.ft</Text>
+              </View>
+              {!!fieldErrors.area && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.area}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -914,9 +985,10 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Enter state"
                   placeholderTextColor={colors.textSecondary}
                   value={state}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setState(text);
                     setStateAutoFilled(false);
+                    clearFieldError('state');
                   }}
                   editable={!stateAutoFilled}
                 />
@@ -931,6 +1003,9 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 )}
               </View>
+              {!!fieldErrors.state && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.state}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -951,7 +1026,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter pincode"
                 placeholderTextColor={colors.textSecondary}
                 value={pincode}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   // Only allow digits, max 6
                   const cleaned = text.replace(/[^0-9]/g, '').slice(0, 6);
                   setPincode(cleaned);
@@ -981,6 +1056,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                       selectedConfigurations.includes(config.id) && styles.configButtonActive,
                     ]}
                     onPress={() => {
+                      clearFieldError('configurations');
                       if (selectedConfigurations.includes(config.id)) {
                         setSelectedConfigurations(prev => prev.filter(id => id !== config.id));
                       } else {
@@ -997,6 +1073,9 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {!!fieldErrors.configurations && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.configurations}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -1009,17 +1088,21 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="e.g., 1200"
                   placeholderTextColor={colors.textSecondary}
                   value={carpetAreaRange}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     const cleaned = text.replace(/[^0-9.]/g, '');
                     const parts = cleaned.split('.');
                     if (parts.length <= 2) {
                       setCarpetAreaRange(parts[0] + (parts[1] != null ? '.' + parts[1] : ''));
                     }
+                    clearFieldError('carpetAreaRange');
                   }}
                   keyboardType="decimal-pad"
                 />
                 <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
+              {!!fieldErrors.carpetAreaRange && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.carpetAreaRange}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -1029,7 +1112,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="e.g., 3"
                 placeholderTextColor={colors.textSecondary}
                 value={numberOfTowers}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/[^0-9]/g, '');
                   setNumberOfTowers(cleaned);
                 }}
@@ -1044,7 +1127,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="e.g., 200"
                 placeholderTextColor={colors.textSecondary}
                 value={totalUnits}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/[^0-9]/g, '');
                   setTotalUnits(cleaned);
                 }}
@@ -1059,7 +1142,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="e.g., 15"
                 placeholderTextColor={colors.textSecondary}
                 value={floorsCount}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/[^0-9]/g, '');
                   setFloorsCount(cleaned);
                 }}
@@ -1085,7 +1168,10 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="e.g., 4500000 or 45-60"
                   placeholderTextColor={colors.textSecondary}
                   value={startingPrice}
-                  onChangeText={setStartingPrice}
+                  onChangeText={(text: string) => {
+                    setStartingPrice(text);
+                    clearFieldError('startingPrice');
+                  }}
                   keyboardType="numeric"
                 />
               </View>
@@ -1093,6 +1179,9 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.priceDisplay}>
                   Price: {formatters.price(formatPriceInput(startingPrice))}
                 </Text>
+              )}
+              {!!fieldErrors.startingPrice && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.startingPrice}</Text>
               )}
             </View>
 
@@ -1397,12 +1486,18 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
               </Text>
               <TouchableOpacity
                 style={styles.uploadButton}
-                onPress={handleProjectImagesUpload}>
+                onPress={() => {
+                  clearFieldError('projectImages');
+                  handleProjectImagesUpload();
+                }}>
                 <Text style={styles.uploadButtonText}>🖼️ Upload from gallery (Max 20)</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.uploadButton, styles.uploadButtonSecondary]}
-                onPress={handleProjectImagesFromCamera}>
+                onPress={() => {
+                  clearFieldError('projectImages');
+                  handleProjectImagesFromCamera();
+                }}>
                 <Text style={styles.uploadButtonText}>📷 Take photo with camera</Text>
               </TouchableOpacity>
               <Text style={styles.imageCountText}>
@@ -1412,6 +1507,9 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.warningText}>
                   ⚠️ Please upload at least 2 images to continue.
                 </Text>
+              )}
+              {!!fieldErrors.projectImages && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.projectImages}</Text>
               )}
               
               {projectImages.length > 0 && (
@@ -1588,8 +1686,14 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter sales person name"
                 placeholderTextColor={colors.textSecondary}
                 value={salesName}
-                onChangeText={setSalesName}
+                onChangeText={(text: string) => {
+                  setSalesName(text);
+                  clearFieldError('salesName');
+                }}
               />
+              {!!fieldErrors.salesName && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.salesName}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -1601,13 +1705,17 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="10"
                 placeholderTextColor={colors.textSecondary}
                 value={salesNumber}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
                   setSalesNumber(cleaned);
+                  clearFieldError('salesNumber');
                 }}
                 keyboardType="numeric"
                 maxLength={10}
               />
+              {!!fieldErrors.salesNumber && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.salesNumber}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -1619,10 +1727,16 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="Enter email address"
                 placeholderTextColor={colors.textSecondary}
                 value={emailId}
-                onChangeText={setEmailId}
+                onChangeText={(text: string) => {
+                  setEmailId(text);
+                  clearFieldError('emailId');
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
+              {!!fieldErrors.emailId && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.emailId}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -1632,7 +1746,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="10"
                 placeholderTextColor={colors.textSecondary}
                 value={mobileNumber}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
                   setMobileNumber(cleaned);
                 }}
@@ -1648,7 +1762,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="10"
                 placeholderTextColor={colors.textSecondary}
                 value={whatsappNumber}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
                   setWhatsappNumber(cleaned);
                 }}
@@ -1664,7 +1778,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                 placeholder="10"
                 placeholderTextColor={colors.textSecondary}
                 value={alternativeNumber}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
                   setAlternativeNumber(cleaned);
                 }}
@@ -1866,7 +1980,8 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
       onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <SafeAreaView style={styles.safeArea}>
+          <SafeAreaView>
+            <View style={styles.safeArea}>
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Add Project</Text>
@@ -1969,6 +2084,7 @@ const AddProjectScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 )}
               </TouchableOpacity>
+            </View>
             </View>
           </SafeAreaView>
         </View>
@@ -2134,6 +2250,12 @@ const styles = StyleSheet.create({
   hintText: {
     ...typography.caption,
     color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: spacing.xs,
+  },
+  fieldErrorText: {
+    ...typography.caption,
+    color: colors.error,
     fontSize: 12,
     marginTop: spacing.xs,
   },

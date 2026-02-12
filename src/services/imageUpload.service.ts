@@ -19,7 +19,8 @@ export interface ImageUploadWithModerationResult {
   message: string;
   moderationReason?: string | null;
   imageId?: number | string | null;
-  imageUrl?: string; // Final URL (may be Firebase URL or backend URL)
+  imageUrl?: string; // Final URL returned by backend (watermarked Firebase URL with cache-bust or server fallback)
+  storageType?: 'firebase' | 'server';
 }
 
 /**
@@ -98,55 +99,12 @@ export const uploadPropertyImageWithModeration = async (
       throw new Error('Authentication token not found. Please login again.');
     }
 
-    // Create FormData with Firebase URL
-    const formData = new FormData();
-    formData.append('firebase_url', firebaseUrl);
-    
-    if (propertyId && propertyId !== 0) {
-      formData.append('property_id', String(propertyId));
-    } else {
-      // For validation-only mode, don't send property_id
-      formData.append('validate_only', 'true');
-    }
-
-    const moderationUrl = `${API_CONFIG.API_BASE_URL}${API_ENDPOINTS.MODERATE_AND_UPLOAD}`;
-    
-    console.log('[ImageUpload] Sending to moderation API:', {
-      url: moderationUrl,
-      hasPropertyId: !!propertyId && propertyId !== 0,
-      firebaseUrl: firebaseUrl.substring(0, 80),
+    const data = await moderateExistingFirebaseUrl({
+      firebaseUrl,
+      propertyId,
+      authToken,
+      validateOnly: !(propertyId && propertyId !== 0),
     });
-
-    const response = await fetch(moderationUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        Accept: 'application/json',
-        // Don't set Content-Type - let fetch set it with boundary for FormData
-      },
-      body: formData,
-    });
-
-    const responseText = await response.text();
-    console.log('[ImageUpload] Moderation API response:', {
-      status: response.status,
-      ok: response.ok,
-      responsePreview: responseText.substring(0, 200),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Moderation failed: ${response.status} - ${responseText.substring(0, 200)}`,
-      );
-    }
-
-    let data: any;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('[ImageUpload] Failed to parse moderation response:', parseError);
-      throw new Error('Invalid response from moderation API');
-    }
 
     // Extract moderation status - normalize to uppercase
     const rawStatus = data.data?.moderation_status || data.moderation_status;
@@ -159,6 +117,20 @@ export const uploadPropertyImageWithModeration = async (
         throw new Error('Firebase upload succeeded but URL is missing');
       }
       
+      const backendImageUrl: string | null =
+        (typeof data?.data?.image_url === 'string' && data.data.image_url.trim()
+          ? data.data.image_url.trim()
+          : null) ||
+        (typeof data?.image_url === 'string' && data.image_url.trim()
+          ? data.image_url.trim()
+          : null);
+
+      const storageTypeRaw: any = data?.data?.storage_type ?? data?.storage_type;
+      const storageType: 'firebase' | 'server' | undefined =
+        storageTypeRaw === 'firebase' || storageTypeRaw === 'server'
+          ? storageTypeRaw
+          : undefined;
+
       // Success - image was moderated
       const result: ImageUploadWithModerationResult = {
         success: true,
@@ -167,7 +139,8 @@ export const uploadPropertyImageWithModeration = async (
         message: data.message || 'Image uploaded successfully',
         moderationReason: data.data?.moderation_reason || data.moderation_reason || null,
         imageId: data.data?.image_id || data.image_id || null,
-        imageUrl: firebaseUrl, // Use Firebase URL as the final URL
+        imageUrl: backendImageUrl || firebaseUrl, // Prefer backend-returned (watermarked) URL; fallback to original Firebase URL
+        storageType,
       };
 
       console.log('[ImageUpload] Upload and moderation successful:', {
@@ -190,6 +163,112 @@ export const uploadPropertyImageWithModeration = async (
     throw error;
   }
 };
+
+/**
+ * Moderate + watermark an already-uploaded Firebase download URL (no re-upload from device).
+ * Use this after you have a real DB `property_id` (create mode).
+ */
+export const moderateFirebaseUrlForProperty = async (
+  firebaseUrl: string,
+  propertyId: number | string,
+): Promise<ImageUploadWithModerationResult> => {
+  const authToken = await getAuthToken();
+  if (!authToken) {
+    throw new Error('Authentication token not found. Please login again.');
+  }
+
+  const data = await moderateExistingFirebaseUrl({
+    firebaseUrl,
+    propertyId,
+    authToken,
+    validateOnly: false,
+  });
+
+  const rawStatus = data.data?.moderation_status || data.moderation_status;
+  const moderationStatus = rawStatus ? String(rawStatus).toUpperCase() : 'PENDING';
+
+  const backendImageUrl: string | null =
+    (typeof data?.data?.image_url === 'string' && data.data.image_url.trim()
+      ? data.data.image_url.trim()
+      : null) ||
+    (typeof data?.image_url === 'string' && data.image_url.trim()
+      ? data.image_url.trim()
+      : null);
+
+  const storageTypeRaw: any = data?.data?.storage_type ?? data?.storage_type;
+  const storageType: 'firebase' | 'server' | undefined =
+    storageTypeRaw === 'firebase' || storageTypeRaw === 'server'
+      ? storageTypeRaw
+      : undefined;
+
+  return {
+    success: true,
+    firebaseUrl,
+    moderationStatus: (moderationStatus as any) || 'PENDING',
+    message: data.message || 'Image processed successfully',
+    moderationReason: data.data?.moderation_reason || data.moderation_reason || null,
+    imageId: data.data?.image_id || data.image_id || null,
+    imageUrl: backendImageUrl || firebaseUrl,
+    storageType,
+  };
+};
+
+async function moderateExistingFirebaseUrl(opts: {
+  firebaseUrl: string;
+  propertyId: number | string | null;
+  authToken: string;
+  validateOnly: boolean;
+}): Promise<any> {
+  const {firebaseUrl, propertyId, authToken, validateOnly} = opts;
+
+  const formData = new FormData();
+  formData.append('firebase_url', firebaseUrl);
+
+  if (validateOnly) {
+    formData.append('validate_only', 'true');
+  } else if (propertyId && propertyId !== 0) {
+    formData.append('property_id', String(propertyId));
+  }
+
+  const moderationUrl = `${API_CONFIG.API_BASE_URL}${API_ENDPOINTS.MODERATE_AND_UPLOAD}`;
+
+  console.log('[ImageUpload] Sending to moderation API:', {
+    url: moderationUrl,
+    hasPropertyId: !validateOnly && !!propertyId && propertyId !== 0,
+    validateOnly,
+    firebaseUrl: firebaseUrl.substring(0, 80),
+  });
+
+  const response = await fetch(moderationUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      Accept: 'application/json',
+      // Don't set Content-Type - let fetch set it with boundary for FormData
+    },
+    body: formData,
+  });
+
+  const responseText = await response.text();
+  console.log('[ImageUpload] Moderation API response:', {
+    status: response.status,
+    ok: response.ok,
+    responsePreview: responseText.substring(0, 200),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Moderation failed: ${response.status} - ${responseText.substring(0, 200)}`,
+    );
+  }
+
+  try {
+    return JSON.parse(responseText);
+  } catch (parseError) {
+    console.error('[ImageUpload] Failed to parse moderation response:', parseError);
+    throw new Error('Invalid response from moderation API');
+  }
+}
 
 /**
  * Upload multiple images with moderation
