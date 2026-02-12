@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,18 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
-import {CompositeNavigationProp} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerStackParamList} from '../../navigation/SellerNavigator';
-import {colors, spacing, typography} from '../../theme';
-import {useAuth} from '../../context/AuthContext';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { SellerStackParamList } from '../../navigation/SellerNavigator';
+import { colors, spacing, typography } from '../../theme';
+import { useAuth } from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
-import {sellerService, DashboardStats} from '../../services/seller.service';
+import { sellerService, DashboardStats } from '../../services/seller.service';
 
 type SubscriptionScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<SellerStackParamList, 'Subscription'>,
@@ -26,15 +28,27 @@ type Props = {
   navigation: SubscriptionScreenNavigationProp;
 };
 
-const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
-  const {logout} = useAuth();
+const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
+  const { logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<DashboardStats['subscription'] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
-  
+
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    // Simulate refresh
+    setTimeout(() => setRefreshing(false), 2000);
+  }, []);
+
+  const handleSubscribe = (planId: string) => {
+    // TODO: Implement payment gateway integration
+    console.log('Subscribe to:', planId);
+  };
 
   useEffect(() => {
     Animated.parallel([
@@ -108,25 +122,88 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
         subscriptionDays={daysRemaining}
         scrollY={scrollY}
       />
-      
+
       <Animated.ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true}
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
         )}
-        scrollEventThrottle={16}>
-        
-        <Animated.View style={{opacity: fadeAnim, transform: [{translateY: slideAnim}]}}>
+        scrollEventThrottle={16}
+        refreshControl={ // Added RefreshControl
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }>
+
+        {/* Free Trial Timer */}
+        <View style={styles.timerContainer}>
+          <LinearGradient
+            colors={['#FF9800', '#F57C00']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.timerGradient}>
+            <View style={styles.timerContent}>
+              <Text style={styles.timerLabel}>Free Trial Ends In</Text>
+              <View style={styles.timerBox}>
+                <Text style={styles.timerValue}>14</Text>
+                <Text style={styles.timerUnit}>Days</Text>
+              </View>
+              <Text style={styles.timerSubtext}>Upgrade now to keep posting!</Text>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* Standard Plan Card */}
+        <View style={styles.planCard}>
+          <LinearGradient
+            colors={[colors.primary, '#1565c0']}
+            style={styles.planGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}>
+            <View style={styles.planHeader}>
+              <Text style={styles.planTitle}>Standard Plan</Text>
+              <View style={styles.priceContainer}>
+                <Text style={styles.currency}>₹</Text>
+                <Text style={styles.price}>99</Text>
+                <Text style={styles.period}>/ property</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.featuresList}>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>✅</Text>
+                <Text style={styles.featureText}>Upload 1 Property</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>✅</Text>
+                <Text style={styles.featureText}>Valid for 30 Days property visibility</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>✅</Text>
+                <Text style={styles.featureText}>Standard Support</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.subscribeButton}
+              activeOpacity={0.9}
+              onPress={() => handleSubscribe('standard_99')}>
+              <Text style={styles.subscribeButtonText}>Pay Now</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
           {/* Free Trial Status Card */}
           <View style={styles.trialCard}>
             {/* @ts-expect-error - LinearGradient works but TypeScript types are incorrect */}
             <LinearGradient
               colors={[colors.primary, colors.secondary]}
-              start={{x: 0, y: 0}}
-              end={{x: 1, y: 1}}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.trialGradient}>
               <View style={styles.trialContent}>
                 <View style={styles.trialHeader}>
@@ -140,7 +217,7 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
                     </Text>
                   </View>
                 </View>
-                
+
                 <Text style={styles.trialNote}>
                   You have full access to all premium features during your free trial period.
                 </Text>
@@ -166,7 +243,7 @@ const SubscriptionScreen: React.FC<Props> = ({navigation}) => {
             <Text style={styles.helpText}>
               Contact our support team for any questions
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.helpButton}
               onPress={() => navigation.navigate('Support')}>
               <Text style={styles.helpButtonText}>Contact Support</Text>
@@ -202,14 +279,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl + spacing.lg, // Added more top padding
     paddingBottom: spacing.xxl + spacing.xl,
   },
-  
+
   // Trial Card
   trialCard: {
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: spacing.xl,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 8},
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 8,
@@ -256,7 +333,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  
+
   // Coming Soon Card
   comingSoonCard: {
     backgroundColor: colors.surface,
@@ -265,7 +342,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
@@ -303,7 +380,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     paddingHorizontal: spacing.md,
   },
-  
+
   // Help Section
   helpSection: {
     marginTop: spacing.md,
@@ -312,10 +389,161 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+  },
+  planName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  planPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+
+  // New Styles
+  timerContainer: {
+    marginBottom: spacing.lg,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#FF9800',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  timerGradient: {
+    padding: spacing.lg,
+  },
+  timerContent: {
+    alignItems: 'center',
+  },
+  timerLabel: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  timerBox: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    marginBottom: spacing.sm,
+  },
+  timerValue: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginRight: spacing.xs,
+  },
+  timerUnit: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
+  },
+  timerSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    fontStyle: 'italic',
+  },
+
+  // Plan Card Styles
+  planCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: spacing.xl,
+    elevation: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+  },
+  planGradient: {
+    padding: spacing.xl,
+  },
+  planHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  planTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: spacing.xs,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  currency: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 8,
+    marginRight: 4,
+  },
+  price: {
+    fontSize: 56,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 64,
+  },
+  period: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 36,
+    marginLeft: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginVertical: spacing.lg,
+  },
+  featuresList: {
+    marginBottom: spacing.xl,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  featureIcon: {
+    fontSize: 18,
+    marginRight: spacing.md,
+  },
+  featureText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  subscribeButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  subscribeButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   helpTitle: {
     fontSize: 18,

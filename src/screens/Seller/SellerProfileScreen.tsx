@@ -684,7 +684,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('AllListings')}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>🏘️</Text>
+            <Text style={styles.menuIcon}>🏢</Text>
             <Text style={styles.menuText}>My Properties</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
@@ -695,7 +695,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('Leads')}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>💬</Text>
+            <Text style={styles.menuIcon}>👥</Text>
             <Text style={styles.menuText}>Leads</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
@@ -706,7 +706,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('Support')}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>🆘</Text>
+            <Text style={styles.menuIcon}>🎧</Text>
             <Text style={styles.menuText}>Support</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
@@ -717,7 +717,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('Subscription')}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>💳</Text>
+            <Text style={styles.menuIcon}>💎</Text>
             <Text style={styles.menuText}>Subscription</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
@@ -728,7 +728,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={handleLogout}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>🚪</Text>
+            <Text style={styles.menuIcon}>👋</Text>
             <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>

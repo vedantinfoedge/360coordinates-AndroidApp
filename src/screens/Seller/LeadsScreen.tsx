@@ -142,11 +142,11 @@ const LeadsScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <SellerHeader
+      {/* <SellerHeader
         onProfilePress={() => navigation.navigate('Profile' as never)}
         onSupportPress={() => navigation.navigate('Support' as never)}
       // Add other props if SellerHeader supports them
-      />
+      /> */}
 
       {loading && leads.length === 0 ? (
         <View style={styles.center}>

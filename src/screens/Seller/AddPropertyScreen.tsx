@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,33 +15,33 @@ import {
   Alert,
   KeyboardAvoidingView,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {useRoute, RouteProp} from '@react-navigation/native';
-import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute, RouteProp } from '@react-navigation/native';
+import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {SellerStackParamList} from '../../navigation/SellerNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { SellerStackParamList } from '../../navigation/SellerNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AMENITY_GAP = spacing.xs;
 const AMENITY_COLS = 4;
 const AMENITY_ITEM_WIDTH = (SCREEN_WIDTH - 2 * spacing.xl - (AMENITY_COLS - 1) * AMENITY_GAP) / AMENITY_COLS;
 import Dropdown from '../../components/common/Dropdown';
-import {propertyService} from '../../services/property.service';
-import {sellerService} from '../../services/seller.service';
+import { propertyService } from '../../services/property.service';
+import { sellerService } from '../../services/seller.service';
 import {
   uploadPropertyImageWithModeration,
   moderateFirebaseUrlForProperty,
 } from '../../services/imageUpload.service';
-import {formatters} from '../../utils/formatters';
-import {USE_FIREBASE_STORAGE} from '../../config/firebaseStorage.config';
-import {isFirebaseStorageAvailable} from '../../services/firebaseStorageProperty.service';
-import {useAuth} from '../../context/AuthContext';
+import { formatters } from '../../utils/formatters';
+import { USE_FIREBASE_STORAGE } from '../../config/firebaseStorage.config';
+import { isFirebaseStorageAvailable } from '../../services/firebaseStorageProperty.service';
+import { useAuth } from '../../context/AuthContext';
 import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
-import {extractStateFromContext} from '../../utils/geocoding';
+import { extractStateFromContext } from '../../utils/geocoding';
 import CustomAlert from '../../utils/alertHelper';
 import {
   GuidePropertyType,
@@ -62,8 +62,8 @@ type Props = {
 
 type PropertyStatus = 'sell' | 'rent';
 
-const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
-  const {user} = useAuth();
+const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
+  const { user } = useAuth();
   const route = useRoute<RouteProp<SellerStackParamList, 'AddProperty'>>();
   const routeParams = (route.params as any) || {};
   const isEditMode = !!routeParams.propertyId;
@@ -71,8 +71,14 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const propertyId = routeParams.propertyId;
   const createdAt = routeParams.createdAt;
   const [loadingProperty, setLoadingProperty] = useState(isEditMode);
-  
+
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Subscription Check
+  const isAgent = (user as any)?.role === 'agent';
+  const isPaidSeller = (user as any)?.subscription_status === 'active' || (user as any)?.subscription_status === 'pro';
+  // Allow 10 for Agents or Paid Sellers, 3 for Free Sellers
+  const MAX_PHOTOS = isAgent || isPaidSeller ? 10 : 3;
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sell');
   const [propertyType, setPropertyType] = useState<GuidePropertyType | ''>('');
@@ -96,19 +102,19 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [furnishing, setFurnishing] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<Array<{uri: string; base64?: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string}>>([]);
+  const [photos, setPhotos] = useState<Array<{ uri: string; base64?: string; moderationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking'; moderationReason?: string; imageUrl?: string }>>([]);
   const [expectedPrice, setExpectedPrice] = useState('');
   const [priceNegotiable, setPriceNegotiable] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [maintenance, setMaintenance] = useState('');
   const [availableForBachelors, setAvailableForBachelors] = useState(false);
-  const stepScrollViewRef = useRef<{scrollTo: (opts: {y: number; animated?: boolean}) => void} | null>(null);
+  const stepScrollViewRef = useRef<{ scrollTo: (opts: { y: number; animated?: boolean }) => void } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const clearFieldError = useCallback((field: string) => {
     setFieldErrors(prev => {
       if (!prev[field]) return prev;
-      const next = {...prev};
+      const next = { ...prev };
       delete next[field];
       return next;
     });
@@ -121,7 +127,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   }, [fieldErrors]);
 
   const showError = (title: string, message: string) => {
-    Alert.alert(title, message, [{text: 'OK'}]);
+    Alert.alert(title, message, [{ text: 'OK' }]);
   };
 
   // Format price for suggestion below input (e.g. 2000 → "2k", 1500000 → "15L", 15000000 → "1.5Cr")
@@ -136,11 +142,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
   const totalSteps = 5;
   const steps = [
-    {id: 1, name: 'Basic Info', icon: '📝'},
-    {id: 2, name: 'Property Details', icon: '🏠'},
-    {id: 3, name: 'Amenities', icon: '✨'},
-    {id: 4, name: 'Photos', icon: '📷'},
-    {id: 5, name: 'Pricing', icon: '💰'},
+    { id: 1, name: 'Basic Info', icon: '📝' },
+    { id: 2, name: 'Property Details', icon: '🏠' },
+    { id: 3, name: 'Amenities', icon: '✨' },
+    { id: 4, name: 'Photos', icon: '📷' },
+    { id: 5, name: 'Pricing', icon: '💰' },
   ];
 
   // Get field visibility configuration based on property type (using guide utility)
@@ -185,7 +191,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     if (!createdAtDate) return false;
     const now = new Date();
     let created: Date;
-    
+
     if (typeof createdAtDate === 'string') {
       // Parse MySQL DATETIME format: "YYYY-MM-DD HH:MM:SS"
       const parsed = formatters.parseMySQLDateTime(createdAtDate);
@@ -194,7 +200,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     } else {
       created = createdAtDate;
     }
-    
+
     const hoursSinceCreation = (now.getTime() - created.getTime()) / (1000 * 60 * 60);
     return hoursSinceCreation >= 24;
   };
@@ -202,7 +208,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   // Check if a field can be edited based on 24-hour restriction
   const canEditField = (fieldName: string): boolean => {
     if (!isEditMode || !isLimitedEdit) return true;
-    
+
     // After 24 hours, only these fields can be edited
     const editableFields = ['title', 'price', 'priceNegotiable', 'maintenanceCharges', 'depositAmount'];
     return editableFields.includes(fieldName);
@@ -219,10 +225,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       try {
         setLoadingProperty(true);
         const response: any = await propertyService.getPropertyDetails(propertyId);
-        
+
         if (response && response.success && response.data) {
           const propData = response.data.property || response.data;
-          
+
           // Populate form fields
           setPropertyTitle(propData.title || propData.property_title || '');
           setPropertyStatus(propData.status === 'rent' ? 'rent' : 'sell');
@@ -249,7 +255,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           setMaintenance(propData.maintenance_charges ? String(propData.maintenance_charges) : '');
           setAvailableForBachelors(propData.available_for_bachelors || false);
           setSelectedAmenities(propData.amenities ? (Array.isArray(propData.amenities) ? propData.amenities : []) : []);
-          
+
           // Load existing images
           if (propData.images && Array.isArray(propData.images) && propData.images.length > 0) {
             const existingImages = propData.images.map((imgUrl: string) => ({
@@ -260,11 +266,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             setPhotos(existingImages);
           }
         } else {
-          Alert.alert('Error', 'Failed to load property details', [{text: 'OK', onPress: () => navigation.goBack()}]);
+          Alert.alert('Error', 'Failed to load property details', [{ text: 'OK', onPress: () => navigation.goBack() }]);
         }
       } catch (error: any) {
         console.error('Error loading property:', error);
-        Alert.alert('Error', error.message || 'Failed to load property details', [{text: 'OK', onPress: () => navigation.goBack()}]);
+        Alert.alert('Error', error.message || 'Failed to load property details', [{ text: 'OK', onPress: () => navigation.goBack() }]);
       } finally {
         setLoadingProperty(false);
       }
@@ -318,26 +324,37 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   // Request camera and gallery permissions when user enters Photos step so they're prompted once before tapping Take photo / Gallery
   useEffect(() => {
     if (currentStep !== 4) return;
-    requestCameraPermission().catch(() => {});
-    requestCameraCapturePermission().catch(() => {});
+    requestCameraPermission().catch(() => { });
+    requestCameraCapturePermission().catch(() => { });
   }, [currentStep]);
 
   const handleImagePicker = async () => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Please grant photo access in Settings to upload property images.', [{text: 'OK'}]);
+      Alert.alert('Permission Denied', 'Please grant photo access in Settings to upload property images.', [{ text: 'OK' }]);
       return;
     }
 
-    if (photos.length >= 10) {
-      showError('Limit Reached', 'You can upload maximum 10 photos');
+    if (photos.length >= MAX_PHOTOS) {
+      if (!isAgent && !isPaidSeller) {
+        Alert.alert(
+          'Limit Reached',
+          'Free plan allows only 3 images. Upgrade to add more.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Upgrade', onPress: () => navigation.navigate('Subscription' as never) }
+          ]
+        );
+      } else {
+        showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
+      }
       return;
     }
 
     const options = {
       mediaType: 'photo' as MediaType,
       quality: 0.5 as const,
-      selectionLimit: 10 - photos.length,
+      selectionLimit: MAX_PHOTOS - photos.length,
       includeBase64: true,
     };
 
@@ -348,148 +365,169 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
       if (response.errorCode) {
         const msg = response.errorMessage || response.errorCode === 'permission' ? 'Photo access denied. Please allow access in Settings.' : 'Failed to pick image';
-        Alert.alert('Error', msg, [{text: 'OK'}]);
+        Alert.alert('Error', msg, [{ text: 'OK' }]);
         return;
       }
 
       if (response.assets && response.assets.length > 0) {
-        const maxPhotos = 10;
-        const remainingSlots = maxPhotos - photos.length;
+        const remainingSlots = MAX_PHOTOS - photos.length;
         const assetsToAdd = response.assets.slice(0, remainingSlots);
 
-        if (photos.length + assetsToAdd.length > maxPhotos) {
-          showError('Limit Reached', 'You can upload maximum 10 photos');
+        if (photos.length + assetsToAdd.length > MAX_PHOTOS) {
+          if (!isAgent && !isPaidSeller) {
+            Alert.alert(
+              'Limit Reached',
+              'Free plan allows only 3 images. Upgrade to add more.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Upgrade', onPress: () => navigation.navigate('Subscription' as never) }
+              ]
+            );
+          } else {
+            showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
+          }
           return;
         }
 
         try {
-        const newPhotos = assetsToAdd.map(asset => {
-          let imageType = asset.type || 'jpeg';
-          if (!asset.type && asset.uri) {
-            const uriLower = asset.uri.toLowerCase();
-            if (uriLower.includes('.png')) imageType = 'png';
-            else if (uriLower.includes('.jpg') || uriLower.includes('.jpeg')) imageType = 'jpeg';
-            else if (uriLower.includes('.webp')) imageType = 'webp';
-          }
-          
-          let base64Data = asset.base64;
-          if (base64Data && base64Data.includes('data:image/')) {
-            const parts = base64Data.split(',');
-            base64Data = parts.length > 1 ? parts[1] : base64Data;
-          }
-          
-          const base64String = base64Data 
-            ? `data:image/${imageType};base64,${base64Data}`
-            : undefined;
-          
-          return {
-            uri: asset.uri || '',
-            base64: base64String,
-            moderationStatus: 'checking' as const,
-            moderationReason: undefined,
-            imageUrl: undefined,
-          };
-        });
-        
-        const updatedPhotos = [...photos, ...newPhotos];
-        setPhotos(updatedPhotos);
+          const newPhotos = assetsToAdd.map(asset => {
+            let imageType = asset.type || 'jpeg';
+            if (!asset.type && asset.uri) {
+              const uriLower = asset.uri.toLowerCase();
+              if (uriLower.includes('.png')) imageType = 'png';
+              else if (uriLower.includes('.jpg') || uriLower.includes('.jpeg')) imageType = 'jpeg';
+              else if (uriLower.includes('.webp')) imageType = 'webp';
+            }
 
-        // Storage workflow: Device → Firebase Storage → backend receives URL for moderation only; images stored in Firebase
-        const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
-        const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
+            let base64Data = asset.base64;
+            if (base64Data && base64Data.includes('data:image/')) {
+              const parts = base64Data.split(',');
+              base64Data = parts.length > 1 ? parts[1] : base64Data;
+            }
 
-        if (!firebaseEnabled || !firebaseAvailable) {
-          const message = !user?.id
-            ? 'You must be signed in to upload images.'
-            : !firebaseAvailable
-            ? 'Firebase Storage is not available. Please rebuild the app to enable image uploads.'
-            : 'Firebase Storage is required for property images. Please enable it and rebuild the app.';
-          Alert.alert('Image Upload Unavailable', message, [{text: 'OK'}]);
-          setPhotos(prev => {
-            const updated = [...prev];
-            newPhotos.forEach((_, index) => {
-              const imgIndex = prev.length - newPhotos.length + index;
-              if (updated[imgIndex]) {
-                updated[imgIndex] = {
-                  ...updated[imgIndex],
-                  moderationStatus: 'REJECTED' as const,
-                  moderationReason: message,
-                };
+            const base64String = base64Data
+              ? `data:image/${imageType};base64,${base64Data}`
+              : undefined;
+
+            return {
+              uri: asset.uri || '',
+              base64: base64String,
+              moderationStatus: 'checking' as const,
+              moderationReason: undefined,
+              imageUrl: undefined,
+            };
+          });
+
+          const updatedPhotos = [...photos, ...newPhotos];
+          setPhotos(updatedPhotos);
+
+          // Storage workflow: Device → Firebase Storage → backend receives URL for moderation only; images stored in Firebase
+          const firebaseEnabled = USE_FIREBASE_STORAGE && user?.id;
+          const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
+
+          if (!firebaseEnabled || !firebaseAvailable) {
+            const message = !user?.id
+              ? 'You must be signed in to upload images.'
+              : !firebaseAvailable
+                ? 'Firebase Storage is not available. Please rebuild the app to enable image uploads.'
+                : 'Firebase Storage is required for property images. Please enable it and rebuild the app.';
+            Alert.alert('Image Upload Unavailable', message, [{ text: 'OK' }]);
+            setPhotos(prev => {
+              const updated = [...prev];
+              newPhotos.forEach((_, index) => {
+                const imgIndex = prev.length - newPhotos.length + index;
+                if (updated[imgIndex]) {
+                  updated[imgIndex] = {
+                    ...updated[imgIndex],
+                    moderationStatus: 'REJECTED' as const,
+                    moderationReason: message,
+                  };
+                }
+              });
+              return updated;
+            });
+          } else {
+            newPhotos.forEach((img, index) => {
+              if (img.uri) {
+                const uploadPropertyId = isEditMode && propertyId ? (typeof propertyId === 'string' ? propertyId : String(propertyId)) : null;
+                uploadPropertyImageWithModeration(img.uri, uploadPropertyId, user!.id)
+                  .then(result => {
+                    setPhotos(prev => {
+                      const updated = [...prev];
+                      const imgIndex = prev.length - newPhotos.length + index;
+                      if (updated[imgIndex]) {
+                        const status = String(result.moderationStatus || '').toUpperCase();
+                        let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'REJECTED';
+                        if (status === 'SAFE' || status === 'APPROVED') moderationStatus = 'APPROVED';
+                        else if (status === 'REJECTED' || status === 'UNSAFE') moderationStatus = 'REJECTED';
+                        else moderationStatus = 'APPROVED';
+                        // Prefer backend-returned URL (watermarked + cache-busted), fallback to original Firebase URL
+                        const finalUrl = result.imageUrl || result.firebaseUrl || '';
+                        updated[imgIndex] = {
+                          ...updated[imgIndex],
+                          moderationStatus,
+                          moderationReason: result.moderationReason || undefined,
+                          imageUrl: finalUrl,
+                        };
+                      }
+                      return updated;
+                    });
+                    if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
+                      Alert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines. Please upload property images only.', [{ text: 'OK' }]);
+                    }
+                  })
+                  .catch(error => {
+                    console.error('[AddProperty] Firebase upload error:', error);
+                    setPhotos(prev => {
+                      const updated = [...prev];
+                      const imgIndex = prev.length - newPhotos.length + index;
+                      if (updated[imgIndex]) {
+                        updated[imgIndex] = {
+                          ...updated[imgIndex],
+                          moderationStatus: 'REJECTED' as const,
+                          moderationReason: error.message || 'Failed to upload image',
+                        };
+                      }
+                      return updated;
+                    });
+                    let errorMessage = error.message || 'Failed to upload image to Firebase.';
+                    if (errorMessage.includes('not available') || errorMessage.includes('not installed')) {
+                      errorMessage = 'Firebase Storage is not available. Please rebuild the app.';
+                    }
+                    Alert.alert('Upload Failed', errorMessage, [{ text: 'OK' }]);
+                  });
               }
             });
-            return updated;
-          });
-        } else {
-          newPhotos.forEach((img, index) => {
-            if (img.uri) {
-              const uploadPropertyId = isEditMode && propertyId ? (typeof propertyId === 'string' ? propertyId : String(propertyId)) : null;
-              uploadPropertyImageWithModeration(img.uri, uploadPropertyId, user!.id)
-                .then(result => {
-                  setPhotos(prev => {
-                    const updated = [...prev];
-                    const imgIndex = prev.length - newPhotos.length + index;
-                    if (updated[imgIndex]) {
-                      const status = String(result.moderationStatus || '').toUpperCase();
-                      let moderationStatus: 'APPROVED' | 'REJECTED' | 'PENDING' | 'checking' = 'REJECTED';
-                      if (status === 'SAFE' || status === 'APPROVED') moderationStatus = 'APPROVED';
-                      else if (status === 'REJECTED' || status === 'UNSAFE') moderationStatus = 'REJECTED';
-                      else moderationStatus = 'APPROVED';
-                      // Prefer backend-returned URL (watermarked + cache-busted), fallback to original Firebase URL
-                      const finalUrl = result.imageUrl || result.firebaseUrl || '';
-                      updated[imgIndex] = {
-                        ...updated[imgIndex],
-                        moderationStatus,
-                        moderationReason: result.moderationReason || undefined,
-                        imageUrl: finalUrl,
-                      };
-                    }
-                    return updated;
-                  });
-                  if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
-                    Alert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines. Please upload property images only.', [{text: 'OK'}]);
-                  }
-                })
-                .catch(error => {
-                  console.error('[AddProperty] Firebase upload error:', error);
-                  setPhotos(prev => {
-                    const updated = [...prev];
-                    const imgIndex = prev.length - newPhotos.length + index;
-                    if (updated[imgIndex]) {
-                      updated[imgIndex] = {
-                        ...updated[imgIndex],
-                        moderationStatus: 'REJECTED' as const,
-                        moderationReason: error.message || 'Failed to upload image',
-                      };
-                    }
-                    return updated;
-                  });
-                  let errorMessage = error.message || 'Failed to upload image to Firebase.';
-                  if (errorMessage.includes('not available') || errorMessage.includes('not installed')) {
-                    errorMessage = 'Firebase Storage is not available. Please rebuild the app.';
-                  }
-                  Alert.alert('Upload Failed', errorMessage, [{text: 'OK'}]);
-                });
-            }
-          });
-        }
+          }
 
-        console.log('[AddProperty] Added', newPhotos.length, 'images (Device → Firebase Storage → backend URL for moderation)');
+          console.log('[AddProperty] Added', newPhotos.length, 'images (Device → Firebase Storage → backend URL for moderation)');
         } catch (err) {
           console.error('[AddProperty] Image processing error:', err);
-          Alert.alert('Error', 'Failed to process images. Please try again.', [{text: 'OK'}]);
+          Alert.alert('Error', 'Failed to process images. Please try again.', [{ text: 'OK' }]);
         }
       }
     });
   };
 
   const handleCameraCapture = async () => {
-    if (photos.length >= 10) {
-      showError('Limit Reached', 'You can upload maximum 10 photos');
+    if (photos.length >= MAX_PHOTOS) {
+      if (!isAgent && !isPaidSeller) {
+        Alert.alert(
+          'Limit Reached',
+          'Free plan allows only 3 images. Upgrade to add more.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Upgrade', onPress: () => navigation.navigate('Subscription' as never) }
+          ]
+        );
+      } else {
+        showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
+      }
       return;
     }
     const hasPermission = await requestCameraCapturePermission();
     if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Please grant camera access in Settings to take photos.', [{text: 'OK'}]);
+      Alert.alert('Permission Denied', 'Please grant camera access in Settings to take photos.', [{ text: 'OK' }]);
       return;
     }
     const options = {
@@ -502,7 +540,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       if (response.didCancel) return;
       if (response.errorCode) {
         const msg = response.errorMessage || response.errorCode === 'camera_unavailable' ? 'Camera not available' : 'Failed to take photo';
-        Alert.alert('Error', msg, [{text: 'OK'}]);
+        Alert.alert('Error', msg, [{ text: 'OK' }]);
         return;
       }
       if (response.assets && response.assets.length > 0) {
@@ -534,7 +572,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         const firebaseAvailable = firebaseEnabled && isFirebaseStorageAvailable();
         if (!firebaseEnabled || !firebaseAvailable) {
           const message = !user?.id ? 'You must be signed in to upload images.' : !firebaseAvailable ? 'Firebase Storage is not available.' : 'Firebase Storage is required.';
-          Alert.alert('Image Upload Unavailable', message, [{text: 'OK'}]);
+          Alert.alert('Image Upload Unavailable', message, [{ text: 'OK' }]);
           setPhotos(prev => prev.map((p, i) => (i === prev.length - 1 ? { ...p, moderationStatus: 'REJECTED' as const, moderationReason: message } : p)));
           return;
         }
@@ -560,7 +598,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               return updated;
             });
             if (result.moderationStatus === 'REJECTED' || result.moderationStatus === 'UNSAFE') {
-              Alert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.', [{text: 'OK'}]);
+              Alert.alert('Image Rejected', result.moderationReason || 'Image does not meet our guidelines.', [{ text: 'OK' }]);
             }
           })
           .catch(error => {
@@ -569,7 +607,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               if (updated[imgIndex]) updated[imgIndex] = { ...updated[imgIndex], moderationStatus: 'REJECTED' as const, moderationReason: error.message };
               return updated;
             });
-            Alert.alert('Upload Failed', error.message || 'Failed to upload image.', [{text: 'OK'}]);
+            Alert.alert('Upload Failed', error.message || 'Failed to upload image.', [{ text: 'OK' }]);
           });
       }
     });
@@ -706,7 +744,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       if (isEditMode && propertyId) {
         // EDIT MODE: Update existing property
         console.log('[AddProperty] Editing property ID:', propertyId);
-        
+
         // For edit mode, collect images differently:
         // - Existing images: preserve URLs (filter out blob URLs)
         // - New images: include base64 or imageUrl from moderation
@@ -714,12 +752,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           .filter(p => p.imageUrl && !p.uri.startsWith('blob:') && !p.uri.startsWith('file:'))
           .map(p => p.imageUrl!)
           .filter((url): url is string => !!url && !url.startsWith('blob:'));
-        
+
         // New images that were uploaded (have base64 or were uploaded via moderation)
-        const newImages = photos.filter(p => 
+        const newImages = photos.filter(p =>
           p.base64 || (p.imageUrl && (p.uri.startsWith('file:') || p.uri.startsWith('blob:')))
         );
-        
+
         const newImageBase64 = newImages
           .map(p => {
             if (p.base64) {
@@ -733,27 +771,27 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             return null;
           })
           .filter((base64): base64 is string => base64 !== null && base64 !== '');
-        
+
         // Combine existing URLs and new base64 images
         const allImages = [...existingImageUrls, ...newImageBase64];
-        
+
         // Check if we have any images
         if (allImages.length === 0 && photos.length > 0) {
           Alert.alert(
             'No Valid Images',
             'Please wait for images to be processed or upload new images.',
-            [{text: 'OK'}]
+            [{ text: 'OK' }]
           );
           setIsSubmitting(false);
           return;
         }
-        
+
         const checkingImages = photos.filter(p => p.moderationStatus === 'checking');
         if (checkingImages.length > 0) {
           Alert.alert(
             'Images Still Validating',
             'Please wait for all images to be validated before submitting.',
-            [{text: 'OK'}]
+            [{ text: 'OK' }]
           );
           setIsSubmitting(false);
           return;
@@ -761,7 +799,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
         // Build update data based on 24-hour restriction
         const updateData: any = {};
-        
+
         // Always allowed fields (after 24 hours): title, price, price_negotiable, maintenance_charges, deposit_amount
         updateData.title = propertyTitle.trim();
         updateData.price = parseFloat(expectedPrice.replace(/[^0-9.]/g, '')) || 0;
@@ -773,7 +811,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         if (propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel')) {
           updateData.available_for_bachelors = availableForBachelors;
         }
-        
+
         // Only include other fields if not in limited edit mode
         // Location fields are explicitly blocked after 24 hours: location, latitude, longitude, state, additional_address
         if (!isLimitedEdit) {
@@ -798,24 +836,24 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           updateData.description = description.trim();
           updateData.amenities = selectedAmenities;
         }
-        
+
         // Include images if any
         if (allImages.length > 0) {
           updateData.images = allImages;
         }
-        
+
         console.log('[AddProperty] Updating property with data:', {
           ...updateData,
           images: `[${allImages.length} images]`,
         });
 
         const response: any = await sellerService.updateProperty(propertyId, updateData);
-        
+
         if (response && response.success) {
           Alert.alert(
             'Success',
             'Property updated successfully!',
-            [{text: 'OK', onPress: () => navigation.goBack()}]
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
           );
         } else {
           const errorMessage = response?.message || response?.error?.message || 'Failed to update property';
@@ -833,7 +871,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           Alert.alert(
             'No Valid Images',
             'Please upload at least 4 images that have been approved or are pending review.',
-            [{text: 'OK'}]
+            [{ text: 'OK' }]
           );
           setIsSubmitting(false);
           return;
@@ -844,7 +882,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           Alert.alert(
             'Images Still Validating',
             'Please wait for all images to be validated before submitting.',
-            [{text: 'OK'}]
+            [{ text: 'OK' }]
           );
           setIsSubmitting(false);
           return;
@@ -876,7 +914,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             Alert.alert(
               'Image Data Missing',
               'Approved images are missing image data. Please try removing and re-uploading the images.',
-              [{text: 'OK'}],
+              [{ text: 'OK' }],
             );
             setIsSubmitting(false);
             return;
@@ -890,7 +928,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           Alert.alert(
             'Images Not Ready',
             'Please wait for all images to finish uploading before submitting.',
-            [{text: 'OK'}],
+            [{ text: 'OK' }],
           );
           setIsSubmitting(false);
           return;
@@ -937,12 +975,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           available_for_bachelors: propertyStatus === 'rent' && (propertyType === 'Apartment' || propertyType === 'PG / Hostel') ? availableForBachelors : undefined,
           ...(USE_FIREBASE_STORAGE
             ? {
-                // Important: images are uploaded via Firebase and finalized (watermark + DB save) after property creation.
-                // Do NOT send raw Firebase URLs here, otherwise backend may store unwatermarked URLs and create duplicates later.
-              }
+              // Important: images are uploaded via Firebase and finalized (watermark + DB save) after property creation.
+              // Do NOT send raw Firebase URLs here, otherwise backend may store unwatermarked URLs and create duplicates later.
+            }
             : {
-                images: imagesPayload && imagesPayload.length > 0 ? imagesPayload : undefined,
-              }),
+              images: imagesPayload && imagesPayload.length > 0 ? imagesPayload : undefined,
+            }),
         };
 
         console.log('[AddProperty] Creating property with endpoint: /seller/properties/add.php');
@@ -955,7 +993,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
         );
 
         const response: any = await propertyService.createProperty(propertyData, 'seller');
-        
+
         if (response && response.success) {
           const createdPropertyId =
             response?.data?.property?.id ||
@@ -988,11 +1026,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           }
 
           Alert.alert(
-            'Success', 
-            `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) uploaded.` : ''}${
-              failedCount > 0 ? ` (${failedCount} image(s) failed to watermark; you can re-upload in Edit.)` : ''
-            }`, 
-            [{text: 'OK', onPress: () => navigation.goBack()}]
+            'Success',
+            `Property listed successfully!${imageCount > 0 ? ` ${imageCount} image(s) uploaded.` : ''}${failedCount > 0 ? ` (${failedCount} image(s) failed to watermark; you can re-upload in Edit.)` : ''
+            }`,
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
           );
         } else {
           let errorMessage = 'Failed to create property';
@@ -1014,7 +1051,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
           }
           console.error('[AddProperty] Property creation failed:', errorMessage);
           console.error('[AddProperty] Full error response:', JSON.stringify(response, null, 2));
-          Alert.alert('Error', errorMessage, [{text: 'OK'}]);
+          Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
         }
       }
     } catch (error: any) {
@@ -1032,7 +1069,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       } else if (typeof error === 'string') {
         errorMessage = error;
       }
-      Alert.alert('Error', errorMessage, [{text: 'OK'}]);
+      Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
     } finally {
       setIsSubmitting(false);
     }
@@ -1043,8 +1080,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       'Cancel Listing',
       'Are you sure you want to cancel? Your progress will be lost.',
       [
-        {text: 'Continue Editing', style: 'cancel'},
-        {text: 'Cancel', style: 'destructive', onPress: () => navigation.goBack()},
+        { text: 'Continue Editing', style: 'cancel' },
+        { text: 'Cancel', style: 'destructive', onPress: () => navigation.goBack() },
       ],
     );
   };
@@ -1089,8 +1126,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
                       colors={['#0077C0', '#005A94']}
-                      start={{x: 0, y: 0}}
-                      end={{x: 1, y: 0}}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
                       style={styles.typeButtonGradient}>
                       <Text style={styles.typeButtonIcon}>🏷️</Text>
                       <Text style={styles.typeButtonTextSelected}>Sell</Text>
@@ -1110,8 +1147,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
                       colors={['#0077C0', '#005A94']}
-                      start={{x: 0, y: 0}}
-                      end={{x: 1, y: 0}}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
                       style={styles.typeButtonGradient}>
                       <Text style={styles.typeButtonIcon}>🔑</Text>
                       <Text style={styles.typeButtonTextSelected}>Rent</Text>
@@ -1237,18 +1274,18 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 />
               </View>
               {renderFieldError('location')}
-              
+
               {/* Property Location on Map - Below Location Input */}
               <View style={styles.mapContainer}>
                 <Text style={styles.mapLabel}>Property Location on Map (Optional)</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.mapButton}
                   onPress={() => setLocationPickerVisible(true)}>
                   {/* @ts-expect-error - LinearGradient works but TypeScript types are incorrect */}
                   <LinearGradient
                     colors={['#0077C0', '#005A94']}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 0}}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
                     style={styles.mapButtonGradient}>
                     <Text style={styles.mapButtonIcon}>📍</Text>
                     <Text style={styles.mapButtonText}>Add Location on Map</Text>
@@ -1267,7 +1304,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <LocationPicker
               visible={locationPickerVisible}
-              initialLocation={latitude && longitude ? {latitude, longitude} : undefined}
+              initialLocation={latitude && longitude ? { latitude, longitude } : undefined}
               onLocationSelect={(locationData) => {
                 setLatitude(locationData.latitude);
                 setLongitude(locationData.longitude);
@@ -1331,7 +1368,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             {fieldVisibility.showBedrooms && (
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>
-                  {propertyType === 'Studio Apartment' ? 'Studio' : 'Bedrooms'} 
+                  {propertyType === 'Studio Apartment' ? 'Studio' : 'Bedrooms'}
                   {fieldVisibility.bedroomsRequired && <Text style={styles.required}>*</Text>}
                 </Text>
                 {propertyType === 'Studio Apartment' ? (
@@ -1593,14 +1630,14 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               placeholder="Select facing direction"
               required={true}
               options={[
-                {label: 'North', value: 'North'},
-                {label: 'South', value: 'South'},
-                {label: 'East', value: 'East'},
-                {label: 'West', value: 'West'},
-                {label: 'North-East', value: 'North-East'},
-                {label: 'North-West', value: 'North-West'},
-                {label: 'South-East', value: 'South-East'},
-                {label: 'South-West', value: 'South-West'},
+                { label: 'North', value: 'North' },
+                { label: 'South', value: 'South' },
+                { label: 'East', value: 'East' },
+                { label: 'West', value: 'West' },
+                { label: 'North-East', value: 'North-East' },
+                { label: 'North-West', value: 'North-West' },
+                { label: 'South-East', value: 'South-East' },
+                { label: 'South-West', value: 'South-West' },
               ]}
               value={facing}
               onSelect={(value) => {
@@ -1617,11 +1654,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Select property age"
                   required={true}
                   options={[
-                    {label: 'New Construction', value: 'New Construction'},
-                    {label: 'Less than 1 Year', value: 'Less than 1 Year'},
-                    {label: '1-5 Years', value: '1-5 Years'},
-                    {label: '5-10 Years', value: '5-10 Years'},
-                    {label: '10+ Years', value: '10+ Years'},
+                    { label: 'New Construction', value: 'New Construction' },
+                    { label: 'Less than 1 Year', value: 'Less than 1 Year' },
+                    { label: '1-5 Years', value: '1-5 Years' },
+                    { label: '5-10 Years', value: '5-10 Years' },
+                    { label: '10+ Years', value: '10+ Years' },
                   ]}
                   value={propertyAge}
                   onSelect={(value) => {
@@ -1640,9 +1677,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholder="Select furnishing status"
                   required={true}
                   options={[
-                    {label: 'Unfurnished', value: 'Unfurnished'},
-                    {label: 'Semi-Furnished', value: 'Semi-Furnished'},
-                    {label: 'Fully-Furnished', value: 'Fully-Furnished'},
+                    { label: 'Unfurnished', value: 'Unfurnished' },
+                    { label: 'Semi-Furnished', value: 'Semi-Furnished' },
+                    { label: 'Fully-Furnished', value: 'Fully-Furnished' },
                   ]}
                   value={furnishing}
                   onSelect={(value) => {
@@ -1673,7 +1710,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     style={[
                       styles.amenityButton,
                       selectedAmenities.includes(amenity.id) &&
-                        styles.amenityButtonActive,
+                      styles.amenityButtonActive,
                     ]}
                     onPress={() => {
                       toggleAmenity(amenity.id);
@@ -1684,7 +1721,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                       style={[
                         styles.amenityText,
                         selectedAmenities.includes(amenity.id) &&
-                          styles.amenityTextActive,
+                        styles.amenityTextActive,
                       ]}>
                       {amenity.label}
                     </Text>
@@ -1733,7 +1770,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               Add 4–10 high-quality photos of your property (minimum 4 required)
             </Text>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.photoUploadArea}
               onPress={() => {
                 clearFieldError('photos');
@@ -1749,7 +1786,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 Minimum 4 images required. Supports: JPG, PNG, WEBP (Max 5MB each)
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.photoCameraButton}
               onPress={() => {
                 clearFieldError('photos');
@@ -1768,17 +1805,17 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   const showRejectedBadge = photo.moderationStatus === 'REJECTED';
                   const statusColor = showApprovedBadge ? '#4CAF50' : showRejectedBadge ? colors.error : 'transparent';
                   const statusText = showApprovedBadge ? '✓' : showRejectedBadge ? '✗' : '';
-                  
+
                   return (
                     <View key={index} style={styles.photoPreviewItem}>
-                      <Image source={{uri: photo.uri}} style={styles.photoPreviewImage} />
+                      <Image source={{ uri: photo.uri }} style={styles.photoPreviewImage} />
                       {photo.moderationStatus === 'checking' && (
                         <View style={[styles.moderationBadge, styles.moderationBadgeLoading]}>
                           <ActivityIndicator size="small" color={colors.surface} />
                         </View>
                       )}
                       {(showApprovedBadge || showRejectedBadge) && (
-                        <View style={[styles.moderationBadge, {backgroundColor: statusColor}]}>
+                        <View style={[styles.moderationBadge, { backgroundColor: statusColor }]}>
                           <Text style={styles.moderationBadgeText}>{statusText}</Text>
                         </View>
                       )}
@@ -1796,7 +1833,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                             Alert.alert(
                               'Image Rejected',
                               photo.moderationReason || 'Image does not meet our guidelines. Please upload property images only.',
-                              [{text: 'OK'}]
+                              [{ text: 'OK' }]
                             );
                           }}>
                           <Text style={styles.errorDetailsText}>View Details</Text>
@@ -1878,7 +1915,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     Typically 2-6 months of rent
                   </Text>
                 </View>
-                
+
                 {/* Available for Bachelors - Only for Apartment, PG / Hostel */}
                 {(propertyType === 'Apartment' || propertyType === 'PG / Hostel') && (
                   <View style={styles.inputContainer}>
@@ -2017,121 +2054,121 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               style={styles.safeArea}
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-            {/* Restricted edit banner for older listings */}
-            {isEditMode && isLimitedEdit && (
-              <View style={styles.limitedBanner}>
-                <Text style={styles.limitedBannerTitle}>Limited Edit Mode</Text>
-                <Text style={styles.limitedBannerText}>
-                  This listing is more than 24 hours old. You can only edit the Title and Pricing fields (price, negotiable, security deposit, maintenance). Other details are locked.
-                </Text>
-              </View>
-            )}
-
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>
-                {isEditMode ? 'Edit Property' : 'List Your Property'}
-              </Text>
-              <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Progress Steps */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.progressContainer}
-              contentContainerStyle={styles.progressContent}>
-              {steps.map((step) => {
-                const status = getStepStatus(step.id);
-                return (
-                  <TouchableOpacity
-                    key={step.id}
-                    style={styles.stepItem}
-                    onPress={() => {
-                      if (status === 'completed' || status === 'active') {
-                        setCurrentStep(step.id);
-                      }
-                    }}
-                    disabled={status === 'pending'}>
-                    <View
-                      style={[
-                        styles.stepCircle,
-                        status === 'completed' && styles.stepCircleCompleted,
-                        status === 'active' && styles.stepCircleActive,
-                      ]}>
-                      {status === 'completed' ? (
-                        <Text style={styles.stepCheckmark}>✓</Text>
-                      ) : (
-                        <Text style={styles.stepIcon}>{step.icon}</Text>
-                      )}
-                    </View>
-                    <Text
-                      style={[
-                        styles.stepLabel,
-                        status === 'completed' && styles.stepLabelCompleted,
-                        status === 'active' && styles.stepLabelActive,
-                      ]}
-                      numberOfLines={1}>
-                      {step.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* Content */}
-            <ScrollView
-              ref={stepScrollViewRef}
-              style={styles.content}
-              contentContainerStyle={styles.contentContainer}
-              showsVerticalScrollIndicator={true}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag">
-              {renderStepContent()}
-            </ScrollView>
-
-            {/* Footer */}
-            <View style={styles.footer}>
-              {currentStep > 1 && (
-                <TouchableOpacity style={styles.backButton} onPress={handlePrevious}>
-                  <Text style={styles.backButtonIcon}>←</Text>
-                  <Text style={styles.backButtonText}>Back</Text>
-                </TouchableOpacity>
+              {/* Restricted edit banner for older listings */}
+              {isEditMode && isLimitedEdit && (
+                <View style={styles.limitedBanner}>
+                  <Text style={styles.limitedBannerTitle}>Limited Edit Mode</Text>
+                  <Text style={styles.limitedBannerText}>
+                    This listing is more than 24 hours old. You can only edit the Title and Pricing fields (price, negotiable, security deposit, maintenance). Other details are locked.
+                  </Text>
+                </View>
               )}
-              <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.nextButton, isSubmitting && styles.disabledButton]} 
-                onPress={handleNext}
-                disabled={isSubmitting}>
-                {currentStep === totalSteps ? (
-                  // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
-                  <LinearGradient
-                    colors={isSubmitting ? ['#CCCCCC', '#999999'] : ['#43A047', '#2E7D32']}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 0}}
-                    style={styles.publishButtonGradient}>
-                    <Text style={styles.publishButtonIcon}>{isSubmitting ? '⏳' : '✓'}</Text>
-                    <Text style={styles.publishButtonText}>
-                      {isSubmitting ? 'Submitting...' : 'Publish Listing'}
-                    </Text>
-                  </LinearGradient>
-                ) : (
-                  // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
-                  <LinearGradient
-                    colors={['#0077C0', '#005A94']}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 0}}
-                    style={styles.nextButtonGradient}>
-                    <Text style={styles.nextButtonText}>Next</Text>
-                    <Text style={styles.nextButtonArrow}>→</Text>
-                  </LinearGradient>
+
+              {/* Header */}
+              <View style={styles.header}>
+                <Text style={styles.headerTitle}>
+                  {isEditMode ? 'Edit Property' : 'List Your Property'}
+                </Text>
+                <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Progress Steps */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.progressContainer}
+                contentContainerStyle={styles.progressContent}>
+                {steps.map((step) => {
+                  const status = getStepStatus(step.id);
+                  return (
+                    <TouchableOpacity
+                      key={step.id}
+                      style={styles.stepItem}
+                      onPress={() => {
+                        if (status === 'completed' || status === 'active') {
+                          setCurrentStep(step.id);
+                        }
+                      }}
+                      disabled={status === 'pending'}>
+                      <View
+                        style={[
+                          styles.stepCircle,
+                          status === 'completed' && styles.stepCircleCompleted,
+                          status === 'active' && styles.stepCircleActive,
+                        ]}>
+                        {status === 'completed' ? (
+                          <Text style={styles.stepCheckmark}>✓</Text>
+                        ) : (
+                          <Text style={styles.stepIcon}>{step.icon}</Text>
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.stepLabel,
+                          status === 'completed' && styles.stepLabelCompleted,
+                          status === 'active' && styles.stepLabelActive,
+                        ]}
+                        numberOfLines={1}>
+                        {step.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Content */}
+              <ScrollView
+                ref={stepScrollViewRef}
+                style={styles.content}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag">
+                {renderStepContent()}
+              </ScrollView>
+
+              {/* Footer */}
+              <View style={styles.footer}>
+                {currentStep > 1 && (
+                  <TouchableOpacity style={styles.backButton} onPress={handlePrevious}>
+                    <Text style={styles.backButtonIcon}>←</Text>
+                    <Text style={styles.backButtonText}>Back</Text>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.nextButton, isSubmitting && styles.disabledButton]}
+                  onPress={handleNext}
+                  disabled={isSubmitting}>
+                  {currentStep === totalSteps ? (
+                    // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
+                    <LinearGradient
+                      colors={isSubmitting ? ['#CCCCCC', '#999999'] : ['#43A047', '#2E7D32']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.publishButtonGradient}>
+                      <Text style={styles.publishButtonIcon}>{isSubmitting ? '⏳' : '✓'}</Text>
+                      <Text style={styles.publishButtonText}>
+                        {isSubmitting ? 'Submitting...' : 'Publish Listing'}
+                      </Text>
+                    </LinearGradient>
+                  ) : (
+                    // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
+                    <LinearGradient
+                      colors={['#0077C0', '#005A94']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.nextButtonGradient}>
+                      <Text style={styles.nextButtonText}>Next</Text>
+                      <Text style={styles.nextButtonArrow}>→</Text>
+                    </LinearGradient>
+                  )}
+                </TouchableOpacity>
+              </View>
             </KeyboardAvoidingView>
           </SafeAreaView>
         </View>
