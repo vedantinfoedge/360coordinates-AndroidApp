@@ -432,13 +432,13 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <TouchableOpacity
         style={styles.propertyCard}
-        onPress={() => navigation.getParent()?.navigate((item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails') as never, { propertyId: item.id } as never)}>
+        onPress={() => (navigation.getParent() as any)?.navigate(item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails', { propertyId: item.id })}>
         {imageUrl ? (
           <Image
             source={{ uri: imageUrl }}
             style={styles.propertyImage}
             resizeMode="cover"
-            onError={(error) => {
+            onError={(error: any) => {
               console.error(`[AgentProperties] Image load error for property ${item.id}:`, {
                 uri: imageUrl,
                 error: error.nativeEvent?.error || 'Unknown error',
@@ -545,7 +545,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.propertyActions}>
               <TouchableOpacity
                 style={styles.editButton}
-                onPress={(e) => {
+                onPress={(e: any) => {
                   e.stopPropagation();
                   handleEdit(item.id);
                 }}>
@@ -553,7 +553,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteButton}
-                onPress={(e) => {
+                onPress={(e: any) => {
                   e.stopPropagation();
                   handleDelete(item.id);
                 }}>

@@ -954,107 +954,106 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
               delay={300}
             />
           </View>
-        </Animated.View>
 
-        {/* Recent Properties Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={styles.sectionIconContainer}>
-                <Text style={styles.sectionIcon}>🏠</Text>
+          {/* Recent Properties Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <View style={styles.sectionIconContainer}>
+                  <Text style={styles.sectionIcon}>🏠</Text>
+                </View>
+                <Text style={styles.sectionTitle}>Your Properties</Text>
               </View>
-              <Text style={styles.sectionTitle}>Your Properties</Text>
+              <AnimatedSeeAllButton
+                onPress={() => navigation.navigate('Listings')}>
+                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={styles.viewAllArrow}>›</Text>
+              </AnimatedSeeAllButton>
             </View>
-            <AnimatedSeeAllButton
-              onPress={() => navigation.navigate('Listings')}>
-              <Text style={styles.viewAllText}>View All</Text>
-              <Text style={styles.viewAllArrow}>›</Text>
-            </AnimatedSeeAllButton>
+            {recentProperties.length > 0 ? (
+              <FlatList
+                data={recentProperties}
+                renderItem={({ item, index }: { item: RecentProperty; index: number }) => (
+                  <AnimatedPropertyCard item={item} index={index} navigation={navigation} />
+                )}
+                keyExtractor={(item: RecentProperty) => String(item.id)}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyStateIconContainer}>
+                  <Text style={styles.emptyStateIcon}>🏠</Text>
+                </View>
+                <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
+                <Text style={styles.emptyStateText}>
+                  Start by adding your first property to get started
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyStateButton}
+                  onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
+                  activeOpacity={0.8}>
+                  <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
-          {recentProperties.length > 0 ? (
-            <FlatList
-              data={recentProperties}
-              renderItem={({ item, index }: { item: RecentProperty; index: number }) => (
-                <AnimatedPropertyCard item={item} index={index} navigation={navigation} />
-              )}
-              keyExtractor={(item: RecentProperty) => String(item.id)}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyStateIconContainer}>
-                <Text style={styles.emptyStateIcon}>🏠</Text>
-              </View>
-              <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
-              <Text style={styles.emptyStateText}>
-                Start by adding your first property to get started
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyStateButton}
-                onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
-                activeOpacity={0.8}>
-                <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
 
-        {/* Recent Leads Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={styles.sectionIconContainer}>
-                <Text style={styles.sectionIcon}>📋</Text>
+          {/* Recent Leads Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <View style={styles.sectionIconContainer}>
+                  <Text style={styles.sectionIcon}>📋</Text>
+                </View>
+                <View style={styles.sectionTitleRow}>
+                  <Text style={styles.sectionTitle}>Recent Leads</Text>
+                  {newLeadsCount > 0 && (
+                    <View style={styles.sectionBadge}>
+                      <Text style={styles.sectionBadgeText}>
+                        {newLeadsCount} New
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
-              <View style={styles.sectionTitleRow}>
-                <Text style={styles.sectionTitle}>Recent Leads</Text>
-                {newLeadsCount > 0 && (
-                  <View style={styles.sectionBadge}>
-                    <Text style={styles.sectionBadgeText}>
-                      {newLeadsCount} New
+              <AnimatedSeeAllButton onPress={() => (navigation as any).navigate('Leads')}>
+                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={styles.viewAllArrow}>›</Text>
+              </AnimatedSeeAllButton>
+            </View>
+
+            {recentLeads.length > 0 ? (
+              <View>
+                {recentLeads.map((lead, idx) => (
+                  <View key={`${lead.created_at}-${idx}`} style={styles.inquiryCard}>
+                    <Text style={styles.inquiryBuyerName} numberOfLines={1}>
+                      {lead.buyer_name || 'Buyer'}
+                    </Text>
+                    <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
+                      {lead.property_title || '—'}
+                    </Text>
+                    <Text style={styles.inquiryTime}>
+                      {lead.created_at ? formatters.timeAgo(lead.created_at) : ''}
                     </Text>
                   </View>
-                )}
+                ))}
               </View>
-            </View>
-            <AnimatedSeeAllButton onPress={() => (navigation as any).navigate('Leads')}>
-              <Text style={styles.viewAllText}>View All</Text>
-              <Text style={styles.viewAllArrow}>›</Text>
-            </AnimatedSeeAllButton>
+            ) : (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyStateIconContainer}>
+                  <Text style={styles.emptyStateIcon}>📋</Text>
+                </View>
+                <Text style={styles.emptyStateTitle}>No Leads Yet</Text>
+                <Text style={styles.emptyStateText}>
+                  When buyers click "View Contact" on your listings, they will appear here.
+                </Text>
+              </View>
+            )}
           </View>
 
-          {recentLeads.length > 0 ? (
-            <View>
-              {recentLeads.map((lead, idx) => (
-                <View key={`${lead.created_at}-${idx}`} style={styles.inquiryCard}>
-                  <Text style={styles.inquiryBuyerName} numberOfLines={1}>
-                    {lead.buyer_name || 'Buyer'}
-                  </Text>
-                  <Text style={styles.inquiryPropertyTitle} numberOfLines={1}>
-                    {lead.property_title || '—'}
-                  </Text>
-                  <Text style={styles.inquiryTime}>
-                    {lead.created_at ? formatters.timeAgo(lead.created_at) : ''}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyStateIconContainer}>
-                <Text style={styles.emptyStateIcon}>📋</Text>
-              </View>
-              <Text style={styles.emptyStateTitle}>No Leads Yet</Text>
-              <Text style={styles.emptyStateText}>
-                When buyers click "View Contact" on your listings, they will appear here.
-              </Text>
-            </View>
-          )}
-        </View>
-
-      </Animated.View>
-    </Animated.ScrollView>
+        </Animated.View>
+      </Animated.ScrollView>
     </View >
   );
 };

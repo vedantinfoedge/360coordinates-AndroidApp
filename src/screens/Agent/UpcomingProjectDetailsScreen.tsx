@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,21 +14,21 @@ import {
   Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RouteProp} from '@react-navigation/native';
-import {AgentStackParamList} from '../../navigation/AgentNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {propertyService} from '../../services/property.service';
-import {validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { AgentStackParamList } from '../../navigation/AgentNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { propertyService } from '../../services/property.service';
+import { validateAndProcessPropertyImages, PropertyImage } from '../../utils/imageHelper';
 import AgentHeader from '../../components/AgentHeader';
-import {useAuth} from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
-import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
+import { formatters, capitalize, capitalizeAmenity } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
-import {AMENITIES_LIST} from '../../utils/propertyTypeConfig';
-import {buyerService} from '../../services/buyer.service';
-import {createLead} from '../../services/leadsService';
+import { AMENITIES_LIST } from '../../utils/propertyTypeConfig';
+import { buyerService } from '../../services/buyer.service';
+import { createLead } from '../../services/leadsService';
 import {
   isPropertyUnlocked,
   markPropertyUnlocked,
@@ -48,7 +48,7 @@ type Props = {
   route: UpcomingProjectDetailsScreenRouteProp;
 };
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Carousel width with horizontal margins (same as property details screen)
 const IMAGE_CAROUSEL_WIDTH = SCREEN_WIDTH - (spacing.md * 2);
 
@@ -171,15 +171,15 @@ const buildFormattedProject = (prop: any, propertyImages: PropertyImage[]): any 
   };
 };
 
-const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
+const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const {logout, user} = useAuth();
+  const { logout, user } = useAuth();
   const isBuyer = (user?.user_type || '').toLowerCase() === 'buyer';
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
-  const imageScrollViewRef = useRef<ScrollView>(null);
+  const imageScrollViewRef = useRef<any>(null);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
 
   // Buyer: View Contact / Chat with Builder (same credit flow as property details)
@@ -208,7 +208,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       setCurrentImageIndex(0);
       setFailedImages(new Set());
       setTimeout(() => {
-        imageScrollViewRef.current?.scrollTo({x: 0, animated: false});
+        imageScrollViewRef.current?.scrollTo({ x: 0, animated: false });
       }, 100);
     }
   }, [property?.id]);
@@ -261,7 +261,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         ? formatters.price(parseFloat(property.price), false)
         : 'Price on request';
       const shareMessage = `Check out this project!\n\n${property.title || 'Project'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nVisit us: https://360coordinates.com`;
-      await Share.share({message: shareMessage, title: property.title || 'Project'});
+      await Share.share({ message: shareMessage, title: property.title || 'Project' });
     } catch (e: any) {
       if (e.message !== 'User did not share') {
         CustomAlert.alert('Error', 'Failed to share. Please try again.');
@@ -297,7 +297,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
-  const consumeInteraction = async (): Promise<{success: boolean; remaining: number}> => {
+  const consumeInteraction = async (): Promise<{ success: boolean; remaining: number }> => {
     try {
       const stored = await AsyncStorage.getItem(INTERACTION_STORAGE_KEY);
       let remaining = TOTAL_INTERACTION_LIMIT;
@@ -343,9 +343,9 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         try {
           const historyAction = action === 'chat' ? 'chat_with_owner' : 'viewed_owner_details';
           await buyerService.addHistory(propId, historyAction);
-        } catch (_) {}
+        } catch (_) { }
       }
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const handlePhonePress = (phone: string) => {
@@ -372,10 +372,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
     if (propertyUnlocked) {
       setShowContactModal(true);
-      try { await buyerService.recordInteraction(property.id, 'view_owner'); } catch (_) {}
+      try { await buyerService.recordInteraction(property.id, 'view_owner'); } catch (_) { }
       const sellerId = property.seller_id || property.user_id;
       if (sellerId != null && user?.id != null) {
-        try { await createLead({ property_id: property.id, seller_id: sellerId, buyer_id: user.id, buyer_name: user.full_name ?? '', buyer_phone: user.phone ?? '', buyer_email: user.email ?? '' }); } catch (_) {}
+        try { await createLead({ property_id: property.id, seller_id: sellerId, buyer_id: user.id, buyer_name: user.full_name ?? '', buyer_phone: user.phone ?? '', buyer_email: user.email ?? '' }); } catch (_) { }
       }
       return;
     }
@@ -396,10 +396,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       }
       await unlockPropertyAndSaveHistory('contact');
       setShowContactModal(true);
-      try { await buyerService.recordInteraction(property.id, 'view_owner'); } catch (_) {}
+      try { await buyerService.recordInteraction(property.id, 'view_owner'); } catch (_) { }
       const sellerId = property.seller_id || property.user_id;
       if (sellerId != null && user?.id != null) {
-        try { await createLead({ property_id: property.id, seller_id: sellerId, buyer_id: user.id, buyer_name: user.full_name ?? '', buyer_phone: user.phone ?? '', buyer_email: user.email ?? '' }); } catch (_) {}
+        try { await createLead({ property_id: property.id, seller_id: sellerId, buyer_id: user.id, buyer_name: user.full_name ?? '', buyer_phone: user.phone ?? '', buyer_email: user.email ?? '' }); } catch (_) { }
       }
     } catch (_) {
       CustomAlert.alert('Error', 'Failed to process contact view. Please try again.');
@@ -462,8 +462,8 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     return (
       <View style={styles.container}>
         <AgentHeader
-          onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
-          onSupportPress={() => navigation.navigate('Support' as never)}
+          onProfilePress={() => (navigation as any).navigate('AgentTabs', { screen: 'Profile' })}
+          onSupportPress={() => (navigation as any).navigate('Support')}
           onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
           onLogoutPress={logout}
         />
@@ -515,7 +515,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     if (!d) return null;
     if (typeof d === 'string') {
       const parsed = new Date(d);
-      return isNaN(parsed.getTime()) ? d : parsed.toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'});
+      return isNaN(parsed.getTime()) ? d : parsed.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     }
     return null;
   };
@@ -523,13 +523,13 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   return (
     <View style={styles.container}>
       <AgentHeader
-        onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
-        onSupportPress={() => navigation.navigate('Support' as never)}
+        onProfilePress={() => (navigation as any).navigate('AgentTabs', { screen: 'Profile' })}
+        onSupportPress={() => (navigation as any).navigate('Support')}
         onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
         onLogoutPress={logout}
       />
 
-      <View style={[styles.actionButtonsTop, {top: insets.top + 60}]}>
+      <View style={[styles.actionButtonsTop, { top: insets.top + 60 }]}>
         <TouchableOpacity style={styles.shareButtonTop} onPress={handleShare} activeOpacity={0.7}>
           <View style={styles.actionButtonInner}>
             <Text style={styles.shareIcon}>🔗</Text>
@@ -547,13 +547,13 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={e => {
+                onMomentumScrollEnd={(e: any) => {
                   const index = Math.round(e.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH);
                   if (index >= 0 && index < propertyImages.length) setCurrentImageIndex(index);
                 }}
                 scrollEventThrottle={16}
                 style={styles.imageCarousel}
-                contentContainerStyle={{...styles.imageCarouselContent, width: IMAGE_CAROUSEL_WIDTH * propertyImages.length}}
+                contentContainerStyle={{ ...styles.imageCarouselContent, width: IMAGE_CAROUSEL_WIDTH * propertyImages.length }}
                 snapToInterval={IMAGE_CAROUSEL_WIDTH}
                 snapToAlignment="center">
                 {propertyImages.map((image: PropertyImage, index: number) => (
@@ -569,7 +569,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       </View>
                     ) : (
                       <Image
-                        source={{uri: image.url}}
+                        source={{ uri: image.url }}
                         style={styles.image}
                         resizeMode="cover"
                         onError={() => setFailedImages(prev => new Set(prev).add(image.id))}
@@ -585,7 +585,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       key={index}
                       onPress={() => {
                         setCurrentImageIndex(index);
-                        imageScrollViewRef.current?.scrollTo({x: index * IMAGE_CAROUSEL_WIDTH, animated: true});
+                        imageScrollViewRef.current?.scrollTo({ x: index * IMAGE_CAROUSEL_WIDTH, animated: true });
                       }}
                       activeOpacity={0.7}>
                       <View style={[styles.indicator, index === currentImageIndex && styles.indicatorActive]} />
@@ -595,7 +595,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               )}
             </>
           ) : (
-            <View style={[styles.imageContainer, {width: IMAGE_CAROUSEL_WIDTH}]}>
+            <View style={[styles.imageContainer, { width: IMAGE_CAROUSEL_WIDTH }]}>
               <View style={[styles.image, styles.imagePlaceholder]}>
                 <Text style={styles.imagePlaceholderText}>🏗️</Text>
                 <Text style={styles.imagePlaceholderSubtext}>No images</Text>
@@ -870,10 +870,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       )}
 
       {!isBuyer && (
-        <View style={[styles.actionButtons, {paddingBottom: insets.bottom}]}>
+        <View style={[styles.actionButtons, { paddingBottom: insets.bottom }]}>
           <TouchableOpacity
             style={styles.editButton}
-            onPress={() => navigation.navigate('EditProperty', {propertyId: property.id})}>
+            onPress={() => navigation.navigate('EditProperty', { propertyId: property.id })}>
             <Text style={styles.editButtonText}>✏️ Edit Project</Text>
           </TouchableOpacity>
         </View>

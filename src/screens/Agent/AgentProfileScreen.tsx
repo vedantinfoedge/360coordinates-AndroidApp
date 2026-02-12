@@ -18,7 +18,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { AgentTabParamList } from '../../components/navigation/AgentTabNavigator';
-import { colors, typography, spacing } from '../../theme';
+import { colors, typography, spacing, borderRadius } from '../../theme';
 import { moderateScale } from '../../utils/responsive';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import { useAuth } from '../../context/AuthContext';

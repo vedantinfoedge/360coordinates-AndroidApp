@@ -182,11 +182,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onScrollBeginDrag={() => onImageCarouselScrollStart?.()}
-                onMomentumScrollEnd={(e) => {
+                onMomentumScrollEnd={(e: any) => {
                   onScrollEnd(e);
                   onImageCarouselScrollEnd?.();
                 }}
-                onScrollEndDrag={(e) => {
+                onScrollEndDrag={(e: any) => {
                   onScrollEnd(e);
                   onImageCarouselScrollEnd?.();
                 }}
@@ -378,7 +378,6 @@ const CARD_SHADOW = {
 const styles = StyleSheet.create({
   card: {
     width: scale(300),
-    backgroundColor: colors.surface,
     borderRadius: CARD_RADIUS,
     marginRight: spacing.lg,
     overflow: 'hidden',
