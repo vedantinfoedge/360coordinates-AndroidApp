@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,25 +11,28 @@ import {
   ActivityIndicator,
   Animated,
 } from 'react-native';
-import {launchImageLibrary, launchCamera, MediaType, ImagePickerResponse} from 'react-native-image-picker';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerStackParamList} from '../../navigation/SellerNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {useAuth} from '../../context/AuthContext';
+import { launchImageLibrary, launchCamera, MediaType, ImagePickerResponse } from 'react-native-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { SellerStackParamList } from '../../navigation/SellerNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { useAuth } from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import Button from '../../components/common/Button';
-import {sellerService} from '../../services/seller.service';
+import { sellerService } from '../../services/seller.service';
 import CustomAlert from '../../utils/alertHelper';
-import {userService} from '../../services/user.service';
-import {fixImageUrl} from '../../utils/imageHelper';
-import {validation} from '../../utils/validation';
-import {formatters} from '../../utils/formatters';
+import { userService } from '../../services/user.service';
+import { fixImageUrl } from '../../utils/imageHelper';
+import { validation } from '../../utils/validation';
+import { formatters } from '../../utils/formatters';
+
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { SellerTabParamList } from '../../components/navigation/SellerTabNavigator';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  NativeStackNavigationProp<SellerStackParamList, 'Profile'>,
+  BottomTabNavigationProp<SellerTabParamList, 'Profile'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -37,14 +40,14 @@ type Props = {
   navigation: ProfileScreenNavigationProp;
 };
 
-const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, setUser} = useAuth();
+const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
+  const { user, logout, setUser } = useAuth();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(user?.profile_image || null);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   // Split full_name into first_name and last_name for validation
   const [formData, setFormData] = useState({
     first_name: '',
@@ -57,10 +60,10 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
     alternate_mobile: '',
   });
 
-  const [originalData, setOriginalData] = useState({...formData});
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
-  const [stats, setStats] = useState({listedProperties: 0, inquiries: 0});
-  
+  const [originalData, setOriginalData] = useState({ ...formData });
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [stats, setStats] = useState({ listedProperties: 0, inquiries: 0 });
+
   // Scroll animation for header hide/show
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -83,7 +86,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       const nameParts = fullName.split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
-      
+
       setFormData({
         first_name: firstName,
         last_name: lastName,
@@ -107,12 +110,12 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       if (response && response.success && response.data) {
         const profile = response.data.profile || response.data;
         const userData = response.data.user || user;
-        
+
         const fullName = profile.full_name || userData?.full_name || '';
         const nameParts = fullName.split(' ');
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
-        
+
         const profileData = {
           first_name: firstName,
           last_name: lastName,
@@ -123,10 +126,10 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
           whatsapp_number: profile.whatsapp_number || '',
           alternate_mobile: profile.alternate_mobile || '',
         };
-        
+
         setFormData(profileData);
         setOriginalData(profileData);
-        
+
         if (profile.profile_image) {
           setProfileImage(fixImageUrl(profile.profile_image));
         } else if (userData?.profile_image) {
@@ -143,8 +146,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
   const loadStats = async () => {
     try {
       const [propertiesResponse, inquiriesResponse]: any[] = await Promise.all([
-        sellerService.getProperties({page: 1, limit: 100}),
-        sellerService.getInquiries({page: 1, limit: 100}),
+        sellerService.getProperties({ page: 1, limit: 100 }),
+        sellerService.getInquiries({ page: 1, limit: 100 }),
       ]);
       let propertiesCount = 0;
       if (propertiesResponse) {
@@ -171,29 +174,29 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         const inquiriesData = inquiriesResponse.data?.inquiries ?? inquiriesResponse.data;
         inquiriesCount = Array.isArray(inquiriesData) ? inquiriesData.length : 0;
       }
-      setStats({listedProperties: propertiesCount, inquiries: inquiriesCount});
+      setStats({ listedProperties: propertiesCount, inquiries: inquiriesCount });
     } catch (error: any) {
       if (__DEV__) console.error('Error loading profile stats:', error);
     }
   };
 
   const validateForm = (): boolean => {
-    const newErrors: {[key: string]: string} = {};
-    
+    const newErrors: { [key: string]: string } = {};
+
     // First Name validation (required, 2-50 chars, letters only)
     if (!formData.first_name.trim()) {
       newErrors.first_name = 'First name is required';
     } else if (!validation.firstName(formData.first_name)) {
       newErrors.first_name = 'First name must be 2-50 letters only';
     }
-    
+
     // Last Name validation (required, 2-50 chars, letters only)
     if (!formData.last_name.trim()) {
       newErrors.last_name = 'Last name is required';
     } else if (!validation.lastName(formData.last_name)) {
       newErrors.last_name = 'Last name must be 2-50 letters only';
     }
-    
+
     // Full name validation (2-50 chars total, letters and spaces only)
     const fullName = `${formData.first_name.trim()} ${formData.last_name.trim()}`.trim();
     if (fullName.length < 2 || fullName.length > 50) {
@@ -205,7 +208,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         newErrors.first_name = 'Full name must contain only letters and spaces';
       }
     }
-    
+
     // WhatsApp Number validation (optional, 10-15 digits as per backend spec)
     if (formData.whatsapp_number && formData.whatsapp_number.trim()) {
       const digits = formData.whatsapp_number.replace(/\D/g, '');
@@ -215,7 +218,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         newErrors.whatsapp_number = 'Please enter a valid Indian phone number';
       }
     }
-    
+
     // Alternate Mobile validation (optional, 10-15 digits as per backend spec)
     if (formData.alternate_mobile && formData.alternate_mobile.trim()) {
       const digits = formData.alternate_mobile.replace(/\D/g, '');
@@ -225,7 +228,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         newErrors.alternate_mobile = 'Please enter a valid Indian phone number';
       }
     }
-    
+
     // Address validation (optional, max 500 chars)
     if (formData.address && formData.address.length > 500) {
       newErrors.address = 'Address must be less than 500 characters';
@@ -236,13 +239,13 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleEdit = () => {
-    setOriginalData({...formData});
+    setOriginalData({ ...formData });
     setIsEditing(true);
     setErrors({});
   };
 
   const handleCancel = () => {
-    setFormData({...originalData});
+    setFormData({ ...originalData });
     setIsEditing(false);
     setErrors({});
   };
@@ -252,13 +255,13 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       CustomAlert.alert('Validation Error', 'Please fix the errors before saving');
       return;
     }
-    
+
     try {
       setSaving(true);
-      
+
       // Combine first_name and last_name into full_name
       const fullName = `${formData.first_name.trim()} ${formData.last_name.trim()}`.trim();
-      
+
       // Normalize phone numbers - extract digits only (10-15 digits as per backend spec)
       const normalizePhone = (phone: string): string | null => {
         if (!phone || !phone.trim()) return null;
@@ -269,23 +272,23 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
         }
         return digits; // Store as digits only
       };
-      
+
       const profileData: any = {
         full_name: fullName,
         address: formData.address?.trim() || null,
         whatsapp_number: normalizePhone(formData.whatsapp_number),
         alternate_mobile: normalizePhone(formData.alternate_mobile),
       };
-      
+
       // Remove null values from top level
       Object.keys(profileData).forEach(key => {
         if (profileData[key] === null) {
           delete profileData[key];
         }
       });
-      
+
       const response: any = await sellerService.updateProfile(profileData);
-      
+
       if (response && (response.success || (response.data && response.data.success))) {
         // Update user context
         if (user) {
@@ -295,7 +298,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
             address: formData.address,
           });
         }
-        setOriginalData({...formData, full_name: fullName});
+        setOriginalData({ ...formData, full_name: fullName });
         setIsEditing(false);
         CustomAlert.alert('Success', 'Profile updated successfully');
         // Reload profile to get updated data
@@ -320,9 +323,9 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       'Select Profile Image',
       'Choose an option',
       [
-        {text: 'Camera', onPress: () => handleImageSource('camera')},
-        {text: 'Gallery', onPress: () => handleImageSource('gallery')},
-        {text: 'Cancel', style: 'cancel'},
+        { text: 'Camera', onPress: () => handleImageSource('camera') },
+        { text: 'Gallery', onPress: () => handleImageSource('gallery') },
+        { text: 'Cancel', style: 'cancel' },
       ],
     );
   };
@@ -343,7 +346,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       if (response.assets && response.assets[0]) {
         try {
           setSaving(true);
-          
+
           // Validate image type (JPEG, PNG, WebP)
           const imageType = response.assets[0].type || '';
           const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -352,7 +355,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
             setSaving(false);
             return;
           }
-          
+
           // Validate image size (max 5MB)
           const fileSize = response.assets[0].fileSize || 0;
           if (fileSize > 5 * 1024 * 1024) {
@@ -360,7 +363,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
             setSaving(false);
             return;
           }
-          
+
           const uploadResponse: any = await userService.uploadProfileImage(
             response.assets[0].uri || '',
           );
@@ -421,7 +424,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
       .slice(0, 2);
   };
 
-  const memberSince = (user as any)?.created_at 
+  const memberSince = (user as any)?.created_at
     ? formatters.timeAgo((user as any).created_at)
     : 'Recently';
 
@@ -429,9 +432,9 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
     return (
       <View style={styles.container}>
         <SellerHeader
-          onProfilePress={() => {}}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
+          onProfilePress={() => { }}
+          onSupportPress={() => navigation.navigate('Support')}
+          onSubscriptionPress={() => navigation.navigate('Subscription')}
           onLogoutPress={handleLogout}
         />
         <View style={styles.loadingContainer}>
@@ -445,27 +448,27 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
   return (
     <View style={styles.container}>
       <SellerHeader
-        onProfilePress={() => {}}
+        onProfilePress={() => { }}
         onSupportPress={() => navigation.navigate('Support' as never)}
         onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
         onLogoutPress={handleLogout}
         scrollY={scrollY}
       />
 
-      <Animated.ScrollView 
-        style={styles.scrollView} 
+      <Animated.ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{paddingTop: 30}}
+        contentContainerStyle={{ paddingTop: 30 }}
         onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true}
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
         )}
         scrollEventThrottle={16}>
         {/* Profile Card Section */}
         <View style={styles.topSection}>
           <View style={styles.avatarContainer}>
             {profileImage ? (
-              <Image source={{uri: profileImage}} style={styles.avatarImage} />
+              <Image source={{ uri: profileImage }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>
@@ -473,9 +476,9 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                 </Text>
               </View>
             )}
-            <TouchableOpacity 
-              style={styles.editPhotoButton} 
-              onPress={handleImagePicker} 
+            <TouchableOpacity
+              style={styles.editPhotoButton}
+              onPress={handleImagePicker}
               disabled={saving}>
               {saving ? (
                 <ActivityIndicator size="small" color={colors.surface} />
@@ -545,8 +548,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                   ]}
                   value={formData.first_name}
                   onChangeText={(text: string) => {
-                    setFormData({...formData, first_name: text});
-                    if (errors.first_name) setErrors({...errors, first_name: ''});
+                    setFormData({ ...formData, first_name: text });
+                    if (errors.first_name) setErrors({ ...errors, first_name: '' });
                   }}
                   editable={isEditing}
                   placeholder="First name"
@@ -566,8 +569,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                   ]}
                   value={formData.last_name}
                   onChangeText={(text: string) => {
-                    setFormData({...formData, last_name: text});
-                    if (errors.last_name) setErrors({...errors, last_name: ''});
+                    setFormData({ ...formData, last_name: text });
+                    if (errors.last_name) setErrors({ ...errors, last_name: '' });
                   }}
                   editable={isEditing}
                   placeholder="Last name"
@@ -610,8 +613,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                 ]}
                 value={formData.whatsapp_number}
                 onChangeText={(text: string) => {
-                  setFormData({...formData, whatsapp_number: text});
-                  if (errors.whatsapp_number) setErrors({...errors, whatsapp_number: ''});
+                  setFormData({ ...formData, whatsapp_number: text });
+                  if (errors.whatsapp_number) setErrors({ ...errors, whatsapp_number: '' });
                 }}
                 editable={isEditing}
                 keyboardType="phone-pad"
@@ -633,8 +636,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                 ]}
                 value={formData.alternate_mobile}
                 onChangeText={(text: string) => {
-                  setFormData({...formData, alternate_mobile: text});
-                  if (errors.alternate_mobile) setErrors({...errors, alternate_mobile: ''});
+                  setFormData({ ...formData, alternate_mobile: text });
+                  if (errors.alternate_mobile) setErrors({ ...errors, alternate_mobile: '' });
                 }}
                 editable={isEditing}
                 keyboardType="phone-pad"
@@ -657,8 +660,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
                 ]}
                 value={formData.address}
                 onChangeText={(text: string) => {
-                  setFormData({...formData, address: text});
-                  if (errors.address) setErrors({...errors, address: ''});
+                  setFormData({ ...formData, address: text });
+                  if (errors.address) setErrors({ ...errors, address: '' });
                 }}
                 editable={isEditing}
                 multiline
@@ -701,7 +704,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Support' as never)}
+            onPress={() => navigation.navigate('Support')}
             activeOpacity={0.7}>
             <Text style={styles.menuIcon}>🆘</Text>
             <Text style={styles.menuText}>Support</Text>
@@ -712,7 +715,7 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Subscription' as never)}
+            onPress={() => navigation.navigate('Subscription')}
             activeOpacity={0.7}>
             <Text style={styles.menuIcon}>💳</Text>
             <Text style={styles.menuText}>Subscription</Text>
@@ -721,8 +724,8 @@ const SellerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.menuDivider} />
 
-          <TouchableOpacity 
-            style={styles.menuItem} 
+          <TouchableOpacity
+            style={styles.menuItem}
             onPress={handleLogout}
             activeOpacity={0.7}>
             <Text style={styles.menuIcon}>🚪</Text>
@@ -763,7 +766,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
@@ -807,7 +810,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.surface,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
     elevation: 2,
@@ -896,7 +899,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginHorizontal: spacing.md,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
@@ -938,7 +941,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs + 2,
     borderRadius: 8,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,
@@ -1014,7 +1017,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,

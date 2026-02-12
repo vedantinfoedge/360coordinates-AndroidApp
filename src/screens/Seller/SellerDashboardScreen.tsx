@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,23 +17,27 @@ import {
   InteractionManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../../navigation/AppNavigator';
-import {SellerStackParamList} from '../../navigation/SellerNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {useAuth} from '../../context/AuthContext';
+import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { SellerStackParamList } from '../../navigation/SellerNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon, TabIconName } from '../../components/navigation/TabIcons';
+import { useAuth } from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
-import {sellerService, DashboardStats} from '../../services/seller.service';
+import { sellerService, DashboardStats } from '../../services/seller.service';
 import CustomAlert from '../../utils/alertHelper';
-import {fixImageUrl} from '../../utils/imageHelper';
-import {formatters} from '../../utils/formatters';
-import {DEBUG_SELLER_CRASH, SELLER_DASHBOARD_SAFE_MODE} from '../../config/debugCrash';
+import { fixImageUrl } from '../../utils/imageHelper';
+import { formatters } from '../../utils/formatters';
+import { DEBUG_SELLER_CRASH, SELLER_DASHBOARD_SAFE_MODE } from '../../config/debugCrash';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { SellerTabParamList } from '../../components/navigation/SellerTabNavigator';
 
 type SellerDashboardScreenNavigationProp = CompositeNavigationProp<
-  NativeStackNavigationProp<SellerStackParamList, 'Dashboard'>,
+  BottomTabNavigationProp<SellerTabParamList, 'Home'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -53,7 +57,7 @@ interface RecentProperty {
 }
 
 // Animated Components
-const AnimatedAddPropertyButton = React.memo(({onPress}: {onPress: () => void}) => {
+const AnimatedAddPropertyButton = React.memo(({ onPress }: { onPress: () => void }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -73,7 +77,7 @@ const AnimatedAddPropertyButton = React.memo(({onPress}: {onPress: () => void}) 
   };
 
   return (
-    <Animated.View style={{transform: [{scale: scaleAnim}]}}>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
         style={styles.addPropertyButton}
         onPress={onPress}
@@ -87,7 +91,9 @@ const AnimatedAddPropertyButton = React.memo(({onPress}: {onPress: () => void}) 
 });
 
 const AnimatedStatCard = React.memo(({
-  icon,
+  iconName,
+  iconColor = colors.primary,
+  iconBgColor = '#E3F6FF',
   number,
   label,
   badge,
@@ -96,12 +102,14 @@ const AnimatedStatCard = React.memo(({
   onPress,
   delay = 0,
 }: {
-  icon: string;
+  iconName: TabIconName;
+  iconColor?: string;
+  iconBgColor?: string;
   number?: string | number;
   label: string;
   badge?: string;
   badgeColor?: string;
-  statusPills?: {sale: number; rent: number};
+  statusPills?: { sale: number; rent: number };
   onPress?: () => void;
   delay?: number;
 }) => {
@@ -151,30 +159,30 @@ const AnimatedStatCard = React.memo(({
   const CardWrapper = onPress ? TouchableOpacity : View;
   const cardProps = onPress
     ? {
-        onPress,
-        onPressIn: handlePressIn,
-        onPressOut: handlePressOut,
-        activeOpacity: 0.8,
-      }
+      onPress,
+      onPressIn: handlePressIn,
+      onPressOut: handlePressOut,
+      activeOpacity: 0.8,
+    }
     : {};
 
   return (
     <Animated.View
       style={[
-        {opacity: cardAnim, transform: [{scale: scaleAnim}]},
-        {width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2},
+        { opacity: cardAnim, transform: [{ scale: scaleAnim }] },
+        { width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2 },
       ]}>
       <CardWrapper style={styles.statCard} {...cardProps}>
-        <View style={styles.statCardIcon}>
-          <Text style={styles.statIcon}>{icon}</Text>
+        <View style={[styles.statCardIcon, { backgroundColor: iconBgColor }]}>
+          <TabIcon name={iconName} color={iconColor} size={24} />
         </View>
         {number !== undefined && (
           <Text style={styles.statNumber}>{number}</Text>
         )}
         <Text style={styles.statLabel}>{label}</Text>
         {badge && (
-          <View style={[styles.activeBadge, badgeColor && {backgroundColor: badgeColor}]}>
-            <Text style={[styles.activeBadgeText, {color: getBadgeTextColor()}]}>{badge}</Text>
+          <View style={[styles.activeBadge, badgeColor && { backgroundColor: badgeColor }]}>
+            <Text style={[styles.activeBadgeText, { color: getBadgeTextColor() }]}>{badge}</Text>
           </View>
         )}
         {statusPills && (
@@ -193,13 +201,13 @@ const AnimatedStatCard = React.memo(({
 });
 
 const AnimatedQuickActionCard = React.memo(({
-  icon,
+  iconName,
   title,
   description,
   onPress,
   delay = 0,
 }: {
-  icon: string;
+  iconName: TabIconName;
   title: string;
   description: string;
   onPress: () => void;
@@ -239,7 +247,7 @@ const AnimatedQuickActionCard = React.memo(({
       style={[
         {
           opacity: cardAnim,
-          transform: [{scale: scaleAnim}],
+          transform: [{ scale: scaleAnim }],
           width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.xs * 3) / 2,
         },
       ]}>
@@ -250,7 +258,7 @@ const AnimatedQuickActionCard = React.memo(({
         onPressOut={handlePressOut}
         activeOpacity={0.8}>
         <View style={styles.quickActionIconContainer}>
-          <Text style={styles.quickActionIcon}>{icon}</Text>
+          <TabIcon name={iconName} color={colors.primary} size={20} />
         </View>
         <Text style={styles.quickActionTitle}>{title}</Text>
         <Text style={styles.quickActionDescription}>{description}</Text>
@@ -259,7 +267,7 @@ const AnimatedQuickActionCard = React.memo(({
   );
 });
 
-const AnimatedSeeAllButton = React.memo(({onPress, children}: {
+const AnimatedSeeAllButton = React.memo(({ onPress, children }: {
   onPress: () => void;
   children: React.ReactNode;
 }) => {
@@ -282,7 +290,7 @@ const AnimatedSeeAllButton = React.memo(({onPress, children}: {
   };
 
   return (
-    <Animated.View style={{transform: [{scale: scaleAnim}]}}>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
         style={styles.seeAllButton}
         onPress={onPress}
@@ -295,8 +303,8 @@ const AnimatedSeeAllButton = React.memo(({onPress, children}: {
   );
 });
 
-const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, switchUserRole} = useAuth();
+const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
+  const { user, logout, switchUserRole } = useAuth();
   const [switchingRole, setSwitchingRole] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [allProperties, setAllProperties] = useState<any[]>([]);
@@ -304,14 +312,14 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Performance optimization: cache timestamp to prevent excessive API calls
   const lastFetchTimeRef = useRef<number>(0);
   const isFetchingRef = useRef<boolean>(false);
   const hasAnimatedRef = useRef<boolean>(false);
   const hasLoadedOnceRef = useRef<boolean>(false);
   const CACHE_DURATION = 30000; // 30 seconds cache
-  
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -325,8 +333,8 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   // DEBUG: Static placeholder when isolating crash (no API, no SellerHeader, minimal hooks already run above)
   if (DEBUG_SELLER_CRASH) {
     return (
-      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface}}>
-        <Text style={{fontSize: 16, color: colors.textSecondary}}>Seller Dashboard placeholder (APIs disabled)</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }}>
+        <Text style={{ fontSize: 16, color: colors.textSecondary }}>Seller Dashboard placeholder (APIs disabled)</Text>
       </View>
     );
   }
@@ -372,7 +380,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             try {
               (navigation as any).reset({
                 index: 0,
-                routes: [{name: 'Agent'}],
+                routes: [{ name: 'Agent' }],
               });
             } catch (e: any) {
               console.warn('[SellerDashboard] Agent redirect reset failed:', e?.message);
@@ -380,7 +388,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           },
         },
       ],
-      {cancelable: false}
+      { cancelable: false }
     );
   }, [user, navigation]);
 
@@ -392,27 +400,27 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     // Prevent duplicate fetches and implement caching
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchTimeRef.current;
-    
+
     // Skip if already fetching or if data is still fresh (unless force refresh)
     if (isFetchingRef.current) {
       return;
     }
-    
+
     if (!forceRefresh && timeSinceLastFetch < CACHE_DURATION && hasLoadedOnceRef.current) {
       return; // Use cached data
     }
-    
+
     isFetchingRef.current = true;
-    
+
     try {
       if (showLoading) {
         setLoading(true);
       }
-      
+
       // Try to get stats first - if successful, we only need 3 properties for display
       let apiStats: DashboardStats | null = null;
       let statsSuccess = false;
-      
+
       try {
         console.log('[SellerDashboard] Before getDashboardStats');
         const statsResponse: any = await sellerService.getDashboardStats();
@@ -449,7 +457,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           new_inquiries: 0,
           total_views: 0,
           views_percentage_change: 0,
-          properties_by_status: {sale: 0, rent: 0},
+          properties_by_status: { sale: 0, rent: 0 },
           recent_inquiries: [],
           subscription: null,
         });
@@ -459,11 +467,11 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       }
 
       const response = propertiesResponse as any;
-      
+
       if (response && response.success && response.data) {
         // Handle different response structures
         let properties: any[] = [];
-        
+
         const data = response.data;
         if (data?.properties && Array.isArray(data.properties)) {
           properties = data.properties;
@@ -479,18 +487,18 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             }
           }
         }
-        
+
         // Store all properties for stats calculation
         setAllProperties(properties);
-        
+
         // Calculate dynamic stats from properties
         const totalProperties = properties.length;
         const activeProperties = properties.filter((prop: any) => {
-          const isActive = prop.is_active === 1 || prop.is_active === true || 
-                          prop.status === 'active' || prop.status === 1;
+          const isActive = prop.is_active === 1 || prop.is_active === true ||
+            prop.status === 'active' || prop.status === 1;
           return isActive;
         }).length;
-        
+
         // Use views_count as primary field (backend standard), fallback to views or view_count
         // IMPORTANT: views_count = unique users who viewed this property (1 view per user per property)
         // This count updates when properties are fetched from backend, NOT in real-time.
@@ -500,16 +508,16 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           const propViews = prop.views_count ?? prop.views ?? prop.view_count ?? 0;
           return sum + (typeof propViews === 'number' ? propViews : 0);
         }, 0);
-        
+
         const totalInquiries = properties.reduce((sum: number, prop: any) => {
           return sum + (prop.inquiry_count || prop.inquiries || prop.inquiry_count || 0);
         }, 0);
-        
+
         const propertiesByStatus = {
           sale: properties.filter((prop: any) => prop.status === 'sale' || prop.status === 'sell').length,
           rent: properties.filter((prop: any) => prop.status === 'rent').length,
         };
-        
+
         // Use API stats if available, otherwise use calculated stats from properties
         const finalStats: DashboardStats = apiStats ? {
           ...apiStats,
@@ -530,17 +538,17 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           recent_inquiries: [],
           subscription: null,
         };
-        
+
         setDashboardStats(finalStats);
-        
+
         // Format recent properties (first 3)
         const formattedProperties: RecentProperty[] = properties.slice(0, 3).map((prop: any) => {
           // Try multiple image fields - backend might store images in different formats
-          const rawImage = prop.cover_image || prop.image || prop.images?.[0] || prop.property_image || 
-                          (Array.isArray(prop.images) && prop.images.length > 0 ? prop.images[0] : null);
+          const rawImage = prop.cover_image || prop.image || prop.images?.[0] || prop.property_image ||
+            (Array.isArray(prop.images) && prop.images.length > 0 ? prop.images[0] : null);
           const imageUrl = fixImageUrl(rawImage);
           const propId = prop.id || prop.property_id;
-          
+
           return {
             id: propId,
             title: prop.title || prop.property_title || 'Untitled Property',
@@ -554,7 +562,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             inquiries: prop.inquiries || prop.inquiry_count || 0,
           };
         });
-        
+
         setRecentProperties(formattedProperties);
         hasLoadedOnceRef.current = true;
       } else {
@@ -568,7 +576,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           new_inquiries: 0,
           total_views: 0,
           views_percentage_change: 0,
-          properties_by_status: {sale: 0, rent: 0},
+          properties_by_status: { sale: 0, rent: 0 },
           recent_inquiries: [],
           subscription: null,
         };
@@ -586,7 +594,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         new_inquiries: 0,
         total_views: 0,
         views_percentage_change: 0,
-        properties_by_status: {sale: 0, rent: 0},
+        properties_by_status: { sale: 0, rent: 0 },
         recent_inquiries: [],
         subscription: null,
       };
@@ -662,7 +670,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     onPressOut?: () => void;
     style: any;
     children: React.ReactNode;
-  }> = ({imageUrl, propertyId, onPress, onPressIn, onPressOut, style, children}) => {
+  }> = ({ imageUrl, propertyId, onPress, onPressIn, onPressOut, style, children }) => {
     const [hasError, setHasError] = useState(false);
 
     React.useEffect(() => {
@@ -678,7 +686,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         activeOpacity={0.9}>
         {imageUrl && !hasError ? (
           <Image
-            source={{uri: imageUrl}}
+            source={{ uri: imageUrl }}
             style={styles.propertyImage}
             resizeMode="cover"
             onError={() => setHasError(true)}
@@ -705,7 +713,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   }) => {
     // Validate and fix image URL for Android - improved handling
     let imageUrl: string | null = null;
-    
+
     if (item.cover_image) {
       const trimmed = String(item.cover_image).trim();
       if (trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') {
@@ -731,7 +739,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         }
       }
     }
-    
+
     const cardAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const hasAnimated = useRef(false);
@@ -768,73 +776,73 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <Animated.View
         style={{
           opacity: cardAnim,
-          transform: [{scale: scaleAnim}],
+          transform: [{ scale: scaleAnim }],
         }}>
         <PropertyImageCard
           imageUrl={imageUrl}
           propertyId={String(item.id)}
-          onPress={() => navigation.navigate('PropertyDetails', {propertyId: String(item.id)})}
+          onPress={() => navigation.navigate('PropertyDetails', { propertyId: String(item.id) })}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           style={styles.propertyCard}>
-        <View style={styles.propertyCardContent}>
-          <View style={styles.propertyCardHeader}>
-            <View style={styles.propertyCardInfo}>
-              <View style={styles.propertyBadgeContainer}>
-                <View
-                  style={[
-                    styles.propertyStatusBadge,
-                    {
-                      backgroundColor:
-                        item.status === 'sale' ? colors.success : colors.primary,
-                    },
-                  ]}>
-                  <Text style={styles.propertyStatusText}>
-                    {item.status === 'sale' ? 'For Sale' : 'For Rent'}
+          <View style={styles.propertyCardContent}>
+            <View style={styles.propertyCardHeader}>
+              <View style={styles.propertyCardInfo}>
+                <View style={styles.propertyBadgeContainer}>
+                  <View
+                    style={[
+                      styles.propertyStatusBadge,
+                      {
+                        backgroundColor:
+                          item.status === 'sale' ? colors.success : colors.primary,
+                      },
+                    ]}>
+                    <Text style={styles.propertyStatusText}>
+                      {item.status === 'sale' ? 'For Sale' : 'For Rent'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.propertyCardTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <View style={styles.propertyLocationRow}>
+                  <View style={styles.locationIconContainer}>
+                    <Text style={styles.locationIcon}>📍</Text>
+                  </View>
+                  <Text style={styles.propertyCardLocation} numberOfLines={1}>
+                    {item.location}
                   </Text>
                 </View>
               </View>
-              <Text style={styles.propertyCardTitle} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <View style={styles.propertyLocationRow}>
-                <View style={styles.locationIconContainer}>
-                  <Text style={styles.locationIcon}>📍</Text>
+            </View>
+            <View style={styles.propertyCardStats}>
+              <View style={styles.propertyStatItem}>
+                <View style={styles.propertyStatIconContainer}>
+                  <Text style={styles.propertyStatIcon}>👁</Text>
                 </View>
-                <Text style={styles.propertyCardLocation} numberOfLines={1}>
-                  {item.location}
+                <Text style={styles.propertyStatText}>
+                  {item.views} people interested
+                </Text>
+              </View>
+              <View style={styles.propertyStatItem}>
+                <View style={styles.propertyStatIconContainer}>
+                  <Text style={styles.propertyStatIcon}>💬</Text>
+                </View>
+                <Text style={styles.propertyStatText}>
+                  {item.inquiries} inquiries
                 </Text>
               </View>
             </View>
+            <Text style={styles.propertyCardPrice}>
+              {formatters.price(item.price, item.status === 'rent')}
+            </Text>
           </View>
-          <View style={styles.propertyCardStats}>
-            <View style={styles.propertyStatItem}>
-              <View style={styles.propertyStatIconContainer}>
-                <Text style={styles.propertyStatIcon}>👁</Text>
-              </View>
-              <Text style={styles.propertyStatText}>
-                {item.views} people interested
-              </Text>
-            </View>
-            <View style={styles.propertyStatItem}>
-              <View style={styles.propertyStatIconContainer}>
-                <Text style={styles.propertyStatIcon}>💬</Text>
-              </View>
-              <Text style={styles.propertyStatText}>
-                {item.inquiries} inquiries
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.propertyCardPrice}>
-            {formatters.price(item.price, item.status === 'rent')}
-          </Text>
-        </View>
         </PropertyImageCard>
       </Animated.View>
     );
   }), []);
 
-  const renderPropertyCard = useCallback(({item, index}: {item: RecentProperty; index: number}) => (
+  const renderPropertyCard = useCallback(({ item, index }: { item: RecentProperty; index: number }) => (
     <AnimatedPropertyCard
       item={item}
       index={index}
@@ -855,8 +863,8 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
   // Safe mode: render only static JSX (no API, no SellerHeader). Must be after ALL hooks (useMemo, useCallback above).
   if (SELLER_DASHBOARD_SAFE_MODE) {
     return (
-      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface}}>
-        <Text style={{fontSize: 16, color: colors.textSecondary}}>Seller Home Safe</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }}>
+        <Text style={{ fontSize: 16, color: colors.textSecondary }}>Seller Home Safe</Text>
       </View>
     );
   }
@@ -877,15 +885,15 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.container}>
         <SellerHeader
           onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
+          onSupportPress={() => navigation.navigate('Support')}
+          onSubscriptionPress={() => navigation.navigate('Subscription')}
           onBuyPropertyPress={async () => {
             // Set dashboard preference and navigate to Buyer dashboard
             await AsyncStorage.setItem('@target_dashboard', 'buyer');
             await AsyncStorage.setItem('@user_dashboard_preference', 'buyer');
             (navigation as any).reset({
               index: 0,
-              routes: [{name: 'MainTabs'}],
+              routes: [{ name: 'MainTabs' }],
             });
           }}
           onLogoutPress={async () => {
@@ -908,15 +916,15 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
       <View style={styles.container}>
         <SellerHeader
           onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
+          onSupportPress={() => navigation.navigate('Support')}
+          onSubscriptionPress={() => navigation.navigate('Subscription')}
           onBuyPropertyPress={async () => {
             // Set dashboard preference and navigate to Buyer dashboard
             await AsyncStorage.setItem('@target_dashboard', 'buyer');
             await AsyncStorage.setItem('@user_dashboard_preference', 'buyer');
             (navigation as any).reset({
               index: 0,
-              routes: [{name: 'MainTabs'}],
+              routes: [{ name: 'MainTabs' }],
             });
           }}
           onLogoutPress={async () => {
@@ -938,7 +946,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
     new_inquiries: 0,
     total_views: 0,
     views_percentage_change: 0,
-    properties_by_status: {sale: 0, rent: 0},
+    properties_by_status: { sale: 0, rent: 0 },
     recent_inquiries: [],
     subscription: null,
   };
@@ -956,7 +964,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
         onBuyPropertyPress={async () => {
           // Switch role to buyer and navigate to Buyer dashboard
           if (switchingRole) return; // Prevent multiple clicks
-          
+
           try {
             setSwitchingRole(true);
             await switchUserRole('buyer');
@@ -985,14 +993,14 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         onScroll={Animated.event(
-          [{nativeEvent: {contentOffset: {y: scrollY}}}],
-          {useNativeDriver: true}
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
         )}
         scrollEventThrottle={16}>
         <Animated.View
           style={{
             opacity: fadeAnim,
-            transform: [{translateY: slideAnim}],
+            transform: [{ translateY: slideAnim }],
           }}>
           {/* Seller Header Box */}
           <View style={styles.sellerHeaderContainer}>
@@ -1013,7 +1021,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
                     if (statsResponse && statsResponse.success && statsResponse.data) {
                       const currentCount = statsResponse.data.total_properties || 0;
                       const planType = statsResponse.data.subscription?.plan_type || 'free';
-                      const limits: {[key: string]: number} = {
+                      const limits: { [key: string]: number } = {
                         free: 3,
                         basic: 10,
                         pro: 10,
@@ -1024,7 +1032,7 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
                         CustomAlert.alert(
                           'Property limit reached',
                           `Property limit reached. You can list up to ${limit} properties in your current plan.`,
-                          [{text: 'OK'}]
+                          [{ text: 'OK' }]
                         );
                         return;
                       }
@@ -1039,167 +1047,175 @@ const SellerDashboardScreen: React.FC<Props> = ({navigation}) => {
             </View>
           </View>
 
-        {/* Statistics Cards (2x2 Grid) with Animations */}
-        <Animated.View 
-          style={[
-            styles.statsGrid,
-            {
-              opacity: statsAnim,
-            },
-          ]}>
-          {/* Card 1: Total Properties */}
-          <AnimatedStatCard
-            icon="🏠"
-            number={stats.total_properties}
-            label="Total Properties"
-            badge={`${stats.active_properties} Active`}
-            badgeColor="#D1FAE5"
-            onPress={() => navigation.navigate('MyProperties')}
-            delay={0}
-          />
-
-          {/* Card 2: People Showed Interest (Views) */}
-          <AnimatedStatCard
-            icon="👁"
-            number={formatters.formatNumber(stats.total_views)}
-            label="Views"
-            badge={stats.views_percentage_change > 0 
-              ? `+${stats.views_percentage_change}%` 
-              : stats.views_percentage_change < 0 
-              ? `${stats.views_percentage_change}%` 
-              : 'Active'}
-            badgeColor={stats.views_percentage_change > 0 ? '#D1FAE5' : stats.views_percentage_change < 0 ? '#FEE2E2' : '#E3F6FF'}
-            delay={100}
-          />
-
-          {/* Card 3: Total Leads */}
-          <AnimatedStatCard
-            icon="💬"
-            number={stats.total_inquiries}
-            label="Total Leads"
-            badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
-            badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F3F4F6'}
-            onPress={() => navigation.navigate('Leads')}
-            delay={200}
-          />
-
-          {/* Card 4: Listing Status */}
-          <AnimatedStatCard
-            icon="📊"
-            number={(stats.properties_by_status?.sale ?? 0) + (stats.properties_by_status?.rent ?? 0)}
-            label="Listing Status"
-            statusPills={{
-              sale: stats.properties_by_status?.sale ?? 0,
-              rent: stats.properties_by_status?.rent ?? 0,
-            }}
-            delay={300}
-          />
-        </Animated.View>
-
-        {/* Quick Actions Grid (2x2) with Animations */}
-        <View style={styles.quickActionsGrid}>
-          <AnimatedQuickActionCard
-            icon="➕"
-            title="Add New Property"
-            description="List a new property for sale or rent"
-            onPress={async () => {
-              // Check property limit before navigating (free: 3, basic/pro/premium: 10)
-              try {
-                const statsResponse: any = await sellerService.getDashboardStats();
-                if (statsResponse && statsResponse.success && statsResponse.data) {
-                  const currentCount = statsResponse.data.total_properties || 0;
-                  const planType = statsResponse.data.subscription?.plan_type || 'free';
-                  const limits: {[key: string]: number} = {
-                    free: 3,
-                    basic: 10,
-                    pro: 10,
-                    premium: 10,
-                  };
-                  const limit = limits[planType] || limits.free;
-                  if (limit > 0 && currentCount >= limit) {
-                    CustomAlert.alert(
-                      'Property limit reached',
-                      `Property limit reached. You can list up to ${limit} properties in your current plan.`,
-                      [{text: 'OK'}]
-                    );
-                    return;
-                  }
-                }
-                navigation.navigate('AddProperty');
-              } catch (error) {
-                // If check fails, still allow navigation (will be checked again in AddPropertyScreen)
-                navigation.navigate('AddProperty');
-              }
-            }}
-            delay={0}
-          />
-
-          <AnimatedQuickActionCard
-            icon="✏"
-            title="Manage Properties"
-            description="Edit, update or remove listings"
-            onPress={() => navigation.navigate('MyProperties')}
-            delay={100}
-          />
-
-          <AnimatedQuickActionCard
-            icon="💬"
-            title="View Leads"
-            description="See leads from buyers who viewed contact"
-            onPress={() => navigation.navigate('Leads')}
-            delay={200}
-          />
-
-          <AnimatedQuickActionCard
-            icon="👤"
-            title="Update Profile"
-            description="Manage your account settings"
-            onPress={() => navigation.navigate('Profile')}
-            delay={300}
-          />
-        </View>
-
-        {/* Recent Properties Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={styles.sectionIconContainer}>
-                <Text style={styles.sectionIcon}>🏠</Text>
-              </View>
-              <Text style={styles.sectionTitle}>Your Properties</Text>
-            </View>
-            <AnimatedSeeAllButton
-              onPress={() => navigation.navigate('MyProperties')}>
-              <Text style={styles.viewAllText}>View All</Text>
-              <Text style={styles.viewAllArrow}>›</Text>
-            </AnimatedSeeAllButton>
-          </View>
-          {(recentProperties?.length ?? 0) > 0 ? (
-            <FlatList
-              data={recentProperties ?? []}
-              renderItem={renderPropertyCard}
-              keyExtractor={(item: RecentProperty) => String(item.id)}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
+          {/* Statistics Cards (2x2 Grid) with Animations */}
+          <Animated.View
+            style={[
+              styles.statsGrid,
+              {
+                opacity: statsAnim,
+              },
+            ]}>
+            {/* Card 1: Total Properties */}
+            <AnimatedStatCard
+              iconName="home"
+              iconColor={colors.primary}
+              iconBgColor="#E3F6FF"
+              number={stats.total_properties}
+              label="Total Properties"
+              badge={`${stats.active_properties} Active`}
+              badgeColor="#D1FAE5"
+              onPress={() => navigation.navigate('AllListings')}
+              delay={0}
             />
-          ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyStateIconContainer}>
-                <Text style={styles.emptyStateIcon}>🏠</Text>
+
+            {/* Card 2: People Showed Interest (Views) */}
+            <AnimatedStatCard
+              iconName="eye"
+              iconColor="#8B5CF6"
+              iconBgColor="#F3E8FF"
+              number={formatters.formatNumber(stats.total_views)}
+              label="Views"
+              badge={stats.views_percentage_change > 0
+                ? `+${stats.views_percentage_change}%`
+                : stats.views_percentage_change < 0
+                  ? `${stats.views_percentage_change}%`
+                  : 'Active'}
+              badgeColor={stats.views_percentage_change > 0 ? '#D1FAE5' : stats.views_percentage_change < 0 ? '#FEE2E2' : '#E3F6FF'}
+              delay={100}
+            />
+
+            {/* Card 3: Total Leads */}
+            <AnimatedStatCard
+              iconName="chats"
+              iconColor="#F59E0B"
+              iconBgColor="#FEF3C7"
+              number={stats.total_inquiries}
+              label="Total Leads"
+              badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
+              badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F3F4F6'}
+              onPress={() => navigation.navigate('Leads')}
+              delay={200}
+            />
+
+            {/* Card 4: Listing Status */}
+            <AnimatedStatCard
+              iconName="list"
+              iconColor="#10B981"
+              iconBgColor="#D1FAE5"
+              number={(stats.properties_by_status?.sale ?? 0) + (stats.properties_by_status?.rent ?? 0)}
+              label="Listing Status"
+              statusPills={{
+                sale: stats.properties_by_status?.sale ?? 0,
+                rent: stats.properties_by_status?.rent ?? 0,
+              }}
+              delay={300}
+            />
+          </Animated.View>
+
+          {/* Quick Actions Grid (2x2) with Animations */}
+          <View style={styles.quickActionsGrid}>
+            <AnimatedQuickActionCard
+              iconName="plus"
+              title="Add New Property"
+              description="List a new property for sale or rent"
+              onPress={async () => {
+                // Check property limit before navigating (free: 3, basic/pro/premium: 10)
+                try {
+                  const statsResponse: any = await sellerService.getDashboardStats();
+                  if (statsResponse && statsResponse.success && statsResponse.data) {
+                    const currentCount = statsResponse.data.total_properties || 0;
+                    const planType = statsResponse.data.subscription?.plan_type || 'free';
+                    const limits: { [key: string]: number } = {
+                      free: 3,
+                      basic: 10,
+                      pro: 10,
+                      premium: 10,
+                    };
+                    const limit = limits[planType] || limits.free;
+                    if (limit > 0 && currentCount >= limit) {
+                      CustomAlert.alert(
+                        'Property limit reached',
+                        `Property limit reached. You can list up to ${limit} properties in your current plan.`,
+                        [{ text: 'OK' }]
+                      );
+                      return;
+                    }
+                  }
+                  navigation.navigate('AddProperty');
+                } catch (error) {
+                  // If check fails, still allow navigation (will be checked again in AddPropertyScreen)
+                  navigation.navigate('AddProperty');
+                }
+              }}
+              delay={0}
+            />
+
+            <AnimatedQuickActionCard
+              iconName="edit"
+              title="Manage Properties"
+              description="Edit, update or remove listings"
+              onPress={() => navigation.navigate('AllListings')}
+              delay={100}
+            />
+
+            <AnimatedQuickActionCard
+              iconName="chats"
+              title="View Leads"
+              description="See leads from buyers who viewed contact"
+              onPress={() => navigation.navigate('Leads')}
+              delay={200}
+            />
+
+            <AnimatedQuickActionCard
+              iconName="profile"
+              title="Update Profile"
+              description="Manage your account settings"
+              onPress={() => navigation.navigate('Profile')}
+              delay={300}
+            />
+          </View>
+
+          {/* Recent Properties Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <View style={[styles.sectionIconContainer, { backgroundColor: '#E0F2FE' }]}>
+                  <TabIcon name="home" size={20} color={colors.primary} />
+                </View>
+                <Text style={styles.sectionTitle}>Your Properties</Text>
               </View>
-              <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
-              <Text style={styles.emptyStateText}>
-                Start by adding your first property to get started
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyStateButton}
-                onPress={() => navigation.navigate('AddProperty')}
-                activeOpacity={0.8}>
-                <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
-              </TouchableOpacity>
+              <AnimatedSeeAllButton
+                onPress={() => navigation.navigate('AllListings')}>
+                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={styles.viewAllArrow}>›</Text>
+              </AnimatedSeeAllButton>
             </View>
-          )}
-        </View>
+            {(recentProperties?.length ?? 0) > 0 ? (
+              <FlatList
+                data={recentProperties ?? []}
+                renderItem={renderPropertyCard}
+                keyExtractor={(item: RecentProperty) => String(item.id)}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyStateIconContainer, { backgroundColor: '#F3F4F6', padding: 16, borderRadius: 50 }]}>
+                  <TabIcon name="home" size={64} color="#9CA3AF" />
+                </View>
+                <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
+                <Text style={styles.emptyStateText}>
+                  Start by adding your first property to get started
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyStateButton}
+                  onPress={() => navigation.navigate('AddProperty')}
+                  activeOpacity={0.8}>
+                  <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </Animated.View>
       </Animated.ScrollView>
     </View>
@@ -1253,7 +1269,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 6},
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
@@ -1267,7 +1283,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
@@ -1297,7 +1313,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginTop: spacing.md,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 4,
@@ -1323,7 +1339,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: 4,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
@@ -1419,7 +1435,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
@@ -1530,7 +1546,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
@@ -1691,7 +1707,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: 10,
     shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,

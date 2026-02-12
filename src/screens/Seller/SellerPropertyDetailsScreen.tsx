@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,61 +9,55 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
-  Alert,
   Share,
+  Alert,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RouteProp} from '@react-navigation/native';
-import {SellerStackParamList} from '../../navigation/SellerNavigator';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {propertyService} from '../../services/property.service';
-import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { SellerTabParamList } from '../../components/navigation/SellerTabNavigator';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { propertyService } from '../../services/property.service';
+import { validateAndProcessPropertyImages, PropertyImage } from '../../utils/imageHelper';
 import SellerHeader from '../../components/SellerHeader';
-import {useAuth} from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
-import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
+import { formatters, capitalize, capitalizeAmenity } from '../../utils/formatters';
 
-type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
-  SellerStackParamList,
+type SellerPropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
+  SellerTabParamList,
   'PropertyDetails'
 >;
 
-type PropertyDetailsScreenRouteProp = RouteProp<SellerStackParamList, 'PropertyDetails'>;
+type SellerPropertyDetailsScreenRouteProp = RouteProp<SellerTabParamList, 'PropertyDetails'>;
 
 type Props = {
-  navigation: PropertyDetailsScreenNavigationProp;
-  route: PropertyDetailsScreenRouteProp;
+  navigation: SellerPropertyDetailsScreenNavigationProp;
+  route: SellerPropertyDetailsScreenRouteProp;
 };
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
-// Calculate image carousel width accounting for container margins
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_CAROUSEL_WIDTH = SCREEN_WIDTH - (spacing.md * 2);
 
-// PropertyImage type is imported from imageHelper
-
-const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
+const SellerPropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const {logout, user} = useAuth();
+  const { logout } = useAuth();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const imageScrollViewRef = useRef<any>(null);
-  const [failedImages, setFailedImages] = useState<Set<number>>(new Set()); // Track failed image IDs
+  const imageScrollViewRef = useRef<ScrollView>(null);
+  const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadPropertyDetails();
   }, [route.params.propertyId]);
 
-  // Reset image index when property changes
   useEffect(() => {
     if (property && property.images && property.images.length > 0) {
       setCurrentImageIndex(0);
-      setFailedImages(new Set()); // Reset failed images when property changes
+      setFailedImages(new Set());
       setTimeout(() => {
-        // @ts-ignore
         imageScrollViewRef.current?.scrollTo({
           x: 0,
           animated: false,
@@ -72,16 +66,15 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     }
   }, [property?.id]);
 
-  // Check if property can be edited (within 24 hours)
   const canEditProperty = (property: any): boolean => {
     const createdAt = property.created_at || property.created_date || property.date_created;
-    if (!createdAt) return true; // Allow if no date available
-    
+    if (!createdAt) return true;
+
     const createdDate = new Date(createdAt);
     const now = new Date();
     const diffMs = now.getTime() - createdDate.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    
+
     return diffHours < 24;
   };
 
@@ -89,30 +82,17 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     try {
       setLoading(true);
       const response = await propertyService.getPropertyDetails(route.params.propertyId);
-      
       const responseData = response as any;
-      console.log('[SellerPropertyDetails] Raw API Response:', {
-        success: responseData?.success,
-        hasData: !!responseData?.data,
-        hasProperty: !!responseData?.data?.property,
-        propertyId: responseData?.data?.property?.id,
-        propertyTitle: responseData?.data?.property?.title,
-        imagesField: responseData?.data?.property?.images,
-      });
-      
+
       if (responseData && responseData.success && responseData.data) {
         const propData = responseData.data.property || responseData.data;
-        
-        // ✅ Use helper function to validate and process images (EXACTLY like website)
+
         let propertyImages: PropertyImage[] = validateAndProcessPropertyImages(
           propData.images,
           propData.title || 'Property',
           propData.cover_image
         );
-        
-        console.log(`[SellerPropertyDetails] Processed ${propertyImages.length} valid images from ${propData.images?.length || 0} total`);
-        
-        // Final fallback: Placeholder (only if absolutely no images)
+
         if (propertyImages.length === 0) {
           propertyImages = [{
             id: 1,
@@ -120,10 +100,8 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             alt: propData.title || 'Property image'
           }];
         }
-        
-        // Store images as objects
+
         propData.images = propertyImages;
-        
         setProperty(propData);
         setCurrentImageIndex(0);
       } else {
@@ -141,18 +119,17 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleEdit = () => {
     if (!property) return;
-    
+
     const limitedEdit = !canEditProperty(property);
-    
+
     if (limitedEdit) {
       Alert.alert(
         'Limited Edit Mode',
-        'This property was created more than 24 hours ago.\n\nOnly the Title and Pricing fields (price, negotiable, deposit, maintenance) can be edited. Other details are locked.',
-        [{text: 'OK'}],
+        'This property was created more than 24 hours ago.\n\nOnly the Title and Pricing fields can be edited.',
+        [{ text: 'OK' }],
       );
     }
-    
-    // Navigate to AddProperty screen with edit params
+
     navigation.navigate('AddProperty', {
       propertyId: String(property.id),
       isLimitedEdit: limitedEdit,
@@ -162,13 +139,13 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleShareProperty = async () => {
     if (!property) return;
-    
+
     try {
-      const priceText = property.price 
+      const priceText = property.price
         ? `₹${parseFloat(property.price).toLocaleString('en-IN')}${property.status === 'rent' ? '/month' : ''}`
         : 'Price not available';
       const shareMessage = `Check out this property!\n\n${property.title || 'Property'}\n📍 ${property.location || property.city || 'Location not specified'}\n💰 ${priceText}\n\n${property.description ? property.description.substring(0, 100) + '...' : ''}\n\nVisit us: https://360coordinates.com`;
-      
+
       await Share.share({
         message: shareMessage,
         title: property.title || 'Property',
@@ -198,24 +175,14 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     );
   }
 
-  // Get property images - already converted to objects
-  // Get property images - already converted to objects in loadPropertyDetails
-  // Use all images that have a valid URL (don't filter out - they're already processed)
-  const propertyImages: PropertyImage[] = property.images && Array.isArray(property.images) && property.images.length > 0
-    ? property.images.filter((img: any): img is PropertyImage => {
-        // Only filter out null/undefined or empty URLs
-        return img && 
-               typeof img === 'object' && 
-               img.url && 
-               typeof img.url === 'string' &&
-               img.url.trim() !== '';
-      })
+  const propertyImages: PropertyImage[] = property.images && Array.isArray(property.images)
+    ? property.images
     : [];
-  
-  const formattedPrice = property.price 
+
+  const formattedPrice = property.price
     ? formatters.price(parseFloat(property.price), property.status === 'rent')
     : 'Price not available';
-  
+
   const amenities = property.amenities || [];
 
   return (
@@ -227,8 +194,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         onLogoutPress={logout}
       />
 
-      {/* Share Button - Positioned below header */}
-      <View style={[styles.actionButtonsTop, {top: (insets.top + 60)}]}>
+      <View style={[styles.actionButtonsTop, { top: (insets.top + 60) }]}>
         <TouchableOpacity
           style={styles.shareButtonTop}
           onPress={(e) => {
@@ -242,12 +208,12 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content with Image */}
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
-        {/* Image Slider/Carousel */}
+
+        {/* Image Slider/Carousel - Matches Buyer UI */}
         <View style={styles.imageCarouselContainer}>
           {propertyImages.length > 0 ? (
             <>
@@ -256,7 +222,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={(event: any) => {
+                onMomentumScrollEnd={(event) => {
                   const index = Math.round(
                     event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
                   );
@@ -264,7 +230,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                     setCurrentImageIndex(index);
                   }
                 }}
-                onScroll={(event: any) => {
+                onScroll={(event) => {
                   const index = Math.round(
                     event.nativeEvent.contentOffset.x / IMAGE_CAROUSEL_WIDTH,
                   );
@@ -281,7 +247,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 decelerationRate="fast"
                 snapToInterval={IMAGE_CAROUSEL_WIDTH}
                 snapToAlignment="center">
-                {propertyImages.map((image: PropertyImage, index: number) => (
+                {propertyImages.map((image, index) => (
                   <TouchableOpacity
                     key={image.id}
                     style={styles.imageContainer}
@@ -297,16 +263,14 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       </View>
                     ) : (
                       <Image
-                        source={{uri: image.url}}
+                        source={{ uri: image.url }}
                         style={styles.image}
                         resizeMode="cover"
                         onError={(error) => {
-                          console.error(`[SellerPropertyDetails] Image ${index} failed to load:`, image.url, error);
-                          // Mark this image as failed
+                          console.error(`[SellerPropertyDetails] Image ${index} failed:`, image.url);
                           setFailedImages(prev => new Set(prev).add(image.id));
                         }}
                         onLoadStart={() => {
-                          // Remove from failed set if it starts loading successfully
                           setFailedImages(prev => {
                             const newSet = new Set(prev);
                             newSet.delete(image.id);
@@ -318,55 +282,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-              
-              {/* Image Counter - Hidden per user request */}
-              {/* {propertyImages.length > 1 && (
-                <View style={styles.imageCounter}>
-                  <Text style={styles.imageCounterText}>
-                    {currentImageIndex + 1} / {propertyImages.length}
-                  </Text>
-                </View>
-              )} */}
-          
-              {/* Navigation Arrows - Hidden per user request */}
-              {/* {propertyImages.length > 1 && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.carouselNavButton, styles.carouselNavButtonLeft]}
-                    onPress={() => {
-                      const newIndex = currentImageIndex > 0 
-                        ? currentImageIndex - 1 
-                        : propertyImages.length - 1;
-                      setCurrentImageIndex(newIndex);
-                      // @ts-ignore
-                      imageScrollViewRef.current?.scrollTo({
-                        x: newIndex * IMAGE_CAROUSEL_WIDTH,
-                        animated: true,
-                      });
-                    }}
-                    activeOpacity={0.7}>
-                    <Text style={styles.carouselNavButtonText}>‹</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.carouselNavButton, styles.carouselNavButtonRight]}
-                    onPress={() => {
-                      const newIndex = currentImageIndex < propertyImages.length - 1 
-                        ? currentImageIndex + 1 
-                        : 0;
-                      setCurrentImageIndex(newIndex);
-                      // @ts-ignore
-                      imageScrollViewRef.current?.scrollTo({
-                        x: newIndex * IMAGE_CAROUSEL_WIDTH,
-                        animated: true,
-                      });
-                    }}
-                    activeOpacity={0.7}>
-                    <Text style={styles.carouselNavButtonText}>›</Text>
-                  </TouchableOpacity>
-                </>
-              )} */}
 
-              {/* Image Indicators/Dots */}
               {propertyImages.length > 1 && (
                 <View style={styles.imageIndicators}>
                   {propertyImages.map((_, index) => (
@@ -374,7 +290,6 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                       key={index}
                       onPress={() => {
                         setCurrentImageIndex(index);
-                        // @ts-ignore
                         imageScrollViewRef.current?.scrollTo({
                           x: index * IMAGE_CAROUSEL_WIDTH,
                           animated: true,
@@ -391,8 +306,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                   ))}
                 </View>
               )}
-              
-              {/* Swipe Gesture Hint */}
+
               {propertyImages.length > 1 && (
                 <View style={styles.swipeHint}>
                   <Text style={styles.swipeHintText}>← Swipe to view more →</Text>
@@ -410,8 +324,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           )}
         </View>
 
-        {/* Content Sections */}
-        {/* Title and Price */}
+        {/* Content Sections - Matches Buyer UI */}
         <View style={styles.headerSection}>
           <Text style={styles.title}>{capitalize(property.title || property.property_title || 'Property Title')}</Text>
           <View style={styles.locationContainer}>
@@ -447,7 +360,7 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.infoIconContainer}>
               <Text style={styles.infoIcon}>🏢</Text>
             </View>
-            <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground floor' : (property.floor || 'N/A')}</Text>
+            <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground' : (property.floor || 'N/A')}</Text>
           </View>
         </View>
 
@@ -541,8 +454,8 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         </View>
       </ScrollView>
 
-      {/* Fixed Action Buttons */}
-      <View style={[styles.actionButtons, {paddingBottom: insets.bottom}]}>
+      {/* Fixed Action Buttons - Edit Only */}
+      <View style={[styles.actionButtons, { paddingBottom: insets.bottom }]}>
         <TouchableOpacity
           style={styles.editButton}
           onPress={handleEdit}>
@@ -550,7 +463,6 @@ const SellerPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         </TouchableOpacity>
       </View>
 
-      {/* Image Gallery Modal */}
       <ImageGallery
         visible={showImageGallery}
         images={propertyImages.map(img => img.url)}
@@ -691,7 +603,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: {width: 0, height: 1},
+    textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   imageCounter: {
@@ -730,7 +642,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 4,
@@ -868,7 +780,7 @@ const styles = StyleSheet.create({
       },
       ios: {
         shadowColor: '#000',
-        shadowOffset: {width: 0, height: 1},
+        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 2,
       },
@@ -950,7 +862,7 @@ const styles = StyleSheet.create({
       },
       ios: {
         shadowColor: '#000',
-        shadowOffset: {width: 0, height: -2},
+        shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
       },
@@ -970,7 +882,7 @@ const styles = StyleSheet.create({
       },
       ios: {
         shadowColor: colors.primary,
-        shadowOffset: {width: 0, height: 4},
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4,
         shadowRadius: 8,
       },
