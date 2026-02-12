@@ -679,6 +679,73 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Upcoming Projects Section (by Agent/Builder) */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Explore Projects</Text>
+              <Text style={styles.sectionSubtitle}>
+                New projects from Agents & Builders
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                navigation.navigate('Search' as never, {
+                  query: '',
+                  location: '',
+                  listingType: 'buy',
+                  status: 'sale',
+                  project_type: 'upcoming',
+                } as never);
+              }}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {upcomingProjects.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselList}>
+              {upcomingProjects.map((item: Property) => {
+                const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
+                const images: string[] | undefined = item.images?.length
+                  ? item.images
+                    .map((url: string) => fixImageUrl(url))
+                    .filter((url): url is string => Boolean(url))
+                  : undefined;
+                return (
+                  <View key={item.id} style={styles.carouselCard}>
+                    <PropertyCard
+                      image={imageUrl || undefined}
+                      images={images}
+                      name={item.title}
+                      location={item.location}
+                      price={formatters.price(item.price, item.status === 'rent')}
+                      type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
+                      onPress={() =>
+                        navigation.navigate(
+                          item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
+                          { propertyId: String(item.id) },
+                        )
+                      }
+                      onFavoritePress={() => handleToggleFavorite(item.id)}
+                      onSharePress={() => handleShareProperty(item)}
+                      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+                      property={item}
+                      style={styles.carouselPropertyCard}
+                    />
+                  </View>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No upcoming projects at the moment</Text>
+            </View>
+          )}
+        </View>
+
+
         {/* Explore Properties Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -763,71 +830,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           )}
         </View>
 
-        {/* Upcoming Projects Section (by Agent/Builder) */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Upcoming Projects</Text>
-              <Text style={styles.sectionSubtitle}>
-                New projects from Agents & Builders
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => {
-                navigation.navigate('Search' as never, {
-                  query: '',
-                  location: '',
-                  listingType: 'buy',
-                  status: 'sale',
-                  project_type: 'upcoming',
-                } as never);
-              }}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          {upcomingProjects.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.carouselList}>
-              {upcomingProjects.map((item: Property) => {
-                const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
-                const images: string[] | undefined = item.images?.length
-                  ? item.images
-                    .map((url: string) => fixImageUrl(url))
-                    .filter((url): url is string => Boolean(url))
-                  : undefined;
-                return (
-                  <View key={item.id} style={styles.carouselCard}>
-                    <PropertyCard
-                      image={imageUrl || undefined}
-                      images={images}
-                      name={item.title}
-                      location={item.location}
-                      price={formatters.price(item.price, item.status === 'rent')}
-                      type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
-                      onPress={() =>
-                        navigation.navigate(
-                          item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
-                          { propertyId: String(item.id) },
-                        )
-                      }
-                      onFavoritePress={() => handleToggleFavorite(item.id)}
-                      onSharePress={() => handleShareProperty(item)}
-                      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
-                      property={item}
-                      style={styles.carouselPropertyCard}
-                    />
-                  </View>
-                );
-              })}
-            </ScrollView>
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No upcoming projects at the moment</Text>
-            </View>
-          )}
-        </View>
+
 
         {/* Buy New Home — Flats & Apartments for Sale */}
         <View style={styles.section}>
