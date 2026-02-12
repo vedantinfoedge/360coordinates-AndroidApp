@@ -123,6 +123,7 @@ export const buyerService = {
     max_price?: number;
     bedrooms?: string;
     search?: string;
+    project_type?: string;
   }): Promise<PropertiesListResponse> => {
     const response = await api.get(API_ENDPOINTS.BUYER_PROPERTIES_LIST, {
       params,

@@ -233,15 +233,22 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         }
       }
 
-      const allResponse = await buyerService.getProperties({ limit: 50 });
-      if (allResponse.success && allResponse.data?.properties) {
-        const allList = allResponse.data.properties as Property[];
+      // Fetch extra data for Upcoming Projects and Buy New Home sections
+      const [projectsResponse, propertiesResponse] = await Promise.all([
+        buyerService.getProperties({ limit: 50, project_type: 'upcoming' }),
+        buyerService.getProperties({ limit: 100 })
+      ]);
 
+      if (projectsResponse.success && projectsResponse.data?.properties) {
+        const projectsList = projectsResponse.data.properties as Property[];
         // Explore Projects: Show projects from AGENTS and SELLERS (Builders)
-        setUpcomingProjects(allList.filter(p =>
-          p.project_type === 'upcoming'
-        ).slice(0, 15));
+        setUpcomingProjects(projectsList.filter(p => p.project_type === 'upcoming'));
+      } else {
+        setUpcomingProjects([]);
+      }
 
+      if (propertiesResponse.success && propertiesResponse.data?.properties) {
+        const allList = propertiesResponse.data.properties as Property[];
         setBuyNewHomeProperties(
           allList
             .filter(

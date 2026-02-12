@@ -302,15 +302,24 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       // Fetch extra data for Upcoming Projects and Buy New Home sections (all statuses, larger set)
-      const allResponse = await buyerService.getProperties({ limit: 50 });
-      if (allResponse.success && allResponse.data?.properties) {
-        const allList = allResponse.data.properties as Property[];
+      // Use parallel requests to get specific data for each section
+      const [projectsResponse, propertiesResponse] = await Promise.all([
+        buyerService.getProperties({ limit: 50, project_type: 'upcoming' }),
+        buyerService.getProperties({ limit: 100 })
+      ]);
 
+      if (projectsResponse.success && projectsResponse.data?.properties) {
+        const projectsList = projectsResponse.data.properties as Property[];
         // Explore Projects: Show projects from AGENTS and SELLERS (Builders)
-        const upcoming = allList.filter(p =>
-          p.project_type === 'upcoming'
-        ).slice(0, 15);
+        // Since we fetched with project_type='upcoming', we just use the result
+        const upcoming = projectsList.filter(p => p.project_type === 'upcoming');
+        setUpcomingProjects(upcoming);
+      } else {
+        setUpcomingProjects([]);
+      }
 
+      if (propertiesResponse.success && propertiesResponse.data?.properties) {
+        const allList = propertiesResponse.data.properties as Property[];
         const forSale = allList
           .filter(
             p =>
@@ -319,7 +328,6 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
               (p.property_type || '').toLowerCase().includes('apartment'),
           )
           .slice(0, 15);
-        setUpcomingProjects(upcoming);
         setBuyNewHomeProperties(forSale);
       }
     } catch (error: any) {
