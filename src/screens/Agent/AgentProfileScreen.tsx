@@ -459,7 +459,10 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name *</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="profile" color={colors.primary} size={18} />
+                <Text style={styles.label}>Full Name *</Text>
+              </View>
               {isEditing ? (
                 <TextInput
                   style={styles.input}
@@ -473,29 +476,44 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email (Login)</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="mail" color={colors.primary} size={18} />
+                <Text style={styles.label}>Email (Login)</Text>
+              </View>
               <TextInput
                 style={[styles.input, styles.inputLocked]}
                 value={formData.email}
                 editable={false}
                 keyboardType="email-address"
               />
-              <Text style={styles.lockedText}>This is your login email and cannot be changed</Text>
+              <View style={styles.lockedLabelRow}>
+                <TabIcon name="support" color={colors.textSecondary} size={12} />
+                <Text style={styles.lockedText}>This is your login email and cannot be changed</Text>
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Phone Number (Login)</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="phone" color={colors.primary} size={18} />
+                <Text style={styles.label}>Phone Number (Login)</Text>
+              </View>
               <TextInput
                 style={[styles.input, styles.inputLocked]}
                 value={formData.phone}
                 editable={false}
                 keyboardType="phone-pad"
               />
-              <Text style={styles.lockedText}>This is your login mobile number and cannot be changed</Text>
+              <View style={styles.lockedLabelRow}>
+                <TabIcon name="support" color={colors.textSecondary} size={12} />
+                <Text style={styles.lockedText}>This is your login mobile number and cannot be changed</Text>
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>WhatsApp Number</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="phone" color={colors.primary} size={18} />
+                <Text style={styles.label}>WhatsApp Number</Text>
+              </View>
               {isEditing ? (
                 <TextInput
                   style={styles.input}
@@ -510,7 +528,10 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Alternate Mobile</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="phone" color={colors.primary} size={18} />
+                <Text style={styles.label}>Alternate Mobile</Text>
+              </View>
               {isEditing ? (
                 <TextInput
                   style={styles.input}
@@ -525,7 +546,10 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Address</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="location" color={colors.primary} size={18} />
+                <Text style={styles.label}>Address</Text>
+              </View>
               {isEditing ? (
                 <TextInput
                   style={[styles.input, styles.textArea]}
@@ -547,7 +571,10 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Company Name</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="building" color={colors.primary} size={18} />
+                <Text style={styles.label}>Company Name</Text>
+              </View>
               {isEditing ? (
                 <TextInput
                   style={styles.input}
@@ -561,7 +588,10 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>RERA id *</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="file-text" color={colors.primary} size={18} />
+                <Text style={styles.label}>RERA id *</Text>
+              </View>
               {isEditing ? (
                 <TextInput
                   style={styles.input}
@@ -575,7 +605,10 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>GST Number</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="file-text" color={colors.primary} size={18} />
+                <Text style={styles.label}>GST Number</Text>
+              </View>
               {isEditing ? (
                 <TextInput
                   style={styles.input}
@@ -589,7 +622,10 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Website</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="link" color={colors.primary} size={18} />
+                <Text style={styles.label}>Website</Text>
+              </View>
               {isEditing ? (
                 <TextInput
                   style={styles.input}
@@ -854,10 +890,21 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: spacing.xs,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
   label: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+  },
+  lockedLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: 2,
   },
   input: {
     borderWidth: 1,
