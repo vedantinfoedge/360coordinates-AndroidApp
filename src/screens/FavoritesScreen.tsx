@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -57,22 +57,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    if (isLoggedIn) {
-      loadFavorites();
-    }
-  }, [isLoggedIn]);
-
-  // Reload favorites when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      if (isLoggedIn) {
-        loadFavorites(1, false);
-      }
-    }, [isLoggedIn])
-  );
-
-  const loadFavorites = async (pageNum: number = 1, append: boolean = false) => {
+  const loadFavorites = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     try {
       console.log('==== [FavoritesScreen] LOAD FAVORITES START ====');
       console.log('[FavoritesScreen] Page:', pageNum, 'Append:', append);
@@ -145,7 +130,23 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadFavorites(1, false);
+    }
+  }, [isLoggedIn, loadFavorites]);
+
+  // Reload favorites whenever this screen is focused (e.g. from Profile → My Favorites)
+  // so that items added from anywhere (search, details, map, etc.) appear in the list
+  useFocusEffect(
+    useCallback(() => {
+      if (isLoggedIn) {
+        loadFavorites(1, false);
+      }
+    }, [isLoggedIn, loadFavorites])
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);

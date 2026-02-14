@@ -456,6 +456,9 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         setIsFavorite(newFavoriteStatus);
         // Update property object
         setProperty({...property, is_favorite: newFavoriteStatus});
+        if (newFavoriteStatus) {
+          CustomAlert.alert('Added to favorites', 'View this and all favorites in Profile → My Favorites.');
+        }
       } else {
         CustomAlert.alert('Error', response?.message || 'Failed to update favorite');
       }
