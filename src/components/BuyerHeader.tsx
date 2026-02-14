@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {TabIcon, TabIconName} from './navigation/TabIcons';
 import {verticalScale} from '../utils/responsive';
 
 const HEADER_HEIGHT = verticalScale(64);
@@ -186,15 +187,14 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
     console.log('  - menuItems:', menuItems.map(item => item.label));
   }, [showProfile, showLogout, showSignIn, showSignUp, showProfileFinal, showLogoutFinal, showSignInFinal, showSignUpFinal, isLoggedIn, menuItems, onSignInPress, onSignUpPress, onLogoutPress]);
 
-  // Get icon for menu item
-  const getMenuIcon = (label: string): string => {
+  const getMenuIconName = (label: string): TabIconName => {
     switch (label) {
-      case 'View Profile': return '👤';
-      case 'Support': return '💬';
-      case 'Sign Up': return '✨';
-      case 'Login': return '🔑';
-      case 'Logout': return '🚪';
-      default: return '•';
+      case 'View Profile': return 'profile';
+      case 'Support': return 'support';
+      case 'Sign Up': return 'sparkles';
+      case 'Login': return 'key';
+      case 'Logout': return 'logout';
+      default: return 'chevron-right';
     }
   };
 
@@ -255,7 +255,9 @@ const BuyerHeader: React.FC<BuyerHeaderProps> = ({
                   <TouchableOpacity
                     style={styles.menuItem}
                     onPress={item.onPress}>
-                    <Text style={styles.menuItemIcon}>{getMenuIcon(item.label)}</Text>
+                    <View style={styles.menuItemIconBox}>
+                      <TabIcon name={getMenuIconName(item.label)} color={colors.primary} size={20} />
+                    </View>
                     <Text style={item.isLogout ? [styles.menuItemText, styles.logoutText] : styles.menuItemText}>
                       {item.label}
                     </Text>
@@ -363,6 +365,14 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 18,
     gap: 12,
+  },
+  menuItemIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: colors.accentLighter,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuItemIcon: {
     fontSize: 18,

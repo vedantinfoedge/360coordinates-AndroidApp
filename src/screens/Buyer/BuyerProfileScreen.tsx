@@ -226,7 +226,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           ]}>
           <View style={styles.loginContent}>
             <View style={styles.loginIconContainer}>
-              <Text style={styles.loginIcon}>👤</Text>
+              <TabIcon name="profile" color={colors.primary} size={48} />
             </View>
             <Text style={styles.loginTitle}>Login Required</Text>
             <Text style={styles.loginSubtitle}>
@@ -356,7 +356,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.formSection}>
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <Text style={styles.labelIcon}>👤</Text>
+              <TabIcon name="profile" color={colors.primary} size={18} />
               <Text style={styles.label}>Full Name</Text>
             </View>
             {isEditing ? (
@@ -374,13 +374,16 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <Text style={styles.labelIcon}>✉</Text>
+              <TabIcon name="mail" color={colors.primary} size={18} />
               <Text style={styles.label}>Email</Text>
             </View>
             {isEditing ? (
               <View style={styles.lockedInput}>
                 <Text style={styles.lockedInputText}>{formData.email}</Text>
-                <Text style={styles.lockedLabel}>🔒 Locked</Text>
+                <View style={styles.lockedLabelRow}>
+                  <TabIcon name="support" color={colors.textSecondary} size={12} />
+                  <Text style={styles.lockedLabel}> Locked</Text>
+                </View>
               </View>
             ) : (
               <Text style={styles.value}>{formData.email}</Text>
@@ -389,7 +392,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <Text style={styles.labelIcon}>📞</Text>
+              <TabIcon name="phone" color={colors.primary} size={18} />
               <Text style={styles.label}>Phone Number</Text>
             </View>
             {isEditing ? (
@@ -397,7 +400,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.lockedInputText}>
                   {formData.phone || 'Not provided'}
                 </Text>
-                <Text style={styles.lockedLabel}>🔒 Locked</Text>
+                <View style={styles.lockedLabelRow}>
+                  <TabIcon name="support" color={colors.textSecondary} size={12} />
+                  <Text style={styles.lockedLabel}> Locked</Text>
+                </View>
               </View>
             ) : (
               <Text style={styles.value}>
@@ -408,7 +414,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <Text style={styles.labelIcon}>📱</Text>
+              <TabIcon name="phone" color={colors.primary} size={18} />
               <Text style={styles.label}>Alternate Mobile (Optional)</Text>
             </View>
             {isEditing ? (
@@ -430,7 +436,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <Text style={styles.labelIcon}>📍</Text>
+              <TabIcon name="location" color={colors.primary} size={18} />
               <Text style={styles.label}>Address</Text>
             </View>
             {isEditing ? (
@@ -462,11 +468,11 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             activeOpacity={0.7}>
             <View style={styles.optionLeft}>
               <View style={styles.optionIconContainer}>
-                <Text style={styles.optionIcon}>❤</Text>
+                <TabIcon name="heart" color={colors.primary} size={20} />
               </View>
               <Text style={styles.optionText}>My Favorites</Text>
             </View>
-            <Text style={styles.optionArrow}>›</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
           <View style={styles.divider} />
           <TouchableOpacity 
@@ -478,11 +484,11 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             activeOpacity={0.7}>
             <View style={styles.optionLeft}>
               <View style={styles.optionIconContainer}>
-                <Text style={styles.optionIcon}>💬</Text>
+                <TabIcon name="inquiries" color={colors.primary} size={20} />
               </View>
               <Text style={styles.optionText}>My Inquiries</Text>
             </View>
-            <Text style={styles.optionArrow}>›</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
           <View style={styles.divider} />
           <TouchableOpacity 
@@ -491,11 +497,11 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             activeOpacity={0.7}>
             <View style={styles.optionLeft}>
               <View style={[styles.optionIconContainer, styles.recentIconContainer]}>
-                <Text style={styles.optionIcon}>🕐</Text>
+                <TabIcon name="eye" color={colors.primary} size={20} />
               </View>
               <Text style={styles.optionText}>Recently Viewed</Text>
             </View>
-            <Text style={styles.optionArrow}>›</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
           <View style={styles.divider} />
           <TouchableOpacity 
@@ -504,11 +510,11 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             activeOpacity={0.7}>
             <View style={styles.optionLeft}>
               <View style={[styles.optionIconContainer, styles.logoutIconContainer]}>
-                <Text style={styles.optionIcon}>🚪</Text>
+                <TabIcon name="logout" color="#DC2626" size={20} />
               </View>
               <Text style={[styles.optionText, styles.logoutText]}>Logout</Text>
             </View>
-            <Text style={styles.optionArrow}>›</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
         </View>
       </Animated.ScrollView>
@@ -534,7 +540,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                   setShowImagePickerModal(false);
                   setTimeout(() => handleImagePicker('camera'), 300);
                 }}>
-                <Text style={styles.imagePickerOptionIcon}>📷</Text>
+                <TabIcon name="camera" color={colors.primary} size={32} />
                 <Text style={styles.imagePickerOptionText}>Camera</Text>
               </TouchableOpacity>
               
@@ -544,7 +550,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                   setShowImagePickerModal(false);
                   setTimeout(() => handleImagePicker('gallery'), 300);
                 }}>
-                <Text style={styles.imagePickerOptionIcon}>🖼️</Text>
+                <TabIcon name="image" color={colors.primary} size={32} />
                 <Text style={styles.imagePickerOptionText}>Gallery</Text>
               </TouchableOpacity>
             </View>
@@ -812,6 +818,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     flex: 1,
+  },
+  lockedLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   lockedLabel: {
     ...typography.caption,

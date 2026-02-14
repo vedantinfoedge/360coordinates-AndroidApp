@@ -484,7 +484,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
               {saving ? (
                 <ActivityIndicator size="small" color={colors.surface} />
               ) : (
-                <Text style={styles.editPhotoText}>📷</Text>
+                <TabIcon name="camera" color={colors.surface} size={24} />
               )}
             </TouchableOpacity>
           </View>

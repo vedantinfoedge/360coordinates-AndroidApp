@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {TabIcon} from './navigation/TabIcons';
 import {verticalScale} from '../utils/responsive';
 
 const HEADER_HEIGHT = verticalScale(48);
@@ -172,7 +173,9 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
                   onProfilePress?.();
                 }}
                 activeOpacity={0.7}>
-                <Text style={styles.menuIcon}>👤</Text>
+                <View style={[styles.menuIconBox, {backgroundColor: colors.accentLighter}]}>
+                  <TabIcon name="profile" color={colors.primary} size={18} />
+                </View>
                 <Text style={styles.menuItemText}>Profile</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
@@ -183,7 +186,9 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
                   onSupportPress?.();
                 }}
                 activeOpacity={0.7}>
-                <Text style={styles.menuIcon}>💬</Text>
+                <View style={[styles.menuIconBox, {backgroundColor: '#DCFCE7'}]}>
+                  <TabIcon name="support" color="#16A34A" size={18} />
+                </View>
                 <Text style={styles.menuItemText}>Support</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
@@ -194,7 +199,9 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
                   onSubscriptionPress?.();
                 }}
                 activeOpacity={0.7}>
-                <Text style={styles.menuIcon}>⭐</Text>
+                <View style={[styles.menuIconBox, {backgroundColor: '#FEF3C7'}]}>
+                  <TabIcon name="subscription" color="#D97706" size={18} />
+                </View>
                 <Text style={styles.menuItemText}>Subscription</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
@@ -205,7 +212,9 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
                   onLogoutPress?.();
                 }}
                 activeOpacity={0.7}>
-                <Text style={styles.menuIcon}>🚪</Text>
+                <View style={[styles.menuIconBox, {backgroundColor: '#FEE2E2'}]}>
+                  <TabIcon name="logout" color="#DC2626" size={18} />
+                </View>
                 <Text style={[styles.menuItemText, styles.logoutText]}>
                   Logout
                 </Text>
@@ -334,6 +343,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md + 4,
     paddingHorizontal: spacing.lg,
     minHeight: 52,
+  },
+  menuIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuIcon: {
     fontSize: 18,
