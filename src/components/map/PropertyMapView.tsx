@@ -19,7 +19,7 @@ import { favoriteService } from '../../services/favorite.service';
 import { Share } from 'react-native';
 import { MAP_CONFIG } from '../../config/mapbox.config';
 import CustomAlert from '../../utils/alertHelper';
-import { PG_HOSTEL_PROPERTY_TYPE } from '../../utils/propertySearchParams';
+import { PG_HOSTEL_PROPERTY_TYPE, buildPGHostelFetchParams } from '../../utils/propertySearchParams';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -271,96 +271,153 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       setLoading(true);
 
       const lt = searchParams?.listingType ?? listingType;
-      const params: any = { limit: 50 };
 
-      if (searchParams) {
-        // Use search params from FullscreenMapSearch
-        if (lt === 'buy') params.status = 'sale';
-        else if (lt === 'rent' || lt === 'pg-hostel') params.status = 'rent';
-        if (lt === 'pg-hostel') {
-          params.property_type = 'PG / Hostel';
-          params.available_for_bachelors = true;
-        }
-        const loc = (searchParams.location || '').trim();
-        const city = (searchParams.city || '').trim();
-        if (loc) params.location = loc;
-        if (city) params.city = city;
-        if (!loc && city) params.location = city;
+      // Special handling for PG/Hostel: Fetch both "PG/Hostel" type AND "Available for Bachelors" (Union)
+      if (lt === 'pg-hostel') {
+        // Use helper to build params for both queries
+        const { pgParams, bachelorsParams } = buildPGHostelFetchParams({
+          limit: 50,
+          location: searchParams?.location,
+          city: searchParams?.city,
+          min_price: searchParams?.minBudget ? searchParams.minBudget * 1000 : undefined, // Convert to backend units if needed, but helper handles passing through
+          max_price: searchParams?.maxBudget ? searchParams.maxBudget * 1000 : undefined,
+          budget: searchParams?.budget,
+        });
 
-        const pt = searchParams.propertyType;
-        if (pt && pt !== 'all' && lt !== 'pg-hostel') {
-          // Specific type mapping to match backend expectations (same as SearchResultsScreen)
-          const specificTypeMap: { [key: string]: string } = {
-            'Apartment': 'apartment',
-            'Villa': 'villa',
-            'Independent House': 'independent-house',
-            'Bungalow': 'bungalow',
-            'Studio Apartment': 'studio-apartment',
-            'Penthouse': 'penthouse',
-            'Farm House': 'farm-house',
-            'Plot / Land': 'plot-land',
-            'Commercial Office': 'commercial-office',
-            'Commercial Shop': 'commercial-shop',
-            'Retail Space': 'retail-space',
-            'Co-working Space': 'coworking-space',
-            'Warehouse / Godown': 'warehouse-godown',
-            'Industrial Property': 'industrial-property',
-            'PG / Hostel': 'pg-hostel',
-          };
-
-          // Try specific type first
-          const specific = specificTypeMap[pt];
-          if (specific) {
-            params.property_type = specific;
-          } else {
-            // Fallback to broad category if no specific type match (Rest of the logic remains same)
-            const category = categoryMap[pt];
-            // If even category is missing, use slug
-            params.property_type = category || pt.toLowerCase().replace(/ /g, '-');
-          }
+        // Add any map-specific overrides if necessary, but helper should suffice for core filters
+        // If specific property type is selected (e.g. 1RK vs 1BHK in PG context?), handle it? 
+        // Current CompactSearchBar for PG passes propertyType='PG / Hostel' (fixed). 
+        // If user selected '1RK', it comes in 'bedrooms'.
+        if (searchParams?.bedrooms) {
+          pgParams.bedrooms = searchParams.bedrooms;
+          bachelorsParams.bedrooms = searchParams.bedrooms;
         }
 
-        const mn = searchParams.minBudget ?? 0;
-        const mx = searchParams.maxBudget ?? (lt === 'buy' ? 1000 : 200);
-        // Any = no filter: Buy max 500 (5Cr), Rent/PG max 200–500 depending on property type
-        const maxForAny = 500;
-        const hasBudgetFilter = mn > 0 || mx < maxForAny;
-        if (hasBudgetFilter) {
-          const mult = lt === 'buy' ? 100000 : 1000; // lakhs for buy, thousands/month for rent & pg-hostel
-          params.min_price = String(Math.round(mn * mult));
-          params.max_price = String(Math.round(mx * mult));
+        const [resPG, resBachelors] = await Promise.all([
+          propertyService.getProperties(pgParams),
+          propertyService.getProperties(bachelorsParams)
+        ]);
+
+        // Merge results by ID
+        const byId = new Map<string, any>();
+        const add = (list: any[]) => {
+          if (!list || !Array.isArray(list)) return;
+          list.forEach((p: any) => {
+            const id = String(p.id ?? p.property_id ?? '');
+            if (id && !byId.has(id)) {
+              // Filter for valid coordinates
+              if (p.latitude && p.longitude) {
+                byId.set(id, p);
+              }
+            }
+          });
+        };
+
+        if (resPG && resPG.success) {
+          add(resPG.data?.properties || resPG.data);
         }
-        if (searchParams.bedrooms) params.bedrooms = searchParams.bedrooms;
-        if (searchParams.area) params.area = searchParams.area;
+        if (resBachelors && resBachelors.success) {
+          add(resBachelors.data?.properties || resBachelors.data);
+        }
+
+        const mergedProperties = Array.from(byId.values()).map((prop: any) => ({
+          id: prop.id,
+          title: prop.title || prop.property_title,
+          location: prop.location || prop.city || 'Location not specified',
+          price: parseFloat(prop.price || '0'),
+          status: prop.status || prop.property_status || 'sale',
+          property_type: prop.property_type || prop.type || '',
+          latitude: parseFloat(prop.latitude),
+          longitude: parseFloat(prop.longitude),
+          cover_image: prop.cover_image || prop.image,
+        }));
+
+        setProperties(mergedProperties);
+        log.property(`Loaded ${mergedProperties.length} PG/Hostel properties for map (merged)`);
+
       } else {
-        // Legacy: listing type only
-        if (lt === 'buy') params.status = 'sale';
-        else if (lt === 'rent') params.status = 'rent';
-        else if (lt === 'pg-hostel') {
-          params.status = 'rent';
-          params.property_type = 'PG / Hostel';
-          params.available_for_bachelors = true;
+        // Standard logic for Buy/Rent
+        const params: any = { limit: 50 };
+
+        if (searchParams) {
+          // Use search params from FullscreenMapSearch
+          if (lt === 'buy') params.status = 'sale';
+          else if (lt === 'rent') params.status = 'rent';
+
+          const loc = (searchParams.location || '').trim();
+          const city = (searchParams.city || '').trim();
+          if (loc) params.location = loc;
+          if (city) params.city = city;
+          if (!loc && city) params.location = city;
+
+          const pt = searchParams.propertyType;
+          if (pt && pt !== 'all') {
+            // Specific type mapping to match backend expectations (same as SearchResultsScreen)
+            const specificTypeMap: { [key: string]: string } = {
+              'Apartment': 'apartment',
+              'Villa': 'villa',
+              'Independent House': 'independent-house',
+              'Bungalow': 'bungalow',
+              'Studio Apartment': 'studio-apartment',
+              'Penthouse': 'penthouse',
+              'Farm House': 'farm-house',
+              'Plot / Land': 'plot-land',
+              'Commercial Office': 'commercial-office',
+              'Commercial Shop': 'commercial-shop',
+              'Retail Space': 'retail-space',
+              'Co-working Space': 'coworking-space',
+              'Warehouse / Godown': 'warehouse-godown',
+              'Industrial Property': 'industrial-property',
+              'PG / Hostel': 'pg-hostel', // Should not happen in this block but safe to keep
+            };
+
+            // Try specific type first
+            const specific = specificTypeMap[pt];
+            if (specific) {
+              params.property_type = specific;
+            } else {
+              // Fallback to broad category if no specific type match
+              const category = categoryMap[pt];
+              params.property_type = category || pt.toLowerCase().replace(/ /g, '-');
+            }
+          }
+
+          const mn = searchParams.minBudget ?? 0;
+          const mx = searchParams.maxBudget ?? (lt === 'buy' ? 1000 : 200);
+          const maxForAny = 500; // Simplified check
+          const hasBudgetFilter = mn > 0 || mx < maxForAny;
+          if (hasBudgetFilter) {
+            const mult = lt === 'buy' ? 100000 : 1000;
+            params.min_price = String(Math.round(mn * mult));
+            params.max_price = String(Math.round(mx * mult));
+          }
+          if (searchParams.bedrooms) params.bedrooms = searchParams.bedrooms;
+          if (searchParams.area) params.area = searchParams.area;
+        } else {
+          // Legacy: listing type only (without searchParams from compact bar)
+          if (lt === 'buy') params.status = 'sale';
+          else if (lt === 'rent') params.status = 'rent';
         }
-      }
 
-      const response = await propertyService.getProperties(params);
+        const response = await propertyService.getProperties(params);
 
-      if (response.success && response.data?.properties) {
-        const formattedProperties = response.data.properties
-          .filter((prop: any) => prop.latitude && prop.longitude)
-          .map((prop: any) => ({
-            id: prop.id,
-            title: prop.title || prop.property_title,
-            location: prop.location || prop.city || 'Location not specified',
-            price: parseFloat(prop.price || '0'),
-            status: prop.status || prop.property_status || 'sale',
-            property_type: prop.property_type || prop.type || '',
-            latitude: parseFloat(prop.latitude),
-            longitude: parseFloat(prop.longitude),
-            cover_image: prop.cover_image || prop.image,
-          }));
-        setProperties(formattedProperties);
-        log.property(`Loaded ${formattedProperties.length} properties for map (filter: ${lt})`);
+        if (response.success && response.data?.properties) {
+          const formattedProperties = response.data.properties
+            .filter((prop: any) => prop.latitude && prop.longitude)
+            .map((prop: any) => ({
+              id: prop.id,
+              title: prop.title || prop.property_title,
+              location: prop.location || prop.city || 'Location not specified',
+              price: parseFloat(prop.price || '0'),
+              status: prop.status || prop.property_status || 'sale',
+              property_type: prop.property_type || prop.type || '',
+              latitude: parseFloat(prop.latitude),
+              longitude: parseFloat(prop.longitude),
+              cover_image: prop.cover_image || prop.image,
+            }));
+          setProperties(formattedProperties);
+          log.property(`Loaded ${formattedProperties.length} properties for map (filter: ${lt})`);
+        }
       }
     } catch (error) {
       log.error('property', 'Error loading properties for map', error);
