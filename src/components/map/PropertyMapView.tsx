@@ -480,29 +480,45 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
     try {
       // Use buyerService.toggleFavorite which returns new state
-      console.log('[PropertyMapView] Toggling favorite for:', selectedProperty.id);
+      console.log('==== [PropertyMapView] TOGGLE FAVORITE START ====');
+      console.log('[PropertyMapView] Property ID:', selectedProperty.id);
+      console.log('[PropertyMapView] Property Title:', selectedProperty.title);
+      console.log('[PropertyMapView] Current isFavorite state:', isFavorite);
+
       const response = await buyerService.toggleFavorite(selectedProperty.id);
-      console.log('[PropertyMapView] Toggle response:', JSON.stringify(response));
+
+      console.log('[PropertyMapView] Toggle Response - Success:', response?.success);
+      console.log('[PropertyMapView] Toggle Response - Message:', response?.message);
+      console.log('[PropertyMapView] Toggle Response - Data:', JSON.stringify(response?.data, null, 2));
+      console.log('[PropertyMapView] Toggle Response - is_favorite:', response?.data?.is_favorite);
 
       if (response && response.success) {
         // Toggle based on current state if backend doesn't return explicit boolean in correct format
         // But buyerService returns { data: { is_favorite: boolean } } usually
         if (response.data && typeof response.data.is_favorite === 'boolean') {
           setIsFavorite(response.data.is_favorite);
+          console.log('[PropertyMapView] Updated isFavorite to:', response.data.is_favorite);
         } else {
           setIsFavorite(!isFavorite); // Fallback
+          console.log('[PropertyMapView] Fallback toggle - Updated isFavorite to:', !isFavorite);
         }
+
+        const newState = response.data?.is_favorite ?? !isFavorite;
+        console.log('[PropertyMapView] Final state:', newState ? 'ADDED' : 'REMOVED');
+        console.log('==== [PropertyMapView] TOGGLE FAVORITE END ====\n');
 
         CustomAlert.alert(
           'Success',
-          // Note: if we just toggled !isFavorite, the new state is !initialState
-          // We can use the updated state if we set it, or just use !isFavorite logic for the message (careful with closure)
-          // Better to use the response data if available
-          (response.data?.is_favorite ?? !isFavorite) ? 'Added to favorites' : 'Removed from favorites'
+          newState ? 'Added to favorites' : 'Removed from favorites'
         );
+      } else {
+        console.log('[PropertyMapView] Toggle failed - success was false');
+        console.log('==== [PropertyMapView] TOGGLE FAVORITE END ====\n');
       }
     } catch (error: any) {
       console.error('[PropertyMapView] Toggle favorite error:', error);
+      console.error('[PropertyMapView] Error details:', JSON.stringify(error, null, 2));
+      console.log('==== [PropertyMapView] TOGGLE FAVORITE END (ERROR) ====\n');
       CustomAlert.alert('Error', error.message || 'Failed to update favorite');
     }
   };
