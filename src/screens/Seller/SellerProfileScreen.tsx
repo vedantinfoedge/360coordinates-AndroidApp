@@ -10,6 +10,7 @@ import {
   Image,
   ActivityIndicator,
   Animated,
+  Modal,
 } from 'react-native';
 import { launchImageLibrary, launchCamera, MediaType, ImagePickerResponse } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +49,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [saving, setSaving] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(user?.profile_image || null);
   const [isEditing, setIsEditing] = useState(false);
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
 
   // Split full_name into first_name and last_name for validation
   const [formData, setFormData] = useState({
@@ -320,15 +322,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleImagePicker = () => {
-    CustomAlert.alert(
-      'Select Profile Image',
-      'Choose an option',
-      [
-        { text: 'Camera', onPress: () => handleImageSource('camera') },
-        { text: 'Gallery', onPress: () => handleImageSource('gallery') },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
+    setShowImagePickerModal(true);
   };
 
   const handleImageSource = (source: 'camera' | 'gallery') => {
@@ -541,7 +535,10 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.form}>
             <View style={styles.row}>
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={styles.label}>First Name *</Text>
+                <View style={styles.labelContainer}>
+                  <TabIcon name="profile" color={colors.primary} size={18} />
+                  <Text style={styles.label}>First Name *</Text>
+                </View>
                 <TextInput
                   style={[
                     styles.input,
@@ -562,7 +559,10 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
               </View>
 
               <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Text style={styles.label}>Last Name *</Text>
+                <View style={styles.labelContainer}>
+                  <TabIcon name="profile" color={colors.primary} size={18} />
+                  <Text style={styles.label}>Last Name *</Text>
+                </View>
                 <TextInput
                   style={[
                     styles.input,
@@ -584,29 +584,44 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="mail" color={colors.primary} size={18} />
+                <Text style={styles.label}>Email</Text>
+              </View>
               <TextInput
                 style={[styles.input, styles.inputDisabled]}
                 value={formData.email}
                 editable={false}
                 keyboardType="email-address"
               />
-              <Text style={styles.hintText}>Email cannot be changed</Text>
+              <View style={styles.lockedLabelRow}>
+                <TabIcon name="support" color={colors.textSecondary} size={12} />
+                <Text style={styles.hintText}>Email cannot be changed</Text>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Phone Number</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="phone" color={colors.primary} size={18} />
+                <Text style={styles.label}>Phone Number</Text>
+              </View>
               <TextInput
                 style={[styles.input, styles.inputDisabled]}
                 value={formData.phone}
                 editable={false}
                 keyboardType="phone-pad"
               />
-              <Text style={styles.hintText}>Phone number cannot be changed</Text>
+              <View style={styles.lockedLabelRow}>
+                <TabIcon name="support" color={colors.textSecondary} size={12} />
+                <Text style={styles.hintText}>Phone number cannot be changed</Text>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>WhatsApp Number</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="phone" color={colors.primary} size={18} />
+                <Text style={styles.label}>WhatsApp Number</Text>
+              </View>
               <TextInput
                 style={[
                   styles.input,
@@ -629,7 +644,10 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Alternate Mobile</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="phone" color={colors.primary} size={18} />
+                <Text style={styles.label}>Alternate Mobile</Text>
+              </View>
               <TextInput
                 style={[
                   styles.input,
@@ -652,7 +670,10 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Address</Text>
+              <View style={styles.labelContainer}>
+                <TabIcon name="location" color={colors.primary} size={18} />
+                <Text style={styles.label}>Address</Text>
+              </View>
               <TextInput
                 style={[
                   styles.input,
@@ -746,6 +767,50 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </Animated.ScrollView>
+
+      {/* Image Picker Modal */}
+      <Modal
+        visible={showImagePickerModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowImagePickerModal(false)}>
+        <TouchableOpacity
+          style={styles.imagePickerModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowImagePickerModal(false)}>
+          <View style={styles.imagePickerModalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.imagePickerModalTitle}>Select Profile Image</Text>
+            <Text style={styles.imagePickerModalSubtitle}>Choose an option</Text>
+            <View style={styles.imagePickerModalButtons}>
+              <TouchableOpacity
+                style={styles.imagePickerOptionButton}
+                onPress={() => {
+                  setShowImagePickerModal(false);
+                  setTimeout(() => handleImageSource('camera'), 300);
+                }}
+                activeOpacity={0.7}>
+                <TabIcon name="camera" color={colors.primary} size={32} />
+                <Text style={styles.imagePickerOptionText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.imagePickerOptionButton}
+                onPress={() => {
+                  setShowImagePickerModal(false);
+                  setTimeout(() => handleImageSource('gallery'), 300);
+                }}
+                activeOpacity={0.7}>
+                <TabIcon name="image" color={colors.primary} size={32} />
+                <Text style={styles.imagePickerOptionText}>Gallery</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.imagePickerCancelButton}
+              onPress={() => setShowImagePickerModal(false)}>
+              <Text style={styles.imagePickerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -980,12 +1045,23 @@ const styles = StyleSheet.create({
   halfWidth: {
     flex: 1,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
   label: {
     ...typography.caption,
     color: '#374151',
     fontWeight: '600',
-    marginBottom: spacing.sm,
     fontSize: 14,
+  },
+  lockedLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   input: {
     backgroundColor: '#FAFAFA',
@@ -1073,6 +1149,66 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#F3F4F6',
     marginLeft: spacing.xxl + spacing.sm,
+  },
+  imagePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  imagePickerModalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    minWidth: 280,
+  },
+  imagePickerModalTitle: {
+    ...typography.h3,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  imagePickerModalSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
+  imagePickerModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  imagePickerOptionButton: {
+    flex: 1,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  imagePickerOptionText: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 14,
+    marginTop: spacing.sm,
+  },
+  imagePickerCancelButton: {
+    width: '100%',
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: spacing.sm,
+  },
+  imagePickerCancelText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
 

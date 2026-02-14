@@ -58,6 +58,7 @@ interface Property {
   latitude: number;
   longitude: number;
   cover_image?: string;
+  property_type?: string;
 }
 
 interface PropertyMapViewProps {
@@ -72,6 +73,12 @@ interface PropertyMapViewProps {
   fullscreenSearchBar?: React.ReactNode;
   /** Search params from FullscreenMapSearch - used to fetch filtered properties */
   searchParams?: MapSearchParams;
+}
+
+/** Normalized API response shape (service may return this or AxiosResponse) */
+interface ApiResponseWithData<T = unknown> {
+  success?: boolean;
+  data?: T;
 }
 
 const categoryMap: { [key: string]: string } = {
@@ -226,10 +233,10 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
         params.status = propertyStatus as 'sale' | 'rent' | 'pg';
       }
 
-      const response = await propertyService.getProperties(params);
+      const response = await propertyService.getProperties(params) as ApiResponseWithData<{ properties?: any[] }>;
 
       if (response.success && response.data?.properties) {
-        let formattedProperties = response.data.properties
+        let formattedProperties: Property[] = response.data.properties
           .filter((prop: any) =>
             prop.latitude &&
             prop.longitude &&
@@ -318,11 +325,15 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           });
         };
 
-        if (resPG && resPG.success) {
-          add(resPG.data?.properties || resPG.data);
+        const resPGTyped = resPG as ApiResponseWithData<{ properties?: any[] }>;
+        const resBachelorsTyped = resBachelors as ApiResponseWithData<{ properties?: any[] }>;
+        if (resPGTyped && resPGTyped.success) {
+          const list = resPGTyped.data?.properties ?? (Array.isArray(resPGTyped.data) ? resPGTyped.data : []);
+          add(list);
         }
-        if (resBachelors && resBachelors.success) {
-          add(resBachelors.data?.properties || resBachelors.data);
+        if (resBachelorsTyped && resBachelorsTyped.success) {
+          const list = resBachelorsTyped.data?.properties ?? (Array.isArray(resBachelorsTyped.data) ? resBachelorsTyped.data : []);
+          add(list);
         }
 
         const mergedProperties = Array.from(byId.values()).map((prop: any) => ({
@@ -404,7 +415,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           else if (lt === 'rent') params.status = 'rent';
         }
 
-        const response = await propertyService.getProperties(params);
+        const response = await propertyService.getProperties(params) as ApiResponseWithData<{ properties?: any[] }>;
 
         if (response.success && response.data?.properties) {
           const formattedProperties = response.data.properties
@@ -445,7 +456,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   const checkFavoriteStatus = async (propertyId: string) => {
     try {
       // Use buyerService.getPropertyDetails which returns is_favorite field
-      const response = await buyerService.getPropertyDetails(propertyId);
+      const response = await buyerService.getPropertyDetails(propertyId) as ApiResponseWithData<{ property?: { is_favorite?: boolean } }>;
       if (response && response.success && response.data?.property) {
         setIsFavorite(!!response.data.property.is_favorite);
       } else {
@@ -481,7 +492,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     try {
       // Use buyerService.toggleFavorite which returns new state
       console.log('[PropertyMapView] Toggling favorite for:', selectedProperty.id);
-      const response = await buyerService.toggleFavorite(selectedProperty.id);
+      const response = await buyerService.toggleFavorite(selectedProperty.id) as ApiResponseWithData<{ is_favorite?: boolean }>;
       console.log('[PropertyMapView] Toggle response:', JSON.stringify(response));
 
       if (response && response.success) {
@@ -689,7 +700,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                     {/* Close Button - Top Right */}
                     <TouchableOpacity
                       style={styles.popupCardCloseBtn}
-                      onPress={(e) => {
+                      onPress={(e: { stopPropagation: () => void }) => {
                         e.stopPropagation();
                         setSelectedProperty(null);
                         setSelectedPropertyId(null);
@@ -716,7 +727,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                   <View style={styles.popupCardActionRow}>
                     <TouchableOpacity
                       style={[styles.popupCardActionBtn, isFavorite && styles.popupCardActionBtnActive]}
-                      onPress={(e) => {
+                      onPress={(e: { stopPropagation: () => void }) => {
                         e.stopPropagation();
                         handleToggleFavorite();
                       }}>
@@ -728,7 +739,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.popupCardActionBtn}
-                      onPress={(e) => {
+                      onPress={(e: { stopPropagation: () => void }) => {
                         e.stopPropagation();
                         handleShare();
                       }}>
@@ -736,7 +747,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.popupCardViewBtn}
-                      onPress={(e) => {
+                      onPress={(e: { stopPropagation: () => void }) => {
                         e.stopPropagation();
                         if (onPropertyPress) {
                           onPropertyPress(selectedProperty);
@@ -754,10 +765,10 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
       {/* List View */}
       {viewMode === 'list' && (
-        <FlatList
+        <FlatList<Property>
           data={properties}
-          keyExtractor={item => String(item.id)}
-          renderItem={({ item }) => (
+          keyExtractor={(item: Property) => String(item.id)}
+          renderItem={({ item }: { item: Property }) => (
             <TouchableOpacity
               style={styles.listItem}
               onPress={() => {
