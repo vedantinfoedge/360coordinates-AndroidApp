@@ -17,6 +17,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RouteProp} from '@react-navigation/native';
 import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import {propertyService} from '../../services/property.service';
 import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
 import AgentHeader from '../../components/AgentHeader';
@@ -249,7 +250,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           }}
           activeOpacity={0.7}>
           <View style={styles.actionButtonInner}>
-            <Text style={styles.shareIcon}>🔗</Text>
+            <TabIcon name="link" color={colors.surface} size={20} />
           </View>
         </TouchableOpacity>
       </View>
@@ -304,7 +305,9 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                     activeOpacity={0.9}>
                     {failedImages.has(image.id) ? (
                       <View style={[styles.image, styles.imagePlaceholder]}>
-                        <Text style={styles.imagePlaceholderText}>🏠</Text>
+                        <View style={styles.imagePlaceholderIconWrap}>
+                          <TabIcon name="home" color="#9CA3AF" size={44} />
+                        </View>
                         <Text style={styles.imagePlaceholderSubtext}>Image unavailable</Text>
                       </View>
                     ) : (
@@ -373,7 +376,9 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <View style={styles.headerSection}>
           <Text style={styles.title}>{capitalize(property.title || property.property_title || 'Property Title')}</Text>
           <View style={styles.locationContainer}>
-            <Text style={styles.locationIcon}>📍</Text>
+            <View style={styles.locationIconWrap}>
+              <TabIcon name="location" color={colors.textSecondary} size={18} />
+            </View>
             <Text style={styles.location} numberOfLines={2}>
               {property.location || property.city || property.address || 'Location not specified'}
             </Text>
@@ -385,7 +390,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <View style={styles.quickInfo}>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🛏</Text>
+              <TabIcon name="bed" color={colors.primary} size={20} />
             </View>
             <Text style={styles.infoText}>
               {(property.bedrooms ?? '—')} Beds
@@ -393,7 +398,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🚿</Text>
+              <TabIcon name="bath" color={colors.primary} size={20} />
             </View>
             <Text style={styles.infoText}>
               {(property.bathrooms ?? '—')} Baths
@@ -401,7 +406,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>📐</Text>
+              <TabIcon name="square" color={colors.primary} size={20} />
             </View>
             <Text style={styles.infoText} numberOfLines={1}>
               {property.area
@@ -411,7 +416,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🏢</Text>
+              <TabIcon name="building" color={colors.primary} size={20} />
             </View>
             <Text style={styles.infoText} numberOfLines={1}>
               {(property.floor === '0' || property.floor === 0)
@@ -552,7 +557,8 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => navigation.navigate('EditProperty', {propertyId: property.id})}>
-          <Text style={styles.editButtonText}>✏️ Edit Property</Text>
+          <TabIcon name="edit" color={colors.surface} size={18} />
+          <Text style={styles.editButtonText}>Edit Property</Text>
         </TouchableOpacity>
       </View>
 
@@ -660,8 +666,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imagePlaceholderText: {
-    fontSize: 48,
+  imagePlaceholderIconWrap: {
     marginBottom: spacing.xs,
   },
   imagePlaceholderSubtext: {
@@ -768,8 +773,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     gap: spacing.xs,
   },
-  locationIcon: {
-    fontSize: 16,
+  locationIconWrap: {
+    marginRight: spacing.xs,
   },
   location: {
     fontSize: 16,
@@ -960,6 +965,10 @@ const styles = StyleSheet.create({
   },
   editButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
     padding: spacing.md,

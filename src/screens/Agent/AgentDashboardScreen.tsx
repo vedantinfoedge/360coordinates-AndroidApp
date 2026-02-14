@@ -495,7 +495,7 @@ const AnimatedPropertyCard = React.memo(({
               </Text>
               <View style={styles.propertyLocationRow}>
                 <View style={styles.locationIconContainer}>
-                  <Text style={styles.locationIcon}>📍</Text>
+                  <TabIcon name="location" color={colors.textSecondary} size={14} />
                 </View>
                 <Text style={styles.propertyCardLocation} numberOfLines={1}>
                   {item.location}
@@ -779,7 +779,9 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
           }}
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.errorIcon}>🚫</Text>
+          <View style={styles.errorIconWrap}>
+            <TabIcon name="alert" color={colors.error} size={48} />
+          </View>
           <Text style={styles.errorTitle}>Access Denied</Text>
           <Text style={styles.errorText}>
             You are registered as {user.user_type === 'buyer' ? 'Buyer/Tenant' : user.user_type === 'seller' ? 'Seller/Owner' : 'User'}. You cannot access this dashboard.
@@ -960,7 +962,7 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
                 <View style={styles.sectionIconContainer}>
-                  <Text style={styles.sectionIcon}>🏠</Text>
+                  <TabIcon name="home" color={colors.primary} size={20} />
                 </View>
                 <Text style={styles.sectionTitle}>Your Properties</Text>
               </View>
@@ -983,7 +985,7 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
             ) : (
               <View style={styles.emptyState}>
                 <View style={styles.emptyStateIconContainer}>
-                  <Text style={styles.emptyStateIcon}>🏠</Text>
+                  <TabIcon name="home" color="#9CA3AF" size={48} />
                 </View>
                 <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
                 <Text style={styles.emptyStateText}>
@@ -1004,7 +1006,7 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
                 <View style={styles.sectionIconContainer}>
-                  <Text style={styles.sectionIcon}>📋</Text>
+                  <TabIcon name="clipboard" color={colors.primary} size={20} />
                 </View>
                 <View style={styles.sectionTitleRow}>
                   <Text style={styles.sectionTitle}>Recent Leads</Text>
@@ -1042,7 +1044,7 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
             ) : (
               <View style={styles.emptyState}>
                 <View style={styles.emptyStateIconContainer}>
-                  <Text style={styles.emptyStateIcon}>📋</Text>
+                  <TabIcon name="clipboard" color="#9CA3AF" size={48} />
                 </View>
                 <Text style={styles.emptyStateTitle}>No Leads Yet</Text>
                 <Text style={styles.emptyStateText}>
@@ -1069,8 +1071,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
   },
-  errorIcon: {
-    fontSize: 64,
+  errorIconWrap: {
     marginBottom: spacing.lg,
   },
   errorTitle: {

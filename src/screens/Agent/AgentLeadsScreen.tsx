@@ -13,6 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {AgentTabParamList} from '../../components/navigation/AgentTabNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import {getLeads, Lead} from '../../services/leadsService';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
@@ -134,7 +135,9 @@ const AgentLeadsScreen: React.FC<Props> = ({navigation}) => {
         </View>
       ) : error && leads.length === 0 ? (
         <View style={[styles.center, {paddingTop: contentTopPadding}]}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <View style={styles.errorIconWrap}>
+            <TabIcon name="alert" color={colors.error} size={48} />
+          </View>
           <Text style={styles.errorTitle}>Unable to load leads</Text>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
@@ -165,7 +168,9 @@ const AgentLeadsScreen: React.FC<Props> = ({navigation}) => {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>📋</Text>
+              <View style={styles.emptyIconWrap}>
+                <TabIcon name="clipboard" color="#9CA3AF" size={56} />
+              </View>
               <Text style={styles.emptyTitle}>No leads yet</Text>
               <Text style={styles.emptyText}>
                 When buyers click "View Contact" on your listings, they will appear here.
@@ -197,8 +202,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
   },
-  errorIcon: {
-    fontSize: 48,
+  errorIconWrap: {
     marginBottom: spacing.sm,
   },
   errorTitle: {
@@ -290,8 +294,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.xl * 2,
   },
-  emptyIcon: {
-    fontSize: 56,
+  emptyIconWrap: {
     marginBottom: spacing.md,
   },
   emptyTitle: {

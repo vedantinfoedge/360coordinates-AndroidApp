@@ -19,6 +19,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { AgentStackParamList } from '../../navigation/AgentNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import { propertyService } from '../../services/property.service';
 import { validateAndProcessPropertyImages, PropertyImage } from '../../utils/imageHelper';
 import AgentHeader from '../../components/AgentHeader';
@@ -532,7 +533,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
       <View style={[styles.actionButtonsTop, { top: insets.top + 60 }]}>
         <TouchableOpacity style={styles.shareButtonTop} onPress={handleShare} activeOpacity={0.7}>
           <View style={styles.actionButtonInner}>
-            <Text style={styles.shareIcon}>🔗</Text>
+            <TabIcon name="link" color={colors.surface} size={20} />
           </View>
         </TouchableOpacity>
       </View>
@@ -564,7 +565,9 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                     activeOpacity={0.9}>
                     {failedImages.has(image.id) ? (
                       <View style={[styles.image, styles.imagePlaceholder]}>
-                        <Text style={styles.imagePlaceholderText}>🏗️</Text>
+                        <View style={styles.imagePlaceholderIconWrap}>
+                          <TabIcon name="building" color="#9CA3AF" size={44} />
+                        </View>
                         <Text style={styles.imagePlaceholderSubtext}>Image unavailable</Text>
                       </View>
                     ) : (
@@ -597,7 +600,9 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
           ) : (
             <View style={[styles.imageContainer, { width: IMAGE_CAROUSEL_WIDTH }]}>
               <View style={[styles.image, styles.imagePlaceholder]}>
-                <Text style={styles.imagePlaceholderText}>🏗️</Text>
+                <View style={styles.imagePlaceholderIconWrap}>
+                  <TabIcon name="building" color="#9CA3AF" size={44} />
+                </View>
                 <Text style={styles.imagePlaceholderSubtext}>No images</Text>
               </View>
             </View>
@@ -613,7 +618,9 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
             </View>
           </View>
           <View style={styles.locationContainer}>
-            <Text style={styles.locationIcon}>📍</Text>
+            <View style={styles.locationIconWrap}>
+              <TabIcon name="location" color={colors.textSecondary} size={18} />
+            </View>
             <Text style={styles.location}>{property.location || property.city || property.fullAddress || property.address || 'Location not specified'}</Text>
           </View>
           <Text style={styles.priceLabel}>Price Range</Text>
@@ -626,53 +633,71 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         <View style={styles.quickInfo}>
           {bhkTypeText ? (
             <View style={styles.infoCard}>
-              <Text style={styles.infoIcon}>🏠</Text>
+              <View style={styles.infoIconWrap}>
+                <TabIcon name="home" color={colors.primary} size={20} />
+              </View>
               <Text style={styles.infoText}>{bhkTypeText}</Text>
             </View>
           ) : null}
           <View style={styles.infoCard}>
-            <Text style={styles.infoIcon}>📋</Text>
+            <View style={styles.infoIconWrap}>
+              <TabIcon name="clipboard" color={colors.primary} size={20} />
+            </View>
             <Text style={styles.infoText}>Upcoming</Text>
           </View>
           {(property.property_type || property.project_type) && (
             <View style={styles.infoCard}>
-              <Text style={styles.infoIcon}>🏢</Text>
+              <View style={styles.infoIconWrap}>
+                <TabIcon name="building" color={colors.primary} size={20} />
+              </View>
               <Text style={styles.infoText}>{capitalize(String(property.property_type || property.project_type))}</Text>
             </View>
           )}
           {property.project_status && (
             <View style={styles.infoCard}>
-              <Text style={styles.infoIcon}>📋</Text>
+              <View style={styles.infoIconWrap}>
+                <TabIcon name="clipboard" color={colors.primary} size={20} />
+              </View>
               <Text style={styles.infoText}>{String(property.project_status)}</Text>
             </View>
           )}
           {hasValidArea && (
             <View style={styles.infoCard}>
-              <Text style={styles.infoIcon}>📐</Text>
+              <View style={styles.infoIconWrap}>
+                <TabIcon name="square" color={colors.primary} size={20} />
+              </View>
               <Text style={styles.infoText}>{property.area} sq ft</Text>
             </View>
           )}
           {property.number_of_towers != null && property.number_of_towers !== '' && (
             <View style={styles.infoCard}>
-              <Text style={styles.infoIcon}>🏗️</Text>
+              <View style={styles.infoIconWrap}>
+                <TabIcon name="building" color={colors.primary} size={20} />
+              </View>
               <Text style={styles.infoText}>{property.number_of_towers} Tower{Number(property.number_of_towers) !== 1 ? 's' : ''}</Text>
             </View>
           )}
           {property.total_units != null && property.total_units !== '' && (
             <View style={styles.infoCard}>
-              <Text style={styles.infoIcon}>🏠</Text>
+              <View style={styles.infoIconWrap}>
+                <TabIcon name="home" color={colors.primary} size={20} />
+              </View>
               <Text style={styles.infoText}>{property.total_units} Units</Text>
             </View>
           )}
           {property.floors_count != null && property.floors_count !== '' && (
             <View style={styles.infoCard}>
-              <Text style={styles.infoIcon}>📐</Text>
+              <View style={styles.infoIconWrap}>
+                <TabIcon name="layers" color={colors.primary} size={20} />
+              </View>
               <Text style={styles.infoText}>{property.floors_count} Floors</Text>
             </View>
           )}
           {hasValidCarpetArea && (
             <View style={styles.infoCard}>
-              <Text style={styles.infoIcon}>📏</Text>
+              <View style={styles.infoIconWrap}>
+                <TabIcon name="square" color={colors.primary} size={20} />
+              </View>
               <Text style={styles.infoText}>{carpetDisplay}</Text>
             </View>
           )}
@@ -856,7 +881,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               style={[styles.chatButton, (processingChat || interactionLoading) && styles.contactButtonDisabled]}
               onPress={handleChatWithBuilder}
               disabled={processingChat || interactionLoading}>
-              <Text style={styles.chatButtonText}>💬 Chat with Builder</Text>
+              <>
+                <TabIcon name="chats" color={colors.surface} size={18} />
+                <Text style={styles.chatButtonText}>Chat with Builder</Text>
+              </>
             </TouchableOpacity>
           </View>
           {!interactionLoading && (
@@ -874,7 +902,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => navigation.navigate('EditProperty', { propertyId: property.id })}>
-            <Text style={styles.editButtonText}>✏️ Edit Project</Text>
+            <>
+              <TabIcon name="edit" color={colors.surface} size={18} />
+              <Text style={styles.editButtonText}>Edit Project</Text>
+            </>
           </TouchableOpacity>
         </View>
       )}
@@ -887,7 +918,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Sales / Builder Contact</Text>
                 <TouchableOpacity onPress={() => setShowContactModal(false)}>
-                  <Text style={styles.modalClose}>✕</Text>
+                  <TabIcon name="close" color={colors.textSecondary} size={20} />
                 </TouchableOpacity>
               </View>
               {!interactionLoading && (
@@ -965,7 +996,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                   setShowContactModal(false);
                   setTimeout(() => handleChatWithBuilder(), 300);
                 }}>
-                <Text style={styles.modalChatButtonText}>💬 Start Chat</Text>
+                <>
+                  <TabIcon name="chats" color={colors.surface} size={18} />
+                  <Text style={styles.modalChatButtonText}>Start Chat</Text>
+                </>
               </TouchableOpacity>
             </View>
           </View>
@@ -994,7 +1028,7 @@ const styles = StyleSheet.create({
   imageContainer: { width: IMAGE_CAROUSEL_WIDTH, height: 300, overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
   imagePlaceholder: { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' },
-  imagePlaceholderText: { fontSize: 48, marginBottom: spacing.xs },
+  imagePlaceholderIconWrap: { marginBottom: spacing.xs },
   imagePlaceholderSubtext: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
   imageIndicators: { position: 'absolute', bottom: spacing.md, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: spacing.xs, zIndex: 3 },
   indicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
@@ -1009,7 +1043,7 @@ const styles = StyleSheet.create({
   upcomingBadge: { backgroundColor: colors.accent, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md },
   upcomingBadgeText: { ...typography.caption, color: colors.surface, fontWeight: '600', fontSize: 11 },
   locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, gap: spacing.xs },
-  locationIcon: { fontSize: 16 },
+  locationIconWrap: {},
   location: { fontSize: 16, color: colors.textSecondary, flex: 1 },
   priceLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs, textTransform: 'uppercase', fontWeight: '600' },
   price: { fontSize: 28, fontWeight: '700', color: colors.primary, marginTop: spacing.xs },
@@ -1022,7 +1056,7 @@ const styles = StyleSheet.create({
   mapButtonText: { ...typography.body, color: colors.primary, fontWeight: '700', fontSize: 16 },
   quickInfo: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.surface, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.sm },
   infoCard: { flex: 1, minWidth: '30%', alignItems: 'center', backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
-  infoIcon: { fontSize: 20, marginBottom: spacing.xs },
+  infoIconWrap: { marginBottom: spacing.xs },
   infoText: { ...typography.caption, color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   section: { backgroundColor: colors.surface, padding: spacing.xl, marginTop: spacing.lg, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 2, borderBottomColor: colors.primary + '30' },
@@ -1043,12 +1077,12 @@ const styles = StyleSheet.create({
   addressSub: { ...typography.body, color: colors.textSecondary, lineHeight: 22, fontSize: 14, marginTop: spacing.xs },
   coordinates: { ...typography.caption, color: colors.textSecondary, fontSize: 12, fontStyle: 'italic', marginTop: spacing.xs },
   actionButtons: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, flexDirection: 'row', gap: spacing.md },
-  editButton: { flex: 1, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
+  editButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, minHeight: 52 },
   editButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
   buyerActionButtons: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, ...Platform.select({ android: { elevation: 8 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4 } }) },
   contactButton: { flex: 1, backgroundColor: colors.surface, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.primary },
   contactButtonText: { ...typography.body, color: colors.primary, fontWeight: '700', fontSize: 16 },
-  chatButton: { flex: 1, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center' },
+  chatButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg },
   chatButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
   contactButtonDisabled: { opacity: 0.5 },
   limitContainer: { position: 'absolute', left: spacing.md, alignItems: 'flex-start' },
@@ -1065,7 +1099,7 @@ const styles = StyleSheet.create({
   contactLabel: { ...typography.caption, color: colors.textSecondary, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', marginBottom: spacing.xs },
   contactValue: { ...typography.body, color: colors.text, fontSize: 16, fontWeight: '600' },
   contactLink: { color: colors.primary, textDecorationLine: 'underline' },
-  modalChatButton: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
+  modalChatButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, minHeight: 52 },
   modalChatButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
 });
 

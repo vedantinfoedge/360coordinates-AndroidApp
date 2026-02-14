@@ -17,6 +17,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {AgentStackParamList} from '../../navigation/AgentNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
 import {sellerService} from '../../services/seller.service';
@@ -400,13 +401,17 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
             onPress={() => {
               // Handle phone call
             }}>
-            <Text style={styles.actionButtonText}>📞 Call</Text>
+            <TabIcon name="phone" color={colors.text} size={16} />
+            <Text style={styles.actionButtonText}>Call</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
           style={[styles.actionButton, styles.replyButton]}
           onPress={() => handleReply(item)}>
-          <Text style={[styles.actionButtonText, styles.replyButtonText]}>💬 Chat</Text>
+          <>
+            <TabIcon name="chats" color={colors.surface} size={16} />
+            <Text style={[styles.actionButtonText, styles.replyButtonText]}>Chat</Text>
+          </>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -442,7 +447,9 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
       {/* Search and Filter Bar */}
       <View style={styles.searchBar}>
         <View style={styles.searchInputContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <View style={styles.searchIconWrap}>
+            <TabIcon name="search" color={colors.textSecondary} size={18} />
+          </View>
           <TextInput
             style={styles.searchInput}
             placeholder="Search by buyer, message, or property..."
@@ -519,7 +526,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter Inquiries</Text>
               <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <TabIcon name="close" color={colors.textSecondary} size={20} />
               </TouchableOpacity>
             </View>
             
@@ -670,11 +677,14 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     backgroundColor: colors.surfaceSecondary,
-    alignItems: 'center',
   },
   replyButton: {
     backgroundColor: colors.primary,
@@ -825,8 +835,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  searchIcon: {
-    fontSize: 18,
+  searchIconWrap: {
     marginRight: spacing.sm,
   },
   searchInput: {

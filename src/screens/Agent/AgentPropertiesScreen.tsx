@@ -18,6 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import { verticalScale } from '../../utils/responsive';
 import { useAuth } from '../../context/AuthContext';
 import AgentHeader from '../../components/AgentHeader';
@@ -453,7 +454,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           />
         ) : (
           <View style={styles.propertyImagePlaceholder}>
-            <Text style={styles.placeholderText}>🏠</Text>
+            <TabIcon name="home" color="#9CA3AF" size={44} />
           </View>
         )}
         <View style={styles.propertyInfo}>
@@ -518,18 +519,20 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </View>
           <View style={styles.propertyLocationRow}>
-            <Text style={styles.locationIcon}>📍</Text>
+            <View style={styles.locationIconWrap}>
+              <TabIcon name="location" color={colors.textSecondary} size={16} />
+            </View>
             <Text style={styles.propertyLocation} numberOfLines={1}>
               {item.location}
             </Text>
           </View>
           <View style={styles.propertyStatsRow}>
             <View style={styles.propertyStatItem}>
-              <Text style={styles.propertyStatIcon}>👁️</Text>
+              <TabIcon name="eye" color={colors.textSecondary} size={16} />
               <Text style={styles.propertyStatText}>{item.views_count || 0}</Text>
             </View>
             <View style={styles.propertyStatItem}>
-              <Text style={styles.propertyStatIcon}>💬</Text>
+              <TabIcon name="inquiries" color={colors.textSecondary} size={16} />
               <Text style={styles.propertyStatText}>{item.inquiry_count || 0}</Text>
             </View>
           </View>
@@ -549,7 +552,8 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
                   e.stopPropagation();
                   handleEdit(item.id);
                 }}>
-                <Text style={styles.editButtonText}>✏️ Edit</Text>
+                <TabIcon name="edit" color={colors.surface} size={16} />
+                <Text style={styles.editButtonText}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteButton}
@@ -557,7 +561,8 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
                   e.stopPropagation();
                   handleDelete(item.id);
                 }}>
-                <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
+                <TabIcon name="trash" color={colors.surface} size={16} />
+                <Text style={styles.deleteButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -593,7 +598,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.searchBar}>
         <View style={styles.searchInputContainer}>
           <View style={styles.searchIconContainer}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <TabIcon name="search" color={colors.textSecondary} size={18} />
           </View>
           <TextInput
             style={styles.searchInput}
@@ -604,7 +609,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           />
         </View>
         <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)} activeOpacity={0.7}>
-          <Text style={styles.filterButtonIcon}>⚙</Text>
+          <TabIcon name="settings" color={colors.primary} size={20} />
         </TouchableOpacity>
       </View>
       <Modal visible={showFilterModal} transparent animationType="slide" onRequestClose={() => setShowFilterModal(false)}>
@@ -613,7 +618,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter & Sort</Text>
               <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <TabIcon name="close" color={colors.textSecondary} size={20} />
               </TouchableOpacity>
             </View>
             <View style={styles.filterSection}>
@@ -673,7 +678,9 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : allProperties.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🏠</Text>
+          <View style={styles.emptyIconWrap}>
+            <TabIcon name="home" color="#9CA3AF" size={48} />
+          </View>
           <Text style={styles.emptyText}>No Listings Yet</Text>
           <Text style={styles.emptySubtext}>Start by adding your first property or project</Text>
           <View style={styles.emptyButtonsRow}>
@@ -687,7 +694,9 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : filteredAndSortedProperties.length === 0 && searchQuery ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🔍</Text>
+          <View style={styles.emptyIconWrap}>
+            <TabIcon name="search" color="#9CA3AF" size={48} />
+          </View>
           <Text style={styles.emptyText}>No Listings Found</Text>
           <Text style={styles.emptySubtext}>Try adjusting your search terms or filters</Text>
         </View>
@@ -702,12 +711,14 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
             const projects = listingData.filter(p => p.project_type === 'upcoming');
             const propertiesOnly = listingData.filter(p => p.project_type !== 'upcoming');
 
-            const renderSection = (title: string, icon: string, data: Property[]) => {
+            const renderSection = (title: string, iconName: 'home' | 'building', data: Property[]) => {
               return (
                 <View style={styles.sectionWrap} key={title}>
                   <View style={styles.sectionTitleRow}>
                     <View style={styles.sectionTitleLeft}>
-                      <Text style={styles.sectionIcon}>{icon}</Text>
+                      <View style={styles.sectionIconWrap}>
+                        <TabIcon name={iconName} color={colors.primary} size={20} />
+                      </View>
                       <Text style={styles.sectionTitleText}>{title}</Text>
                       <View style={styles.sectionCountBadge}>
                         <Text style={styles.sectionCountText}>{data.length}</Text>
@@ -729,8 +740,8 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
 
             return (
               <>
-                {renderSection('Properties', '🏠', propertiesOnly)}
-                {renderSection('Projects', '🏗️', projects)}
+                {renderSection('Properties', 'home', propertiesOnly)}
+                {renderSection('Projects', 'building', projects)}
               </>
             );
           })()}
@@ -742,7 +753,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.fab}
           onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
           activeOpacity={0.8}>
-          <Text style={styles.fabIcon}>+</Text>
+          <TabIcon name="plus" color={colors.surface} size={24} />
           <Text style={styles.fabText}>New Property</Text>
         </TouchableOpacity>
       )}
@@ -973,8 +984,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  locationIcon: {
-    fontSize: 14,
+  locationIconWrap: {
     marginRight: spacing.xs,
   },
   propertyLocation: {
@@ -1018,6 +1028,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -1030,6 +1043,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     backgroundColor: colors.error,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -1055,8 +1071,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
-  emptyIcon: {
-    fontSize: 64,
+  emptyIconWrap: {
     marginBottom: spacing.md,
   },
   emptyText: {
@@ -1114,9 +1129,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  sectionIcon: {
-    fontSize: 18,
-  },
+  sectionIconWrap: {},
   sectionTitleText: {
     fontSize: 18,
     fontWeight: '800',

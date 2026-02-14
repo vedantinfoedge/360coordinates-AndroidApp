@@ -145,14 +145,18 @@ export default function AgentCustomTabBar({state, descriptors, navigation}: Bott
               style={[styles.arcMenuItem, styles.arcMenuItemTop]}
               onPress={handleAddProperty}
               activeOpacity={0.8}>
-              <Text style={styles.arcMenuIcon}>🏠</Text>
+              <View style={styles.arcMenuIconWrap}>
+                <TabIcon name="home" color={colors.primary} size={24} />
+              </View>
               <Text style={styles.arcMenuLabel}>Add Property</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.arcMenuItem, styles.arcMenuItemBottom]}
               onPress={handleAddProject}
               activeOpacity={0.8}>
-              <Text style={styles.arcMenuIcon}>🏗️</Text>
+              <View style={styles.arcMenuIconWrap}>
+                <TabIcon name="building" color={colors.primary} size={24} />
+              </View>
               <Text style={styles.arcMenuLabel}>Add Project</Text>
             </TouchableOpacity>
           </View>
@@ -256,9 +260,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     transform: [{translateX: 40}],
   },
-  arcMenuIcon: {
-    fontSize: 28,
+  arcMenuIconWrap: {
     marginBottom: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   arcMenuLabel: {
     ...typography.body,
