@@ -55,7 +55,7 @@ const PROJECT_STATUSES = [
   { label: 'COMPLETED', value: 'COMPLETED' },
 ];
 
-// Configuration Options
+// Configuration Options (per project type)
 const CONFIGURATIONS = [
   { id: '1bhk', label: '1 BHK' },
   { id: '2bhk', label: '2 BHK' },
@@ -65,6 +65,13 @@ const CONFIGURATIONS = [
   { id: 'villa', label: 'Villa' },
   { id: 'plot', label: 'Plot' },
 ];
+
+const CONFIGURATIONS_BY_TYPE: Record<string, string[]> = {
+  apartment: ['1bhk', '2bhk', '3bhk', '4bhk', '5bhk'],
+  villa: ['villa'],
+  plot: ['plot'],
+  commercial: ['1bhk', '2bhk', '3bhk', '4bhk', '5bhk', 'villa', 'plot'],
+};
 
 // Amenities Options
 const AMENITIES = [
@@ -92,6 +99,7 @@ const BANKS = [
 
 const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
+  const scrollViewRef = useRef<ScrollView>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -156,10 +164,10 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const [brochure, setBrochure] = useState<{ uri: string; name: string } | null>(null);
   const [masterPlan, setMasterPlan] = useState<{ uri: string; base64?: string } | null>(null);
 
-  // Step 8: Contact & Sales
-  const [salesName, setSalesName] = useState('');
-  const [salesNumber, setSalesNumber] = useState('');
-  const [emailId, setEmailId] = useState('');
+  // Step 5: Contact & Sales (at least one sales person)
+  const [salesPersons, setSalesPersons] = useState<Array<{ name: string; number: string; email: string }>>([
+    { name: '', number: '', email: '' },
+  ]);
   const [mobileNumber, setMobileNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [alternativeNumber, setAlternativeNumber] = useState('');
@@ -168,18 +176,13 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const [projectHighlights, setProjectHighlights] = useState('');
   const [usp, setUsp] = useState('');
 
-  const totalSteps = 10;
+  const totalSteps = 5;
   const steps = [
-    { id: 1, name: 'Basic Info', icon: '📝' },
+    { id: 1, name: 'Basic Details', icon: '📝' },
     { id: 2, name: 'Location', icon: '📍' },
-    { id: 3, name: 'Config', icon: '🏗️' },
-    { id: 4, name: 'Pricing', icon: '💰' },
-    { id: 5, name: 'Amenities', icon: '✨' },
-    { id: 6, name: 'Legal', icon: '📋' },
-    { id: 7, name: 'Media', icon: '📷' },
-    { id: 8, name: 'Contact', icon: '📞' },
-    { id: 9, name: 'Marketing', icon: '📢' },
-    { id: 10, name: 'Preview', icon: '👁️' },
+    { id: 3, name: 'Configuration', icon: '🏗️' },
+    { id: 4, name: 'Pricing & Amenities', icon: '💰' },
+    { id: 5, name: 'Media & Contact', icon: '📷' },
   ];
 
   // Price formatting helper
@@ -471,102 +474,129 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
     });
   };
 
-  // Validation functions
+  // Scroll to first field with error
+  const scrollToFirstError = useCallback((firstErrorField: string) => {
+    // Scroll to top so user sees error messages; ScrollView doesn't have findNodeHandle for field refs easily
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
+  // Validation functions (per AddUpcomingProjectPopup spec)
   const validateStep = (step: number): boolean => {
     switch (step) {
-      case 1:
-        {
-          const nextErrors: Record<string, string> = {};
-          if (!projectName.trim()) nextErrors.projectName = 'Please enter project name';
-          if (!projectType) nextErrors.projectType = 'Please select project type';
-          if (!description.trim()) nextErrors.description = 'Please enter project description';
-          if (description.length > 1000) nextErrors.description = 'Description cannot exceed 1000 characters';
-          if (Object.keys(nextErrors).length > 0) {
-            setFieldErrors(nextErrors);
-            return false;
-          }
-          setFieldErrors({});
-          return true;
+      case 1: {
+        // Basic Details: project name, type, status, description (min 100 chars)
+        const nextErrors: Record<string, string> = {};
+        if (!projectName.trim()) nextErrors.projectName = 'Project name is required';
+        if (!projectType) nextErrors.projectType = 'Project type is required';
+        if (!projectStatus || !['UNDER CONSTRUCTION', 'PRE-LAUNCH', 'COMPLETED'].includes(projectStatus)) {
+          nextErrors.projectStatus = 'Project status is required (UNDER CONSTRUCTION / PRE-LAUNCH / COMPLETED)';
         }
-      case 2:
-        {
-          const nextErrors: Record<string, string> = {};
-          if (!location.trim()) nextErrors.location = 'Please enter location';
-          if (!area.trim()) nextErrors.area = 'Please enter area (sq ft)';
-          const areaNum = parseFloat(area.replace(/[^0-9.]/g, ''));
-          if (area.trim() && (isNaN(areaNum) || areaNum <= 0)) {
-            nextErrors.area = 'Area must be a positive number (sq ft)';
-          }
-          if (!state.trim()) nextErrors.state = 'Please enter state';
-          if (Object.keys(nextErrors).length > 0) {
-            setFieldErrors(nextErrors);
-            return false;
-          }
-          setFieldErrors({});
-          return true;
+        if (!description.trim()) nextErrors.description = 'Description is required';
+        else if (description.trim().length < 100) {
+          nextErrors.description = 'Description must be at least 100 characters';
         }
-      case 3:
-        {
-          const nextErrors: Record<string, string> = {};
-          if (selectedConfigurations.length === 0) {
-            nextErrors.configurations = 'Please select at least one configuration';
-          }
-          if (!carpetAreaRange.trim()) {
-            nextErrors.carpetAreaRange = 'Please enter carpet area (numbers only)';
-          } else {
-            const carpetNum = parseFloat(carpetAreaRange);
-            if (isNaN(carpetNum) || carpetNum <= 0) {
-              nextErrors.carpetAreaRange = 'Carpet area must be a positive number';
-            }
-          }
-          if (Object.keys(nextErrors).length > 0) {
-            setFieldErrors(nextErrors);
-            return false;
-          }
-          setFieldErrors({});
-          return true;
+        if (Object.keys(nextErrors).length > 0) {
+          setFieldErrors(nextErrors);
+          scrollToFirstError(Object.keys(nextErrors)[0]);
+          return false;
         }
-      case 4:
-        {
-          const nextErrors: Record<string, string> = {};
-          if (!startingPrice.trim()) nextErrors.startingPrice = 'Please enter starting price';
-          if (Object.keys(nextErrors).length > 0) {
-            setFieldErrors(nextErrors);
-            return false;
-          }
-          setFieldErrors({});
-          return true;
+        setFieldErrors({});
+        return true;
+      }
+      case 2: {
+        // Location: at least one of location or area, state, additional address, pincode 6 digits
+        const nextErrors: Record<string, string> = {};
+        if (!location.trim() && !area.trim()) {
+          nextErrors.location = 'At least one of location or area is required';
         }
-      case 7:
-        {
-          const nextErrors: Record<string, string> = {};
-          const approvedImages = projectImages.filter(img => img.moderationStatus === 'APPROVED');
-          if (approvedImages.length < 2) nextErrors.projectImages = 'Please upload at least 2 approved images';
-          if (projectImages.length > 20) nextErrors.projectImages = 'Maximum 20 images allowed';
-          const checkingImages = projectImages.filter(img => img.moderationStatus === 'checking');
-          if (checkingImages.length > 0) nextErrors.projectImages = 'Please wait for all images to be processed';
-          if (Object.keys(nextErrors).length > 0) {
-            setFieldErrors(nextErrors);
-            return false;
-          }
-          setFieldErrors({});
-          return true;
+        if (!state.trim()) nextErrors.state = 'State is required';
+        if (!additionalAddress.trim()) nextErrors.additionalAddress = 'Additional address is required';
+        if (!pincode.trim()) nextErrors.pincode = 'Pincode is required';
+        else if (!/^\d{6}$/.test(pincode)) {
+          nextErrors.pincode = 'Pincode must be exactly 6 digits';
         }
-      case 8:
-        {
-          const nextErrors: Record<string, string> = {};
-          if (!salesName.trim()) nextErrors.salesName = 'Please enter sales person name';
-          if (!salesNumber.trim() || salesNumber.length !== 10) {
-            nextErrors.salesNumber = 'Please enter valid 10-digit sales number';
-          }
-          if (!emailId.trim() || !emailId.includes('@')) nextErrors.emailId = 'Please enter valid email address';
-          if (Object.keys(nextErrors).length > 0) {
-            setFieldErrors(nextErrors);
-            return false;
-          }
-          setFieldErrors({});
-          return true;
+        if (Object.keys(nextErrors).length > 0) {
+          setFieldErrors(nextErrors);
+          scrollToFirstError(Object.keys(nextErrors)[0]);
+          return false;
         }
+        setFieldErrors({});
+        return true;
+      }
+      case 3: {
+        // Configuration: at least one config (from options for project type), area range
+        const nextErrors: Record<string, string> = {};
+        if (!projectType) {
+          nextErrors.configurations = 'Select a project type in Step 1 first';
+        } else if (selectedConfigurations.length === 0) {
+          nextErrors.configurations = 'Please select at least one configuration';
+        }
+        if (!carpetAreaRange.trim()) {
+          nextErrors.carpetAreaRange = 'Area range is required';
+        } else {
+          const carpetNum = parseFloat(carpetAreaRange.replace(/[^0-9.]/g, ''));
+          if (isNaN(carpetNum) || carpetNum <= 0) {
+            nextErrors.carpetAreaRange = 'Area range must be a positive number';
+          }
+        }
+        if (Object.keys(nextErrors).length > 0) {
+          setFieldErrors(nextErrors);
+          scrollToFirstError(Object.keys(nextErrors)[0]);
+          return false;
+        }
+        setFieldErrors({});
+        return true;
+      }
+      case 4: {
+        // Pricing & Amenities: starting price, at least one amenity
+        const nextErrors: Record<string, string> = {};
+        if (!startingPrice.trim()) nextErrors.startingPrice = 'Starting price is required';
+        if (selectedAmenities.length === 0) nextErrors.amenities = 'At least one amenity is required';
+        if (Object.keys(nextErrors).length > 0) {
+          setFieldErrors(nextErrors);
+          scrollToFirstError(Object.keys(nextErrors)[0]);
+          return false;
+        }
+        setFieldErrors({});
+        return true;
+      }
+      case 5: {
+        // Media & Contact: images 2-20, no rejected, at least one approved when uploaded; at least one sales person
+        const nextErrors: Record<string, string> = {};
+        const approvedImages = projectImages.filter(img => img.moderationStatus === 'APPROVED');
+        const rejectedImages = projectImages.filter(img => img.moderationStatus === 'REJECTED');
+        if (projectImages.length > 0) {
+          if (projectImages.length < 2) nextErrors.projectImages = 'Between 2 and 20 images required';
+          else if (projectImages.length > 20) nextErrors.projectImages = 'Maximum 20 images allowed';
+          else if (rejectedImages.length > 0) nextErrors.projectImages = 'Rejected images must be removed';
+          else if (approvedImages.length === 0) nextErrors.projectImages = 'At least one approved image required when images are uploaded';
+        } else {
+          nextErrors.projectImages = 'Between 2 and 20 images required';
+        }
+        const checkingImages = projectImages.filter(img => img.moderationStatus === 'checking');
+        if (checkingImages.length > 0) nextErrors.projectImages = 'Please wait for all images to be processed';
+
+        const validSalesPersons = salesPersons.filter(sp => {
+          const nameOk = /^[a-zA-Z\s]+$/.test(sp.name.trim()) && sp.name.trim().length >= 2;
+          const numberOk = sp.number.replace(/\D/g, '').length === 10;
+          const emailOk = sp.email.trim() && sp.email.includes('@');
+          return nameOk && numberOk && emailOk;
+        });
+        if (validSalesPersons.length === 0) {
+          const first = salesPersons[0];
+          if (!first.name.trim()) nextErrors.salesName_0 = 'Name is required';
+          else if (/[^a-zA-Z\s]/.test(first.name)) nextErrors.salesName_0 = 'Name: letters and spaces only';
+          if (first.number.replace(/\D/g, '').length !== 10) nextErrors.salesNumber_0 = 'Number must be exactly 10 digits';
+          if (!first.email.trim() || !first.email.includes('@')) nextErrors.salesEmail_0 = 'Email is required';
+        }
+        if (Object.keys(nextErrors).length > 0) {
+          setFieldErrors(nextErrors);
+          scrollToFirstError(Object.keys(nextErrors)[0]);
+          return false;
+        }
+        setFieldErrors({});
+        return true;
+      }
       default:
         return true;
     }
@@ -590,7 +620,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(10)) {
+    if (!validateStep(5)) {
       return;
     }
 
@@ -653,9 +683,30 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
           bank_approved: bankApproved || null,
           approved_banks: selectedBanks.length > 0 ? selectedBanks.join(',') : null,
           other_bank_names: otherBankNames.trim() || null,
-          sales_name: salesName.trim(),
-          sales_number: salesNumber.trim(),
-          email_id: emailId.trim(),
+          sales_name: (() => {
+            const valid = salesPersons.find(sp =>
+              /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
+              sp.number.replace(/\D/g, '').length === 10 &&
+              sp.email.includes('@')
+            );
+            return valid?.name.trim() || salesPersons[0]?.name.trim() || '';
+          })(),
+          sales_number: (() => {
+            const valid = salesPersons.find(sp =>
+              /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
+              sp.number.replace(/\D/g, '').length === 10 &&
+              sp.email.includes('@')
+            );
+            return valid?.number.trim() || salesPersons[0]?.number.trim() || '';
+          })(),
+          email_id: (() => {
+            const valid = salesPersons.find(sp =>
+              /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
+              sp.number.replace(/\D/g, '').length === 10 &&
+              sp.email.includes('@')
+            );
+            return valid?.email.trim() || salesPersons[0]?.email.trim() || '';
+          })(),
           mobile_number: mobileNumber.trim() || null,
           whatsapp_number: whatsappNumber.trim() || null,
           alternative_number: alternativeNumber.trim() || null,
@@ -858,8 +909,14 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                 placeholder="Select project status"
                 options={PROJECT_STATUSES}
                 value={projectStatus}
-                onSelect={(value) => setProjectStatus(value)}
+                onSelect={(value) => {
+                  setProjectStatus(value);
+                  clearFieldError('projectStatus');
+                }}
               />
+              {!!fieldErrors.projectStatus && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.projectStatus}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -879,7 +936,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Provide a short overview of your project (500-1000 characters)"
+                placeholder="Provide a detailed overview (minimum 100 characters)"
                 placeholderTextColor={colors.textSecondary}
                 value={description}
                 onChangeText={(text: string) => {
@@ -892,7 +949,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                 maxLength={1000}
               />
               <Text style={styles.charCount}>
-                {description.length}/1000
+                {description.length}/1000 {description.trim().length < 100 && '(min 100 required)'}
               </Text>
               {!!fieldErrors.description && (
                 <Text style={styles.fieldErrorText}>{fieldErrors.description}</Text>
@@ -904,11 +961,11 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
       case 2:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Location Details</Text>
+            <Text style={styles.stepTitle}>Location</Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Location <Text style={styles.required}>*</Text>
+                Location / Area <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.locationInputContainer}>
                 <TextInput
@@ -934,6 +991,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                   />
                 )}
               </View>
+              <Text style={styles.hintText}>At least one of location or area is required</Text>
               {!!fieldErrors.location && (
                 <Text style={styles.fieldErrorText}>{fieldErrors.location}</Text>
               )}
@@ -941,7 +999,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Area (sq ft) <Text style={styles.required}>*</Text>
+                Area (sq ft)
               </Text>
               <View style={styles.areaInputContainer}>
                 <TextInput
@@ -1052,46 +1110,64 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Additional Address (Optional)</Text>
+              <Text style={styles.label}>
+                Additional Address <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="Enter additional address details"
                 placeholderTextColor={colors.textSecondary}
                 value={additionalAddress}
-                onChangeText={setAdditionalAddress}
+                onChangeText={(text: string) => {
+                  setAdditionalAddress(text);
+                  clearFieldError('additionalAddress');
+                }}
               />
+              {!!fieldErrors.additionalAddress && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.additionalAddress}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Pincode (Optional)</Text>
+              <Text style={styles.label}>
+                Pincode <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter pincode"
+                placeholder="6 digits"
                 placeholderTextColor={colors.textSecondary}
                 value={pincode}
                 onChangeText={(text: string) => {
-                  // Only allow digits, max 6
                   const cleaned = text.replace(/[^0-9]/g, '').slice(0, 6);
                   setPincode(cleaned);
+                  clearFieldError('pincode');
                 }}
                 keyboardType="numeric"
                 maxLength={6}
               />
+              {!!fieldErrors.pincode && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.pincode}</Text>
+              )}
             </View>
           </View>
         );
 
       case 3:
+        const configIdsForType = projectType ? (CONFIGURATIONS_BY_TYPE[projectType] || []) : [];
+        const configOptionsForType = configIdsForType.map(id => CONFIGURATIONS.find(c => c.id === id)!).filter(Boolean);
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Configuration & Inventory Details</Text>
+            <Text style={styles.stepTitle}>Configuration</Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Property Configurations <Text style={styles.required}>*</Text>
+                Configurations <Text style={styles.required}>*</Text>
               </Text>
+              {!projectType ? (
+                <Text style={styles.warningText}>Select a project type in Step 1 first</Text>
+              ) : null}
               <View style={styles.buttonGrid}>
-                {CONFIGURATIONS.map(config => (
+                {configOptionsForType.map(config => (
                   <TouchableOpacity
                     key={config.id}
                     style={[
@@ -1123,7 +1199,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Carpet Area Range <Text style={styles.required}>*</Text>
+                Area Range <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.areaInputContainer}>
                 <TextInput
@@ -1134,9 +1210,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                   onChangeText={(text: string) => {
                     const cleaned = text.replace(/[^0-9.]/g, '');
                     const parts = cleaned.split('.');
-                    if (parts.length <= 2) {
-                      setCarpetAreaRange(parts[0] + (parts[1] != null ? '.' + parts[1] : ''));
-                    }
+                    const next = parts.length <= 2 ? (parts[0] + (parts[1] != null ? '.' + parts[1] : '')) : parts[0];
+                    setCarpetAreaRange(next);
                     clearFieldError('carpetAreaRange');
                   }}
                   keyboardType="decimal-pad"
@@ -1198,7 +1273,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
       case 4:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Pricing & Timeline</Text>
+            <Text style={styles.stepTitle}>Pricing & Amenities</Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
@@ -1323,16 +1398,11 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                 />
               )}
             </View>
-          </View>
-        );
-
-      case 5:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Amenities</Text>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Amenities (All Optional)</Text>
+              <Text style={styles.label}>
+                Amenities <Text style={styles.required}>*</Text>
+              </Text>
               <View style={styles.amenitiesGrid}>
                 {AMENITIES.map(amenity => (
                   <TouchableOpacity
@@ -1342,6 +1412,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       selectedAmenities.includes(amenity.id) && styles.amenityButtonActive,
                     ]}
                     onPress={() => {
+                      clearFieldError('amenities');
                       if (selectedAmenities.includes(amenity.id)) {
                         setSelectedAmenities(prev => prev.filter(id => id !== amenity.id));
                       } else {
@@ -1359,122 +1430,19 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                   </TouchableOpacity>
                 ))}
               </View>
+              {!!fieldErrors.amenities && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.amenities}</Text>
+              )}
             </View>
           </View>
         );
 
-      case 6:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Legal & Approval Information</Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>RERA Status (Optional)</Text>
-              <Dropdown
-                placeholder="Select RERA Status"
-                options={[
-                  { label: 'Applied', value: 'Applied' },
-                  { label: 'Approved', value: 'Approved' },
-                ]}
-                value={reraStatus}
-                onSelect={(value) => setReraStatus(value)}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Land Ownership Type (Optional)</Text>
-              <Dropdown
-                placeholder="Select Ownership Type"
-                options={[
-                  { label: 'Freehold', value: 'Freehold' },
-                  { label: 'Leasehold', value: 'Leasehold' },
-                  { label: 'Power of Attorney', value: 'Power of Attorney' },
-                  { label: 'Co-operative Society', value: 'Co-operative Society' },
-                ]}
-                value={landOwnershipType}
-                onSelect={(value) => setLandOwnershipType(value)}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Bank Approved (Optional)</Text>
-              <Dropdown
-                placeholder="Select"
-                options={[
-                  { label: 'Yes', value: 'Yes' },
-                  { label: 'No', value: 'No' },
-                ]}
-                value={bankApproved}
-                onSelect={(value) => {
-                  setBankApproved(value);
-                  if (value !== 'Yes') {
-                    setSelectedBanks([]);
-                    setOtherBankNames('');
-                  }
-                }}
-              />
-            </View>
-
-            {bankApproved === 'Yes' && (
-              <>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    Select Approved Banks <Text style={styles.required}>*</Text>
-                  </Text>
-                  <View style={styles.buttonGrid}>
-                    {BANKS.map(bank => (
-                      <TouchableOpacity
-                        key={bank.id}
-                        style={[
-                          styles.configButton,
-                          selectedBanks.includes(bank.id) && styles.configButtonActive,
-                        ]}
-                        onPress={() => {
-                          if (selectedBanks.includes(bank.id)) {
-                            setSelectedBanks(prev => prev.filter(id => id !== bank.id));
-                            if (bank.id === 'other') {
-                              setOtherBankNames('');
-                            }
-                          } else {
-                            setSelectedBanks(prev => [...prev, bank.id]);
-                          }
-                        }}>
-                        {selectedBanks.includes(bank.id) && (
-                          <Text style={styles.checkmark}>✓</Text>
-                        )}
-                        <Text style={[
-                          styles.configButtonText,
-                          selectedBanks.includes(bank.id) && styles.configButtonTextActive,
-                        ]}>{bank.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {selectedBanks.includes('other') && (
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Other Bank Name(s) (Optional)</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter bank names separated by comma (e.g., PNB, Canara Bank)"
-                      placeholderTextColor={colors.textSecondary}
-                      value={otherBankNames}
-                      onChangeText={setOtherBankNames}
-                    />
-                    <Text style={styles.hintText}>You can enter multiple bank names separated by commas</Text>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-        );
-
-      case 7:
+      case 5: {
         const approvedImagesCount = projectImages.filter(img => img.moderationStatus === 'APPROVED').length;
 
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Media Uploads</Text>
+            <Text style={styles.stepTitle}>Media & Contact</Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Project Cover Image (Optional)</Text>
@@ -1712,81 +1680,95 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
-        );
-
-      case 8:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Contact & Sales Information</Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Sales Name <Text style={styles.required}>*</Text>
+                Sales Person(s) <Text style={styles.required}>*</Text> (At least one required)
               </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter sales person name"
-                placeholderTextColor={colors.textSecondary}
-                value={salesName}
-                onChangeText={(text: string) => {
-                  setSalesName(text);
-                  clearFieldError('salesName');
-                }}
-              />
-              {!!fieldErrors.salesName && (
-                <Text style={styles.fieldErrorText}>{fieldErrors.salesName}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Sales Number <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="10"
-                placeholderTextColor={colors.textSecondary}
-                value={salesNumber}
-                onChangeText={(text: string) => {
-                  const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
-                  setSalesNumber(cleaned);
-                  clearFieldError('salesNumber');
-                }}
-                keyboardType="numeric"
-                maxLength={10}
-              />
-              {!!fieldErrors.salesNumber && (
-                <Text style={styles.fieldErrorText}>{fieldErrors.salesNumber}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Email ID <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter email address"
-                placeholderTextColor={colors.textSecondary}
-                value={emailId}
-                onChangeText={(text: string) => {
-                  setEmailId(text);
-                  clearFieldError('emailId');
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              {!!fieldErrors.emailId && (
-                <Text style={styles.fieldErrorText}>{fieldErrors.emailId}</Text>
-              )}
+              {salesPersons.map((sp, index) => (
+                <View key={index} style={styles.salesPersonCard}>
+                  <View style={styles.salesPersonRow}>
+                    <Text style={styles.salesPersonLabel}>Name</Text>
+                    {salesPersons.length > 1 && (
+                      <TouchableOpacity
+                        onPress={() => setSalesPersons(prev => prev.filter((_, i) => i !== index))}
+                        style={styles.removeSalesPersonBtn}>
+                        <Text style={styles.removeSalesPersonText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Letters and spaces only"
+                    placeholderTextColor={colors.textSecondary}
+                    value={sp.name}
+                    onChangeText={(text: string) => {
+                      setSalesPersons(prev => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], name: text };
+                        return next;
+                      });
+                      clearFieldError(`salesName_${index}`);
+                    }}
+                  />
+                  {!!fieldErrors[`salesName_${index}`] && (
+                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesName_${index}`]}</Text>
+                  )}
+                  <Text style={styles.salesPersonLabel}>Number (10 digits)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="10-digit phone number"
+                    placeholderTextColor={colors.textSecondary}
+                    value={sp.number}
+                    onChangeText={(text: string) => {
+                      const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                      setSalesPersons(prev => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], number: cleaned };
+                        return next;
+                      });
+                      clearFieldError(`salesNumber_${index}`);
+                    }}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                  {!!fieldErrors[`salesNumber_${index}`] && (
+                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesNumber_${index}`]}</Text>
+                  )}
+                  <Text style={styles.salesPersonLabel}>Email</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="email@example.com"
+                    placeholderTextColor={colors.textSecondary}
+                    value={sp.email}
+                    onChangeText={(text: string) => {
+                      setSalesPersons(prev => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], email: text };
+                        return next;
+                      });
+                      clearFieldError(`salesEmail_${index}`);
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  {!!fieldErrors[`salesEmail_${index}`] && (
+                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesEmail_${index}`]}</Text>
+                  )}
+                </View>
+              ))}
+              <TouchableOpacity
+                style={styles.addSalesPersonButton}
+                onPress={() => setSalesPersons(prev => [...prev, { name: '', number: '', email: '' }])}>
+                <Text style={styles.addSalesPersonText}>+ Add another sales person</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Mobile Number (Optional)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="10"
+                placeholder="10-digit number"
                 placeholderTextColor={colors.textSecondary}
                 value={mobileNumber}
                 onChangeText={(text: string) => {
@@ -1802,7 +1784,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.label}>WhatsApp Number (Optional)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="10"
+                placeholder="10-digit number"
                 placeholderTextColor={colors.textSecondary}
                 value={whatsappNumber}
                 onChangeText={(text: string) => {
@@ -1813,200 +1795,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                 maxLength={10}
               />
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Alternative Number (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="10"
-                placeholderTextColor={colors.textSecondary}
-                value={alternativeNumber}
-                onChangeText={(text: string) => {
-                  const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
-                  setAlternativeNumber(cleaned);
-                }}
-                keyboardType="numeric"
-                maxLength={10}
-              />
-            </View>
           </View>
         );
-
-      case 9:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Marketing Highlights</Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Project Highlights (Optional but recommended)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="e.g., Near Metro Station, Sea View, Golf Course Nearby"
-                placeholderTextColor={colors.textSecondary}
-                value={projectHighlights}
-                onChangeText={setProjectHighlights}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>USP (Unique Selling Points) (Optional)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="What makes your project unique?"
-                placeholderTextColor={colors.textSecondary}
-                value={usp}
-                onChangeText={setUsp}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-          </View>
-        );
-
-      case 10:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Preview & Submit</Text>
-
-            <ScrollView style={styles.previewScroll}>
-              <View style={styles.previewSection}>
-                <Text style={styles.previewSectionTitle}>Basic Information</Text>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Project Name:</Text>
-                  <Text style={styles.previewValue}>{projectName || 'N/A'}</Text>
-                </View>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Agent:</Text>
-                  <Text style={styles.previewValue}>{user?.full_name || 'N/A'}</Text>
-                </View>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Project Type:</Text>
-                  <Text style={styles.previewValue}>
-                    {PROJECT_TYPES.find(t => t.id === projectType)?.label || 'N/A'}
-                  </Text>
-                </View>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Status:</Text>
-                  <Text style={styles.previewValue}>{projectStatus || 'N/A'}</Text>
-                </View>
-                {reraNumber && (
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>RERA Number:</Text>
-                    <Text style={styles.previewValue}>{reraNumber}</Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.previewSection}>
-                <Text style={styles.previewSectionTitle}>Location</Text>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Location:</Text>
-                  <Text style={styles.previewValue}>{location || 'N/A'}</Text>
-                </View>
-                {additionalAddress && (
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Full Address:</Text>
-                    <Text style={styles.previewValue}>{additionalAddress}</Text>
-                  </View>
-                )}
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>State:</Text>
-                  <Text style={styles.previewValue}>{state || 'N/A'}</Text>
-                </View>
-                {latitude && longitude && (
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Coordinates:</Text>
-                    <Text style={styles.previewValue}>
-                      {latitude.toFixed(6)}, {longitude.toFixed(6)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.previewSection}>
-                <Text style={styles.previewSectionTitle}>Configuration</Text>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Configurations:</Text>
-                  <Text style={styles.previewValue}>
-                    {selectedConfigurations.map(id =>
-                      CONFIGURATIONS.find(c => c.id === id)?.label
-                    ).filter(Boolean).join(', ') || 'N/A'}
-                  </Text>
-                </View>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Carpet Area Range:</Text>
-                  <Text style={styles.previewValue}>{carpetAreaRange || 'N/A'} sq.ft</Text>
-                </View>
-              </View>
-
-              <View style={styles.previewSection}>
-                <Text style={styles.previewSectionTitle}>Pricing</Text>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Starting Price:</Text>
-                  <Text style={styles.previewValue}>
-                    {startingPrice ? formatters.price(formatPriceInput(startingPrice)) : 'N/A'}
-                  </Text>
-                </View>
-                {pricePerSqft && (
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Price per Sq.ft:</Text>
-                    <Text style={styles.previewValue}>
-                      {formatters.price(formatPriceInput(pricePerSqft))}/sq.ft
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.previewSection}>
-                <Text style={styles.previewSectionTitle}>Contact</Text>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Sales Name:</Text>
-                  <Text style={styles.previewValue}>{salesName || 'N/A'}</Text>
-                </View>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Sales Number:</Text>
-                  <Text style={styles.previewValue}>{salesNumber || 'N/A'}</Text>
-                </View>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Email:</Text>
-                  <Text style={styles.previewValue}>{emailId || 'N/A'}</Text>
-                </View>
-                {mobileNumber && (
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Mobile Number:</Text>
-                    <Text style={styles.previewValue}>{mobileNumber}</Text>
-                  </View>
-                )}
-                {whatsappNumber && (
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>WhatsApp Number:</Text>
-                    <Text style={styles.previewValue}>{whatsappNumber}</Text>
-                  </View>
-                )}
-                {alternativeNumber && (
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Alternative Number:</Text>
-                    <Text style={styles.previewValue}>{alternativeNumber}</Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.previewSection}>
-                <Text style={styles.previewSectionTitle}>Images</Text>
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Approved Images:</Text>
-                  <Text style={styles.previewValue}>
-                    {projectImages.filter(img => img.moderationStatus === 'APPROVED').length} / 20
-                  </Text>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        );
+      }
 
       default:
         return null;
@@ -2080,6 +1871,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
 
             {/* Content */}
             <ScrollView
+              ref={scrollViewRef}
               style={styles.content}
               contentContainerStyle={styles.contentContainer}
               showsVerticalScrollIndicator={false}>
@@ -2100,16 +1892,10 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.nextButton,
-                  (isSubmitting ||
-                    (currentStep === 7 && projectImages.filter(img => img.moderationStatus === 'APPROVED').length < 2) ||
-                    (currentStep === 7 && projectImages.length > 20)
-                  ) && styles.nextButtonDisabled
+                  isSubmitting && styles.nextButtonDisabled
                 ]}
                 onPress={handleNext}
-                disabled={isSubmitting ||
-                  (currentStep === 7 && projectImages.filter(img => img.moderationStatus === 'APPROVED').length < 2) ||
-                  (currentStep === 7 && projectImages.length > 20)
-                }>
+                disabled={isSubmitting}>
                 {isSubmitting ? (
                   <View style={styles.submitButtonInner}>
                     <ActivityIndicator size="small" color={colors.surface} />
@@ -2300,6 +2086,48 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 12,
     marginTop: spacing.xs,
+  },
+  salesPersonCard: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  salesPersonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  salesPersonLabel: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  removeSalesPersonBtn: {
+    padding: spacing.xs,
+  },
+  removeSalesPersonText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 12,
+  },
+  addSalesPersonButton: {
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  addSalesPersonText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontSize: 14,
   },
   buttonGrid: {
     flexDirection: 'row',

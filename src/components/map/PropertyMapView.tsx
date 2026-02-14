@@ -19,8 +19,22 @@ import {favoriteService} from '../../services/favorite.service';
 import {Share} from 'react-native';
 import {MAP_CONFIG} from '../../config/mapbox.config';
 import CustomAlert from '../../utils/alertHelper';
+import {PG_HOSTEL_PROPERTY_TYPE} from '../../utils/propertySearchParams';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
+
+/** Search params passed from FullscreenMapSearch / PropertyMapScreen */
+export interface MapSearchParams {
+  location?: string;
+  city?: string;
+  listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel';
+  propertyType?: string;
+  budget?: string;
+  minBudget?: number;
+  maxBudget?: number;
+  bedrooms?: string;
+  area?: string;
+}
 
 // Check if Mapbox is available
 let isMapboxAvailable = false;
@@ -51,7 +65,29 @@ interface PropertyMapViewProps {
   showListToggle?: boolean;
   listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel';
   selectedPropertyId?: string | number; // Property ID to highlight on map
+  /** Search bar rendered above the map (shown when fullscreen). Only visible when provided. */
+  fullscreenSearchBar?: React.ReactNode;
+  /** Search params from FullscreenMapSearch - used to fetch filtered properties */
+  searchParams?: MapSearchParams;
 }
+
+const categoryMap: {[key: string]: string} = {
+  'Apartment': 'Residential',
+  'Villa': 'Residential',
+  'Independent House': 'Residential',
+  'Bungalow': 'Residential',
+  'Studio Apartment': 'Residential',
+  'Penthouse': 'Residential',
+  'Farm House': 'Residential',
+  'Plot / Land': 'Land',
+  'Commercial Office': 'Commercial',
+  'Commercial Shop': 'Commercial',
+  'Retail Space': 'Commercial',
+  'Co-working Space': 'Commercial',
+  'Warehouse / Godown': 'Commercial',
+  'Industrial Property': 'Industrial',
+  'PG / Hostel': PG_HOSTEL_PROPERTY_TYPE,
+};
 
 const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   properties: initialProperties,
@@ -61,6 +97,8 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   showListToggle = true,
   listingType = 'all',
   selectedPropertyId: propSelectedPropertyId,
+  fullscreenSearchBar,
+  searchParams,
 }) => {
   const [properties, setProperties] = useState<Property[]>(initialProperties || []);
   const [loading, setLoading] = useState(!initialProperties);
@@ -77,13 +115,19 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   // Store current property ID (from PropertyDetailsScreen) separately
   const currentPropertyId = propSelectedPropertyId ? String(propSelectedPropertyId) : null;
 
+  const effectiveListingType = searchParams?.listingType || listingType;
+
+  const searchParamsKey = searchParams
+    ? `${searchParams.location}|${searchParams.city}|${searchParams.listingType}|${searchParams.propertyType}|${searchParams.minBudget}|${searchParams.maxBudget}|${searchParams.bedrooms}|${searchParams.area}`
+    : '';
+
   useEffect(() => {
     if (!initialProperties) {
       loadProperties();
     } else {
       // Filter initial properties based on listing type
       let filtered = initialProperties;
-      if (listingType === 'pg-hostel') {
+      if (effectiveListingType === 'pg-hostel') {
         filtered = initialProperties.filter((prop: any) => {
           const propType = (prop.property_type || '').toLowerCase();
           return propType.includes('pg') || 
@@ -91,14 +135,14 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                  propType === 'pg-hostel' ||
                  prop.status === 'pg';
         });
-      } else if (listingType === 'buy') {
+      } else if (effectiveListingType === 'buy') {
         filtered = initialProperties.filter((prop: any) => prop.status === 'sale');
-      } else if (listingType === 'rent') {
+      } else if (effectiveListingType === 'rent') {
         filtered = initialProperties.filter((prop: any) => prop.status === 'rent');
       }
       setProperties(filtered);
     }
-  }, [listingType, initialProperties]);
+  }, [effectiveListingType, initialProperties, searchParamsKey]);
 
   // Load selected property and center map on it
   useEffect(() => {
@@ -165,11 +209,11 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
         longitude: centerLng,
         radius: 5,
       };
-      if (listingType === 'buy') {
+      if (effectiveListingType === 'buy') {
         params.status = 'sale';
-      } else if (listingType === 'rent') {
+      } else if (effectiveListingType === 'rent') {
         params.status = 'rent';
-      } else if (listingType === 'pg-hostel') {
+      } else if (effectiveListingType === 'pg-hostel') {
         params.status = 'rent';
         params.property_type = 'PG / Hostel';
         params.available_for_bachelors = true;
@@ -226,16 +270,48 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     try {
       setLoading(true);
       
-      // Same backend as website: property_type 'PG / Hostel', available_for_bachelors (list.php)
+      const lt = searchParams?.listingType ?? listingType;
       const params: any = { limit: 50 };
-      if (listingType === 'buy') {
-        params.status = 'sale';
-      } else if (listingType === 'rent') {
-        params.status = 'rent';
-      } else if (listingType === 'pg-hostel') {
-        params.status = 'rent';
-        params.property_type = 'PG / Hostel';
-        params.available_for_bachelors = true;
+      
+      if (searchParams) {
+        // Use search params from FullscreenMapSearch
+        if (lt === 'buy') params.status = 'sale';
+        else if (lt === 'rent' || lt === 'pg-hostel') params.status = 'rent';
+        if (lt === 'pg-hostel') {
+          params.property_type = 'PG / Hostel';
+          params.available_for_bachelors = true;
+        }
+        const loc = (searchParams.location || '').trim();
+        const city = (searchParams.city || '').trim();
+        if (loc) params.location = loc;
+        if (city) params.city = city;
+        if (!loc && city) params.location = city;
+        const pt = searchParams.propertyType;
+        if (pt && pt !== 'all' && lt !== 'pg-hostel') {
+          const category = categoryMap[pt];
+          params.property_type = category || pt.toLowerCase().replace(/ /g, '-');
+        }
+        const mn = searchParams.minBudget ?? 0;
+        const mx = searchParams.maxBudget ?? (lt === 'buy' ? 1000 : 200);
+        // Any = no filter: Buy max 500 (5Cr), Rent/PG max 200–500 depending on property type
+        const maxForAny = 500;
+        const hasBudgetFilter = mn > 0 || mx < maxForAny;
+        if (hasBudgetFilter) {
+          const mult = lt === 'buy' ? 100000 : 1000; // lakhs for buy, thousands/month for rent & pg-hostel
+          params.min_price = String(Math.round(mn * mult));
+          params.max_price = String(Math.round(mx * mult));
+        }
+        if (searchParams.bedrooms) params.bedrooms = searchParams.bedrooms;
+        if (searchParams.area) params.area = searchParams.area;
+      } else {
+        // Legacy: listing type only
+        if (lt === 'buy') params.status = 'sale';
+        else if (lt === 'rent') params.status = 'rent';
+        else if (lt === 'pg-hostel') {
+          params.status = 'rent';
+          params.property_type = 'PG / Hostel';
+          params.available_for_bachelors = true;
+        }
       }
       
       const response = await propertyService.getProperties(params);
@@ -255,7 +331,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
             cover_image: prop.cover_image || prop.image,
           }));
         setProperties(formattedProperties);
-        log.property(`Loaded ${formattedProperties.length} properties for map (filter: ${listingType})`);
+        log.property(`Loaded ${formattedProperties.length} properties for map (filter: ${lt})`);
       }
     } catch (error) {
       log.error('property', 'Error loading properties for map', error);
@@ -418,6 +494,11 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       {/* Map View */}
       {viewMode === 'map' && (
         <View style={styles.mapContainer}>
+          {fullscreenSearchBar ? (
+            <View style={styles.fullscreenSearchContainer}>
+              {fullscreenSearchBar}
+            </View>
+          ) : null}
           <MapViewComponent
             initialCenter={mapCenter || initialCenter}
             initialZoom={mapZoom || initialZoom}
@@ -604,6 +685,11 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
+  },
+  fullscreenSearchContainer: {
+    flexShrink: 0,
+    zIndex: 10,
+    paddingTop: 8,
   },
   propertyCardOverlay: {
     position: 'absolute',

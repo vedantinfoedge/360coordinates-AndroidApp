@@ -9,9 +9,9 @@ import {
   FlatList,
   Image,
   ActivityIndicator,
+  Share,
   RefreshControl,
   Animated,
-  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -80,7 +80,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const headerHeight = insets.top + verticalScale(70);
 
   // Smooth marquee auto-scroll refs
-  const carouselScrollRef = useRef<ScrollView>(null);
+  const carouselScrollRef = useRef<any>(null);
   const scrollPosition = useRef(0);
   const animationRef = useRef<number | null>(null);
   const isUserScrolling = useRef(false);
@@ -308,10 +308,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       params.listingType = listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent';
       params.status = listingType === 'sale' ? 'sale' : 'rent';
 
-      navigation.navigate('Search' as never, {
+      navigation.navigate('Search' as any, {
         screen: 'SearchResults',
         params: params,
-      } as never);
+      } as any);
     } catch (error: any) {
       console.error('Error navigating to search:', error);
       CustomAlert.alert('Error', 'Failed to navigate to search. Please try again.');
@@ -319,17 +319,17 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleCityPress = (cityName: string) => {
-    navigation.navigate('Search' as never, {
+    navigation.navigate('Search' as any, {
       screen: 'SearchResults',
       params: { location: cityName },
-    } as never);
+    } as any);
   };
 
   const handlePropertyPress = (property: Property) => {
-    navigation.navigate('Search' as never, {
+    navigation.navigate('Search' as any, {
       screen: property.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
       params: { propertyId: String(property.id) },
-    } as never);
+    } as any);
   };
 
   const handleShareProperty = async (property: Property) => {
@@ -350,7 +350,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const renderPropertyCard = ({ item, index }: { item: Property; index: number }) => {
     const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
     const images = item.images?.length
-      ? item.images.map((url: string) => fixImageUrl(url)).filter(Boolean)
+      ? (item.images.map((url: string) => fixImageUrl(url)).filter(Boolean) as string[])
       : undefined;
     return (
       <Animated.View
@@ -392,8 +392,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <BuyerHeader
-        onProfilePress={() => navigation.navigate('Profile' as never)}
-        onSupportPress={() => navigation.navigate('Support' as never)}
+        onProfilePress={() => navigation.navigate('Profile' as any)}
+        onSupportPress={() => navigation.navigate('Support' as any)}
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={
           isGuest
@@ -478,7 +478,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     placeholder="Search by city, locality, project"
                     placeholderTextColor={colors.textSecondary}
                     value={searchLocation || searchQuery}
-                    onChangeText={text => {
+                    onChangeText={(text: string) => {
                       setSearchLocation(text);
                       setSearchQuery(text);
                       setShowLocationSuggestions(text.length >= 2);
@@ -506,12 +506,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               style={styles.mapSearchButton}
               onPress={() => {
                 try {
-                  navigation.navigate('Search' as never, {
+                  navigation.navigate('Search' as any, {
                     screen: 'PropertyMap',
                     params: {
                       listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
                     },
-                  } as never);
+                  } as any);
                 } catch (err: any) {
                   console.error('Error navigating to map:', err);
                   CustomAlert.alert('Error', 'Map is not available.');
@@ -534,7 +534,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <TouchableOpacity
                 onPress={() => {
-                  navigation.navigate('Search' as never, {
+                  navigation.navigate('Search' as any, {
                     screen: 'SearchResults',
                     params: {
                       query: '',
@@ -544,7 +544,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       project_type: 'upcoming',
                       searchMode: 'projects',
                     },
-                  } as never);
+                  } as any);
                 }}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
@@ -611,10 +611,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
                     // Navigate to SearchResults screen
                     console.log('[HomeScreen] Navigating to SearchResults with params:', params);
-                    navigation.navigate('Search' as never, {
+                    navigation.navigate('Search' as any, {
                       screen: 'SearchResults',
                       params: params,
-                    } as never);
+                    } as any);
                   } catch (error: any) {
                     console.error('Error navigating to all properties:', error);
                     CustomAlert.alert('Error', 'Failed to load all properties. Please try again.');
@@ -638,13 +638,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 contentContainerStyle={styles.propertiesList}
                 onScrollBeginDrag={handleScrollBeginDrag}
                 onScrollEndDrag={handleScrollEndDrag}
-                onMomentumScrollEnd={(event) => {
+                onMomentumScrollEnd={(event: any) => {
                   scrollPosition.current = event.nativeEvent.contentOffset.x;
                 }}>
                 {getMarqueeData().map((item: Property, index: number) => {
                   const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
                   const images = item.images?.length
-                    ? item.images.map((url: string) => fixImageUrl(url)).filter(Boolean)
+                    ? (item.images.map((url: string) => fixImageUrl(url)).filter(Boolean) as string[])
                     : undefined;
                   return (
                     <Animated.View
@@ -693,7 +693,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <TouchableOpacity
                 onPress={() => {
-                  navigation.navigate('Search' as never, {
+                  navigation.navigate('Search' as any, {
                     screen: 'SearchResults',
                     params: {
                       query: '',
@@ -702,7 +702,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       status: 'sale',
                       propertyType: 'Apartment',
                     },
-                  } as never);
+                  } as any);
                 }}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
@@ -715,7 +715,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 {buyNewHomeProperties.map((item: Property) => {
                   const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
                   const images = item.images?.length
-                    ? (item.images.map((url: string) => fixImageUrl(url)).filter((u): u is string => Boolean(u)) as string[])
+                    ? (item.images.map((url: string) => fixImageUrl(url)).filter(Boolean) as string[])
                     : undefined;
                   return (
                     <View key={item.id} style={styles.carouselCard}>
@@ -747,14 +747,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
-                Browse Residential Projects in Top Cities
+                Search Residential Properties in Top Cities
               </Text>
             </View>
             <FlatList
               data={TOP_CITIES}
               horizontal
               showsHorizontalScrollIndicator={false}
-              keyExtractor={item => item.id}
+              keyExtractor={(item: TopCity) => item.id}
               contentContainerStyle={styles.citiesList}
               renderItem={renderCityCard}
             />

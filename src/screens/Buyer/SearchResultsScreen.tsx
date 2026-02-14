@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Share,
-  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -20,7 +19,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SearchStackParamList } from '../../navigation/SearchNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import PropertyCard from '../../components/PropertyCard';
-import BuyerHeader from '../../components/BuyerHeader';
 import { useAuth } from '../../context/AuthContext';
 import { propertyTypes, pgHostelType, ListingType, PropertyType } from '../../data/propertyTypes';
 import {
@@ -224,26 +222,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [routeSyncKey]);
 
   const hasInitializedBudgetContext = useRef(false);
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const searchBarHeight = 175; // Search bar + dropdown row + results header
-
-  // Search bar: visible at top, hides on scroll down
-  const searchBarAnimatedStyle = {
-    transform: [
-      {
-        translateY: scrollY.interpolate({
-          inputRange: [0, searchBarHeight],
-          outputRange: [0, -searchBarHeight],
-          extrapolate: 'clamp',
-        }),
-      },
-    ],
-    opacity: scrollY.interpolate({
-      inputRange: [0, searchBarHeight / 2],
-      outputRange: [1, 0],
-      extrapolate: 'clamp',
-    }),
-  };
+  const searchBarHeight = 175; // Search bar + dropdown row + results header (for padding list below sticky section)
 
   // Property type classification (bedroom filter shown for these types only)
   const bedroomBasedTypes = [
@@ -1004,38 +983,10 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const renderSeparator = () => <View style={styles.propertySeparator} />;
 
-  // Calculate header height: insets.top + header minHeight (60) + padding (spacing.md * 2 = 16 * 2 = 32)
-  // More accurate calculation based on actual header structure
-  const headerHeight = insets.top + 60 + (spacing.md * 2); // insets.top + minHeight + padding
-
   return (
     <View style={styles.container}>
-      <BuyerHeader
-        onProfilePress={() => {
-          (navigation as any).getParent()?.navigate('Profile');
-        }}
-        onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={isLoggedIn ? logout : undefined}
-        onSignInPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
-            : undefined
-        }
-        onSignUpPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
-            : undefined
-        }
-        showLogout={isLoggedIn}
-        showProfile={isLoggedIn}
-        showSignIn={isGuest}
-        showSignUp={isGuest}
-        scrollY={scrollY}
-        headerHeight={headerHeight}
-      />
-
-      {/* Search Bar - hides on scroll down, shows at top */}
-      <Animated.View style={[styles.searchSectionAnimated, { top: insets.top }, searchBarAnimatedStyle]}>
+      {/* Sticky search bar and filters */}
+      <View style={[styles.searchSectionSticky, { paddingTop: insets.top }]}>
         <View style={styles.searchBarContainer}>
           <View style={styles.searchInputWrapper}>
             <Text style={styles.searchIcon}>📍</Text>
@@ -1299,27 +1250,23 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.clearText}>Clear All</Text>
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </View>
 
       {/* Properties List */}
       {loading ? (
-        <View style={[styles.loadingContainer, { paddingTop: insets.top + searchBarHeight }]}>
+        <View style={[styles.loadingContainer, { paddingTop: searchBarHeight }]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading properties...</Text>
         </View>
       ) : (
-        <Animated.FlatList
+        <FlatList
           data={filteredProperties}
           renderItem={renderProperty}
           keyExtractor={(item: Property) => item.id}
-          contentContainerStyle={[styles.listContent, { paddingTop: insets.top + searchBarHeight, paddingBottom: 100 }]}
+          contentContainerStyle={[styles.listContent, { paddingTop: spacing.md, paddingBottom: 100 }]}
           ItemSeparatorComponent={renderSeparator}
           showsVerticalScrollIndicator={false}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true },
-          )}
-          scrollEventThrottle={16}
+          style={styles.listScroll}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No properties found</Text>
@@ -1339,9 +1286,14 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
           style={styles.floatingMapButton}
           onPress={() => {
             try {
-              // Navigate to PropertyMap with current filter params
-              const mapParams: any = {};
-              mapParams.listingType = listingType;
+              const mapParams: any = {
+                listingType,
+                location: (location || searchText || '').trim() || undefined,
+                propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
+                budget: budget || undefined,
+                bedrooms: bedrooms || undefined,
+                area: area || undefined,
+              };
               navigation.navigate('PropertyMap', mapParams as never);
             } catch (error: any) {
               console.error('Error navigating to map:', error);
@@ -1628,13 +1580,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 10,
   },
-  searchSectionAnimated: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+  searchSectionSticky: {
     backgroundColor: colors.surface,
     paddingVertical: spacing.sm,
-    zIndex: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    zIndex: 10,
+  },
+  listScroll: {
+    flex: 1,
   },
   searchBarContainer: {
     flexDirection: 'row',

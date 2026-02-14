@@ -25,7 +25,18 @@ export type SearchStackParamList = {
   PropertyDetails: { propertyId: string; returnFromLogin?: boolean };
   UpcomingProjectDetails: { propertyId: string };
   AllProperties: { listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel' } | undefined;
-  PropertyMap: { listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'; propertyId?: string | number } | undefined;
+  PropertyMap:
+    | {
+        listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel';
+        propertyId?: string | number;
+        location?: string;
+        city?: string;
+        propertyType?: string;
+        budget?: string;
+        bedrooms?: string;
+        area?: string;
+      }
+    | undefined;
   Favorites: undefined;
 };
 
