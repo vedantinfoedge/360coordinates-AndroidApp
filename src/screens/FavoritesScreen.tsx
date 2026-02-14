@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,18 +9,18 @@ import {
   RefreshControl,
   Share,
 } from 'react-native';
-import {CompositeNavigationProp, useFocusEffect} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../navigation/AppNavigator';
-import {BuyerStackParamList} from '../navigation/BuyerNavigator';
-import {colors, spacing, typography, borderRadius} from '../theme';
-import {TabIcon} from '../components/navigation/TabIcons';
-import {buyerService} from '../services/buyer.service';
-import {fixImageUrl} from '../utils/imageHelper';
-import {formatters} from '../utils/formatters';
+import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { BuyerStackParamList } from '../navigation/BuyerNavigator';
+import { colors, spacing, typography, borderRadius } from '../theme';
+import { TabIcon } from '../components/navigation/TabIcons';
+import { buyerService } from '../services/buyer.service';
+import { fixImageUrl } from '../utils/imageHelper';
+import { formatters } from '../utils/formatters';
 import BuyerHeader from '../components/BuyerHeader';
 import PropertyCard from '../components/PropertyCard';
-import {useAuth} from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import CustomAlert from '../utils/alertHelper';
 
 type FavoritesScreenNavigationProp = CompositeNavigationProp<
@@ -45,10 +45,10 @@ interface Property {
   is_favorite?: boolean;
 }
 
-const FavoritesScreen: React.FC<Props> = ({navigation}) => {
-  const {logout, user, isAuthenticated} = useAuth();
+const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
+  const { logout, user, isAuthenticated } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
-  
+
   // Check if user is guest
   const isLoggedIn = Boolean(user && isAuthenticated);
   const isGuest = !isLoggedIn;
@@ -74,16 +74,26 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
 
   const loadFavorites = async (pageNum: number = 1, append: boolean = false) => {
     try {
+      console.log('==== [FavoritesScreen] LOAD FAVORITES START ====');
+      console.log('[FavoritesScreen] Page:', pageNum, 'Append:', append);
+
       if (pageNum === 1) {
         setLoading(true);
       }
-      
+
       // Use buyer service endpoint (matches the toggle endpoint)
-      const response = await buyerService.getFavorites({page: pageNum, limit: 20});
-      
+      const response = await buyerService.getFavorites({ page: pageNum, limit: 20 });
+
+      console.log('[FavoritesScreen] Response - Success:', response?.success);
+      console.log('[FavoritesScreen] Response - Message:', response?.message);
+      console.log('[FavoritesScreen] Response - Data keys:', response?.data ? Object.keys(response.data) : 'null');
+
       if (response && response.success && response.data) {
         // Handle buyer service response format
         const propertiesList = response.data.properties || response.data.favorites || [];
+        console.log('[FavoritesScreen] Properties count from API:', propertiesList.length);
+        console.log('[FavoritesScreen] First property (if any):', propertiesList[0] ? JSON.stringify(propertiesList[0], null, 2) : 'none');
+
         const formattedProperties = propertiesList.map((prop: any) => ({
           id: prop.id || prop.property_id,
           title: prop.title || prop.property_title || 'Untitled Property',
@@ -97,27 +107,37 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
           is_favorite: true, // All items in favorites are favorited
         }));
 
+        console.log('[FavoritesScreen] Formatted properties count:', formattedProperties.length);
+
         if (append) {
           setProperties(prev => [...prev, ...formattedProperties]);
+          console.log('[FavoritesScreen] Appended to existing properties');
         } else {
           setProperties(formattedProperties);
+          console.log('[FavoritesScreen] Set new properties list');
         }
 
         // Check if there are more pages
         const pagination = response.data.pagination;
         if (pagination) {
+          console.log('[FavoritesScreen] Pagination:', JSON.stringify(pagination, null, 2));
           setHasMore(pagination.current_page < pagination.total_pages);
         } else {
           setHasMore(formattedProperties.length === 20);
+          console.log('[FavoritesScreen] No pagination info, hasMore based on count:', formattedProperties.length === 20);
         }
       } else {
+        console.log('[FavoritesScreen] No data or unsuccessful response');
         if (!append) {
           setProperties([]);
         }
         setHasMore(false);
       }
+      console.log('==== [FavoritesScreen] LOAD FAVORITES END ====\n');
     } catch (error: any) {
-      console.error('Error loading favorites:', error);
+      console.error('[FavoritesScreen] Error loading favorites:', error);
+      console.error('[FavoritesScreen] Error details:', JSON.stringify(error, null, 2));
+      console.log('==== [FavoritesScreen] LOAD FAVORITES END (ERROR) ====\n');
       if (!append) {
         CustomAlert.alert('Error', error.message || 'Failed to load favorites');
       }
@@ -146,10 +166,10 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
     try {
       // Optimistically remove from list
       setProperties(prev => prev.filter(prop => prop.id !== propertyId));
-      
+
       // Call API to remove from favorites
       await buyerService.toggleFavorite(propertyId);
-      
+
       // Show success message
       CustomAlert.alert('Removed', 'Property removed from favorites');
     } catch (error: any) {
@@ -163,7 +183,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
   const handleShareProperty = async (property: Property) => {
     try {
       const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
-      
+
       await Share.share({
         message: shareMessage,
         title: property.title,
@@ -176,7 +196,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const renderProperty = ({item}: {item: Property}) => {
+  const renderProperty = ({ item }: { item: Property }) => {
     const propertyType = item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy';
     const images = item.images?.length
       ? item.images.map((url: string) => fixImageUrl(url)).filter(Boolean)
@@ -193,7 +213,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
         onPress={() =>
           navigation.navigate(
             (item as any).project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
-            {propertyId: String(item.id)},
+            { propertyId: String(item.id) },
           )
         }
         onFavoritePress={() => handleToggleFavorite(item.id)}
@@ -213,12 +233,12 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
           onLogoutPress={isLoggedIn ? logout : undefined}
           onSignInPress={
             isGuest
-              ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+              ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
               : undefined
           }
           onSignUpPress={
             isGuest
-              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+              ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
               : undefined
           }
           showLogout={isLoggedIn}
@@ -226,7 +246,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
           showSignIn={isGuest}
           showSignUp={isGuest}
         />
-        <View style={[styles.centerContainer, {flex: 1}]}>
+        <View style={[styles.centerContainer, { flex: 1 }]}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading favorites...</Text>
         </View>
@@ -243,12 +263,12 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
           onLogoutPress={isLoggedIn ? logout : undefined}
           onSignInPress={
             isGuest
-              ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+              ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
               : undefined
           }
           onSignUpPress={
             isGuest
-              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+              ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
               : undefined
           }
           showLogout={isLoggedIn}
@@ -256,7 +276,7 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
           showSignIn={isGuest}
           showSignUp={isGuest}
         />
-        <View style={[styles.centerContainer, {flex: 1}]}>
+        <View style={[styles.centerContainer, { flex: 1 }]}>
           <View style={styles.emptyIconWrap}>
             <TabIcon name="heart-outline" color={colors.textSecondary} size={64} />
           </View>
@@ -282,12 +302,12 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
         onLogoutPress={isLoggedIn ? logout : undefined}
         onSignInPress={
           isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
+            ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
             : undefined
         }
         onSignUpPress={
           isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
+            ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
             : undefined
         }
         showLogout={isLoggedIn}
