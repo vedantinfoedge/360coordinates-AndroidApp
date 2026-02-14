@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, ScrollView } from 'react-native';
 import { colors, spacing, typography, borderRadius } from '../theme';
+import { TabIcon } from './navigation/TabIcons';
 import { scale, verticalScale, moderateScale } from '../utils/responsive';
 import CustomAlert from '../utils/alertHelper';
 import { capitalize } from '../utils/formatters';
@@ -201,7 +202,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                   <View key={`img-${index}`} style={[styles.slide, { width: slideWidth }]}>
                     {imageErrorIndices.has(index) ? (
                       <View style={styles.imagePlaceholder}>
-                        <Text style={styles.imagePlaceholderText}>🏠</Text>
+                        <TabIcon name="home" color={colors.textSecondary} size={36} />
                         <Text style={styles.imagePlaceholderText}>No Image</Text>
                       </View>
                     ) : (
@@ -266,7 +267,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             <>
               {!imageLoaded && (
                 <View style={styles.imagePlaceholder} pointerEvents="none">
-                  <Text style={styles.imagePlaceholderText}>🏠</Text>
+                  <TabIcon name="home" color={colors.textSecondary} size={36} />
                 </View>
               )}
               <Image
@@ -281,12 +282,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </>
           ) : imageUrls.length >= 1 && imageError ? (
             <View style={styles.imagePlaceholder}>
-              <Text style={styles.imagePlaceholderText}>🏠</Text>
+              <TabIcon name="home" color={colors.textSecondary} size={36} />
               <Text style={styles.imagePlaceholderText}>No Image</Text>
             </View>
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Text style={styles.imagePlaceholderText}>🏠</Text>
+              <TabIcon name="home" color={colors.textSecondary} size={36} />
               <Text style={styles.imagePlaceholderText}>No Image</Text>
             </View>
           )}
@@ -301,7 +302,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               }}
               activeOpacity={0.7}>
               <View style={styles.actionButtonContainer}>
-                <Text style={styles.actionIcon}>🔗</Text>
+                <TabIcon name="link" color={colors.surface} size={18} />
               </View>
             </TouchableOpacity>
             <TouchableOpacity
@@ -312,9 +313,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               }}
               activeOpacity={0.7}>
               <View style={styles.actionButtonContainer}>
-                <Text style={styles.actionIcon}>
-                  {favorite ? '❤️' : '🤍'}
-                </Text>
+                <TabIcon
+                  name={favorite ? 'heart' : 'heart-outline'}
+                  color={favorite ? '#E53935' : colors.surface}
+                  size={20}
+                />
               </View>
             </TouchableOpacity>
           </View>

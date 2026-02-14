@@ -20,6 +20,7 @@ import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon, TabIconName} from '../../components/navigation/TabIcons';
 import {verticalScale, moderateScale, scale} from '../../utils/responsive';
 import {propertyService} from '../../services/property.service';
 import {favoriteService} from '../../services/favorite.service';
@@ -1092,7 +1093,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <View style={styles.headerSection}>
           <Text style={styles.title}>{capitalize(property.title || 'Property Title')}</Text>
           <View style={styles.locationContainer}>
-            <Text style={styles.locationIcon}>📍</Text>
+            <TabIcon name="location" color={colors.textSecondary} size={18} />
             <Text style={styles.location}>{property.location || property.city || 'Location not specified'}</Text>
           </View>
           <Text style={styles.price}>{formattedPrice}</Text>
@@ -1102,25 +1103,25 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <View style={styles.quickInfo}>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🛏</Text>
+              <TabIcon name="bed" color={colors.primary} size={20} />
             </View>
             <Text style={styles.infoText}>{property.bedrooms} Beds</Text>
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🚿</Text>
+              <TabIcon name="bath" color={colors.primary} size={20} />
             </View>
             <Text style={styles.infoText}>{property.bathrooms} Baths</Text>
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>📐</Text>
+              <TabIcon name="square" color={colors.primary} size={20} />
             </View>
             <Text style={styles.infoText}>{property.area}</Text>
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <Text style={styles.infoIcon}>🏢</Text>
+              <TabIcon name="building" color={colors.primary} size={20} />
             </View>
             <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground floor' : (property.floor ?? 'N/A')}</Text>
           </View>
@@ -1183,45 +1184,31 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           <View style={styles.amenitiesGrid}>
             {amenities.length > 0 ? (
               amenities.map((amenity: string, index: number) => {
-                // Map amenity names to relevant icons
-                const getAmenityIcon = (name: string): string => {
+                const getAmenityIconName = (name: string): TabIconName => {
                   const lowerName = name.toLowerCase();
-                  if (lowerName.includes('parking') || lowerName.includes('car')) return '🚗';
-                  if (lowerName.includes('gym') || lowerName.includes('fitness')) return '💪';
-                  if (lowerName.includes('pool') || lowerName.includes('swimming')) return '🏊';
-                  if (lowerName.includes('garden') || lowerName.includes('park')) return '🌳';
-                  if (lowerName.includes('lift') || lowerName.includes('elevator')) return '🛗';
-                  if (lowerName.includes('security') || lowerName.includes('guard')) return '🛡️';
-                  if (lowerName.includes('wifi') || lowerName.includes('internet')) return '📶';
-                  if (lowerName.includes('ac') || lowerName.includes('air condition')) return '❄️';
-                  if (lowerName.includes('power') || lowerName.includes('backup') || lowerName.includes('generator')) return '⚡';
-                  if (lowerName.includes('water') || lowerName.includes('supply')) return '💧';
-                  if (lowerName.includes('cctv') || lowerName.includes('camera')) return '📹';
-                  if (lowerName.includes('club') || lowerName.includes('community')) return '🏛️';
-                  if (lowerName.includes('play') || lowerName.includes('children')) return '🎮';
-                  if (lowerName.includes('balcony') || lowerName.includes('terrace')) return '🏠';
-                  if (lowerName.includes('modular') || lowerName.includes('kitchen')) return '🍳';
-                  if (lowerName.includes('wardrobe') || lowerName.includes('closet')) return '🚪';
-                  if (lowerName.includes('fire') || lowerName.includes('safety')) return '🔥';
-                  if (lowerName.includes('intercom')) return '📞';
-                  if (lowerName.includes('gas') || lowerName.includes('pipeline')) return '🔥';
-                  if (lowerName.includes('rain') || lowerName.includes('harvest')) return '🌧️';
-                  if (lowerName.includes('solar')) return '☀️';
-                  if (lowerName.includes('servant') || lowerName.includes('maid')) return '🧹';
-                  if (lowerName.includes('visitor')) return '👥';
-                  if (lowerName.includes('sport') || lowerName.includes('court')) return '🎾';
-                  if (lowerName.includes('jogging') || lowerName.includes('track')) return '🏃';
-                  if (lowerName.includes('laundry')) return '🧺';
-                  if (lowerName.includes('pet')) return '🐕';
-                  if (lowerName.includes('furnished')) return '🛋️';
-                  if (lowerName.includes('vastu')) return '🧭';
-                  return '✓';
+                  if (lowerName.includes('parking') || lowerName.includes('car')) return 'square';
+                  if (lowerName.includes('gym') || lowerName.includes('fitness')) return 'square';
+                  if (lowerName.includes('pool') || lowerName.includes('swimming')) return 'sparkles';
+                  if (lowerName.includes('garden') || lowerName.includes('park')) return 'sparkles';
+                  if (lowerName.includes('lift') || lowerName.includes('elevator')) return 'layers';
+                  if (lowerName.includes('security') || lowerName.includes('guard')) return 'support';
+                  if (lowerName.includes('wifi') || lowerName.includes('internet')) return 'sparkles';
+                  if (lowerName.includes('ac') || lowerName.includes('air condition')) return 'sparkles';
+                  if (lowerName.includes('power') || lowerName.includes('backup') || lowerName.includes('generator')) return 'sparkles';
+                  if (lowerName.includes('water') || lowerName.includes('supply')) return 'bath';
+                  if (lowerName.includes('cctv') || lowerName.includes('camera')) return 'camera';
+                  if (lowerName.includes('club') || lowerName.includes('community')) return 'building';
+                  if (lowerName.includes('play') || lowerName.includes('children')) return 'sparkles';
+                  if (lowerName.includes('balcony') || lowerName.includes('terrace')) return 'home';
+                  if (lowerName.includes('fire') || lowerName.includes('safety')) return 'alert';
+                  if (lowerName.includes('intercom')) return 'phone';
+                  if (lowerName.includes('gas') || lowerName.includes('pipeline')) return 'sparkles';
+                  return 'check';
                 };
-                
                 return (
                   <View key={index} style={styles.amenityItem}>
                     <View style={styles.amenityIconContainer}>
-                      <Text style={styles.amenityIcon}>{getAmenityIcon(amenity)}</Text>
+                      <TabIcon name={getAmenityIconName(amenity)} color={colors.primary} size={20} />
                     </View>
                     <Text style={styles.amenityText} numberOfLines={2}>
                       {capitalizeAmenity(amenity)}
@@ -1275,7 +1262,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           ]}
           onPress={handleChatWithOwner}
           disabled={processingChat || interactionLoading}>
-          <Text style={styles.chatButtonText}>💬 Chat with Owner</Text>
+          <View style={styles.chatButtonContent}>
+            <TabIcon name="inquiries" color={colors.surface} size={18} />
+            <Text style={styles.chatButtonText}>Chat with Owner</Text>
+          </View>
         </TouchableOpacity>
       </View>
       
@@ -1308,7 +1298,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 console.log('[PropertyDetails] Close button pressed');
                 setShowContactModal(false);
               }}>
-                <Text style={styles.modalClose}>✕</Text>
+                <TabIcon name="close" color={colors.text} size={22} />
               </TouchableOpacity>
             </View>
             
@@ -1344,7 +1334,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 {/* Phone - Always show (with "Not available" if missing) */}
                 <View style={styles.contactItem}>
                   <View style={styles.contactLabelContainer}>
-                    <Text style={styles.contactLabelIcon}>📞</Text>
+                    <TabIcon name="phone" color={colors.primary} size={18} />
                     <Text style={styles.contactLabel}>Phone</Text>
                   </View>
                   {(property.seller?.phone || property.seller_phone || property.owner?.phone) ? (
@@ -1404,7 +1394,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                   handleChatWithOwner();
                 }, 300);
               }}>
-              <Text style={styles.modalChatButtonText}>💬 Start Chat</Text>
+              <View style={styles.modalChatButtonContent}>
+                <TabIcon name="inquiries" color={colors.surface} size={18} />
+                <Text style={styles.modalChatButtonText}>Start Chat</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -1432,7 +1425,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 <TouchableOpacity
                   onPress={() => setShowVideoModal(false)}
                   style={styles.videoModalCloseButton}>
-                  <Text style={styles.videoModalCloseText}>✕</Text>
+                  <TabIcon name="close" color={colors.text} size={22} />
                 </TouchableOpacity>
               </View>
               <View style={styles.videoPlayerContainer}>
@@ -2006,6 +1999,11 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  chatButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   chatButtonText: {
     ...typography.body,
     color: colors.surface,
@@ -2097,6 +2095,11 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
       },
     }),
+  },
+  modalChatButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   modalChatButtonText: {
     ...typography.body,

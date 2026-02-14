@@ -13,6 +13,7 @@ import {useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 
 type SellSelectionScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SellSelection'>;
@@ -86,7 +87,10 @@ const SellSelectionScreen: React.FC<Props> = ({navigation}) => {
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.navigate('Initial' as never)}>
-              <Text style={styles.backButtonText}>← Back</Text>
+              <View style={styles.backButtonContent}>
+                <TabIcon name="chevron-left" color={colors.text} size={20} />
+                <Text style={styles.backButtonText}>Back</Text>
+              </View>
             </TouchableOpacity>
             <Text style={styles.title}>Choose Your Role</Text>
             <Text style={styles.subtitle}>
@@ -111,9 +115,9 @@ const SellSelectionScreen: React.FC<Props> = ({navigation}) => {
                 List your property directly as an owner
               </Text>
               <View style={styles.featureList}>
-                <Text style={styles.featureItem}>✓ Add unlimited properties</Text>
-                <Text style={styles.featureItem}>✓ Manage inquiries</Text>
-                <Text style={styles.featureItem}>✓ Track views and leads</Text>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Add unlimited properties</Text></View>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Manage inquiries</Text></View>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Track views and leads</Text></View>
               </View>
             </TouchableOpacity>
 
@@ -133,9 +137,9 @@ const SellSelectionScreen: React.FC<Props> = ({navigation}) => {
                 List properties on behalf of clients
               </Text>
               <View style={styles.featureList}>
-                <Text style={styles.featureItem}>✓ Manage multiple properties</Text>
-                <Text style={styles.featureItem}>✓ Client management tools</Text>
-                <Text style={styles.featureItem}>✓ Advanced analytics</Text>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Manage multiple properties</Text></View>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Client management tools</Text></View>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Advanced analytics</Text></View>
               </View>
             </TouchableOpacity>
 
@@ -155,9 +159,9 @@ const SellSelectionScreen: React.FC<Props> = ({navigation}) => {
                 List your construction projects
               </Text>
               <View style={styles.featureList}>
-                <Text style={styles.featureItem}>✓ Project listings</Text>
-                <Text style={styles.featureItem}>✓ Unit management</Text>
-                <Text style={styles.featureItem}>✓ Builder dashboard</Text>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Project listings</Text></View>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Unit management</Text></View>
+                <View style={styles.featureItemRow}><TabIcon name="check" color={colors.primary} size={16} /><Text style={styles.featureItem}>Builder dashboard</Text></View>
               </View>
             </TouchableOpacity>
           </View>
@@ -189,6 +193,17 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     padding: spacing.sm,
     marginBottom: spacing.md,
+  },
+  backButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  featureItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
   backButtonText: {
     ...typography.body,

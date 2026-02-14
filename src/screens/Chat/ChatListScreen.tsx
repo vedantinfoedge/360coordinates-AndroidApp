@@ -20,6 +20,7 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { BuyerStackParamList } from '../../navigation/BuyerNavigator';
 import { ChatStackParamList } from '../../navigation/ChatNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import BuyerHeader from '../../components/BuyerHeader';
 import { useAuth } from '../../context/AuthContext';
 import { chatService } from '../../services/chat.service';
@@ -1516,7 +1517,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
           ]}>
           <View style={styles.loginContent}>
             <View style={styles.loginIconContainer}>
-              <Text style={styles.loginIcon}>💬</Text>
+              <TabIcon name="inquiries" color={colors.primary} size={48} />
             </View>
             <Text style={styles.loginTitle}>Login Required</Text>
             <Text style={styles.loginSubtitle}>
@@ -1671,7 +1672,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
         <>
           <View style={[styles.searchBar, { paddingTop: insets.top + spacing.md }]}>
             <View style={styles.searchInputContainer}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <TabIcon name="search" color={colors.textSecondary} size={20} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by buyer, message, or property..."
@@ -1753,7 +1754,9 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
         />
       ) : (
         <View style={[styles.emptyContainer, { paddingTop: isAgentOrSeller ? spacing.xl : insets.top + 60 + spacing.md * 2 }]}>
-          <Text style={styles.emptyIcon}>💬</Text>
+          <View style={styles.emptyIconWrap}>
+            <TabIcon name="inquiries" color={colors.textSecondary} size={64} />
+          </View>
           <Text style={styles.emptyText}>
             {chatFilter === 'unread' ? 'No unread chats' : searchQuery.trim() ? 'No chats found' : 'No chats yet'}
           </Text>
@@ -1778,7 +1781,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.buyerCardHeader}>
               <Text style={styles.buyerCardTitle}>{cardTitle}</Text>
               <TouchableOpacity onPress={() => setBuyerCardVisible(false)} activeOpacity={0.7}>
-                <Text style={styles.buyerCardClose}>✕</Text>
+                <TabIcon name="close" color={colors.text} size={20} />
               </TouchableOpacity>
             </View>
 
@@ -2192,6 +2195,9 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  emptyIconWrap: {
     marginBottom: spacing.md,
   },
   emptyText: {

@@ -17,6 +17,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
@@ -280,7 +281,10 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
         
         {/* Header Section */}
         <View style={styles.headerSection}>
-          <Text style={styles.pageTitle}>🏠 Recently Viewed Properties</Text>
+          <View style={styles.pageTitleRow}>
+            <TabIcon name="home" color={colors.primary} size={22} />
+            <Text style={styles.pageTitle}>Recently Viewed Properties</Text>
+          </View>
           <Text style={styles.pageSubtitle}>
             Properties you've contacted owners or viewed contact details
           </Text>
@@ -336,9 +340,12 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                   
                   {item.propertyLocation && (
-                    <Text style={styles.propertyLocation} numberOfLines={1}>
-                      📍 {item.propertyLocation}
-                    </Text>
+                    <View style={styles.propertyLocationRow}>
+                      <TabIcon name="location" color={colors.textSecondary} size={16} />
+                      <Text style={styles.propertyLocation} numberOfLines={1}>
+                        {item.propertyLocation}
+                      </Text>
+                    </View>
                   )}
                   
                   {item.propertyPrice && (
@@ -350,7 +357,7 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
                     <Text style={styles.ownerLabel}>Owner Contact Details</Text>
                     
                     <View style={styles.ownerInfoRow}>
-                      <Text style={styles.ownerInfoIcon}>👤</Text>
+                      <TabIcon name="profile" color={colors.primary} size={18} />
                       <Text style={styles.ownerName}>{(item.ownerName || '').toUpperCase()}</Text>
                     </View>
                     
@@ -359,7 +366,7 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
                         style={styles.ownerInfoRow}
                         onPress={() => handlePhonePress(item.ownerPhone || '')}
                         activeOpacity={0.7}>
-                        <Text style={styles.ownerInfoIcon}>📞</Text>
+                        <TabIcon name="phone" color={colors.primary} size={18} />
                         <Text style={[styles.ownerContact, styles.contactLink]}>
                           {item.ownerPhone}
                         </Text>
@@ -369,7 +376,7 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
                       </TouchableOpacity>
                     ) : (
                       <View style={styles.ownerInfoRow}>
-                        <Text style={styles.ownerInfoIcon}>📞</Text>
+                        <TabIcon name="phone" color={colors.textSecondary} size={18} />
                         <Text style={styles.ownerContactNA}>Not available</Text>
                       </View>
                     )}
@@ -379,7 +386,7 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
                         style={styles.ownerInfoRow}
                         onPress={() => handleEmailPress(item.ownerEmail || '')}
                         activeOpacity={0.7}>
-                        <Text style={styles.ownerInfoIcon}>✉️</Text>
+                        <TabIcon name="mail" color={colors.primary} size={18} />
                         <Text style={[styles.ownerContact, styles.contactLink]}>
                           {item.ownerEmail}
                         </Text>
@@ -389,18 +396,32 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
                       </TouchableOpacity>
                     ) : (
                       <View style={styles.ownerInfoRow}>
-                        <Text style={styles.ownerInfoIcon}>✉️</Text>
+                        <TabIcon name="mail" color={colors.textSecondary} size={18} />
                         <Text style={styles.ownerContactNA}>Not available</Text>
                       </View>
                     )}
                   </View>
                   
                   <View style={styles.actionBadge}>
-                    <Text style={styles.actionBadgeText}>
-                      {item.action === 'chat' ? '💬 Chatted' : 
-                       item.action === 'contact' ? '📋 Viewed Contact' : 
-                       '💬📋 Both'}
-                    </Text>
+                    <View style={styles.actionBadgeContent}>
+                      {item.action === 'chat' ? (
+                        <>
+                          <TabIcon name="inquiries" color={colors.primary} size={14} />
+                          <Text style={styles.actionBadgeText}>Chatted</Text>
+                        </>
+                      ) : item.action === 'contact' ? (
+                        <>
+                          <TabIcon name="clipboard" color={colors.primary} size={14} />
+                          <Text style={styles.actionBadgeText}>Viewed Contact</Text>
+                        </>
+                      ) : (
+                        <>
+                          <TabIcon name="inquiries" color={colors.primary} size={14} />
+                          <TabIcon name="clipboard" color={colors.primary} size={14} />
+                          <Text style={styles.actionBadgeText}>Both</Text>
+                        </>
+                      )}
+                    </View>
                   </View>
                 </View>
               ))}
@@ -427,6 +448,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     marginBottom: spacing.md,
+  },
+  pageTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   pageTitle: {
     ...typography.h2,
@@ -565,6 +591,12 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
   },
+  propertyLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
   propertyLocation: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -651,6 +683,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
     fontSize: 12,
+  },
+  actionBadgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   actionBadge: {
     alignSelf: 'flex-start',

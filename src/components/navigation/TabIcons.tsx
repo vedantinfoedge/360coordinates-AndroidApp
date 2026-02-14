@@ -48,7 +48,9 @@ export type TabIconName =
   | 'upload'
   | 'video'
   | 'file'
-  | 'map';
+  | 'map'
+  | 'heart'
+  | 'heart-outline';
 
 type Props = { name: TabIconName; color: string; size?: number };
 
@@ -339,6 +341,18 @@ export function TabIcon({ name, color, size = SIZE }: Props) {
         <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <Path d="M1 6v16l6-3 6 3 6-3 6 3V3l-6 3-6-3-6 3-6-3z" />
           <Path d="M7 3v16M17 3v16M7 9l5-2.5 5 2.5M7 15l5-2.5 5 2.5" />
+        </Svg>
+      );
+    case 'heart':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+        </Svg>
+      );
+    case 'heart-outline':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
         </Svg>
       );
     default:

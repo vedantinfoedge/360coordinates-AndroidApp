@@ -9,6 +9,7 @@ import {
   Modal,
 } from 'react-native';
 import LocationAutoSuggest from './LocationAutoSuggest';
+import {TabIcon} from '../navigation/TabIcons';
 import {propertyTypes, pgHostelType, ListingType} from '../../data/propertyTypes';
 import {
   getBudgetSetFor,
@@ -189,7 +190,7 @@ const CompactSearchBar: React.FC<CompactSearchBarProps> = ({
     <View style={[styles.container, compact && styles.containerCompact]}>
       {/* Location row */}
       <View style={styles.locationRow}>
-        <Text style={styles.searchIcon}>📍</Text>
+        <TabIcon name="location" color="#717171" size={20} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by city, locality, project"

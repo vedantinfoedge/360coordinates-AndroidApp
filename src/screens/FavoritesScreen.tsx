@@ -14,6 +14,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {BuyerStackParamList} from '../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../theme';
+import {TabIcon} from '../components/navigation/TabIcons';
 import {buyerService} from '../services/buyer.service';
 import {fixImageUrl} from '../utils/imageHelper';
 import {formatters} from '../utils/formatters';
@@ -256,7 +257,9 @@ const FavoritesScreen: React.FC<Props> = ({navigation}) => {
           showSignUp={isGuest}
         />
         <View style={[styles.centerContainer, {flex: 1}]}>
-          <Text style={styles.emptyIcon}>❤️</Text>
+          <View style={styles.emptyIconWrap}>
+            <TabIcon name="heart-outline" color={colors.textSecondary} size={64} />
+          </View>
           <Text style={styles.emptyText}>No favorites yet</Text>
           <Text style={styles.emptySubtext}>
             Start exploring properties and add them to your favorites
@@ -367,6 +370,9 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  emptyIconWrap: {
     marginBottom: spacing.md,
   },
   emptyText: {

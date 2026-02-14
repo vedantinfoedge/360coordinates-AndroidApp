@@ -13,6 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import {verticalScale} from '../../utils/responsive';
 import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
@@ -278,7 +279,7 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
             <View style={styles.searchSection}>
               <View style={styles.searchContainer}>
                 <View style={styles.searchInputContainer}>
-                  <Text style={styles.searchIcon}>📍</Text>
+                  <TabIcon name="location" color={colors.textSecondary} size={20} />
                   <View style={styles.searchInputWrapper}>
                     <TextInput
                       style={styles.searchInput}
@@ -355,7 +356,10 @@ const InitialScreen: React.FC<Props> = ({navigation}) => {
                 <TouchableOpacity
                   style={styles.backButton}
                   onPress={handleBackToMain}>
-                  <Text style={styles.backButtonText}>← Back</Text>
+                  <View style={styles.backButtonContent}>
+                    <TabIcon name="chevron-left" color={colors.text} size={20} />
+                    <Text style={styles.backButtonText}>Back</Text>
+                  </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -541,6 +545,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
+  },
+  backButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   backButtonText: {
     ...typography.body,

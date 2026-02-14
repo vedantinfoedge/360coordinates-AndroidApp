@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { BuyerStackParamList } from '../../navigation/BuyerNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 import { useAuth } from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
@@ -553,7 +554,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           showSignUp={isGuest}
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.errorIcon}>🚫</Text>
+          <View style={styles.errorIconWrap}>
+            <TabIcon name="alert" color={colors.textSecondary} size={48} />
+          </View>
           <Text style={styles.errorTitle}>Access Denied</Text>
           <Text style={styles.errorText}>
             You are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.
@@ -650,7 +653,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
             <View style={styles.searchInputContainer}>
-              <Text style={styles.searchIcon}>📍</Text>
+              <TabIcon name="location" color={colors.textSecondary} size={20} />
               <View style={styles.searchInputWrapper}>
                 <TextInput
                   style={styles.searchInput}
@@ -1183,6 +1186,9 @@ const styles = StyleSheet.create({
   },
   errorIcon: {
     fontSize: moderateScale(64),
+    marginBottom: spacing.md,
+  },
+  errorIconWrap: {
     marginBottom: spacing.md,
   },
   errorTitle: {

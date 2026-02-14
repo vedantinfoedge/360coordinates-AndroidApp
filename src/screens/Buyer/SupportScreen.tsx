@@ -19,6 +19,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { BuyerStackParamList } from '../../navigation/BuyerNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import BuyerHeader from '../../components/BuyerHeader';
 import { useAuth } from '../../context/AuthContext';
 
@@ -193,13 +194,13 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.contactItem}
             onPress={handleEmailPress}>
             <View style={styles.contactIconContainer}>
-              <Text style={styles.contactIcon}>📧</Text>
+              <TabIcon name="mail" color={colors.primary} size={24} />
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Email</Text>
               <Text style={styles.contactValue}>info@360coordinates.com</Text>
             </View>
-            <Text style={styles.contactArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
 
           <View style={styles.divider} />
@@ -209,13 +210,13 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.contactItem}
             onPress={handleLocationPress}>
             <View style={styles.contactIconContainer}>
-              <Text style={styles.contactIcon}>📍</Text>
+              <TabIcon name="location" color={colors.primary} size={24} />
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Location</Text>
               <Text style={styles.contactValue}>Pune, Maharashtra, India</Text>
             </View>
-            <Text style={styles.contactArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
         </View>
 

@@ -17,6 +17,7 @@ import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import BuyerHeader from '../../components/BuyerHeader';
 import {useAuth} from '../../context/AuthContext';
 import {chatService} from '../../services/chat.service';
@@ -600,7 +601,7 @@ const ChatScreen: React.FC<Props> = ({navigation}) => {
           ]}>
           <View style={styles.loginContent}>
             <View style={styles.loginIconContainer}>
-              <Text style={styles.loginIcon}>💬</Text>
+              <TabIcon name="inquiries" color={colors.primary} size={48} />
             </View>
             <Text style={styles.loginTitle}>Login Required</Text>
             <Text style={styles.loginSubtitle}>
@@ -710,7 +711,9 @@ const ChatScreen: React.FC<Props> = ({navigation}) => {
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>💬</Text>
+          <View style={styles.emptyIconWrap}>
+            <TabIcon name="inquiries" color={colors.textSecondary} size={64} />
+          </View>
           <Text style={styles.emptyText}>No chats yet</Text>
           <Text style={styles.emptySubtext}>
             Start a conversation by chatting with a property owner
@@ -844,6 +847,9 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  emptyIconWrap: {
     marginBottom: spacing.md,
   },
   emptyText: {

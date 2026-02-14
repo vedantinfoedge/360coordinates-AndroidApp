@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SearchStackParamList } from '../../navigation/SearchNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import PropertyCard from '../../components/PropertyCard';
 import { useAuth } from '../../context/AuthContext';
 import { propertyTypes, pgHostelType, ListingType, PropertyType } from '../../data/propertyTypes';
@@ -992,7 +993,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={[styles.searchSectionSticky, { paddingTop: insets.top }]}>
         <View style={styles.searchBarContainer}>
           <View style={styles.searchInputWrapper}>
-            <Text style={styles.searchIcon}>📍</Text>
+            <TabIcon name="location" color={colors.textSecondary} size={20} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search by city, locality, project"
@@ -1302,7 +1303,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               console.error('Error navigating to map:', error);
             }
           }}>
-          <Text style={styles.floatingMapButtonIcon}>🗺️</Text>
+          <TabIcon name="map" color={colors.surface} size={22} />
           <Text style={styles.floatingMapButtonText}>View on Map</Text>
         </TouchableOpacity>
       )}
@@ -1318,7 +1319,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filters</Text>
               <TouchableOpacity onPress={() => setShowFilters(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <TabIcon name="close" color={colors.text} size={22} />
               </TouchableOpacity>
             </View>
 

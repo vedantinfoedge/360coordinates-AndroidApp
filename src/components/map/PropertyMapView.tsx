@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import MapViewComponent from './MapView';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../navigation/TabIcons';
 import { propertyService } from '../../services/property.service';
 import { getPropertyImageUrl, fixImageUrl } from '../../utils/imageHelper';
 import { log } from '../../utils/debug';
@@ -528,7 +529,9 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   if (!isMapboxAvailable) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorIcon}>🗺️</Text>
+        <View style={styles.errorIconWrap}>
+          <TabIcon name="map" color={colors.textSecondary} size={64} />
+        </View>
         <Text style={styles.errorTitle}>Map Not Available</Text>
         <Text style={styles.errorText}>
           Mapbox native module is not linked.{'\n'}
@@ -552,13 +555,16 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
               viewMode === 'map' && styles.toggleButtonActive,
             ]}
             onPress={() => setViewMode('map')}>
-            <Text
-              style={[
-                styles.toggleText,
-                viewMode === 'map' && styles.toggleTextActive,
-              ]}>
-              🗺️ Map
-            </Text>
+            <View style={styles.toggleIconTextRow}>
+              <TabIcon name="map" color={viewMode === 'map' ? colors.primary : colors.textSecondary} size={18} />
+              <Text
+                style={[
+                  styles.toggleText,
+                  viewMode === 'map' && styles.toggleTextActive,
+                ]}>
+                Map
+              </Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
@@ -566,13 +572,16 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
               viewMode === 'list' && styles.toggleButtonActive,
             ]}
             onPress={() => setViewMode('list')}>
-            <Text
-              style={[
-                styles.toggleText,
-                viewMode === 'list' && styles.toggleTextActive,
-              ]}>
-              📋 List
-            </Text>
+            <View style={styles.toggleIconTextRow}>
+              <TabIcon name="list" color={viewMode === 'list' ? colors.primary : colors.textSecondary} size={18} />
+              <Text
+                style={[
+                  styles.toggleText,
+                  viewMode === 'list' && styles.toggleTextActive,
+                ]}>
+                List
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       )}
@@ -624,7 +633,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                     />
                   ) : (
                     <View style={styles.popupCardImagePlaceholder}>
-                      <Text style={styles.imagePlaceholderText}>📷</Text>
+                      <TabIcon name="camera" color={colors.textSecondary} size={32} />
                     </View>
                   )}
 
@@ -638,7 +647,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                         setSelectedProperty(null);
                         setSelectedPropertyId(null);
                       }}>
-                      <Text style={styles.closeButtonIcon}>✕</Text>
+                      <TabIcon name="close" color={colors.text} size={18} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -664,7 +673,11 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                         e.stopPropagation();
                         handleToggleFavorite();
                       }}>
-                      <Text style={styles.actionButtonText}>{isFavorite ? '❤️' : '🤍'}</Text>
+                      <TabIcon
+                        name={isFavorite ? 'heart' : 'heart-outline'}
+                        color={isFavorite ? '#E53935' : colors.text}
+                        size={20}
+                      />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.popupCardActionBtn}
@@ -672,7 +685,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                         e.stopPropagation();
                         handleShare();
                       }}>
-                      <Text style={styles.actionButtonText}>🔗</Text>
+                      <TabIcon name="link" color={colors.text} size={18} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.popupCardViewBtn}
@@ -718,7 +731,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                 </Text>
               </View>
               <View style={styles.listItemArrow}>
-                <Text style={styles.arrowText}>→</Text>
+                <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
               </View>
             </TouchableOpacity>
           )}
@@ -972,6 +985,14 @@ const styles = StyleSheet.create({
   errorIcon: {
     fontSize: 64,
     marginBottom: spacing.md,
+  },
+  errorIconWrap: {
+    marginBottom: spacing.md,
+  },
+  toggleIconTextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   errorTitle: {
     ...typography.h2,

@@ -18,6 +18,7 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/MainStackNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
@@ -477,7 +478,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.searchSection}>
             <View style={styles.searchContainer}>
               <View style={styles.searchInputContainer}>
-                <Text style={styles.searchIcon}>📍</Text>
+                <TabIcon name="location" color={colors.textSecondary} size={20} />
                 <View style={styles.searchInputWrapper}>
                   <TextInput
                     style={styles.searchInput}

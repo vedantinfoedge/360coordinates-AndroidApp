@@ -5,6 +5,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import PropertyMapView, {MapSearchParams} from '../../components/map/PropertyMapView';
 import FullscreenMapSearch, {CompactSearchBarSearchParams} from '../../components/search/FullscreenMapSearch';
 import {ListingType} from '../../data/propertyTypes';
@@ -218,7 +219,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
       <TouchableOpacity
         style={styles.floatingListButton}
         onPress={handleGoBackToList}>
-        <Text style={styles.floatingListButtonIcon}>📋</Text>
+        <TabIcon name="list" color={colors.text} size={20} />
         <Text style={styles.floatingListButtonText}>Go back to list</Text>
       </TouchableOpacity>
     </View>

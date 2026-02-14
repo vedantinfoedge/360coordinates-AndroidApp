@@ -20,6 +20,7 @@ import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {ChatStackParamList} from '../../navigation/ChatNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 import {chatService} from '../../services/chat.service';
 import {buyerService} from '../../services/buyer.service';
@@ -567,7 +568,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>←</Text>
+          <TabIcon name="chevron-left" color={colors.text} size={24} />
         </TouchableOpacity>
         <View style={styles.headerAvatar}>
           <Text style={styles.headerAvatarText} numberOfLines={1}>

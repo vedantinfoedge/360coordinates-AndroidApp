@@ -19,6 +19,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
@@ -301,7 +302,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 )}
                 <View style={styles.cameraIconContainer}>
-                  <Text style={styles.cameraIcon}>📷</Text>
+                  <TabIcon name="camera" color={colors.surface} size={24} />
                 </View>
               </TouchableOpacity>
             </View>
@@ -325,7 +326,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
               style={styles.editButton} 
               onPress={handleEdit}
               activeOpacity={0.8}>
-              <Text style={styles.editButtonText}>✏️ Edit Profile</Text>
+              <View style={styles.editButtonContent}>
+                <TabIcon name="edit" color={colors.primary} size={18} />
+                <Text style={styles.editButtonText}>Edit Profile</Text>
+              </View>
             </TouchableOpacity>
           ) : (
             <View style={styles.editActions}>
@@ -339,7 +343,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                 style={styles.saveButton} 
                 onPress={handleSave}
                 activeOpacity={0.8}>
-                <Text style={styles.saveButtonText}>✓ Save</Text>
+                <View style={styles.saveButtonContent}>
+                  <TabIcon name="check" color={colors.surface} size={18} />
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -686,6 +693,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  editButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   editButtonText: {
     ...typography.body,
     color: colors.surface,
@@ -710,6 +722,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '700',
     fontSize: 16,
+  },
+  saveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   saveButton: {
     flex: 1,
