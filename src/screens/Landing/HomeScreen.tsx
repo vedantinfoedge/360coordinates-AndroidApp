@@ -308,7 +308,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       params.listingType = listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent';
       params.status = listingType === 'sale' ? 'sale' : 'rent';
 
+<<<<<<< Updated upstream
       navigation.navigate('Search' as any, {
+=======
+      // Default to properties mode for general search
+      params.searchMode = 'properties';
+
+      navigation.navigate('Search' as never, {
+>>>>>>> Stashed changes
         screen: 'SearchResults',
         params: params,
       } as any);
@@ -321,8 +328,16 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const handleCityPress = (cityName: string) => {
     navigation.navigate('Search' as any, {
       screen: 'SearchResults',
+<<<<<<< Updated upstream
       params: { location: cityName },
     } as any);
+=======
+      params: {
+        location: cityName,
+        searchMode: 'properties', // Explicitly set search mode to properties
+      },
+    } as never);
+>>>>>>> Stashed changes
   };
 
   const handlePropertyPress = (property: Property) => {

@@ -396,6 +396,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         params.listingType = 'pg-hostel';
       }
 
+      // Default to properties mode for general search
+      params.searchMode = 'properties';
+
       console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
       // Navigate to Search tab (SearchResultsScreen) so tab selection updates correctly
       navigation.navigate('Search' as never, params as never);
@@ -449,6 +452,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       searchQuery: cityName,
       listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : 'rent',
       status: listingType === 'sale' ? 'sale' : 'rent',
+      searchMode: 'properties', // Explicitly set search mode to properties
     };
     navigation.navigate('Search' as never, params as never);
   };
