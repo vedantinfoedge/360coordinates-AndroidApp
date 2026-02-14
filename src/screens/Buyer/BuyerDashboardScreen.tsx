@@ -759,6 +759,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                         project_status: item.project_status || item.upcoming_project_data?.project_status
                       }}
                       style={styles.carouselPropertyCard}
+                      hideTypeBadge={true}
                     />
                   </View>
                 );

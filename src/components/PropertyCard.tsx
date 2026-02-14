@@ -21,7 +21,10 @@ interface PropertyCardProps {
   /** Called when user starts interacting with the image carousel (swipe or arrow). Pause parent scroll animation. */
   onImageCarouselScrollStart?: () => void;
   /** Called when user finishes interacting with the image carousel. Resume parent scroll after delay. */
+  /** Called when user finishes interacting with the image carousel. Resume parent scroll after delay. */
   onImageCarouselScrollEnd?: () => void;
+  /** Whether to hide the Buy/Rent badge (useful for projects where we want to show status instead) */
+  hideTypeBadge?: boolean;
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -39,6 +42,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   style,
   onImageCarouselScrollStart,
   onImageCarouselScrollEnd,
+  hideTypeBadge = false,
 }) => {
   const [favorite, setFavorite] = useState(isFavorite);
   const [imageError, setImageError] = useState(false);
@@ -315,16 +319,18 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Type Badge */}
-          <View
-            style={[
-              styles.badge,
-              type === 'buy' ? styles.buyBadge : type === 'rent' ? styles.rentBadge : styles.pgBadge,
-            ]}>
-            <Text style={styles.badgeText}>
-              {type === 'buy' ? 'Buy' : type === 'rent' ? 'Rent' : 'PG/Hostel'}
-            </Text>
-          </View>
+          {/* Type Badge - Only show if not hidden */}
+          {!hideTypeBadge && (
+            <View
+              style={[
+                styles.badge,
+                type === 'buy' ? styles.buyBadge : type === 'rent' ? styles.rentBadge : styles.pgBadge,
+              ]}>
+              <Text style={styles.badgeText}>
+                {type === 'buy' ? 'Buy' : type === 'rent' ? 'Rent' : 'PG/Hostel'}
+              </Text>
+            </View>
+          )}
 
           {/* Project Status Badge */}
           {property?.project_status && (
