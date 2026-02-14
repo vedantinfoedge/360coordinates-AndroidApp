@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,18 +10,18 @@ import {
   Dimensions,
 } from 'react-native';
 import MapViewComponent from './MapView';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {propertyService} from '../../services/property.service';
-import {getPropertyImageUrl, fixImageUrl} from '../../utils/imageHelper';
-import {log} from '../../utils/debug';
-import {formatters, capitalize} from '../../utils/formatters';
-import {favoriteService} from '../../services/favorite.service';
-import {Share} from 'react-native';
-import {MAP_CONFIG} from '../../config/mapbox.config';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { propertyService } from '../../services/property.service';
+import { getPropertyImageUrl, fixImageUrl } from '../../utils/imageHelper';
+import { log } from '../../utils/debug';
+import { formatters, capitalize } from '../../utils/formatters';
+import { favoriteService } from '../../services/favorite.service';
+import { Share } from 'react-native';
+import { MAP_CONFIG } from '../../config/mapbox.config';
 import CustomAlert from '../../utils/alertHelper';
-import {PG_HOSTEL_PROPERTY_TYPE} from '../../utils/propertySearchParams';
+import { PG_HOSTEL_PROPERTY_TYPE } from '../../utils/propertySearchParams';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 /** Search params passed from FullscreenMapSearch / PropertyMapScreen */
 export interface MapSearchParams {
@@ -71,7 +71,7 @@ interface PropertyMapViewProps {
   searchParams?: MapSearchParams;
 }
 
-const categoryMap: {[key: string]: string} = {
+const categoryMap: { [key: string]: string } = {
   'Apartment': 'Residential',
   'Villa': 'Residential',
   'Independent House': 'Residential',
@@ -111,7 +111,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(initialCenter);
   const [mapZoom, setMapZoom] = useState<number>(initialZoom);
-  
+
   // Store current property ID (from PropertyDetailsScreen) separately
   const currentPropertyId = propSelectedPropertyId ? String(propSelectedPropertyId) : null;
 
@@ -130,10 +130,10 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       if (effectiveListingType === 'pg-hostel') {
         filtered = initialProperties.filter((prop: any) => {
           const propType = (prop.property_type || '').toLowerCase();
-          return propType.includes('pg') || 
-                 propType.includes('hostel') || 
-                 propType === 'pg-hostel' ||
-                 prop.status === 'pg';
+          return propType.includes('pg') ||
+            propType.includes('hostel') ||
+            propType === 'pg-hostel' ||
+            prop.status === 'pg';
         });
       } else if (effectiveListingType === 'buy') {
         filtered = initialProperties.filter((prop: any) => prop.status === 'sale');
@@ -153,24 +153,24 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
   const loadSelectedPropertyAndRelated = async () => {
     if (!propSelectedPropertyId) return;
-    
+
     try {
       setLoading(true);
-      
+
       // Load the selected property details
       const propertyResponse = await propertyService.getPropertyDetails(propSelectedPropertyId);
       const responseData = propertyResponse as any;
-      
+
       if (responseData && responseData.success && responseData.data?.property) {
         const currentProperty = responseData.data.property;
-        
+
         // If property has coordinates, center map on it
         if (currentProperty.latitude && currentProperty.longitude) {
           const lat = parseFloat(currentProperty.latitude);
           const lng = parseFloat(currentProperty.longitude);
           setMapCenter([lng, lat]);
           setMapZoom(14); // Zoom in closer for single property
-          
+
           // Set as selected property
           const formattedProperty: Property = {
             id: currentProperty.id,
@@ -182,11 +182,11 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
             longitude: lng,
             cover_image: currentProperty.cover_image || currentProperty.image,
           };
-          
+
           setSelectedProperty(formattedProperty);
           setSelectedPropertyId(String(currentProperty.id));
           checkFavoriteStatus(String(currentProperty.id));
-          
+
           // Load related properties (same area, similar type) and pass current property
           await loadRelatedProperties(lat, lng, currentProperty.status || currentProperty.property_status, formattedProperty);
         }
@@ -220,13 +220,13 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       } else if (propertyStatus) {
         params.status = propertyStatus as 'sale' | 'rent' | 'pg';
       }
-      
+
       const response = await propertyService.getProperties(params);
-      
+
       if (response.success && response.data?.properties) {
         let formattedProperties = response.data.properties
-          .filter((prop: any) => 
-            prop.latitude && 
+          .filter((prop: any) =>
+            prop.latitude &&
             prop.longitude &&
             String(prop.id) !== String(propSelectedPropertyId) // Exclude current property
           )
@@ -241,12 +241,12 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
             longitude: parseFloat(prop.longitude),
             cover_image: prop.cover_image || prop.image,
           }));
-        
+
         // Always add current property to the list if provided (for pinning on map)
         if (currentProperty) {
           formattedProperties = [currentProperty, ...formattedProperties];
         }
-        
+
         setProperties(formattedProperties);
         log.property(`Loaded ${formattedProperties.length} related properties for map (including current property)`);
       } else {
@@ -269,10 +269,10 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   const loadProperties = async () => {
     try {
       setLoading(true);
-      
+
       const lt = searchParams?.listingType ?? listingType;
       const params: any = { limit: 50 };
-      
+
       if (searchParams) {
         // Use search params from FullscreenMapSearch
         if (lt === 'buy') params.status = 'sale';
@@ -286,11 +286,40 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
         if (loc) params.location = loc;
         if (city) params.city = city;
         if (!loc && city) params.location = city;
+
         const pt = searchParams.propertyType;
         if (pt && pt !== 'all' && lt !== 'pg-hostel') {
-          const category = categoryMap[pt];
-          params.property_type = category || pt.toLowerCase().replace(/ /g, '-');
+          // Specific type mapping to match backend expectations (same as SearchResultsScreen)
+          const specificTypeMap: { [key: string]: string } = {
+            'Apartment': 'apartment',
+            'Villa': 'villa',
+            'Independent House': 'independent-house',
+            'Bungalow': 'bungalow',
+            'Studio Apartment': 'studio-apartment',
+            'Penthouse': 'penthouse',
+            'Farm House': 'farm-house',
+            'Plot / Land': 'plot-land',
+            'Commercial Office': 'commercial-office',
+            'Commercial Shop': 'commercial-shop',
+            'Retail Space': 'retail-space',
+            'Co-working Space': 'coworking-space',
+            'Warehouse / Godown': 'warehouse-godown',
+            'Industrial Property': 'industrial-property',
+            'PG / Hostel': 'pg-hostel',
+          };
+
+          // Try specific type first
+          const specific = specificTypeMap[pt];
+          if (specific) {
+            params.property_type = specific;
+          } else {
+            // Fallback to broad category if no specific type match (Rest of the logic remains same)
+            const category = categoryMap[pt];
+            // If even category is missing, use slug
+            params.property_type = category || pt.toLowerCase().replace(/ /g, '-');
+          }
         }
+
         const mn = searchParams.minBudget ?? 0;
         const mx = searchParams.maxBudget ?? (lt === 'buy' ? 1000 : 200);
         // Any = no filter: Buy max 500 (5Cr), Rent/PG max 200–500 depending on property type
@@ -313,9 +342,9 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           params.available_for_bachelors = true;
         }
       }
-      
+
       const response = await propertyService.getProperties(params);
-      
+
       if (response.success && response.data?.properties) {
         const formattedProperties = response.data.properties
           .filter((prop: any) => prop.latitude && prop.longitude)
@@ -362,7 +391,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
   const handleToggleFavorite = async () => {
     if (!selectedProperty) return;
-    
+
     try {
       const response = await favoriteService.toggleFavorite(selectedProperty.id);
       if (response && response.success) {
@@ -375,10 +404,10 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
   const handleShare = async () => {
     if (!selectedProperty) return;
-    
+
     try {
       const shareMessage = `Check out this property: ${selectedProperty.title}\nLocation: ${selectedProperty.location}\nPrice: ${formatters.price(selectedProperty.price, selectedProperty.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
-      
+
       await Share.share({
         message: shareMessage,
         title: selectedProperty.title,
@@ -392,17 +421,17 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
   const getMarkerColor = (propertyId: string | number) => {
     const propIdStr = String(propertyId);
-    
+
     // Green (#10B981) if it's the current property (from PropertyDetailsScreen)
     if (currentPropertyId && currentPropertyId === propIdStr) {
       return '#10B981'; // Green color for current property
     }
-    
+
     // Orange (#F97316) if selected/clicked on map
     if (selectedPropertyId === propIdStr) {
       return '#F97316'; // Orange color for selected property
     }
-    
+
     // Blue (#0077C0) for all other properties
     return '#0077C0'; // Blue color for other properties
   };
@@ -532,7 +561,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                 <View style={styles.popupCardImageContainer}>
                   {selectedProperty.cover_image ? (
                     <Image
-                      source={{uri: fixImageUrl(selectedProperty.cover_image)}}
+                      source={{ uri: fixImageUrl(selectedProperty.cover_image) }}
                       style={styles.popupCardImage}
                       resizeMode="cover"
                     />
@@ -541,7 +570,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                       <Text style={styles.imagePlaceholderText}>📷</Text>
                     </View>
                   )}
-                  
+
                   {/* Image Overlay - Compact */}
                   <View style={styles.popupCardImageOverlay}>
                     {/* Close Button - Top Right */}
@@ -556,7 +585,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                     </TouchableOpacity>
                   </View>
                 </View>
-                
+
                 {/* Compact Content Section */}
                 <View style={styles.popupCardContent}>
                   <Text style={styles.popupCardTitle} numberOfLines={1}>
@@ -611,7 +640,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
         <FlatList
           data={properties}
           keyExtractor={item => String(item.id)}
-          renderItem={({item}) => (
+          renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.listItem}
               onPress={() => {
@@ -718,7 +747,7 @@ const styles = StyleSheet.create({
     width: Math.min(280, SCREEN_WIDTH * 0.75),
     maxWidth: 280,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
@@ -844,7 +873,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
