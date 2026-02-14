@@ -16,7 +16,7 @@ import { propertyService } from '../../services/property.service';
 import { getPropertyImageUrl, fixImageUrl } from '../../utils/imageHelper';
 import { log } from '../../utils/debug';
 import { formatters, capitalize } from '../../utils/formatters';
-import { favoriteService } from '../../services/favorite.service';
+import { buyerService } from '../../services/buyer.service';
 import { Share } from 'react-native';
 import { MAP_CONFIG } from '../../config/mapbox.config';
 import CustomAlert from '../../utils/alertHelper';
@@ -440,9 +440,15 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
   const checkFavoriteStatus = async (propertyId: string) => {
     try {
-      const response = await favoriteService.checkFavorite(propertyId);
-      setIsFavorite(response?.success && response?.data?.is_favorite || false);
+      // Use buyerService.getPropertyDetails which returns is_favorite field
+      const response = await buyerService.getPropertyDetails(propertyId);
+      if (response && response.success && response.data?.property) {
+        setIsFavorite(!!response.data.property.is_favorite);
+      } else {
+        setIsFavorite(false);
+      }
     } catch (error) {
+      console.error('[PropertyMapView] Error checking favorite status:', error);
       setIsFavorite(false);
     }
   };
@@ -451,9 +457,21 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     if (!selectedProperty) return;
 
     try {
-      const response = await favoriteService.toggleFavorite(selectedProperty.id);
+      // Use buyerService.toggleFavorite which returns new state
+      const response = await buyerService.toggleFavorite(selectedProperty.id);
       if (response && response.success) {
-        setIsFavorite(response.data?.is_favorite ?? !isFavorite);
+        // Toggle based on current state if backend doesn't return explicit boolean in correct format
+        // But buyerService returns { data: { is_favorite: boolean } } usually
+        if (response.data && typeof response.data.is_favorite === 'boolean') {
+          setIsFavorite(response.data.is_favorite);
+        } else {
+          setIsFavorite(!isFavorite); // Fallback
+        }
+
+        CustomAlert.alert(
+          'Success',
+          isFavorite ? 'Removed from favorites' : 'Added to favorites'
+        );
       }
     } catch (error: any) {
       CustomAlert.alert('Error', error.message || 'Failed to update favorite');
