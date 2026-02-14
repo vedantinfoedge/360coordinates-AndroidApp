@@ -675,7 +675,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                       }}>
                       <TabIcon
                         name={isFavorite ? 'heart' : 'heart-outline'}
-                        color={isFavorite ? '#E53935' : colors.text}
+                        color={isFavorite ? '#E53935' : colors.primaryDark}
                         size={20}
                       />
                     </TouchableOpacity>
@@ -685,7 +685,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                         e.stopPropagation();
                         handleShare();
                       }}>
-                      <TabIcon name="link" color={colors.text} size={18} />
+                      <TabIcon name="link" color={colors.primaryDark} size={18} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.popupCardViewBtn}

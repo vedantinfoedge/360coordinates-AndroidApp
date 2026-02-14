@@ -302,7 +302,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               }}
               activeOpacity={0.7}>
               <View style={styles.actionButtonContainer}>
-                <TabIcon name="link" color={colors.surface} size={18} />
+                <TabIcon name="link" color={colors.primaryDark} size={18} />
               </View>
             </TouchableOpacity>
             <TouchableOpacity
@@ -315,7 +315,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               <View style={styles.actionButtonContainer}>
                 <TabIcon
                   name={favorite ? 'heart' : 'heart-outline'}
-                  color={favorite ? '#E53935' : colors.surface}
+                  color={favorite ? '#E53935' : colors.primaryDark}
                   size={20}
                 />
               </View>
