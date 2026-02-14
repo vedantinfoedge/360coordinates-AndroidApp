@@ -21,6 +21,8 @@ import { Share } from 'react-native';
 import { MAP_CONFIG } from '../../config/mapbox.config';
 import CustomAlert from '../../utils/alertHelper';
 import { PG_HOSTEL_PROPERTY_TYPE, buildPGHostelFetchParams } from '../../utils/propertySearchParams';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -101,6 +103,8 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   fullscreenSearchBar,
   searchParams,
 }) => {
+  const { isAuthenticated } = useAuth();
+  const navigation = useNavigation<any>();
   const [properties, setProperties] = useState<Property[]>(initialProperties || []);
   const [loading, setLoading] = useState(!initialProperties);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
@@ -456,9 +460,30 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   const handleToggleFavorite = async () => {
     if (!selectedProperty) return;
 
+    if (!isAuthenticated) {
+      CustomAlert.alert(
+        'Login Required',
+        'Please login to add properties to your favorites.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Login',
+            onPress: () => {
+              // Navigate to Auth stack
+              navigation.navigate('Auth', { screen: 'Login' });
+            }
+          }
+        ]
+      );
+      return;
+    }
+
     try {
       // Use buyerService.toggleFavorite which returns new state
+      console.log('[PropertyMapView] Toggling favorite for:', selectedProperty.id);
       const response = await buyerService.toggleFavorite(selectedProperty.id);
+      console.log('[PropertyMapView] Toggle response:', JSON.stringify(response));
+
       if (response && response.success) {
         // Toggle based on current state if backend doesn't return explicit boolean in correct format
         // But buyerService returns { data: { is_favorite: boolean } } usually
@@ -470,10 +495,14 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
         CustomAlert.alert(
           'Success',
-          isFavorite ? 'Removed from favorites' : 'Added to favorites'
+          // Note: if we just toggled !isFavorite, the new state is !initialState
+          // We can use the updated state if we set it, or just use !isFavorite logic for the message (careful with closure)
+          // Better to use the response data if available
+          (response.data?.is_favorite ?? !isFavorite) ? 'Added to favorites' : 'Removed from favorites'
         );
       }
     } catch (error: any) {
+      console.error('[PropertyMapView] Toggle favorite error:', error);
       CustomAlert.alert('Error', error.message || 'Failed to update favorite');
     }
   };
