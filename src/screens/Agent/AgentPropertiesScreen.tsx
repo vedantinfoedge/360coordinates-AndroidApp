@@ -1018,7 +1018,7 @@ const styles = StyleSheet.create({
   },
   propertyPrice: {
     ...typography.h3,
-    color: colors.accent,
+    color: colors.primaryDark,
     fontWeight: '700',
     flex: 1,
   },

@@ -38,7 +38,17 @@ export type TabIconName =
   | 'square'
   | 'layers'
   | 'check'
-  | 'sparkles';
+  | 'sparkles'
+  // Form icons
+  | 'file-text'
+  | 'tag'
+  | 'key'
+  | 'dollar'
+  | 'chevron-left'
+  | 'upload'
+  | 'video'
+  | 'file'
+  | 'map';
 
 type Props = { name: TabIconName; color: string; size?: number };
 
@@ -266,6 +276,69 @@ export function TabIcon({ name, color, size = SIZE }: Props) {
           <Path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
           <Path d="M19 12l.75 2.25L22 15l-2.25.75L19 18l-.75-2.25L16 15l2.25-.75L19 12z" />
           <Path d="M5 12l.75 2.25L8 15l-2.25.75L5 18l-.75-2.25L2 15l2.25-.75L5 12z" />
+        </Svg>
+      );
+    case 'file-text':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <Path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+        </Svg>
+      );
+    case 'tag':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+          <Path d="M7 7h.01" />
+        </Svg>
+      );
+    case 'key':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.278 7.278 5.5 5.5 0 017.278-7.278z" />
+          <Path d="M16 20v-2a4 4 0 00-4-4H4" />
+        </Svg>
+      );
+    case 'dollar':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+        </Svg>
+      );
+    case 'chevron-left':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M15 18l-6-6 6-6" />
+        </Svg>
+      );
+    case 'upload':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+          <Path d="M17 8l-5-5-5 5" />
+          <Path d="M12 3v12" />
+        </Svg>
+      );
+    case 'video':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M23 7l-7 5 7 5V7z" />
+          <Path d="M15 5H3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2z" />
+        </Svg>
+      );
+    case 'file':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <Path d="M14 2v6h6" />
+          <Path d="M16 13H8M16 17H8M10 9H8" />
+        </Svg>
+      );
+    case 'map':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M1 6v16l6-3 6 3 6-3 6 3V3l-6 3-6-3-6 3-6-3z" />
+          <Path d="M7 3v16M17 3v16M7 9l5-2.5 5 2.5M7 15l5-2.5 5 2.5" />
         </Svg>
       );
     default:

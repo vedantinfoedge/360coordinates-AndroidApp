@@ -19,6 +19,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { SellerStackParamList } from '../../navigation/SellerNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import SellerHeader from '../../components/SellerHeader';
 import { useAuth } from '../../context/AuthContext';
 
@@ -176,7 +177,7 @@ const SellerSupportScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.contactItem}
             onPress={handleEmailPress}>
             <View style={styles.contactIconContainer}>
-              <Text style={styles.contactIcon}>📧</Text>
+              <TabIcon name="mail" color={colors.primary} size={22} />
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Email</Text>
@@ -192,7 +193,7 @@ const SellerSupportScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.contactItem}
             onPress={handleLocationPress}>
             <View style={styles.contactIconContainer}>
-              <Text style={styles.contactIcon}>📍</Text>
+              <TabIcon name="location" color={colors.primary} size={22} />
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Location</Text>

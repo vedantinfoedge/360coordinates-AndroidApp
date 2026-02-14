@@ -18,6 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { SellerStackParamList } from '../../navigation/SellerNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import { useAuth } from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import Button from '../../components/common/Button';
@@ -495,7 +496,8 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           {(user as any)?.email_verified && (
             <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedText}>✓ Verified</Text>
+              <TabIcon name="check" color={colors.success} size={14} />
+              <Text style={styles.verifiedText}> Verified</Text>
             </View>
           )}
           <View style={styles.statsRow}>
@@ -684,9 +686,11 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('AllListings')}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>🏢</Text>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <TabIcon name="building" color="#0284C7" size={20} />
+            </View>
             <Text style={styles.menuText}>My Properties</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
@@ -695,9 +699,11 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('Leads')}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>👥</Text>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <TabIcon name="leads" color="#0284C7" size={20} />
+            </View>
             <Text style={styles.menuText}>Leads</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
@@ -706,9 +712,11 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('Support')}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>🎧</Text>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#DCFCE7' }]}>
+              <TabIcon name="support" color="#16A34A" size={20} />
+            </View>
             <Text style={styles.menuText}>Support</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
@@ -717,9 +725,11 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('Subscription')}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>💎</Text>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <TabIcon name="subscription" color="#D97706" size={20} />
+            </View>
             <Text style={styles.menuText}>Subscription</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
@@ -728,9 +738,11 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.menuItem}
             onPress={handleLogout}
             activeOpacity={0.7}>
-            <Text style={styles.menuIcon}>👋</Text>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#FEE2E2' }]}>
+              <TabIcon name="logout" color="#DC2626" size={20} />
+            </View>
             <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
-            <Text style={styles.menuArrow}>→</Text>
+            <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
         </View>
       </Animated.ScrollView>
@@ -844,11 +856,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#D1FAE5', // Light green tint
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: 20,
     marginBottom: spacing.sm,
+    gap: spacing.xs,
   },
   verifiedText: {
     ...typography.caption,
@@ -1029,11 +1044,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     minHeight: 54,
   },
-  menuIcon: {
-    fontSize: 20,
+  menuIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: spacing.md,
-    width: 26,
-    textAlign: 'center',
   },
   menuText: {
     ...typography.body,

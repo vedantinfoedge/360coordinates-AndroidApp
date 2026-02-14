@@ -693,7 +693,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           />
         ) : (
           <View style={styles.propertyImagePlaceholder}>
-            <Text style={styles.propertyImagePlaceholderText}>🏠</Text>
+            <TabIcon name="home" color={colors.textSecondary} size={40} />
           </View>
         )}
         {children}
@@ -807,7 +807,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 </Text>
                 <View style={styles.propertyLocationRow}>
                   <View style={styles.locationIconContainer}>
-                    <Text style={styles.locationIcon}>📍</Text>
+                    <TabIcon name="location" color={colors.textSecondary} size={16} />
                   </View>
                   <Text style={styles.propertyCardLocation} numberOfLines={1}>
                     {item.location}
@@ -818,7 +818,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.propertyCardStats}>
               <View style={styles.propertyStatItem}>
                 <View style={styles.propertyStatIconContainer}>
-                  <Text style={styles.propertyStatIcon}>👁</Text>
+                  <TabIcon name="eye" color={colors.textSecondary} size={16} />
                 </View>
                 <Text style={styles.propertyStatText}>
                   {item.views} people interested
@@ -826,7 +826,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <View style={styles.propertyStatItem}>
                 <View style={styles.propertyStatIconContainer}>
-                  <Text style={styles.propertyStatIcon}>💬</Text>
+                  <TabIcon name="inquiries" color={colors.textSecondary} size={16} />
                 </View>
                 <Text style={styles.propertyStatText}>
                   {item.inquiries} inquiries
@@ -901,7 +901,9 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           }}
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.errorIcon}>🚫</Text>
+          <View style={styles.errorIconWrap}>
+            <TabIcon name="alert" color={colors.textSecondary} size={48} />
+          </View>
           <Text style={styles.errorTitle}>Access Denied</Text>
           <Text style={styles.errorText}>
             You are registered as an Agent/Builder. You can only access the Agent/Builder dashboard.
@@ -1235,6 +1237,9 @@ const styles = StyleSheet.create({
   },
   errorIcon: {
     fontSize: 64,
+    marginBottom: spacing.lg,
+  },
+  errorIconWrap: {
     marginBottom: spacing.lg,
   },
   errorTitle: {

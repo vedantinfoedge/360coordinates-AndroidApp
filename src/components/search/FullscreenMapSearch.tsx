@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     overflow: 'hidden',
-    paddingTop: 16,
+    paddingTop: 30,
   },
 });
 

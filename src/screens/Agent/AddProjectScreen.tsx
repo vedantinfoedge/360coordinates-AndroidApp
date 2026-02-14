@@ -17,6 +17,7 @@ import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType } from
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AgentStackParamList } from '../../navigation/AgentNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon, TabIconName } from '../../components/navigation/TabIcons';
 import Dropdown from '../../components/common/Dropdown';
 import { propertyService } from '../../services/property.service';
 import { uploadPropertyImageWithModeration, moderateFirebaseUrlForProperty } from '../../services/imageUpload.service';
@@ -40,19 +41,24 @@ type Props = {
   navigation: AddProjectScreenNavigationProp;
 };
 
-// Project Type Options (per Upcoming Project Form spec)
+const PROJECT_TYPE_ICONS: Record<string, TabIconName> = {
+  apartment: 'building', villa: 'home', independent_house: 'home', row_house: 'home',
+  penthouse: 'building', studio_apartment: 'bed', plot: 'square',
+  commercial_office: 'building', commercial_shop: 'building', pg_hostel: 'bed', warehouse: 'building',
+};
+
 const PROJECT_TYPES = [
-  { id: 'apartment', label: 'Apartment', icon: '🏢' },
-  { id: 'villa', label: 'Villa / Banglow', icon: '🏡' },
-  { id: 'independent_house', label: 'Independent House', icon: '🏘️' },
-  { id: 'row_house', label: 'Row House/ Farm House', icon: '🏘️' },
-  { id: 'penthouse', label: 'Penthouse', icon: '🌆' },
-  { id: 'studio_apartment', label: 'Studio Apartment', icon: '🛏️' },
-  { id: 'plot', label: 'Plot / Land / Industrial Property', icon: '📐' },
-  { id: 'commercial_office', label: 'Commercial Office', icon: '🏢' },
-  { id: 'commercial_shop', label: 'Commercial Shop', icon: '🏪' },
-  { id: 'pg_hostel', label: 'PG / Hostel', icon: '🛏️' },
-  { id: 'warehouse', label: 'Warehouse / Godown', icon: '🏪' },
+  { id: 'apartment', label: 'Apartment' },
+  { id: 'villa', label: 'Villa / Banglow' },
+  { id: 'independent_house', label: 'Independent House' },
+  { id: 'row_house', label: 'Row House/ Farm House' },
+  { id: 'penthouse', label: 'Penthouse' },
+  { id: 'studio_apartment', label: 'Studio Apartment' },
+  { id: 'plot', label: 'Plot / Land / Industrial Property' },
+  { id: 'commercial_office', label: 'Commercial Office' },
+  { id: 'commercial_shop', label: 'Commercial Shop' },
+  { id: 'pg_hostel', label: 'PG / Hostel' },
+  { id: 'warehouse', label: 'Warehouse / Godown' },
 ];
 
 // Project Status Options
@@ -144,25 +150,32 @@ const CONFIGURATIONS_BY_TYPE: Record<string, string[]> = {
   warehouse: ['wh_small', 'wh_medium', 'wh_large', 'cold_storage', 'logistics_wh'],
 };
 
-// Amenities Options (16 per property form spec) - IDs match backend/guide (clubhouse, playground, water_supply)
+const AMENITY_ICONS: Record<string, TabIconName> = {
+  parking: 'square', lift: 'layers', security: 'support', power_backup: 'sparkles',
+  gym: 'square', swimming_pool: 'sparkles', garden: 'sparkles', clubhouse: 'building',
+  playground: 'sparkles', cctv: 'camera', intercom: 'phone', fire_safety: 'alert',
+  water_supply: 'bath', gas_pipeline: 'sparkles', wifi: 'sparkles', ac: 'sparkles',
+  electricity: 'sparkles',
+};
+
 const AMENITIES = [
-  { id: 'parking', label: 'Parking', icon: '🚗' },
-  { id: 'lift', label: 'Lift', icon: '🛗' },
-  { id: 'security', label: '24x7 Security', icon: '👮' },
-  { id: 'power_backup', label: 'Power Backup', icon: '⚡' },
-  { id: 'gym', label: 'Gym', icon: '🏋️' },
-  { id: 'swimming_pool', label: 'Swimming Pool', icon: '🏊' },
-  { id: 'garden', label: 'Garden', icon: '🌳' },
-  { id: 'clubhouse', label: 'Club House', icon: '🏛️' },
-  { id: 'playground', label: "Children's Play Area", icon: '🎢' },
-  { id: 'cctv', label: 'CCTV', icon: '📹' },
-  { id: 'intercom', label: 'Intercom', icon: '📞' },
-  { id: 'fire_safety', label: 'Fire Safety', icon: '🚒' },
-  { id: 'water_supply', label: '24x7 Water', icon: '💧' },
-  { id: 'gas_pipeline', label: 'Gas Pipeline', icon: '🔥' },
-  { id: 'wifi', label: 'WiFi', icon: '📶' },
-  { id: 'ac', label: 'AC', icon: '❄️' },
-  { id: 'electricity', label: 'Electricity', icon: '⚡' },
+  { id: 'parking', label: 'Parking' },
+  { id: 'lift', label: 'Lift' },
+  { id: 'security', label: '24x7 Security' },
+  { id: 'power_backup', label: 'Power Backup' },
+  { id: 'gym', label: 'Gym' },
+  { id: 'swimming_pool', label: 'Swimming Pool' },
+  { id: 'garden', label: 'Garden' },
+  { id: 'clubhouse', label: 'Club House' },
+  { id: 'playground', label: "Children's Play Area" },
+  { id: 'cctv', label: 'CCTV' },
+  { id: 'intercom', label: 'Intercom' },
+  { id: 'fire_safety', label: 'Fire Safety' },
+  { id: 'water_supply', label: '24x7 Water' },
+  { id: 'gas_pipeline', label: 'Gas Pipeline' },
+  { id: 'wifi', label: 'WiFi' },
+  { id: 'ac', label: 'AC' },
+  { id: 'electricity', label: 'Electricity' },
 ];
 
 // Bank Options
@@ -262,12 +275,12 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const [usp, setUsp] = useState('');
 
   const totalSteps = 5;
-  const steps = [
-    { id: 1, name: 'Basic Details', icon: '📝' },
-    { id: 2, name: 'Location', icon: '📍' },
-    { id: 3, name: 'Configuration', icon: '🏗️' },
-    { id: 4, name: 'Pricing & Amenities', icon: '💰' },
-    { id: 5, name: 'Media & Contact', icon: '📷' },
+  const steps: Array<{ id: number; name: string; iconName: TabIconName }> = [
+    { id: 1, name: 'Basic Details', iconName: 'file-text' },
+    { id: 2, name: 'Location', iconName: 'location' },
+    { id: 3, name: 'Configuration', iconName: 'building' },
+    { id: 4, name: 'Pricing & Amenities', iconName: 'dollar' },
+    { id: 5, name: 'Media & Contact', iconName: 'camera' },
   ];
 
   // Price formatting helper
@@ -1002,7 +1015,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       setProjectType(type.id);
                       clearFieldError('projectType');
                     }}>
-                    <Text style={styles.typeButtonIcon}>{type.icon}</Text>
+                    <TabIcon name={PROJECT_TYPE_ICONS[type.id] || 'building'} color={projectType === type.id ? colors.surface : colors.primary} size={24} />
                     <Text style={[
                       styles.typeButtonText,
                       projectType === type.id && styles.typeButtonTextActive,
@@ -1113,9 +1126,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.mapButton}
                 onPress={() => setLocationPickerVisible(true)}>
-                <Text style={styles.mapButtonIcon}>
-                  {latitude && longitude ? '📍' : '🗺️'}
-                </Text>
+                <TabIcon name={latitude && longitude ? 'location' : 'map'} color={colors.surface} size={20} />
                 <Text style={styles.mapButtonText}>
                   {latitude && longitude ? 'Change Location' : 'Add Location on Map'}
                 </Text>
@@ -1600,7 +1611,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                         setSelectedAmenities(prev => [...prev, amenity.id]);
                       }
                     }}>
-                    <Text style={styles.amenityIcon}>{amenity.icon}</Text>
+                    <TabIcon name={AMENITY_ICONS[amenity.id] || 'sparkles'} color={selectedAmenities.includes(amenity.id) ? colors.surface : colors.primary} size={22} />
                     {selectedAmenities.includes(amenity.id) && (
                       <Text style={styles.amenityCheckmark}>✓</Text>
                     )}
@@ -1667,7 +1678,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       }
                     });
                   }}>
-                  <Text style={styles.coverImageCameraIcon}>📷</Text>
+                  <TabIcon name="camera" color={colors.primary} size={36} />
                   <Text style={styles.coverImageCameraLabel}>Take photo</Text>
                 </TouchableOpacity>
               </View>
@@ -1684,7 +1695,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                     clearFieldError('projectImages');
                     handleProjectImagesUpload();
                   }}>
-                  <Text style={styles.uploadButtonText}>🖼️ Gallery (Max 20)</Text>
+                  <Text style={styles.uploadButtonText}>Gallery (Max 20)</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.uploadButton, styles.uploadButtonSecondary, styles.projectImageButton]}
@@ -1692,7 +1703,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                     clearFieldError('projectImages');
                     handleProjectImagesFromCamera();
                   }}>
-                  <Text style={styles.uploadButtonTextSecondary}>📷 Camera</Text>
+                  <View style={styles.uploadButtonIconWrap}><TabIcon name="camera" color={colors.primary} size={20} /></View>
+                  <Text style={styles.uploadButtonTextSecondary}>Camera</Text>
                 </TouchableOpacity>
               </View>
               <Text style={styles.imageCountText}>
@@ -1743,7 +1755,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                             onPress={() => {
                               setProjectImages(prev => prev.filter((_, i) => i !== index));
                             }}>
-                            <Text style={styles.removeImageText}>✕</Text>
+                            <TabIcon name="close" color={colors.surface} size={16} />
                           </TouchableOpacity>
                         )}
                       </View>
@@ -1771,7 +1783,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                     }
                   });
                 }}>
-                <Text style={styles.uploadButtonText}>📄 Upload Floor Plans</Text>
+                <View style={styles.uploadButtonIconWrap}><TabIcon name="file" color={colors.primary} size={20} /></View>
+                <Text style={styles.uploadButtonText}>Upload Floor Plans</Text>
               </TouchableOpacity>
               {floorPlans.length > 0 && (
                 <View style={styles.filesList}>
@@ -1780,7 +1793,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       <Text style={styles.fileName}>{plan.name}</Text>
                       <TouchableOpacity
                         onPress={() => setFloorPlans(prev => prev.filter((_, i) => i !== index))}>
-                        <Text style={styles.removeFileText}>✕</Text>
+                        <TabIcon name="close" color={colors.error} size={16} />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -1806,7 +1819,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                     }
                   });
                 }}>
-                <Text style={styles.uploadButtonText}>📑 Upload Brochure</Text>
+                <View style={styles.uploadButtonIconWrap}><TabIcon name="file" color={colors.primary} size={20} /></View>
+                <Text style={styles.uploadButtonText}>Upload Brochure</Text>
               </TouchableOpacity>
               {brochure && (
                 <View style={styles.fileItem}>
@@ -1860,7 +1874,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       }
                     });
                   }}>
-                  <Text style={styles.uploadButtonText}>📷 Take photo</Text>
+                  <View style={styles.uploadButtonIconWrap}><TabIcon name="camera" color={colors.primary} size={20} /></View>
+                <Text style={styles.uploadButtonText}>Take photo</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2012,7 +2027,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Add Project</Text>
               <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-                <Text style={styles.closeButtonText}>✕</Text>
+                <TabIcon name="close" color={colors.textSecondary} size={22} />
               </TouchableOpacity>
             </View>
 
@@ -2042,9 +2057,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                         status === 'active' && styles.stepCircleActive,
                       ]}>
                       {status === 'completed' ? (
-                        <Text style={styles.stepCheckmark}>✓</Text>
+                        <TabIcon name="check" color={colors.surface} size={16} />
                       ) : (
-                        <Text style={styles.stepIcon}>{step.icon}</Text>
+                        <TabIcon name={step.iconName} color={status === 'active' ? colors.surface : colors.textSecondary} size={16} />
                       )}
                     </View>
                     <Text
@@ -2074,7 +2089,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.footer}>
               {currentStep > 1 && (
                 <TouchableOpacity style={styles.backButton} onPress={handlePrevious}>
-                  <Text style={styles.backButtonIcon}>←</Text>
+                  <TabIcon name="chevron-left" color={colors.primary} size={20} />
                   <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
               )}
@@ -2095,7 +2110,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                 ) : currentStep === totalSteps ? (
                   <View style={styles.publishButtonInner}>
-                    <Text style={styles.publishButtonIcon}>✓</Text>
+                    <TabIcon name="check" color={colors.surface} size={20} />
                     <Text style={styles.publishButtonText}>Publish Project</Text>
                   </View>
                 ) : (
@@ -2550,10 +2565,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   uploadButton: {
+    flexDirection: 'row',
     backgroundColor: '#0077C0',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.sm,
   },
   uploadButtonSecondary: {
@@ -2621,6 +2638,9 @@ const styles = StyleSheet.create({
   },
   projectImageButton: {
     flex: 1,
+  },
+  uploadButtonIconWrap: {
+    marginRight: spacing.xs,
   },
   uploadButtonTextSecondary: {
     ...typography.body,

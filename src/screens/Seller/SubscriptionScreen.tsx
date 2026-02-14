@@ -15,6 +15,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { SellerStackParamList } from '../../navigation/SellerNavigator';
 import { colors, spacing, typography } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import { useAuth } from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import { sellerService, DashboardStats } from '../../services/seller.service';
@@ -174,15 +175,21 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.featuresList}>
               <View style={styles.featureItem}>
-                <Text style={styles.featureIcon}>✅</Text>
+                <View style={styles.featureIconWrap}>
+                  <TabIcon name="check" color={colors.success} size={20} />
+                </View>
                 <Text style={styles.featureText}>Upload 1 Property</Text>
               </View>
               <View style={styles.featureItem}>
-                <Text style={styles.featureIcon}>✅</Text>
+                <View style={styles.featureIconWrap}>
+                  <TabIcon name="check" color={colors.success} size={20} />
+                </View>
                 <Text style={styles.featureText}>Valid for 30 Days property visibility</Text>
               </View>
               <View style={styles.featureItem}>
-                <Text style={styles.featureIcon}>✅</Text>
+                <View style={styles.featureIconWrap}>
+                  <TabIcon name="check" color={colors.success} size={20} />
+                </View>
                 <Text style={styles.featureText}>Standard Support</Text>
               </View>
             </View>
@@ -208,7 +215,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.trialContent}>
                 <View style={styles.trialHeader}>
                   <View style={styles.trialIconContainer}>
-                    <Text style={styles.trialIcon}>🎉</Text>
+                    <TabIcon name="subscription" color={colors.surface} size={28} />
                   </View>
                   <View style={styles.trialTextContainer}>
                     <Text style={styles.trialTitle}>Free Trial Active</Text>
@@ -228,7 +235,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
           {/* Coming Soon Section */}
           <View style={styles.comingSoonCard}>
             <View style={styles.comingSoonIconContainer}>
-              <Text style={styles.comingSoonIcon}>🚀</Text>
+              <TabIcon name="sparkles" color={colors.primary} size={32} />
             </View>
             <Text style={styles.comingSoonTitle}>Subscription Plans</Text>
             <Text style={styles.comingSoonSubtitle}>Coming Soon</Text>
@@ -518,8 +525,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  featureIcon: {
-    fontSize: 18,
+  featureIconWrap: {
     marginRight: spacing.md,
   },
   featureText: {

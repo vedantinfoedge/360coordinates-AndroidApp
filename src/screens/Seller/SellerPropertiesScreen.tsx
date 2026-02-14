@@ -17,6 +17,7 @@ import CustomAlert from '../../utils/alertHelper';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import { useAuth } from '../../context/AuthContext';
 import SellerHeader from '../../components/SellerHeader';
 import { sellerService, DashboardStats } from '../../services/seller.service';
@@ -554,7 +555,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           />
         ) : (
           <View style={styles.propertyImagePlaceholder}>
-            <Text style={styles.placeholderText}>🏠</Text>
+            <TabIcon name="home" color="#9CA3AF" size={44} />
           </View>
         )}
         <View style={styles.propertyInfo}>
@@ -573,18 +574,20 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </View>
           <View style={styles.propertyLocationRow}>
-            <Text style={styles.locationIcon}>📍</Text>
+            <View style={styles.locationIconWrap}>
+              <TabIcon name="location" color={colors.textSecondary} size={16} />
+            </View>
             <Text style={styles.propertyLocation} numberOfLines={1}>
               {item.location || 'Location not specified'}
             </Text>
           </View>
           <View style={styles.propertyStatsRow}>
             <View style={styles.propertyStatItem}>
-              <Text style={styles.propertyStatIcon}>👁️</Text>
+              <TabIcon name="eye" color={colors.textSecondary} size={16} />
               <Text style={styles.propertyStatText}>{item.views_count || item.views || 0}</Text>
             </View>
             <View style={styles.propertyStatItem}>
-              <Text style={styles.propertyStatIcon}>💬</Text>
+              <TabIcon name="inquiries" color={colors.textSecondary} size={16} />
               <Text style={styles.propertyStatText}>{item.inquiry_count || item.inquiries || 0}</Text>
             </View>
           </View>
@@ -605,7 +608,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
                   handleEdit(item.id);
                 }}
                 activeOpacity={0.7}>
-                <Text style={styles.editButtonIcon}>✏</Text>
+                <TabIcon name="edit" color={colors.surface} size={16} />
                 <Text style={styles.editButtonText}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -615,7 +618,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
                   handleDelete(item.id);
                 }}
                 activeOpacity={0.7}>
-                <Text style={styles.deleteButtonIcon}>🗑</Text>
+                <TabIcon name="trash" color={colors.surface} size={16} />
                 <Text style={styles.deleteButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
@@ -654,7 +657,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.searchBar}>
         <View style={styles.searchInputContainer}>
           <View style={styles.searchIconContainer}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <TabIcon name="search" color={colors.textSecondary} size={18} />
           </View>
           <TextInput
             style={styles.searchInput}
@@ -668,7 +671,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.filterButton}
           onPress={() => setShowFilterModal(true)}
           activeOpacity={0.7}>
-          <Text style={styles.filterButtonIcon}>⚙</Text>
+          <TabIcon name="settings" color={colors.primary} size={20} />
         </TouchableOpacity>
       </View>
 
@@ -683,7 +686,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter & Sort</Text>
               <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <TabIcon name="close" color={colors.textSecondary} size={20} />
               </TouchableOpacity>
             </View>
 
@@ -764,7 +767,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
       ) : properties.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
-            <Text style={styles.emptyIcon}>🏠</Text>
+            <TabIcon name="home" color="#9CA3AF" size={48} />
           </View>
           <Text style={styles.emptyTitle}>No Properties Listed</Text>
           <Text style={styles.emptySubtext}>
@@ -785,7 +788,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           {filteredAndSortedProperties.length === 0 && searchQuery ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconContainer}>
-                <Text style={styles.emptyIcon}>🔍</Text>
+                <TabIcon name="search" color="#9CA3AF" size={48} />
               </View>
               <Text style={styles.emptyTitle}>No Properties Found</Text>
               <Text style={styles.emptySubtext}>
@@ -818,7 +821,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.fab}
           onPress={handleAddProperty}
           activeOpacity={0.8}>
-          <Text style={styles.fabIcon}>+</Text>
+          <TabIcon name="plus" color={colors.surface} size={24} />
           <Text style={styles.fabText}>New Property</Text>
         </TouchableOpacity>
       )}
@@ -897,8 +900,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  locationIcon: {
-    fontSize: 13,
+  locationIconWrap: {
     marginRight: spacing.xs,
   },
   propertyLocation: {
@@ -1090,6 +1092,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -1111,6 +1116,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     backgroundColor: '#FEE2E2', // Light red tint
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,

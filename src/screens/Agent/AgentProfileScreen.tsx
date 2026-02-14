@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.surface,
+    borderColor: colors.primaryDark,
   },
   editPhotoText: {
     fontSize: 16,

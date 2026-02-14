@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SellerTabParamList } from '../../components/navigation/SellerTabNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon } from '../../components/navigation/TabIcons';
 import { verticalScale, moderateScale, scale } from '../../utils/responsive';
 import { propertyService } from '../../services/property.service';
 import CustomAlert from '../../utils/alertHelper';
@@ -332,7 +333,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {hasVideo && (
             <TouchableOpacity style={styles.videoButton} onPress={() => setShowVideoModal(true)}>
-              <Text style={styles.videoButtonIcon}>▶</Text>
+              <TabIcon name="video" color={colors.surface} size={18} />
               <Text style={styles.videoButtonText}>Video Tour</Text>
             </TouchableOpacity>
           )}
@@ -351,7 +352,9 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
 
           <View style={styles.locationRow}>
-            <Text style={styles.locationIcon}>📍</Text>
+            <View style={styles.locationIconWrap}>
+              <TabIcon name="location" color={colors.textSecondary} size={18} />
+            </View>
             <Text style={styles.location}>{property.location || property.city || 'Location not available'}</Text>
           </View>
 
@@ -359,19 +362,19 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.specsRow}>
             {property.bedrooms && (
               <View style={styles.specItem}>
-                <Text style={styles.specIcon}>🛏</Text>
+                <TabIcon name="bed" color={colors.primary} size={20} />
                 <Text style={styles.specValue}>{property.bedrooms} Beds</Text>
               </View>
             )}
             {property.bathrooms && (
               <View style={styles.specItem}>
-                <Text style={styles.specIcon}>🚿</Text>
+                <TabIcon name="bath" color={colors.primary} size={20} />
                 <Text style={styles.specValue}>{property.bathrooms} Baths</Text>
               </View>
             )}
             {property.area && (
               <View style={styles.specItem}>
-                <Text style={styles.specIcon}>📐</Text>
+                <TabIcon name="square" color={colors.primary} size={20} />
                 <Text style={styles.specValue}>{property.area} sqft</Text>
               </View>
             )}
@@ -381,7 +384,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Description */}
         <View style={styles.section}>
           <View style={styles.sectionTitleContainer}>
-            <Text style={styles.sectionIcon}>📝</Text>
+            <TabIcon name="file-text" color={colors.primary} size={20} />
             <Text style={styles.sectionTitle}>Description</Text>
           </View>
           <Text style={styles.description}>
@@ -392,7 +395,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Details Grid */}
         <View style={styles.section}>
           <View style={styles.sectionTitleContainer}>
-            <Text style={styles.sectionIcon}>ℹ️</Text>
+            <TabIcon name="building" color={colors.primary} size={20} />
             <Text style={styles.sectionTitle}>Details</Text>
           </View>
           <View style={styles.detailsGrid}>
@@ -427,13 +430,13 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         {amenities.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionTitleContainer}>
-              <Text style={styles.sectionIcon}>✨</Text>
+              <TabIcon name="sparkles" color={colors.primary} size={20} />
               <Text style={styles.sectionTitle}>Amenities</Text>
             </View>
             <View style={styles.amenitiesGrid}>
               {amenities.map((amenity: string, index: number) => (
                 <View key={index} style={styles.amenityItem}>
-                  <Text style={styles.amenityIcon}>✓</Text>
+                  <TabIcon name="check" color={colors.primary} size={16} />
                   <Text style={styles.amenityText}>{capitalizeAmenity(amenity)}</Text>
                 </View>
               ))}
@@ -447,7 +450,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         <TouchableOpacity
           style={styles.editButton}
           onPress={handleEdit}>
-          <Text style={styles.editButtonText}>✏️ Edit Property</Text>
+          <TabIcon name="edit" color={colors.surface} size={18} />
+          <Text style={styles.editButtonText}>Edit Property</Text>
         </TouchableOpacity>
       </View>
 
@@ -680,9 +684,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  locationIcon: {
-    fontSize: 16,
-    marginRight: 4,
+  locationIconWrap: {
+    marginRight: spacing.xs,
   },
   location: {
     ...typography.body,
@@ -699,6 +702,7 @@ const styles = StyleSheet.create({
   specItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
   },
   specIcon: {
     fontSize: 18,
@@ -716,6 +720,7 @@ const styles = StyleSheet.create({
   sectionTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.sm,
   },
   sectionIcon: {
@@ -792,6 +797,10 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     backgroundColor: colors.primary,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,

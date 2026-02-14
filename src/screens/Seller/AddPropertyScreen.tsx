@@ -22,6 +22,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SellerStackParamList } from '../../navigation/SellerNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { TabIcon, TabIconName } from '../../components/navigation/TabIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AMENITY_GAP = spacing.xs;
@@ -61,6 +62,21 @@ type Props = {
 };
 
 type PropertyStatus = 'sell' | 'rent';
+
+const PROPERTY_TYPE_ICONS: Record<string, TabIconName> = {
+  'Apartment': 'building', 'Villa / Banglow': 'home', 'Independent House': 'home',
+  'Row House/ Farm House': 'home', 'Penthouse': 'building', 'Studio Apartment': 'bed',
+  'Plot / Land / Industrial Property': 'square', 'Commercial Office': 'building',
+  'Commercial Shop': 'building', 'Warehouse / Godown': 'building', 'PG / Hostel': 'bed',
+};
+
+const AMENITY_ICONS: Record<string, TabIconName> = {
+  parking: 'square', lift: 'layers', security: 'support', power_backup: 'sparkles',
+  gym: 'square', swimming_pool: 'sparkles', garden: 'sparkles', clubhouse: 'building',
+  playground: 'sparkles', cctv: 'camera', intercom: 'phone', fire_safety: 'alert',
+  water_supply: 'bath', gas_pipeline: 'sparkles', wifi: 'sparkles', ac: 'sparkles',
+  electricity: 'sparkles',
+};
 
 const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
@@ -141,12 +157,12 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const totalSteps = 5;
-  const steps = [
-    { id: 1, name: 'Basic Info', icon: '📝' },
-    { id: 2, name: 'Property Details', icon: '🏠' },
-    { id: 3, name: 'Amenities', icon: '✨' },
-    { id: 4, name: 'Photos', icon: '📷' },
-    { id: 5, name: 'Pricing', icon: '💰' },
+  const steps: Array<{ id: number; name: string; iconName: TabIconName }> = [
+    { id: 1, name: 'Basic Info', iconName: 'file-text' },
+    { id: 2, name: 'Property Details', iconName: 'home' },
+    { id: 3, name: 'Amenities', iconName: 'sparkles' },
+    { id: 4, name: 'Photos', iconName: 'camera' },
+    { id: 5, name: 'Pricing', iconName: 'dollar' },
   ];
 
   // Get field visibility configuration based on property type (using guide utility)
@@ -1129,12 +1145,12 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.typeButtonGradient}>
-                      <Text style={styles.typeButtonIcon}>🏷️</Text>
+                      <TabIcon name="tag" color={colors.surface} size={20} />
                       <Text style={styles.typeButtonTextSelected}>Sell</Text>
                     </LinearGradient>
                   ) : (
                     <View style={styles.typeButtonUnselected}>
-                      <Text style={styles.typeButtonIcon}>🏷️</Text>
+                      <TabIcon name="tag" color={colors.surface} size={20} />
                       <Text style={styles.typeButtonText}>Sell</Text>
                     </View>
                   )}
@@ -1150,12 +1166,12 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.typeButtonGradient}>
-                      <Text style={styles.typeButtonIcon}>🔑</Text>
+                      <TabIcon name="key" color={colors.surface} size={20} />
                       <Text style={styles.typeButtonTextSelected}>Rent</Text>
                     </LinearGradient>
                   ) : (
                     <View style={styles.typeButtonUnselected}>
-                      <Text style={styles.typeButtonIcon}>🔑</Text>
+                      <TabIcon name="key" color={colors.surface} size={20} />
                       <Text style={styles.typeButtonText}>Rent</Text>
                     </View>
                   )}
@@ -1190,7 +1206,9 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                       // Clear amenities when property type changes (they'll be filtered)
                       setSelectedAmenities([]);
                     }}>
-                    <Text style={styles.propertyTypeIcon}>{type.icon}</Text>
+                    <View style={styles.propertyTypeIconWrap}>
+                      <TabIcon name={PROPERTY_TYPE_ICONS[type.value] || 'home'} color={propertyType === type.value ? colors.surface : colors.textSecondary} size={22} />
+                    </View>
                     <Text
                       style={[
                         styles.propertyTypeText,
@@ -1211,7 +1229,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => setAvailableForBachelors(!availableForBachelors)}
                 activeOpacity={0.7}>
                 <View style={[styles.checkbox, availableForBachelors && styles.checkboxChecked]}>
-                  {availableForBachelors && <Text style={styles.checkboxCheck}>✓</Text>}
+                  {availableForBachelors && <TabIcon name="check" color={colors.surface} size={14} />}
                 </View>
                 <Text style={styles.checkboxLabel}>Available for bachelors</Text>
               </TouchableOpacity>
@@ -1287,7 +1305,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.mapButtonGradient}>
-                    <Text style={styles.mapButtonIcon}>📍</Text>
+                    <TabIcon name="location" color={colors.surface} size={18} />
                     <Text style={styles.mapButtonText}>Add Location on Map</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -1716,7 +1734,9 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                       toggleAmenity(amenity.id);
                       clearFieldError('selectedAmenities');
                     }}>
-                    <Text style={styles.amenityIcon}>{amenity.icon}</Text>
+                    <View style={styles.amenityIconWrap}>
+                      <TabIcon name={AMENITY_ICONS[amenity.id] || 'sparkles'} color={selectedAmenities.includes(amenity.id) ? colors.surface : colors.textSecondary} size={20} />
+                    </View>
                     <Text
                       style={[
                         styles.amenityText,
@@ -1777,7 +1797,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 handleImagePicker();
               }}
               activeOpacity={0.7}>
-              <Text style={styles.photoUploadIcon}>📤</Text>
+              <TabIcon name="upload" color={colors.primary} size={32} />
               <Text style={styles.photoUploadText}>Tap to select photos from gallery</Text>
               <Text style={styles.photoUploadSubtext}>
                 Select up to {10 - photos.length} more photos
@@ -1793,7 +1813,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 handleCameraCapture();
               }}
               activeOpacity={0.7}>
-              <Text style={styles.photoUploadIcon}>📷</Text>
+              <TabIcon name="camera" color={colors.primary} size={32} />
               <Text style={styles.photoUploadText}>Take photo with camera</Text>
             </TouchableOpacity>
             {renderFieldError('photos')}
@@ -1890,7 +1910,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                     styles.checkbox,
                     priceNegotiable && styles.checkboxChecked,
                   ]}>
-                  {priceNegotiable && <Text style={styles.checkboxCheck}>✓</Text>}
+                  {priceNegotiable && <TabIcon name="check" color={colors.surface} size={14} />}
                 </View>
                 <Text style={styles.checkboxLabel}>Price is negotiable</Text>
               </TouchableOpacity>
@@ -1927,7 +1947,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                           styles.checkbox,
                           availableForBachelors && styles.checkboxChecked,
                         ]}>
-                        {availableForBachelors && <Text style={styles.checkboxCheck}>✓</Text>}
+                        {availableForBachelors && <TabIcon name="check" color={colors.surface} size={14} />}
                       </View>
                       <Text style={styles.checkboxLabel}>Available for bachelors</Text>
                     </TouchableOpacity>
@@ -2070,7 +2090,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   {isEditMode ? 'Edit Property' : 'List Your Property'}
                 </Text>
                 <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-                  <Text style={styles.closeButtonText}>✕</Text>
+                  <TabIcon name="close" color={colors.surface} size={20} />
                 </TouchableOpacity>
               </View>
 
@@ -2099,9 +2119,11 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                           status === 'active' && styles.stepCircleActive,
                         ]}>
                         {status === 'completed' ? (
-                          <Text style={styles.stepCheckmark}>✓</Text>
+                          <TabIcon name="check" color={colors.surface} size={12} />
                         ) : (
-                          <Text style={styles.stepIcon}>{step.icon}</Text>
+                          <View style={styles.stepIconWrap}>
+                            <TabIcon name={step.iconName} color={currentStep >= step.id ? colors.surface : colors.textSecondary} size={18} />
+                          </View>
                         )}
                       </View>
                       <Text
@@ -2133,7 +2155,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.footer}>
                 {currentStep > 1 && (
                   <TouchableOpacity style={styles.backButton} onPress={handlePrevious}>
-                    <Text style={styles.backButtonIcon}>←</Text>
+                    <TabIcon name="chevron-left" color={colors.surface} size={22} />
                     <Text style={styles.backButtonText}>Back</Text>
                   </TouchableOpacity>
                 )}
@@ -2151,7 +2173,11 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.publishButtonGradient}>
-                      <Text style={styles.publishButtonIcon}>{isSubmitting ? '⏳' : '✓'}</Text>
+                      {isSubmitting ? (
+                        <ActivityIndicator size="small" color={colors.surface} />
+                      ) : (
+                        <TabIcon name="check" color={colors.surface} size={20} />
+                      )}
                       <Text style={styles.publishButtonText}>
                         {isSubmitting ? 'Submitting...' : 'Publish Listing'}
                       </Text>
@@ -2292,6 +2318,10 @@ const styles = StyleSheet.create({
   },
   stepCircleActive: {
     backgroundColor: '#0077C0',
+  },
+  stepIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stepIcon: {
     fontSize: 20,
@@ -2459,6 +2489,9 @@ const styles = StyleSheet.create({
     fontSize: 32,
     marginBottom: spacing.xs,
   },
+  propertyTypeIconWrap: {
+    marginBottom: spacing.xs,
+  },
   propertyTypeText: {
     ...typography.body,
     color: colors.text,
@@ -2492,6 +2525,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.xs,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
   },
@@ -2623,6 +2657,9 @@ const styles = StyleSheet.create({
   },
   amenityIcon: {
     fontSize: 24,
+    marginBottom: spacing.xs,
+  },
+  amenityIconWrap: {
     marginBottom: spacing.xs,
   },
   amenityText: {
