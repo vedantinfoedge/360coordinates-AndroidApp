@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, spacing, typography, borderRadius, shadows} from '../theme';
+import {TabIcon} from './navigation/TabIcons';
 import {verticalScale} from '../utils/responsive';
 
 const HEADER_HEIGHT = verticalScale(56);
@@ -153,24 +154,32 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
               <View style={styles.menuHeader}>
                 <Text style={styles.menuHeaderTitle}>Menu</Text>
                 <TouchableOpacity style={styles.menuCloseButton} onPress={() => setMenuVisible(false)}>
-                  <Text style={styles.menuCloseText}>✕</Text>
+                  <TabIcon name="close" color={colors.textSecondary} size={16} />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setTimeout(() => onProfilePress?.(), 100); }}>
-                <View style={[styles.menuItemIconBox, {backgroundColor: colors.accentLighter}]}><Text style={styles.menuItemIcon}>👤</Text></View>
+                <View style={[styles.menuItemIconBox, {backgroundColor: colors.accentLighter}]}>
+                  <TabIcon name="profile" color="#0284C7" size={18} />
+                </View>
                 <Text style={styles.menuItemText}>Profile</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setTimeout(() => onSupportPress?.(), 100); }}>
-                <View style={[styles.menuItemIconBox, {backgroundColor: '#FEF3C7'}]}><Text style={styles.menuItemIcon}>💬</Text></View>
+                <View style={[styles.menuItemIconBox, {backgroundColor: '#FEF3C7'}]}>
+                  <TabIcon name="support" color="#B45309" size={18} />
+                </View>
                 <Text style={styles.menuItemText}>Support</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setTimeout(() => onSubscriptionPress?.(), 100); }}>
-                <View style={[styles.menuItemIconBox, {backgroundColor: '#F3E8FF'}]}><Text style={styles.menuItemIcon}>💎</Text></View>
+                <View style={[styles.menuItemIconBox, {backgroundColor: '#F3E8FF'}]}>
+                  <TabIcon name="subscription" color="#7C3AED" size={18} />
+                </View>
                 <Text style={styles.menuItemText}>Subscription</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
               <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setTimeout(() => onLogoutPress?.(), 100); }}>
-                <View style={[styles.menuItemIconBox, {backgroundColor: '#FEE2E2'}]}><Text style={styles.menuItemIcon}>🚪</Text></View>
+                <View style={[styles.menuItemIconBox, {backgroundColor: '#FEE2E2'}]}>
+                  <TabIcon name="logout" color="#DC2626" size={18} />
+                </View>
                 <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>
               </TouchableOpacity>
             </Animated.View>
