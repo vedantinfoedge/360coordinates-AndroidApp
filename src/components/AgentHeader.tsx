@@ -11,10 +11,10 @@ import {
   Easing,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {colors, spacing, typography, borderRadius} from '../theme';
+import {colors, spacing, typography, borderRadius, shadows} from '../theme';
 import {verticalScale} from '../utils/responsive';
 
-const HEADER_HEIGHT = verticalScale(64);
+const HEADER_HEIGHT = verticalScale(56);
 
 interface AgentHeaderProps {
   onProfilePress?: () => void;
@@ -95,29 +95,27 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
     <Animated.View 
       style={[
         styles.safeArea, 
-        styles.stickyHeader, 
         {
           paddingTop: insets.top,
           transform: scrollY ? [{translateY: headerTranslateY}] : [],
         }
       ]}>
       <View style={styles.header}>
-        {/* Logo */}
-        <TouchableOpacity
-          style={styles.logoContainer}
-          onPress={() => {
-            // Navigate to dashboard if needed
-          }}>
+        {/* Logo + Title */}
+        <View style={styles.logoSection}>
           <Image
             source={require('../assets/logo.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
-        </TouchableOpacity>
+          <View style={styles.brandText}>
+            <Text style={styles.brandTitle} numberOfLines={1}>Agent</Text>
+            <Text style={styles.brandSubtitle} numberOfLines={1}>Portal</Text>
+          </View>
+        </View>
 
-        {/* Right Side Items */}
+        {/* Right: Badge + Menu */}
         <View style={styles.rightItems}>
-          {/* Free Trial Badge */}
           {subscriptionDays !== undefined && subscriptionDays > 0 && (
             <Animated.View
               style={[
@@ -125,26 +123,21 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
                 subscriptionDays <= 7 && styles.trialBadgeUrgent,
                 subscriptionDays <= 7 && {transform: [{scale: pulseAnim}]},
               ]}>
-              <Text style={styles.trialBadgeText}>
-                {subscriptionDays} {subscriptionDays === 1 ? 'day' : 'days'} left
-              </Text>
+              <Text style={styles.trialBadgeText}>{subscriptionDays}d</Text>
             </Animated.View>
           )}
-
-          {/* Hamburger Menu */}
           <TouchableOpacity
             style={styles.menuButton}
             onPress={() => setMenuVisible(true)}
-            activeOpacity={0.7}>
+            activeOpacity={0.6}>
             <View style={styles.hamburger}>
               <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
-              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
+              <View style={[styles.hamburgerLine, styles.hamburgerLineMiddle, menuVisible && styles.hamburgerLineActive]} />
               <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Dropdown Menu Modal */}
         <Modal
           visible={menuVisible}
           transparent={true}
@@ -155,51 +148,30 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
             activeOpacity={1}
             onPress={() => setMenuVisible(false)}>
             <Animated.View 
-              style={[
-                styles.menuContainer, 
-                {transform: [{translateX: slideAnim}]}
-              ]} 
+              style={[styles.menuContainer, {transform: [{translateX: slideAnim}]}]} 
               onStartShouldSetResponder={() => true}>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  setTimeout(() => onProfilePress?.(), 100);
-                }}>
-                <Text style={styles.menuItemIcon}>👤</Text>
+              <View style={styles.menuHeader}>
+                <Text style={styles.menuHeaderTitle}>Menu</Text>
+                <TouchableOpacity style={styles.menuCloseButton} onPress={() => setMenuVisible(false)}>
+                  <Text style={styles.menuCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setTimeout(() => onProfilePress?.(), 100); }}>
+                <View style={[styles.menuItemIconBox, {backgroundColor: colors.accentLighter}]}><Text style={styles.menuItemIcon}>👤</Text></View>
                 <Text style={styles.menuItemText}>Profile</Text>
               </TouchableOpacity>
-              <View style={styles.menuDivider} />
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  setTimeout(() => onSupportPress?.(), 100);
-                }}>
-                <Text style={styles.menuItemIcon}>💬</Text>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setTimeout(() => onSupportPress?.(), 100); }}>
+                <View style={[styles.menuItemIconBox, {backgroundColor: '#FEF3C7'}]}><Text style={styles.menuItemIcon}>💬</Text></View>
                 <Text style={styles.menuItemText}>Support</Text>
               </TouchableOpacity>
-              <View style={styles.menuDivider} />
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  setTimeout(() => onSubscriptionPress?.(), 100);
-                }}>
-                <Text style={styles.menuItemIcon}>💎</Text>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setTimeout(() => onSubscriptionPress?.(), 100); }}>
+                <View style={[styles.menuItemIconBox, {backgroundColor: '#F3E8FF'}]}><Text style={styles.menuItemIcon}>💎</Text></View>
                 <Text style={styles.menuItemText}>Subscription</Text>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  setTimeout(() => onLogoutPress?.(), 100);
-                }}>
-                <Text style={styles.menuItemIcon}>🚪</Text>
-                <Text style={[styles.menuItemText, styles.logoutText]}>
-                  Logout
-                </Text>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setTimeout(() => onLogoutPress?.(), 100); }}>
+                <View style={[styles.menuItemIconBox, {backgroundColor: '#FEE2E2'}]}><Text style={styles.menuItemIcon}>🚪</Text></View>
+                <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>
               </TouchableOpacity>
             </Animated.View>
           </TouchableOpacity>
@@ -211,124 +183,189 @@ const AgentHeader: React.FC<AgentHeaderProps> = ({
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: colors.background, // Clean off-white
+    backgroundColor: colors.surface,
     zIndex: 1000,
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    ...shadows.subtle,
     ...Platform.select({
-      android: {
-        elevation: 8,
-      },
+      android: {elevation: 2},
       ios: {
-        shadowColor: colors.secondary,
-        shadowOffset: {width: 0, height: 4},
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
+        shadowColor: '#1D242B',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
       },
     }),
-  },
-  stickyHeader: {
-    // For absolute positioning
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 4,
     minHeight: HEADER_HEIGHT,
-    backgroundColor: colors.background, // Clean off-white
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(29, 36, 43, 0.08)',
+    backgroundColor: colors.surface,
   },
-  logoContainer: {
+  logoSection: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
-    marginLeft: 0,
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+    minWidth: 0,
   },
   logoImage: {
-    width: 220,
-    height: 66,
+    width: 100,
+    height: 32,
+  },
+  brandText: {
+    justifyContent: 'center',
+    marginLeft: spacing.xs,
+  },
+  brandTitle: {
+    ...typography.captionSemibold,
+    fontSize: 15,
+    color: colors.text,
+    letterSpacing: 0.2,
+  },
+  brandSubtitle: {
+    ...typography.small,
+    color: colors.textSecondary,
+    marginTop: 0,
+    fontSize: 11,
   },
   rightItems: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingRight: spacing.xl,
   },
   menuButton: {
-    padding: spacing.sm,
-    borderRadius: 10,
-    backgroundColor: 'rgba(29, 36, 43, 0.08)',
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hamburger: {
-    width: 24,
-    height: 18,
+    width: 20,
+    height: 14,
     justifyContent: 'space-between',
   },
   hamburgerLine: {
     width: '100%',
-    height: 2.5,
-    backgroundColor: colors.secondary, // Dark navy blue
-    borderRadius: 2,
+    height: 2,
+    backgroundColor: colors.textSecondary,
+    borderRadius: 1,
+  },
+  hamburgerLineMiddle: {
+    width: '75%',
+    alignSelf: 'flex-end',
   },
   hamburgerLineActive: {
     backgroundColor: colors.primary,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(29, 36, 43, 0.35)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: 70,
-    paddingRight: spacing.md,
+    paddingTop: 60,
+    paddingRight: spacing.lg,
   },
   menuContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    minWidth: 260,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
     overflow: 'hidden',
+    ...shadows.card,
+    ...Platform.select({
+      android: {elevation: 8},
+      ios: {
+        shadowColor: '#1D242B',
+        shadowOffset: {width: -2, height: 4},
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+      },
+    }),
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  menuHeaderTitle: {
+    ...typography.captionSemibold,
+    color: colors.textSecondary,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  menuCloseButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuCloseText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    gap: 12,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  menuItemIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuItemIcon: {
-    fontSize: 18,
+    fontSize: 16,
   },
   menuItemText: {
-    fontSize: 16,
+    ...typography.body,
     fontWeight: '500',
     color: colors.text,
-    letterSpacing: 0.1,
+    fontSize: 15,
   },
   menuDivider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
-    marginHorizontal: 0,
+    backgroundColor: colors.borderLight,
+    marginVertical: spacing.xs,
+    marginHorizontal: spacing.lg,
   },
   logoutText: {
-    color: '#EF4444',
+    color: colors.error,
     fontWeight: '600',
   },
   trialBadge: {
     backgroundColor: colors.primary,
-    paddingHorizontal: spacing.sm + 2,
+    paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: borderRadius.round,
+    minWidth: 36,
+    alignItems: 'center',
   },
   trialBadgeUrgent: {
-    backgroundColor: '#EF4444',
+    backgroundColor: colors.error,
   },
   trialBadgeText: {
     ...typography.caption,

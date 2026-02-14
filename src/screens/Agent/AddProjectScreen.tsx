@@ -40,12 +40,19 @@ type Props = {
   navigation: AddProjectScreenNavigationProp;
 };
 
-// Project Type Options
+// Project Type Options (per Upcoming Project Form spec)
 const PROJECT_TYPES = [
   { id: 'apartment', label: 'Apartment', icon: '🏢' },
-  { id: 'villa', label: 'Villa', icon: '🏡' },
-  { id: 'plot', label: 'Plot', icon: '📐' },
-  { id: 'commercial', label: 'Commercial', icon: '🏢' },
+  { id: 'villa', label: 'Villa / Banglow', icon: '🏡' },
+  { id: 'independent_house', label: 'Independent House', icon: '🏘️' },
+  { id: 'row_house', label: 'Row House/ Farm House', icon: '🏘️' },
+  { id: 'penthouse', label: 'Penthouse', icon: '🌆' },
+  { id: 'studio_apartment', label: 'Studio Apartment', icon: '🛏️' },
+  { id: 'plot', label: 'Plot / Land / Industrial Property', icon: '📐' },
+  { id: 'commercial_office', label: 'Commercial Office', icon: '🏢' },
+  { id: 'commercial_shop', label: 'Commercial Shop', icon: '🏪' },
+  { id: 'pg_hostel', label: 'PG / Hostel', icon: '🛏️' },
+  { id: 'warehouse', label: 'Warehouse / Godown', icon: '🏪' },
 ];
 
 // Project Status Options
@@ -55,35 +62,107 @@ const PROJECT_STATUSES = [
   { label: 'COMPLETED', value: 'COMPLETED' },
 ];
 
-// Configuration Options (per project type)
-const CONFIGURATIONS = [
-  { id: '1bhk', label: '1 BHK' },
-  { id: '2bhk', label: '2 BHK' },
-  { id: '3bhk', label: '3 BHK' },
-  { id: '4bhk', label: '4 BHK' },
-  { id: '5bhk', label: '5+ BHK' },
-  { id: 'villa', label: 'Villa' },
-  { id: 'plot', label: 'Plot' },
+// Configuration Options (per project type - per Upcoming Project Form spec)
+const CONFIGURATIONS: Array<{ id: string; label: string }> = [
+  // Apartment
+  { id: 'studio_apt', label: 'Studio Apartment' },
+  { id: '1bhk', label: '1BHK' },
+  { id: '2bhk', label: '2BHK' },
+  { id: '3bhk', label: '3BHK' },
+  { id: '4bhk', label: '4BHK' },
+  { id: '5bhk', label: '5+BHK' },
+  { id: 'duplex_apt', label: 'Duplex Apartment' },
+  { id: 'penthouse_apt', label: 'Penthouse' },
+  // Villa / Banglow
+  { id: '2bhk_villa', label: '2BHK Villa' },
+  { id: '3bhk_villa', label: '3BHK Villa' },
+  { id: '4bhk_villa', label: '4BHK Villa' },
+  { id: '5bhk_villa', label: '5+BHK Villa' },
+  { id: 'luxury_villa', label: 'Luxury Villa' },
+  // Independent House
+  { id: '1bhk_ind', label: '1BHK Independent House' },
+  { id: '2bhk_ind', label: '2BHK Independent House' },
+  { id: '3bhk_ind', label: '3BHK Independent House' },
+  { id: '4bhk_ind', label: '4+BHK Independent House' },
+  // Row House / Farm House
+  { id: '2bhk_row', label: '2BHK Row House' },
+  { id: '3bhk_row', label: '3BHK Row House' },
+  { id: '4bhk_row', label: '4BHK Row House' },
+  { id: 'farm_plot', label: 'Farm House Plot' },
+  { id: 'luxury_farm', label: 'Luxury Farm House' },
+  // Penthouse
+  { id: '3bhk_ph', label: '3BHK Penthouse' },
+  { id: '4bhk_ph', label: '4BHK Penthouse' },
+  { id: '5bhk_ph', label: '5+BHK Penthouse' },
+  // Studio Apartment
+  { id: 'studio_unit', label: 'Studio Unit' },
+  { id: 'studio_balcony', label: 'Studio + Balcony' },
+  { id: 'studio_deluxe', label: 'Studio Deluxe' },
+  // Plot / Land / Industrial
+  { id: 'res_plot', label: 'Residential Plot' },
+  { id: 'com_plot', label: 'Commercial Plot' },
+  { id: 'ind_plot', label: 'Industrial Plot' },
+  { id: 'na_plot', label: 'NA Plot' },
+  { id: 'agri_land', label: 'Agricultural Land' },
+  // Commercial Office
+  { id: 'office_bare', label: 'Office Space (Bare Shell)' },
+  { id: 'office_furnished', label: 'Furnished Office' },
+  { id: 'coworking', label: 'Co-working Space' },
+  { id: 'it_park', label: 'IT / Tech Park Office' },
+  { id: 'business_center', label: 'Business Center Office' },
+  // Commercial Shop
+  { id: 'retail_shop', label: 'Retail Shop' },
+  { id: 'showroom', label: 'Showroom' },
+  { id: 'foodcourt_shop', label: 'Food Court Shop' },
+  { id: 'kiosk', label: 'Kiosk' },
+  { id: 'mall_shop', label: 'Mall Shop' },
+  // PG / Hostel
+  { id: 'single_sharing', label: 'Single Sharing' },
+  { id: 'double_sharing', label: 'Double Sharing' },
+  { id: 'triple_sharing', label: 'Triple Sharing' },
+  { id: 'dormitory', label: 'Dormitory' },
+  { id: 'hostel_gb', label: 'Girls Hostel / Boys Hostel' },
+  // Warehouse / Godown
+  { id: 'wh_small', label: 'Small Warehouse' },
+  { id: 'wh_medium', label: 'Medium Warehouse' },
+  { id: 'wh_large', label: 'Large Warehouse' },
+  { id: 'cold_storage', label: 'Cold Storage' },
+  { id: 'logistics_wh', label: 'Logistics Warehouse' },
 ];
 
 const CONFIGURATIONS_BY_TYPE: Record<string, string[]> = {
-  apartment: ['1bhk', '2bhk', '3bhk', '4bhk', '5bhk'],
-  villa: ['villa'],
-  plot: ['plot'],
-  commercial: ['1bhk', '2bhk', '3bhk', '4bhk', '5bhk', 'villa', 'plot'],
+  apartment: ['studio_apt', '1bhk', '2bhk', '3bhk', '4bhk', '5bhk', 'duplex_apt', 'penthouse_apt'],
+  villa: ['2bhk_villa', '3bhk_villa', '4bhk_villa', '5bhk_villa', 'luxury_villa'],
+  independent_house: ['1bhk_ind', '2bhk_ind', '3bhk_ind', '4bhk_ind'],
+  row_house: ['2bhk_row', '3bhk_row', '4bhk_row', 'farm_plot', 'luxury_farm'],
+  penthouse: ['3bhk_ph', '4bhk_ph', '5bhk_ph'],
+  studio_apartment: ['studio_unit', 'studio_balcony', 'studio_deluxe'],
+  plot: ['res_plot', 'com_plot', 'ind_plot', 'na_plot', 'agri_land'],
+  commercial_office: ['office_bare', 'office_furnished', 'coworking', 'it_park', 'business_center'],
+  commercial_shop: ['retail_shop', 'showroom', 'foodcourt_shop', 'kiosk', 'mall_shop'],
+  pg_hostel: ['single_sharing', 'double_sharing', 'triple_sharing', 'dormitory', 'hostel_gb'],
+  warehouse: ['wh_small', 'wh_medium', 'wh_large', 'cold_storage', 'logistics_wh'],
 };
 
-// Amenities Options
+// Amenities Options (16 per property form spec) - IDs match backend/guide (clubhouse, playground, water_supply)
 const AMENITIES = [
-  { id: 'lift', label: 'Lift', icon: '🛗' },
   { id: 'parking', label: 'Parking', icon: '🚗' },
+  { id: 'lift', label: 'Lift', icon: '🛗' },
+  { id: 'security', label: '24x7 Security', icon: '👮' },
   { id: 'power_backup', label: 'Power Backup', icon: '⚡' },
-  { id: 'garden', label: 'Garden / Open Space', icon: '🌳' },
   { id: 'gym', label: 'Gym', icon: '🏋️' },
   { id: 'swimming_pool', label: 'Swimming Pool', icon: '🏊' },
-  { id: 'play_area', label: 'Children Play Area', icon: '🎢' },
-  { id: 'club_house', label: 'Club House', icon: '🏛️' },
-  { id: 'security', label: 'Security / CCTV', icon: '👮' },
+  { id: 'garden', label: 'Garden', icon: '🌳' },
+  { id: 'clubhouse', label: 'Club House', icon: '🏛️' },
+  { id: 'playground', label: "Children's Play Area", icon: '🎢' },
+  { id: 'cctv', label: 'CCTV', icon: '📹' },
+  { id: 'intercom', label: 'Intercom', icon: '📞' },
+  { id: 'fire_safety', label: 'Fire Safety', icon: '🚒' },
+  { id: 'water_supply', label: '24x7 Water', icon: '💧' },
+  { id: 'gas_pipeline', label: 'Gas Pipeline', icon: '🔥' },
+  { id: 'wifi', label: 'WiFi', icon: '📶' },
+  { id: 'ac', label: 'AC', icon: '❄️' },
+  { id: 'electricity', label: 'Electricity', icon: '⚡' },
 ];
 
 // Bank Options
@@ -131,6 +210,12 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const [numberOfTowers, setNumberOfTowers] = useState('');
   const [totalUnits, setTotalUnits] = useState('');
   const [floorsCount, setFloorsCount] = useState('');
+  const [unitsPerFloor, setUnitsPerFloor] = useState('');
+  const [numberOfVillas, setNumberOfVillas] = useState('');
+  const [numberOfPlots, setNumberOfPlots] = useState('');
+  const [numberOfFloorsOrTowers, setNumberOfFloorsOrTowers] = useState('');
+  const [bedCapacity, setBedCapacity] = useState('');
+  const [loadingDocks, setLoadingDocks] = useState('');
 
   // Step 4: Pricing & Timeline
   const [startingPrice, setStartingPrice] = useState('');
@@ -209,6 +294,16 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
       return next;
     });
   }, []);
+
+  // When project type changes, clear configurations invalid for the new type
+  useEffect(() => {
+    if (!projectType) {
+      setSelectedConfigurations([]);
+      return;
+    }
+    const validIds = CONFIGURATIONS_BY_TYPE[projectType] || [];
+    setSelectedConfigurations(prev => prev.filter(id => validIds.includes(id)));
+  }, [projectType]);
 
   // Handle location selection from autosuggest
   const handleLocationSelect = (locationData: any) => {
@@ -489,11 +584,11 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         if (!projectName.trim()) nextErrors.projectName = 'Project name is required';
         if (!projectType) nextErrors.projectType = 'Project type is required';
         if (!projectStatus || !['UNDER CONSTRUCTION', 'PRE-LAUNCH', 'COMPLETED'].includes(projectStatus)) {
-          nextErrors.projectStatus = 'Project status is required (UNDER CONSTRUCTION / PRE-LAUNCH / COMPLETED)';
+          nextErrors.projectStatus = 'Project status is required';
         }
-        if (!description.trim()) nextErrors.description = 'Description is required';
+        if (!description.trim()) nextErrors.description = 'Project description is required';
         else if (description.trim().length < 100) {
-          nextErrors.description = 'Description must be at least 100 characters';
+          nextErrors.description = 'Project description must be at least 100 characters';
         }
         if (Object.keys(nextErrors).length > 0) {
           setFieldErrors(nextErrors);
@@ -504,16 +599,16 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         return true;
       }
       case 2: {
-        // Location: at least one of location or area, state, additional address, pincode 6 digits
+        // Location: at least one of location or area, state, fullAddress, pincode 6 digits
         const nextErrors: Record<string, string> = {};
         if (!location.trim() && !area.trim()) {
-          nextErrors.location = 'At least one of location or area is required';
+          nextErrors.location = 'Location is required';
         }
         if (!state.trim()) nextErrors.state = 'State is required';
         if (!additionalAddress.trim()) nextErrors.additionalAddress = 'Additional address is required';
         if (!pincode.trim()) nextErrors.pincode = 'Pincode is required';
         else if (!/^\d{6}$/.test(pincode)) {
-          nextErrors.pincode = 'Pincode must be exactly 6 digits';
+          nextErrors.pincode = 'Pincode must be 6 digits';
         }
         if (Object.keys(nextErrors).length > 0) {
           setFieldErrors(nextErrors);
@@ -529,15 +624,12 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         if (!projectType) {
           nextErrors.configurations = 'Select a project type in Step 1 first';
         } else if (selectedConfigurations.length === 0) {
-          nextErrors.configurations = 'Please select at least one configuration';
+          nextErrors.configurations = 'At least one configuration is required';
         }
         if (!carpetAreaRange.trim()) {
           nextErrors.carpetAreaRange = 'Area range is required';
-        } else {
-          const carpetNum = parseFloat(carpetAreaRange.replace(/[^0-9.]/g, ''));
-          if (isNaN(carpetNum) || carpetNum <= 0) {
-            nextErrors.carpetAreaRange = 'Area range must be a positive number';
-          }
+        } else if (!/\d/.test(carpetAreaRange)) {
+          nextErrors.carpetAreaRange = 'Area range must contain a number';
         }
         if (Object.keys(nextErrors).length > 0) {
           setFieldErrors(nextErrors);
@@ -551,7 +643,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         // Pricing & Amenities: starting price, at least one amenity
         const nextErrors: Record<string, string> = {};
         if (!startingPrice.trim()) nextErrors.startingPrice = 'Starting price is required';
-        if (selectedAmenities.length === 0) nextErrors.amenities = 'At least one amenity is required';
+        if (selectedAmenities.length === 0) nextErrors.amenities = 'At least one amenity must be selected';
         if (Object.keys(nextErrors).length > 0) {
           setFieldErrors(nextErrors);
           scrollToFirstError(Object.keys(nextErrors)[0]);
@@ -561,20 +653,23 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         return true;
       }
       case 5: {
-        // Media & Contact: images 2-20, no rejected, at least one approved when uploaded; at least one sales person
+        // Media & Contact: images 2-20, no rejected, at least one approved; at least one sales person
         const nextErrors: Record<string, string> = {};
         const approvedImages = projectImages.filter(img => img.moderationStatus === 'APPROVED');
         const rejectedImages = projectImages.filter(img => img.moderationStatus === 'REJECTED');
-        if (projectImages.length > 0) {
-          if (projectImages.length < 2) nextErrors.projectImages = 'Between 2 and 20 images required';
-          else if (projectImages.length > 20) nextErrors.projectImages = 'Maximum 20 images allowed';
-          else if (rejectedImages.length > 0) nextErrors.projectImages = 'Rejected images must be removed';
-          else if (approvedImages.length === 0) nextErrors.projectImages = 'At least one approved image required when images are uploaded';
-        } else {
-          nextErrors.projectImages = 'Between 2 and 20 images required';
-        }
         const checkingImages = projectImages.filter(img => img.moderationStatus === 'checking');
-        if (checkingImages.length > 0) nextErrors.projectImages = 'Please wait for all images to be processed';
+
+        if (checkingImages.length > 0) {
+          nextErrors.projectImages = 'Please wait for all images to be validated';
+        } else if (rejectedImages.length > 0) {
+          nextErrors.projectImages = `Please remove ${rejectedImages.length} rejected image(s)`;
+        } else if (projectImages.length < 2) {
+          nextErrors.projectImages = 'Please upload at least 2 images';
+        } else if (projectImages.length > 20) {
+          nextErrors.projectImages = 'You can upload a maximum of 20 images';
+        } else if (approvedImages.length === 0) {
+          nextErrors.projectImages = 'At least one image must be approved';
+        }
 
         const validSalesPersons = salesPersons.filter(sp => {
           const nameOk = /^[a-zA-Z\s]+$/.test(sp.name.trim()) && sp.name.trim().length >= 2;
@@ -583,11 +678,17 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
           return nameOk && numberOk && emailOk;
         });
         if (validSalesPersons.length === 0) {
-          const first = salesPersons[0];
-          if (!first.name.trim()) nextErrors.salesName_0 = 'Name is required';
-          else if (/[^a-zA-Z\s]/.test(first.name)) nextErrors.salesName_0 = 'Name: letters and spaces only';
-          if (first.number.replace(/\D/g, '').length !== 10) nextErrors.salesNumber_0 = 'Number must be exactly 10 digits';
-          if (!first.email.trim() || !first.email.includes('@')) nextErrors.salesEmail_0 = 'Email is required';
+          if (salesPersons.length === 0) {
+            nextErrors.salesPersons = 'At least one sales person is required';
+          } else {
+            const first = salesPersons[0];
+            if (!first.name.trim()) nextErrors.salesPerson_name_0 = 'Sales person name is required';
+            else if (/[^a-zA-Z\s]/.test(first.name)) nextErrors.salesPerson_name_0 = 'Name should contain only letters';
+            const digits = first.number.replace(/\D/g, '');
+            if (!digits) nextErrors.salesPerson_number_0 = 'Sales number is required';
+            else if (digits.length !== 10) nextErrors.salesPerson_number_0 = 'Sales number must be 10 digits';
+            if (!first.email.trim() || !first.email.includes('@')) nextErrors.salesPerson_email_0 = 'Email ID is required';
+          }
         }
         if (Object.keys(nextErrors).length > 0) {
           setFieldErrors(nextErrors);
@@ -646,77 +747,83 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
       const parsedArea = parseFloat(area.replace(/[^0-9.]/g, ''));
 
       // ── Build property payload WITHOUT images ──
+      // Backend expects property_type in guide format (e.g. 'Apartment', 'Villa / Banglow'), not IDs
+      const propertyTypeForBackend = PROJECT_TYPES.find(t => t.id === projectType)?.label || projectType;
+      const rawUpcomingData: Record<string, any> = {
+        project_status: projectStatus,
+        rera_number: reraNumber.trim() || null,
+        city: city || null,
+        pincode: pincode.trim() || null,
+        configurations: selectedConfigurations.join(','),
+        carpet_area_range: carpetAreaRange.trim() || null,
+        number_of_towers: numberOfTowers ? parseInt(numberOfTowers, 10) : null,
+        total_units: totalUnits ? parseInt(totalUnits, 10) : null,
+        floors_count: floorsCount ? parseInt(floorsCount, 10) : null,
+        units_per_floor: unitsPerFloor ? parseInt(unitsPerFloor, 10) : null,
+        number_of_villas: numberOfVillas ? parseInt(numberOfVillas, 10) : null,
+        number_of_plots: numberOfPlots ? parseInt(numberOfPlots, 10) : null,
+        number_of_floors_or_towers: numberOfFloorsOrTowers ? parseInt(numberOfFloorsOrTowers, 10) : null,
+        bed_capacity: bedCapacity ? parseInt(bedCapacity, 10) : null,
+        loading_docks: loadingDocks ? parseInt(loadingDocks, 10) : null,
+        price_per_sqft: formattedPricePerSqft,
+        booking_amount: formattedBookingAmount,
+        launch_date: launchDate || null,
+        possession_date: possessionDate || null,
+        rera_status: reraStatus || null,
+        land_ownership_type: landOwnershipType || null,
+        bank_approved: bankApproved || null,
+        approved_banks: selectedBanks.length > 0 ? selectedBanks.join(',') : null,
+        other_bank_names: otherBankNames.trim() || null,
+        sales_name: (() => {
+          const valid = salesPersons.find(sp =>
+            /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
+            sp.number.replace(/\D/g, '').length === 10 &&
+            sp.email.includes('@')
+          );
+          return valid?.name.trim() || salesPersons[0]?.name.trim() || '';
+        })(),
+        sales_number: (() => {
+          const valid = salesPersons.find(sp =>
+            /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
+            sp.number.replace(/\D/g, '').length === 10 &&
+            sp.email.includes('@')
+          );
+          return valid?.number.trim() || salesPersons[0]?.number.trim() || '';
+        })(),
+        email_id: (() => {
+          const valid = salesPersons.find(sp =>
+            /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
+            sp.number.replace(/\D/g, '').length === 10 &&
+            sp.email.includes('@')
+          );
+          return valid?.email.trim() || salesPersons[0]?.email.trim() || '';
+        })(),
+        mobile_number: mobileNumber.trim() || null,
+        whatsapp_number: whatsappNumber.trim() || null,
+        alternative_number: alternativeNumber.trim() || null,
+        project_highlights: projectHighlights.trim() || null,
+        usp: usp.trim() || null,
+        master_plan: masterPlan?.base64 || null,
+        cover_image: coverImage?.base64 || null,
+      };
+      const upcoming_project_data = Object.fromEntries(
+        Object.entries(rawUpcomingData).filter(([, v]) => v !== null && v !== undefined && v !== '')
+      );
       const propertyData: any = {
         title: projectName.trim(),
-        property_type: projectType,
-        status: 'sale', // Upcoming projects are for sale
-        project_type: 'upcoming', // Mark as upcoming project
+        property_type: propertyTypeForBackend,
+        status: 'sale',
+        project_type: 'upcoming',
         description: description.trim(),
         location: location.trim(),
-        // Backend requires numeric area (sq ft)
         area: isNaN(parsedArea) ? null : parsedArea,
         state: state.trim(),
         additional_address: additionalAddress.trim() || null,
         latitude: latitude || null,
         longitude: longitude || null,
         price: formattedStartingPrice,
-        // Backend expects amenities as an array (not a comma-separated string)
         amenities: selectedAmenities,
-        // NOTE: images intentionally omitted – they are added in Step 3
-        // Store upcoming-project-only fields inside upcoming_project_data (backend persists this JSON)
-        upcoming_project_data: {
-          project_status: projectStatus,
-          rera_number: reraNumber.trim() || null,
-          city: city || null,
-          pincode: pincode.trim() || null,
-          configurations: selectedConfigurations.join(','),
-          carpet_area_range: carpetAreaRange.trim() || null,
-          number_of_towers: numberOfTowers ? parseInt(numberOfTowers, 10) : null,
-          total_units: totalUnits ? parseInt(totalUnits, 10) : null,
-          floors_count: floorsCount ? parseInt(floorsCount, 10) : null,
-          price_per_sqft: formattedPricePerSqft,
-          booking_amount: formattedBookingAmount,
-          launch_date: launchDate || null,
-          possession_date: possessionDate || null,
-          rera_status: reraStatus || null,
-          land_ownership_type: landOwnershipType || null,
-          bank_approved: bankApproved || null,
-          approved_banks: selectedBanks.length > 0 ? selectedBanks.join(',') : null,
-          other_bank_names: otherBankNames.trim() || null,
-          sales_name: (() => {
-            const valid = salesPersons.find(sp =>
-              /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
-              sp.number.replace(/\D/g, '').length === 10 &&
-              sp.email.includes('@')
-            );
-            return valid?.name.trim() || salesPersons[0]?.name.trim() || '';
-          })(),
-          sales_number: (() => {
-            const valid = salesPersons.find(sp =>
-              /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
-              sp.number.replace(/\D/g, '').length === 10 &&
-              sp.email.includes('@')
-            );
-            return valid?.number.trim() || salesPersons[0]?.number.trim() || '';
-          })(),
-          email_id: (() => {
-            const valid = salesPersons.find(sp =>
-              /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
-              sp.number.replace(/\D/g, '').length === 10 &&
-              sp.email.includes('@')
-            );
-            return valid?.email.trim() || salesPersons[0]?.email.trim() || '';
-          })(),
-          mobile_number: mobileNumber.trim() || null,
-          whatsapp_number: whatsappNumber.trim() || null,
-          alternative_number: alternativeNumber.trim() || null,
-          project_highlights: projectHighlights.trim() || null,
-          usp: usp.trim() || null,
-          // Optionally persist these media blobs for future backend support
-          // (backend currently ignores unknown fields except upcoming_project_data)
-          master_plan: masterPlan?.base64 || null,
-          cover_image: coverImage?.base64 || null,
-        },
+        upcoming_project_data,
       };
 
       // ── Step 1: Create property WITHOUT images → get property_id ──
@@ -796,11 +903,18 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
     } catch (error: any) {
       console.error('Submit error:', error);
       let errorMessage = 'Failed to create project. Please try again.';
-      // Check multiple possible error message locations
-      if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error?.response?.data?.error) {
-        errorMessage = typeof error.response.data.error === 'string' ? error.response.data.error : error.response.data.error?.message || errorMessage;
+      const resData = error?.response?.data;
+      // Check multiple possible error message locations (backend may use message, error, msg, etc.)
+      if (resData?.message) {
+        errorMessage = resData.message;
+      } else if (resData?.error) {
+        errorMessage = typeof resData.error === 'string' ? resData.error : resData.error?.message || errorMessage;
+      } else if (resData?.msg) {
+        errorMessage = resData.msg;
+      } else if (resData?.errors && Array.isArray(resData.errors) && resData.errors[0]) {
+        errorMessage = typeof resData.errors[0] === 'string' ? resData.errors[0] : resData.errors[0]?.message || errorMessage;
+      } else if (typeof resData === 'string') {
+        errorMessage = resData;
       } else if (error?.message) {
         errorMessage = error.message;
       } else if (error?.error) {
@@ -995,36 +1109,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               {!!fieldErrors.location && (
                 <Text style={styles.fieldErrorText}>{fieldErrors.location}</Text>
               )}
-            </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Area (sq ft)
-              </Text>
-              <View style={styles.areaInputContainer}>
-                <TextInput
-                  style={[styles.input, styles.areaInput]}
-                  placeholder="e.g., 1200"
-                  placeholderTextColor={colors.textSecondary}
-                  value={area}
-                  onChangeText={(text: string) => {
-                    const cleaned = text.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    const next = parts.length <= 2 ? (parts[0] + (parts[1] != null ? '.' + parts[1] : '')) : parts[0];
-                    setArea(next);
-                    clearFieldError('area');
-                  }}
-                  keyboardType="decimal-pad"
-                />
-                <Text style={styles.areaUnit}>sq.ft</Text>
-              </View>
-              {!!fieldErrors.area && (
-                <Text style={styles.fieldErrorText}>{fieldErrors.area}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Project Location on Map (Optional)</Text>
               <TouchableOpacity
                 style={styles.mapButton}
                 onPress={() => setLocationPickerVisible(true)}>
@@ -1052,6 +1137,32 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               )}
               {!latitude && !longitude && (
                 <Text style={styles.hintText}>Select exact location on map for better visibility</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>
+                Area (sq ft)
+              </Text>
+              <View style={styles.areaInputContainer}>
+                <TextInput
+                  style={[styles.input, styles.areaInput]}
+                  placeholder="e.g., 1200"
+                  placeholderTextColor={colors.textSecondary}
+                  value={area}
+                  onChangeText={(text: string) => {
+                    const cleaned = text.replace(/[^0-9.]/g, '');
+                    const parts = cleaned.split('.');
+                    const next = parts.length <= 2 ? (parts[0] + (parts[1] != null ? '.' + parts[1] : '')) : parts[0];
+                    setArea(next);
+                    clearFieldError('area');
+                  }}
+                  keyboardType="decimal-pad"
+                />
+                <Text style={styles.areaUnit}>sq.ft</Text>
+              </View>
+              {!!fieldErrors.area && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.area}</Text>
               )}
             </View>
 
@@ -1197,76 +1308,146 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Area Range <Text style={styles.required}>*</Text>
-              </Text>
-              <View style={styles.areaInputContainer}>
+            {(() => {
+              const areaLabelByType: Record<string, { label: string; suffix: string; placeholder: string }> = {
+                plot: { label: 'Plot Size Range', suffix: 'sq.ft / sq.m', placeholder: 'e.g., 500 - 2000' },
+                commercial_office: { label: 'Area Range', suffix: 'sq.ft', placeholder: 'e.g., 650 - 1200' },
+                commercial_shop: { label: 'Area Range', suffix: 'sq.ft', placeholder: 'e.g., 650 - 1200' },
+                warehouse: { label: 'Built-up Area Range', suffix: 'sq.ft', placeholder: 'e.g., 650 - 1200' },
+                pg_hostel: { label: 'Carpet Area Range', suffix: 'sq.ft', placeholder: 'e.g., 650 - 1200' },
+              };
+              const areaMeta = areaLabelByType[projectType] || { label: 'Carpet Area Range (sq.ft)', suffix: 'sq.ft', placeholder: 'e.g., 650 - 1200' };
+              return (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {areaMeta.label} <Text style={styles.required}>*</Text>
+                  </Text>
+                  <View style={styles.areaInputContainer}>
+                    <TextInput
+                      style={[styles.input, styles.areaInput]}
+                      placeholder={areaMeta.placeholder}
+                      placeholderTextColor={colors.textSecondary}
+                      value={carpetAreaRange}
+                      onChangeText={(text: string) => {
+                        const cleaned = text.replace(/sq\.ft|sq\.m|sq ft|sq m/gi, '').replace(/[^0-9.\-\s]/g, '').trim();
+                        setCarpetAreaRange(cleaned);
+                        clearFieldError('carpetAreaRange');
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                    <Text style={styles.areaUnit}>{areaMeta.suffix}</Text>
+                  </View>
+                  {!!fieldErrors.carpetAreaRange && (
+                    <Text style={styles.fieldErrorText}>{fieldErrors.carpetAreaRange}</Text>
+                  )}
+                </View>
+              );
+            })()}
+
+            {(projectType === 'apartment' || projectType === 'penthouse' || projectType === 'studio_apartment') && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Number of Towers (Optional)</Text>
                 <TextInput
-                  style={[styles.input, styles.areaInput]}
-                  placeholder="e.g., 1200"
+                  style={styles.input}
+                  placeholder="e.g., 3"
                   placeholderTextColor={colors.textSecondary}
-                  value={carpetAreaRange}
-                  onChangeText={(text: string) => {
-                    const cleaned = text.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    const next = parts.length <= 2 ? (parts[0] + (parts[1] != null ? '.' + parts[1] : '')) : parts[0];
-                    setCarpetAreaRange(next);
-                    clearFieldError('carpetAreaRange');
-                  }}
-                  keyboardType="decimal-pad"
+                  value={numberOfTowers}
+                  onChangeText={(text: string) => setNumberOfTowers(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
                 />
-                <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
-              {!!fieldErrors.carpetAreaRange && (
-                <Text style={styles.fieldErrorText}>{fieldErrors.carpetAreaRange}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Number of Towers / Buildings (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 3"
-                placeholderTextColor={colors.textSecondary}
-                value={numberOfTowers}
-                onChangeText={(text: string) => {
-                  const cleaned = text.replace(/[^0-9]/g, '');
-                  setNumberOfTowers(cleaned);
-                }}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Total Units (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 200"
-                placeholderTextColor={colors.textSecondary}
-                value={totalUnits}
-                onChangeText={(text: string) => {
-                  const cleaned = text.replace(/[^0-9]/g, '');
-                  setTotalUnits(cleaned);
-                }}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Floors Count (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 15"
-                placeholderTextColor={colors.textSecondary}
-                value={floorsCount}
-                onChangeText={(text: string) => {
-                  const cleaned = text.replace(/[^0-9]/g, '');
-                  setFloorsCount(cleaned);
-                }}
-                keyboardType="numeric"
-              />
-            </View>
+            )}
+            {(projectType === 'apartment' || projectType === 'studio_apartment') && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Units per floor (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 4"
+                  placeholderTextColor={colors.textSecondary}
+                  value={unitsPerFloor}
+                  onChangeText={(text: string) => setUnitsPerFloor(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
+            {projectType === 'villa' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Number of Villas (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 24"
+                  placeholderTextColor={colors.textSecondary}
+                  value={numberOfVillas}
+                  onChangeText={(text: string) => setNumberOfVillas(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
+            {(projectType === 'independent_house' || projectType === 'row_house') && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Total Units (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 200"
+                  placeholderTextColor={colors.textSecondary}
+                  value={totalUnits}
+                  onChangeText={(text: string) => setTotalUnits(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
+            {projectType === 'plot' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Number of Plots (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 50"
+                  placeholderTextColor={colors.textSecondary}
+                  value={numberOfPlots}
+                  onChangeText={(text: string) => setNumberOfPlots(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
+            {projectType === 'commercial_office' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Number of Floors / Towers (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 10"
+                  placeholderTextColor={colors.textSecondary}
+                  value={numberOfFloorsOrTowers}
+                  onChangeText={(text: string) => setNumberOfFloorsOrTowers(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
+            {projectType === 'pg_hostel' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Bed Capacity (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 100"
+                  placeholderTextColor={colors.textSecondary}
+                  value={bedCapacity}
+                  onChangeText={(text: string) => setBedCapacity(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
+            {projectType === 'warehouse' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Loading Docks (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 4"
+                  placeholderTextColor={colors.textSecondary}
+                  value={loadingDocks}
+                  onChangeText={(text: string) => setLoadingDocks(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
           </View>
         );
 
@@ -1446,9 +1627,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Project Cover Image (Optional)</Text>
-              <View style={styles.coverImageActions}>
+              <View style={styles.coverImageRow}>
                 <TouchableOpacity
-                  style={styles.imageUploadButton}
+                  style={styles.coverImageUpload}
                   onPress={async () => {
                     const hasPermission = await requestCameraPermission();
                     if (!hasPermission) return;
@@ -1463,16 +1644,16 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                     });
                   }}>
                   {coverImage ? (
-                    <Image source={{ uri: coverImage.uri }} style={styles.imagePreview} />
+                    <Image source={{ uri: coverImage.uri }} style={styles.coverImagePreview} />
                   ) : (
-                    <View style={styles.imagePlaceholder}>
-                      <Text style={styles.imagePlaceholderText}>📷</Text>
-                      <Text style={styles.imagePlaceholderLabel}>Upload Cover Image</Text>
+                    <View style={styles.coverImagePlaceholder}>
+                      <Text style={styles.imagePlaceholderText}>🖼️</Text>
+                      <Text style={styles.imagePlaceholderLabel}>Upload</Text>
                     </View>
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.uploadButton, styles.uploadButtonSecondary]}
+                  style={styles.coverImageCamera}
                   onPress={async () => {
                     const ok = await requestCameraPermissionForCapture();
                     if (!ok) return;
@@ -1486,7 +1667,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       }
                     });
                   }}>
-                  <Text style={styles.uploadButtonText}>📷 Take photo</Text>
+                  <Text style={styles.coverImageCameraIcon}>📷</Text>
+                  <Text style={styles.coverImageCameraLabel}>Take photo</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1495,22 +1677,24 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.label}>
                 Project Images <Text style={styles.required}>*</Text> (Concept images / 3D renders allowed)
               </Text>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={() => {
-                  clearFieldError('projectImages');
-                  handleProjectImagesUpload();
-                }}>
-                <Text style={styles.uploadButtonText}>🖼️ Upload from gallery (Max 20)</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.uploadButton, styles.uploadButtonSecondary]}
-                onPress={() => {
-                  clearFieldError('projectImages');
-                  handleProjectImagesFromCamera();
-                }}>
-                <Text style={styles.uploadButtonText}>📷 Take photo with camera</Text>
-              </TouchableOpacity>
+              <View style={styles.projectImagesButtonRow}>
+                <TouchableOpacity
+                  style={[styles.uploadButton, styles.projectImageButton]}
+                  onPress={() => {
+                    clearFieldError('projectImages');
+                    handleProjectImagesUpload();
+                  }}>
+                  <Text style={styles.uploadButtonText}>🖼️ Gallery (Max 20)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.uploadButton, styles.uploadButtonSecondary, styles.projectImageButton]}
+                  onPress={() => {
+                    clearFieldError('projectImages');
+                    handleProjectImagesFromCamera();
+                  }}>
+                  <Text style={styles.uploadButtonTextSecondary}>📷 Camera</Text>
+                </TouchableOpacity>
+              </View>
               <Text style={styles.imageCountText}>
                 Images uploaded: {approvedImagesCount} / 20 (Minimum 2 required)
               </Text>
@@ -1685,17 +1869,25 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.label}>
                 Sales Person(s) <Text style={styles.required}>*</Text> (At least one required)
               </Text>
+              {!!fieldErrors.salesPersons && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.salesPersons}</Text>
+              )}
+              {salesPersons.length === 0 ? (
+                <TouchableOpacity
+                  style={styles.addSalesPersonButton}
+                  onPress={() => setSalesPersons([{ name: '', number: '', email: '' }])}>
+                  <Text style={styles.addSalesPersonText}>+ Add sales person</Text>
+                </TouchableOpacity>
+              ) : null}
               {salesPersons.map((sp, index) => (
                 <View key={index} style={styles.salesPersonCard}>
                   <View style={styles.salesPersonRow}>
                     <Text style={styles.salesPersonLabel}>Name</Text>
-                    {salesPersons.length > 1 && (
-                      <TouchableOpacity
-                        onPress={() => setSalesPersons(prev => prev.filter((_, i) => i !== index))}
-                        style={styles.removeSalesPersonBtn}>
-                        <Text style={styles.removeSalesPersonText}>Remove</Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      onPress={() => setSalesPersons(prev => prev.filter((_, i) => i !== index))}
+                      style={styles.removeSalesPersonBtn}>
+                      <Text style={styles.removeSalesPersonText}>Remove</Text>
+                    </TouchableOpacity>
                   </View>
                   <TextInput
                     style={styles.input}
@@ -1708,11 +1900,11 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                         next[index] = { ...next[index], name: text };
                         return next;
                       });
-                      clearFieldError(`salesName_${index}`);
+                      clearFieldError(`salesPerson_name_${index}`);
                     }}
                   />
-                  {!!fieldErrors[`salesName_${index}`] && (
-                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesName_${index}`]}</Text>
+                  {!!fieldErrors[`salesPerson_name_${index}`] && (
+                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesPerson_name_${index}`]}</Text>
                   )}
                   <Text style={styles.salesPersonLabel}>Number (10 digits)</Text>
                   <TextInput
@@ -1727,13 +1919,13 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                         next[index] = { ...next[index], number: cleaned };
                         return next;
                       });
-                      clearFieldError(`salesNumber_${index}`);
+                      clearFieldError(`salesPerson_number_${index}`);
                     }}
                     keyboardType="numeric"
                     maxLength={10}
                   />
-                  {!!fieldErrors[`salesNumber_${index}`] && (
-                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesNumber_${index}`]}</Text>
+                  {!!fieldErrors[`salesPerson_number_${index}`] && (
+                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesPerson_number_${index}`]}</Text>
                   )}
                   <Text style={styles.salesPersonLabel}>Email</Text>
                   <TextInput
@@ -1747,13 +1939,13 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                         next[index] = { ...next[index], email: text };
                         return next;
                       });
-                      clearFieldError(`salesEmail_${index}`);
+                      clearFieldError(`salesPerson_email_${index}`);
                     }}
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
-                  {!!fieldErrors[`salesEmail_${index}`] && (
-                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesEmail_${index}`]}</Text>
+                  {!!fieldErrors[`salesPerson_email_${index}`] && (
+                    <Text style={styles.fieldErrorText}>{fieldErrors[`salesPerson_email_${index}`]}</Text>
                   )}
                 </View>
               ))}
@@ -2374,6 +2566,67 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     alignItems: 'center',
+  },
+  coverImageRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'stretch',
+  },
+  coverImageUpload: {
+    flex: 1,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 120,
+  },
+  coverImagePreview: {
+    width: '100%',
+    height: 120,
+    resizeMode: 'cover',
+  },
+  coverImagePlaceholder: {
+    flex: 1,
+    minHeight: 120,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+  },
+  coverImageCamera: {
+    flex: 1,
+    minHeight: 120,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverImageCameraIcon: {
+    fontSize: 32,
+    marginBottom: spacing.xs,
+  },
+  coverImageCameraLabel: {
+    ...typography.body,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  projectImagesButtonRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  projectImageButton: {
+    flex: 1,
+  },
+  uploadButtonTextSecondary: {
+    ...typography.body,
+    color: '#0077C0',
+    fontSize: 14,
+    fontWeight: '600',
   },
   dateText: {
     ...typography.body,
