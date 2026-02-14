@@ -646,6 +646,9 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
 
       if (projectTypeFilter === 'upcoming') {
         results = results.filter((p: any) => (p.project_type || '') === 'upcoming');
+      } else if (searchMode === 'properties') {
+        // HomeScreen / BuyerDashboard search: only properties, no projects
+        results = results.filter((p: any) => (p.project_type || '') !== 'upcoming');
       }
 
       // Format properties
