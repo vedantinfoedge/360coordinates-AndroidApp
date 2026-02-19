@@ -583,7 +583,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
       />
 
       <View style={styles.contentSheet}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, isBuyer && { paddingBottom: 160 }]}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, (isBuyer || isGuest) && { paddingBottom: 160 }]}>
           {/* Image carousel */}
           <View style={styles.imageCarouselContainer}>
           {/* Back button - top left */}
@@ -966,9 +966,9 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
         </ScrollView>
 
-        {isBuyer && (
+        {(isBuyer || isGuest) && (
           <>
-            {!interactionLoading && (
+            {isBuyer && !interactionLoading && (
               <View style={styles.creditsRow}>
                 <View style={styles.creditsDot} />
                 <Text style={[styles.creditsText, interactionState.remaining <= 0 && styles.creditsTextError]}>
@@ -978,15 +978,15 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
             )}
             <View style={[styles.buyerActionButtons, { paddingBottom: insets.bottom + 8 }]}>
             <TouchableOpacity
-              style={[styles.contactButton, (processingContact || interactionLoading) && styles.contactButtonDisabled]}
+              style={[styles.contactButton, isBuyer && (processingContact || interactionLoading) && styles.contactButtonDisabled]}
               onPress={handleViewContact}
-              disabled={processingContact || interactionLoading}>
-              <Text style={styles.contactButtonText}>{showContactModal ? 'Hide Contact' : 'Show Contacts'}</Text>
+              disabled={isBuyer && (processingContact || interactionLoading)}>
+              <Text style={styles.contactButtonText}>{showContactModal ? 'Hide Contact' : 'View Contact'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.chatButton, (processingChat || interactionLoading) && styles.contactButtonDisabled]}
+              style={[styles.chatButton, isBuyer && (processingChat || interactionLoading) && styles.contactButtonDisabled]}
               onPress={handleChatWithBuilder}
-              disabled={processingChat || interactionLoading}>
+              disabled={isBuyer && (processingChat || interactionLoading)}>
               <>
                 <TabIcon name="chats" color={colors.surface} size={18} />
                 <Text style={styles.chatButtonText}>Chat with Builder</Text>
@@ -996,7 +996,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         </>
         )}
 
-      {!isBuyer && (
+      {!isBuyer && !isGuest && (
         <View style={[styles.actionButtons, { paddingBottom: insets.bottom }]}>
           <TouchableOpacity
             style={styles.editButton}
