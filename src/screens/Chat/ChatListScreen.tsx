@@ -12,6 +12,7 @@ import {
   Modal,
   Pressable,
   Image,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
@@ -1822,11 +1823,31 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
 
                 <View style={styles.buyerCardField}>
                   <Text style={styles.buyerCardLabel}>Phone</Text>
-                  <Text style={styles.buyerCardValue}>{cardPerson.phone || '—'}</Text>
+                  {cardPerson.phone ? (
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(`tel:${cardPerson.phone}`)}
+                      activeOpacity={0.7}>
+                      <Text style={[styles.buyerCardValue, styles.buyerCardLink]}>
+                        {cardPerson.phone}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.buyerCardValue}>—</Text>
+                  )}
                 </View>
                 <View style={styles.buyerCardField}>
                   <Text style={styles.buyerCardLabel}>Email</Text>
-                  <Text style={styles.buyerCardValue}>{cardPerson.email || '—'}</Text>
+                  {cardPerson.email ? (
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(`mailto:${cardPerson.email}`)}
+                      activeOpacity={0.7}>
+                      <Text style={[styles.buyerCardValue, styles.buyerCardLink]}>
+                        {cardPerson.email}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.buyerCardValue}>—</Text>
+                  )}
                 </View>
               </View>
             ) : (
@@ -2075,6 +2096,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: 4,
     fontWeight: '600',
+  },
+  buyerCardLink: {
+    color: colors.primary,
+    textDecorationLine: 'underline',
   },
   listContent: {
     paddingBottom: spacing.xs,
