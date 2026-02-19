@@ -81,25 +81,55 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
           const list = Array.isArray(raw) ? raw : [];
           const mapped: ViewedProperty[] = list.map((item: any) => {
             const prop = item?.property ?? item;
-            const seller = item?.seller ?? prop?.seller;
+            // Support multiple backend shapes: seller, owner, user, or flat fields
+            const seller = item?.seller ?? prop?.seller ?? item?.owner ?? prop?.owner ?? item?.user ?? prop?.user;
             const actionType = item?.action_type || item?.actionType || '';
             const action: 'chat' | 'contact' | 'both' =
               actionType === 'chat_with_owner' ? 'chat' :
               actionType === 'viewed_owner_details' ? 'contact' : 'both';
             const price = prop?.price != null ? parseFloat(prop.price) : null;
+            // Extract owner details from nested object or flat fields
+            const ownerName =
+              seller?.name ?? seller?.full_name ?? seller?.fullName ??
+              item?.seller_name ?? prop?.seller_name ?? item?.owner_name ?? prop?.owner_name ??
+              'Owner';
+            const ownerPhone =
+              seller?.phone ?? seller?.mobile ?? seller?.contact_number ??
+              item?.seller_phone ?? prop?.seller_phone ?? item?.owner_phone ?? prop?.owner_phone ??
+              item?.seller_contact ?? prop?.seller_contact ??
+              '';
+            const ownerEmail =
+              seller?.email ?? item?.seller_email ?? prop?.seller_email ?? item?.owner_email ?? prop?.owner_email ?? '';
             return {
               propertyId: item?.property_id ?? item?.propertyId ?? prop?.id ?? '',
               propertyTitle: prop?.title ?? prop?.property_title ?? 'Property',
               propertyLocation: prop?.location ?? prop?.city ?? '',
               propertyPrice: price != null ? `₹${price.toLocaleString('en-IN')}` : '',
-              ownerName: seller?.name ?? seller?.full_name ?? 'Owner',
-              ownerPhone: seller?.phone ?? '',
-              ownerEmail: seller?.email ?? '',
+              ownerName,
+              ownerPhone,
+              ownerEmail,
               viewedAt: item?.created_at ?? item?.viewedAt ?? new Date().toISOString(),
               action,
             };
           });
-          setViewedProperties(mapped);
+          // Fallback: enrich with local data when backend omits owner details
+          const localProperties = await getViewedProperties();
+          const localByPropId = new Map(
+            localProperties.map(p => [String(p.propertyId), p])
+          );
+          const enriched = mapped.map(m => {
+            const hasOwnerDetails = (m.ownerPhone || m.ownerEmail) && m.ownerName !== 'Owner';
+            if (hasOwnerDetails) return m;
+            const local = localByPropId.get(String(m.propertyId));
+            if (!local) return m;
+            return {
+              ...m,
+              ownerName: local.ownerName || m.ownerName,
+              ownerPhone: local.ownerPhone || m.ownerPhone,
+              ownerEmail: local.ownerEmail || m.ownerEmail,
+            };
+          });
+          setViewedProperties(enriched);
           return;
         } catch (err) {
           console.warn('[RecentlyViewed] Backend history failed, using local:', err);

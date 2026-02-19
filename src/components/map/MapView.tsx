@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useImperativeHandle, useRef, useState, forwardRef} from 'react';
 import {
   View,
   StyleSheet,
@@ -35,6 +35,10 @@ try {
   isMapboxAvailable = false;
 }
 
+export interface MapViewHandle {
+  getPointInView: (coordinate: [number, number]) => Promise<[number, number] | null>;
+}
+
 interface MapViewProps {
   initialCenter?: [number, number];
   initialZoom?: number;
@@ -53,18 +57,38 @@ interface MapViewProps {
   style?: any;
 }
 
-const MapViewComponent: React.FC<MapViewProps> = ({
-  initialCenter = MAP_CONFIG.DEFAULT_CENTER,
-  initialZoom = MAP_CONFIG.DEFAULT_ZOOM,
-  markers = [],
-  onLocationSelect,
-  showUserLocation = false,
-  interactive = true,
-  style,
-}) => {
+const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapViewComponent(
+  {
+    initialCenter = MAP_CONFIG.DEFAULT_CENTER,
+    initialZoom = MAP_CONFIG.DEFAULT_ZOOM,
+    markers = [],
+    onLocationSelect,
+    showUserLocation = false,
+    interactive = true,
+    style,
+  },
+  ref,
+) {
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const cameraRef = useRef<any>(null);
+  const mapRef = useRef<any>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getPointInView: async (coordinate: [number, number]): Promise<[number, number] | null> => {
+        if (!mapRef.current?.getPointInView) return null;
+        try {
+          const point = await mapRef.current.getPointInView(coordinate);
+          return point ? [point[0], point[1]] : null;
+        } catch {
+          return null;
+        }
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     initializeMapbox();
@@ -182,6 +206,7 @@ const MapViewComponent: React.FC<MapViewProps> = ({
       )}
       
       <Mapbox.MapView
+        ref={mapRef}
         style={styles.map}
         styleURL={MAP_CONFIG.STYLE_URL}
         onPress={handleMapPress}
@@ -277,7 +302,7 @@ const MapViewComponent: React.FC<MapViewProps> = ({
       </Mapbox.MapView>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

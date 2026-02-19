@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,7 +9,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import MapViewComponent from './MapView';
+import MapViewComponent, { MapViewHandle } from './MapView';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon } from '../navigation/TabIcons';
 import { propertyService } from '../../services/property.service';
@@ -26,6 +26,11 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_WIDTH = Math.min(280, SCREEN_WIDTH * 0.75);
+const CARD_IMAGE_HEIGHT = 140;
+const CARD_CONTENT_HEIGHT = 130;
+const CARD_TOTAL_HEIGHT = CARD_IMAGE_HEIGHT + CARD_CONTENT_HEIGHT;
+const POINTER_HEIGHT = 12;
 
 /** Search params passed from FullscreenMapSearch / PropertyMapScreen */
 export interface MapSearchParams {
@@ -124,6 +129,8 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
     propSelectedPropertyId ? String(propSelectedPropertyId) : null
   );
+  const [selectedPinScreenPosition, setSelectedPinScreenPosition] = useState<{ x: number; y: number } | null>(null);
+  const mapRef = useRef<MapViewHandle>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // Use user location as initial center when available and no selected property
@@ -496,14 +503,21 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     }
   };
 
-  const handleMarkerPress = (propertyId: string) => {
+  const handleMarkerPress = async (propertyId: string) => {
     const property = properties.find(p => String(p.id) === propertyId);
     if (property) {
       setSelectedProperty(property);
       setSelectedPropertyId(propertyId);
       setCurrentImageIndex(0);
-      // Check if property is favorited
       checkFavoriteStatus(propertyId);
+
+      // Get screen position of pin to position card near it
+      const point = await mapRef.current?.getPointInView([property.longitude, property.latitude]);
+      if (point) {
+        setSelectedPinScreenPosition({ x: point[0], y: point[1] });
+      } else {
+        setSelectedPinScreenPosition(null);
+      }
     }
   };
 
@@ -726,32 +740,55 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           ) : null}
           <View style={styles.mapWrapper}>
             <MapViewComponent
-            initialCenter={mapCenter || initialCenter}
-            initialZoom={mapZoom || initialZoom}
-            markers={markers}
-            interactive={true}
-          />
+              ref={mapRef}
+              initialCenter={mapCenter || initialCenter}
+              initialZoom={mapZoom || initialZoom}
+              markers={markers}
+              interactive={true}
+            />
             {loading && fullscreenSearchBar && (
               <View style={styles.mapLoadingOverlay} pointerEvents="none">
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.mapLoadingText}>Loading properties...</Text>
               </View>
             )}
-          </View>
 
-          {/* Selected Property Card - Compact Popup (aside the pin) */}
-          {selectedProperty && (
-            <View style={styles.propertyCardOverlay}>
-              <TouchableOpacity
-                style={styles.overlayTouchable}
-                activeOpacity={1}
-                onPress={() => {
-                  setSelectedProperty(null);
-                  setSelectedPropertyId(null);
-                }}
-              />
-              <TouchableOpacity
-                style={styles.propertyCard}
+            {/* Selected Property Card - Positioned near the clicked pin */}
+            {selectedProperty && (
+              <View style={styles.propertyCardOverlay} pointerEvents="box-none">
+                <TouchableOpacity
+                  style={styles.overlayTouchable}
+                  activeOpacity={1}
+                  onPress={() => {
+                    setSelectedProperty(null);
+                    setSelectedPropertyId(null);
+                    setSelectedPinScreenPosition(null);
+                  }}
+                />
+                <View
+                  style={[
+                    styles.propertyCardWrapper,
+                    selectedPinScreenPosition && {
+                      left: Math.max(
+                        spacing.md,
+                        Math.min(
+                          selectedPinScreenPosition.x - CARD_WIDTH / 2,
+                          SCREEN_WIDTH - CARD_WIDTH - spacing.md,
+                        ),
+                      ),
+                      top: Math.max(
+                        spacing.md,
+                        Math.min(
+                          selectedPinScreenPosition.y - CARD_TOTAL_HEIGHT - POINTER_HEIGHT - 8,
+                          SCREEN_WIDTH * 0.5,
+                        ),
+                      ),
+                    },
+                  ]}>
+                  {/* Triangular pointer pointing to the pin */}
+                  <View style={styles.popupCardPointer} />
+                  <TouchableOpacity
+                    style={styles.propertyCard}
                 activeOpacity={1}
                 onPress={() => {
                   // Navigate to property details when card is clicked

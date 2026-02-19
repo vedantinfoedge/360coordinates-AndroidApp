@@ -22,8 +22,6 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import { propertyService } from '../../services/property.service';
 import { validateAndProcessPropertyImages, PropertyImage } from '../../utils/imageHelper';
-import AgentHeader from '../../components/AgentHeader';
-import BuyerHeader from '../../components/BuyerHeader';
 import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import { formatters, capitalize, capitalizeAmenity } from '../../utils/formatters';
@@ -513,12 +511,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
   if (loading || !property) {
     return (
       <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => (navigation as any).navigate('AgentTabs', { screen: 'Profile' })}
-          onSupportPress={() => (navigation as any).navigate('Support')}
-          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
-          onLogoutPress={logout}
-        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading project details...</Text>
@@ -574,28 +566,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
   return (
     <View style={styles.container}>
-      {isBuyer ? (
-        <BuyerHeader
-          onProfilePress={() => (navigation as any).navigate('Profile')}
-          onSupportPress={() => (navigation as any).navigate('Support')}
-          onLogoutPress={logout ?? undefined}
-          onSignInPress={!user ? () => (navigation as any).navigate('Auth', { screen: 'Login', params: { returnTo: 'UpcomingProjectDetails', propertyId: route.params.propertyId } }) : undefined}
-          onSignUpPress={!user ? () => (navigation as any).navigate('Auth', { screen: 'Register' }) : undefined}
-          showProfile={!!user}
-          showLogout={!!user}
-          showSignIn={!user}
-          showSignUp={!user}
-        />
-      ) : (
-        <AgentHeader
-          onProfilePress={() => (navigation as any).navigate('AgentTabs', { screen: 'Profile' })}
-          onSupportPress={() => (navigation as any).navigate('Support')}
-          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
-          onLogoutPress={logout}
-        />
-      )}
-
-      <View style={[styles.actionButtonsTop, { top: insets.top + 60 }]}>
+      <View style={[styles.actionButtonsTop, { top: insets.top + spacing.md }]}>
         <TouchableOpacity style={styles.shareButtonTop} onPress={handleShare} activeOpacity={0.7}>
           <View style={styles.actionButtonInner}>
             <TabIcon name="link" color={colors.surface} size={20} />
