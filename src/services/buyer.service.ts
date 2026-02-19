@@ -155,7 +155,7 @@ export const buyerService = {
   // Toggle favorite
   toggleFavorite: async (propertyId: number | string) => {
     const response = await api.post(API_ENDPOINTS.BUYER_FAVORITES_TOGGLE, {
-      property_id: propertyId,
+      property_id: Number(propertyId),
     });
     return response;
   },

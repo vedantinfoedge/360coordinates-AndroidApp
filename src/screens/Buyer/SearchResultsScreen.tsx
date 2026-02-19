@@ -973,6 +973,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
+      CustomAlert.alert('Error', error?.message || 'Failed to update favorite. Please try again.');
     }
   };
 

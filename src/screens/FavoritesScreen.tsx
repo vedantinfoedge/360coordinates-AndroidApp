@@ -75,19 +75,19 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
 
       if (response && response.success && response.data) {
         // Handle buyer service response format
-        const propertiesList = response.data.properties || response.data.favorites || [];
+        const propertiesList = response.data.properties || (response.data as { favorites?: Property[] }).favorites || [];
         console.log('[FavoritesScreen] Properties count from API:', propertiesList.length);
         console.log('[FavoritesScreen] First property (if any):', propertiesList[0] ? JSON.stringify(propertiesList[0], null, 2) : 'none');
 
-        const formattedProperties = propertiesList.map((prop: any) => ({
+        const formattedProperties: Property[] = propertiesList.map((prop: any) => ({
           id: prop.id || prop.property_id,
           title: prop.title || prop.property_title || 'Untitled Property',
           location: prop.location || prop.city || 'Location not specified',
           city: prop.city,
           price: prop.price || 0,
           status: prop.status || (prop.listing_type === 'rent' ? 'rent' : prop.listing_type === 'pg-hostel' ? 'pg' : 'sale'),
-          cover_image: fixImageUrl(prop.cover_image || prop.images?.[0] || ''),
-          images: prop.images || [],
+          cover_image: fixImageUrl(prop.cover_image || prop.images?.[0] || '') ?? undefined,
+          images: ((prop.images || []) as string[]).map((url: string) => fixImageUrl(url)).filter((url: string | null): url is string => Boolean(url)),
           property_type: prop.property_type,
           is_favorite: true, // All items in favorites are favorited
         }));
@@ -106,7 +106,8 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
         const pagination = response.data.pagination;
         if (pagination) {
           console.log('[FavoritesScreen] Pagination:', JSON.stringify(pagination, null, 2));
-          setHasMore(pagination.current_page < pagination.total_pages);
+          const currentPage = (pagination as { page?: number; current_page?: number }).current_page ?? pagination.page;
+          setHasMore(currentPage < pagination.total_pages);
         } else {
           setHasMore(formattedProperties.length === 20);
           console.log('[FavoritesScreen] No pagination info, hasMore based on count:', formattedProperties.length === 20);
@@ -135,6 +136,8 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     if (isLoggedIn) {
       loadFavorites(1, false);
+    } else {
+      setLoading(false);
     }
   }, [isLoggedIn, loadFavorites]);
 
@@ -184,7 +187,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleShareProperty = async (property: Property) => {
     try {
-      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(property.price, property.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
+      const shareMessage = `Check out this property: ${property.title}\nLocation: ${property.location}\nPrice: ${formatters.price(Number(property.price), property.status === 'rent')}\n\nVisit us: https://360coordinates.com`;
 
       await Share.share({
         message: shareMessage,
@@ -200,16 +203,16 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
 
   const renderProperty = ({ item }: { item: Property }) => {
     const propertyType = item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy';
-    const images = item.images?.length
-      ? item.images.map((url: string) => fixImageUrl(url)).filter(Boolean)
+    const images: string[] | undefined = item.images?.length
+      ? item.images.map((url: string) => fixImageUrl(url)).filter((u): u is string => Boolean(u))
       : undefined;
     return (
       <PropertyCard
-        image={fixImageUrl(item.cover_image || item.images?.[0])}
+        image={fixImageUrl(item.cover_image || item.images?.[0]) ?? undefined}
         images={images}
         name={item.title}
         location={item.location || item.city || 'Location not specified'}
-        price={formatters.price(item.price, propertyType === 'rent')}
+        price={formatters.price(Number(item.price), propertyType === 'rent')}
         type={propertyType}
         isFavorite={true}
         onPress={() =>
@@ -282,15 +285,27 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.emptyIconWrap}>
             <TabIcon name="heart-outline" color={colors.textSecondary} size={64} />
           </View>
-          <Text style={styles.emptyText}>No favorites yet</Text>
-          <Text style={styles.emptySubtext}>
-            Start exploring properties and add them to your favorites
+          <Text style={styles.emptyText}>
+            {isGuest ? 'Login to view your favorites' : 'No favorites yet'}
           </Text>
-          <TouchableOpacity
-            style={styles.exploreButton}
-            onPress={() => navigation.navigate('Home')}>
-            <Text style={styles.exploreButtonText}>Explore Properties</Text>
-          </TouchableOpacity>
+          <Text style={styles.emptySubtext}>
+            {isGuest
+              ? 'Sign in to save properties and see them here'
+              : 'Start exploring properties and add them to your favorites'}
+          </Text>
+          {isGuest ? (
+            <TouchableOpacity
+              style={styles.exploreButton}
+              onPress={() => (navigation as any).navigate('Auth', { screen: 'Login' })}>
+              <Text style={styles.exploreButtonText}>Login</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.exploreButton}
+              onPress={() => navigation.navigate('Home')}>
+              <Text style={styles.exploreButtonText}>Explore Properties</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -317,19 +332,10 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
         showSignIn={isGuest}
         showSignUp={isGuest}
       />
-      {/* Header with count */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Favorites</Text>
-        {properties.length > 0 && (
-          <Text style={styles.headerSubtitle}>
-            {properties.length} {properties.length === 1 ? 'property' : 'properties'}
-          </Text>
-        )}
-      </View>
       <FlatList
         data={properties}
         renderItem={renderProperty}
-        keyExtractor={item => String(item.id)}
+        keyExtractor={(item: Property) => String(item.id)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -361,24 +367,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
-  },
-  header: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: {
-    ...typography.h2,
-    color: colors.text,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  headerSubtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 14,
   },
   listContent: {
     padding: spacing.md,

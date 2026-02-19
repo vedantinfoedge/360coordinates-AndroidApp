@@ -23,6 +23,7 @@ import { TabIcon } from '../../components/navigation/TabIcons';
 import { propertyService } from '../../services/property.service';
 import { validateAndProcessPropertyImages, PropertyImage } from '../../utils/imageHelper';
 import AgentHeader from '../../components/AgentHeader';
+import BuyerHeader from '../../components/BuyerHeader';
 import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import { formatters, capitalize, capitalizeAmenity } from '../../utils/formatters';
@@ -92,6 +93,55 @@ const formatBhkType = (configurations: string | string[] | null | undefined): st
     Array.isArray(configurations) ? (configurations as string[]).join(',') : (configurations as string)
   );
   return arr.length ? arr.join(', ') : '';
+};
+
+/**
+ * Extract sales contact from property (from upcoming_project_data).
+ * Sales details only - no seller/owner fallback.
+ */
+const getSalesContactFromProperty = (prop: any): {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  landline: string | null;
+  whatsapp: string | null;
+  alternative: string | null;
+  officeAddress: string | null;
+  salesPersons: Array<{ name: string; number: string; email: string; landlineNumber?: string; whatsappNumber?: string; alternativeNumber?: string }>;
+} => {
+  if (!prop) return { name: null, phone: null, email: null, landline: null, whatsapp: null, alternative: null, officeAddress: null, salesPersons: [] };
+  const raw = prop.upcoming_project_data;
+  let data: any = {};
+  if (raw != null) {
+    if (typeof raw === 'string') {
+      try {
+        data = JSON.parse(raw) || {};
+      } catch (_) {
+        data = {};
+      }
+    } else if (typeof raw === 'object' && !Array.isArray(raw)) {
+      data = raw;
+    }
+  }
+  const sp = data.salesPersons && Array.isArray(data.salesPersons) ? data.salesPersons : [];
+  const firstSp = sp[0];
+  const name = prop.sales_name ?? prop.salesName ?? data.sales_name ?? data.salesName ?? firstSp?.name ?? null;
+  const phone = prop.sales_number ?? prop.salesNumber ?? data.sales_number ?? data.salesNumber ?? firstSp?.number ?? prop.mobile_number ?? data.mobile_number ?? null;
+  const email = prop.email_id ?? prop.emailId ?? data.email_id ?? data.emailId ?? firstSp?.email ?? null;
+  const landline = prop.landline_number ?? prop.landlineNumber ?? data.landline_number ?? data.landlineNumber ?? firstSp?.landlineNumber ?? null;
+  const whatsapp = prop.whatsapp_number ?? prop.whatsappNumber ?? data.whatsapp_number ?? data.whatsappNumber ?? firstSp?.whatsappNumber ?? null;
+  const alternative = prop.alternative_number ?? prop.alternativeNumber ?? data.alternative_number ?? data.alternativeNumber ?? firstSp?.alternativeNumber ?? null;
+  const officeAddress = prop.office_address ?? data.office_address ?? prop.fullAddress ?? data.fullAddress ?? null;
+  return {
+    name: name && String(name).trim() ? String(name).trim() : null,
+    phone: phone && String(phone).trim() ? String(phone).trim() : null,
+    email: email && String(email).trim() ? String(email).trim() : null,
+    landline: landline && String(landline).trim() ? String(landline).trim() : null,
+    whatsapp: whatsapp && String(whatsapp).trim() ? String(whatsapp).trim() : null,
+    alternative: alternative && String(alternative).trim() ? String(alternative).trim() : null,
+    officeAddress: officeAddress && String(officeAddress).trim() ? String(officeAddress).trim() : null,
+    salesPersons: sp.filter((p: any) => p && (p.name?.trim() || p.number?.trim() || p.email?.trim())),
+  };
 };
 
 // Build a single formatted project object from API prop + upcoming_project_data (website parity)
@@ -169,6 +219,7 @@ const buildFormattedProject = (prop: any, propertyImages: PropertyImage[]): any 
     additional_address: prop.additional_address,
     cover_image: prop.cover_image,
     price: prop.price,
+    upcoming_project_data: prop.upcoming_project_data ?? upcomingData,
   };
 };
 
@@ -523,12 +574,26 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
   return (
     <View style={styles.container}>
-      <AgentHeader
-        onProfilePress={() => (navigation as any).navigate('AgentTabs', { screen: 'Profile' })}
-        onSupportPress={() => (navigation as any).navigate('Support')}
-        onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
-        onLogoutPress={logout}
-      />
+      {isBuyer ? (
+        <BuyerHeader
+          onProfilePress={() => (navigation as any).navigate('Profile')}
+          onSupportPress={() => (navigation as any).navigate('Support')}
+          onLogoutPress={logout ?? undefined}
+          onSignInPress={!user ? () => (navigation as any).navigate('Auth', { screen: 'Login', params: { returnTo: 'UpcomingProjectDetails', propertyId: route.params.propertyId } }) : undefined}
+          onSignUpPress={!user ? () => (navigation as any).navigate('Auth', { screen: 'Register' }) : undefined}
+          showProfile={!!user}
+          showLogout={!!user}
+          showSignIn={!user}
+          showSignUp={!user}
+        />
+      ) : (
+        <AgentHeader
+          onProfilePress={() => (navigation as any).navigate('AgentTabs', { screen: 'Profile' })}
+          onSupportPress={() => (navigation as any).navigate('Support')}
+          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
+          onLogoutPress={logout}
+        />
+      )}
 
       <View style={[styles.actionButtonsTop, { top: insets.top + 60 }]}>
         <TouchableOpacity style={styles.shareButtonTop} onPress={handleShare} activeOpacity={0.7}>
@@ -875,7 +940,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               style={[styles.contactButton, (processingContact || interactionLoading) && styles.contactButtonDisabled]}
               onPress={handleViewContact}
               disabled={processingContact || interactionLoading}>
-              <Text style={styles.contactButtonText}>{showContactModal ? 'Hide Contact' : 'View Contact'}</Text>
+              <Text style={styles.contactButtonText}>{showContactModal ? 'Hide Contact' : 'Show Contacts'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.chatButton, (processingChat || interactionLoading) && styles.contactButtonDisabled]}
@@ -910,13 +975,13 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         </View>
       )}
 
-      {/* Contact Modal - Buyer only (Sales person details from Add Project) */}
+      {/* Contact Modal - Buyer only (Sales details only from upcoming_project_data) */}
       {isBuyer && (
         <Modal visible={showContactModal} transparent animationType="slide" onRequestClose={() => setShowContactModal(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Sales Person Details</Text>
+                <Text style={styles.modalTitle}>Sales Contact Details</Text>
                 <TouchableOpacity onPress={() => setShowContactModal(false)}>
                   <TabIcon name="close" color={colors.textSecondary} size={20} />
                 </TouchableOpacity>
@@ -928,32 +993,85 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                   </Text>
                 </View>
               )}
-              <View style={styles.contactDetails}>
-                <View style={styles.contactItem}>
-                  <Text style={styles.contactLabel}>Name</Text>
-                  <Text style={styles.contactValue}>{property.sales_name || property.seller_name || 'Sales Contact'}</Text>
+              <ScrollView style={styles.contactDetailsScroll} showsVerticalScrollIndicator={false}>
+                <View style={styles.contactDetails}>
+                  {(() => {
+                    const sales = getSalesContactFromProperty(property);
+                    const hasAny = sales.name || sales.phone || sales.email || sales.landline || sales.whatsapp || sales.alternative || sales.officeAddress || sales.salesPersons.length > 0;
+                    if (!hasAny) {
+                      return <Text style={styles.contactValue}>No sales contact details available for this project.</Text>;
+                    }
+                    return (
+                      <>
+                        {sales.name && (
+                          <View style={styles.contactItem}>
+                            <Text style={styles.contactLabel}>Sales Person</Text>
+                            <Text style={styles.contactValue}>{sales.name}</Text>
+                          </View>
+                        )}
+                        {sales.phone && (
+                          <View style={styles.contactItem}>
+                            <Text style={styles.contactLabel}>Phone</Text>
+                            <TouchableOpacity onPress={() => handlePhonePress(sales.phone || '')}>
+                              <Text style={[styles.contactValue, styles.contactLink]}>{sales.phone}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        {sales.landline && (
+                          <View style={styles.contactItem}>
+                            <Text style={styles.contactLabel}>Landline</Text>
+                            <TouchableOpacity onPress={() => handlePhonePress(sales.landline || '')}>
+                              <Text style={[styles.contactValue, styles.contactLink]}>{sales.landline}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        {sales.email && (
+                          <View style={styles.contactItem}>
+                            <Text style={styles.contactLabel}>Email</Text>
+                            <TouchableOpacity onPress={() => handleEmailPress(sales.email || '')}>
+                              <Text style={[styles.contactValue, styles.contactLink]}>{sales.email}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        {sales.whatsapp && (
+                          <View style={styles.contactItem}>
+                            <Text style={styles.contactLabel}>WhatsApp</Text>
+                            <TouchableOpacity onPress={() => Linking.openURL(`https://wa.me/${(sales.whatsapp || '').replace(/\D/g, '')}`).catch(() => CustomAlert.alert('Error', 'Unable to open WhatsApp'))}>
+                              <Text style={[styles.contactValue, styles.contactLink]}>{sales.whatsapp}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        {sales.alternative && (
+                          <View style={styles.contactItem}>
+                            <Text style={styles.contactLabel}>Alternative Number</Text>
+                            <TouchableOpacity onPress={() => handlePhonePress(sales.alternative || '')}>
+                              <Text style={[styles.contactValue, styles.contactLink]}>{sales.alternative}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        {sales.officeAddress && (
+                          <View style={styles.contactItem}>
+                            <Text style={styles.contactLabel}>Office Address</Text>
+                            <Text style={styles.contactValue}>{sales.officeAddress}</Text>
+                          </View>
+                        )}
+                        {sales.salesPersons.length > 1 && (
+                          <View style={styles.contactItem}>
+                            <Text style={styles.contactLabel}>Other Sales Contacts</Text>
+                            {sales.salesPersons.slice(1, 5).map((sp: any, idx: number) => (
+                              <View key={idx} style={styles.contactSubItem}>
+                                <Text style={styles.contactSubValue}>
+                                  {sp.name}{sp.number ? ` • ${sp.number}` : ''}{sp.email ? ` • ${sp.email}` : ''}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </>
+                    );
+                  })()}
                 </View>
-                <View style={styles.contactItem}>
-                  <Text style={styles.contactLabel}>Mobile Number</Text>
-                  {(property.mobile_number || property.sales_number || property.seller_phone) ? (
-                    <TouchableOpacity onPress={() => handlePhonePress(property.mobile_number || property.sales_number || property.seller_phone || '')}>
-                      <Text style={[styles.contactValue, styles.contactLink]}>{property.mobile_number || property.sales_number || property.seller_phone}</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.contactValue}>Not available</Text>
-                  )}
-                </View>
-                <View style={styles.contactItem}>
-                  <Text style={styles.contactLabel}>Email</Text>
-                  {(property.email_id || property.seller_email) ? (
-                    <TouchableOpacity onPress={() => handleEmailPress(property.email_id || property.seller_email || '')}>
-                      <Text style={[styles.contactValue, styles.contactLink]}>{property.email_id || property.seller_email}</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.contactValue}>Not available</Text>
-                  )}
-                </View>
-              </View>
+              </ScrollView>
               <TouchableOpacity
                 style={styles.modalChatButton}
                 onPress={() => {
@@ -1058,11 +1176,14 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 24, fontWeight: '700', color: colors.text },
   modalClose: { fontSize: 28, color: colors.textSecondary, fontWeight: '300' },
   modalLimitInfo: { marginBottom: spacing.md },
+  contactDetailsScroll: { maxHeight: 320 },
   contactDetails: { gap: spacing.sm, marginBottom: spacing.lg },
   contactItem: { paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   contactLabel: { ...typography.caption, color: colors.textSecondary, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', marginBottom: spacing.xs },
   contactValue: { ...typography.body, color: colors.text, fontSize: 16, fontWeight: '600' },
   contactLink: { color: colors.primary, textDecorationLine: 'underline' },
+  contactSubItem: { paddingTop: spacing.xs },
+  contactSubValue: { ...typography.body, color: colors.textSecondary, fontSize: 14 },
   modalChatButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, minHeight: 52 },
   modalChatButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
 });
