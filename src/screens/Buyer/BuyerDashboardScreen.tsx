@@ -19,7 +19,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { BuyerStackParamList } from '../../navigation/BuyerNavigator';
-import { colors, spacing, typography, borderRadius } from '../../theme';
+import { colors, spacing, typography, borderRadius, fonts } from '../../theme';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 import { useAuth } from '../../context/AuthContext';
@@ -74,13 +74,18 @@ const getFirstName = (user: { full_name?: string } | null) => {
   return user.full_name.trim().split(/\s+/)[0] || null;
 };
 
-// Reference UI colors - dark blue theme
-const DARK_HEADER_BG = '#152d4a';
-const TOGGLE_UNSELECTED_BG = 'rgba(255,255,255,0.2)';
-const TOGGLE_UNSELECTED_TEXT = '#94a3b8';
-const SEARCH_INPUT_BG = '#E2E8F0';
-const SEARCH_PLACEHOLDER = '#718096';
-const MAP_CARD_BG = '#5B9BD5';
+// Reference UI colors - exact match
+const DARK_HEADER_BG = '#1a2a3a';           // Dark charcoal
+const TOGGLE_UNSELECTED_BG = '#E2E8F0';     // Light grey - ref has light bg + dark text
+const TOGGLE_UNSELECTED_TEXT = '#64748b';   // Dark grey text
+const SEARCH_INPUT_BG = '#374151';          // Dark grey input
+const SEARCH_INPUT_TEXT = '#F9FAFB';
+const SEARCH_PLACEHOLDER = '#9CA3AF';       // Light grey placeholder
+const MAP_CARD_BG = '#93C5FD';              // Light blue card
+const MAP_CARD_TITLE = '#1E40AF';           // Dark blue text on map card
+const MAP_CARD_SUBTITLE = '#3B82F6';        // Lighter blue
+const AVATAR_BG = '#60A5FA';                // Light blue circle
+const AVATAR_TEXT_COLOR = '#1E3A8A';        // Dark blue S
 
 const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const { user, logout, isAuthenticated, switchUserRole } = useAuth();
@@ -559,7 +564,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   // Show access denied message if user is an agent
   if (user && user.user_type === 'agent') {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <View style={styles.errorIconWrap}>
             <TabIcon name="alert" color={colors.textSecondary} size={48} />
@@ -577,7 +582,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <Animated.ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -608,8 +613,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 style={styles.avatarButton}
                 onPress={() => navigation.navigate('Profile')}
                 activeOpacity={0.8}>
-                <View style={styles.avatarContainer}>
-                  <Text style={styles.avatarText}>
+                <View style={[styles.avatarContainer, { backgroundColor: AVATAR_BG }]}>
+                  <Text style={[styles.avatarText, { color: AVATAR_TEXT_COLOR }]}>
                     {(user?.full_name?.[0] || 'U').toUpperCase()}
                   </Text>
                   <View style={styles.avatarStatusDot} />
@@ -697,20 +702,20 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 <Svg width="100%" height="100%" style={{ position: 'absolute' }}>
                   <Defs>
                     <Pattern id="mapCardDots" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
-                      <Circle cx="2" cy="2" r="1" fill="white" fillOpacity="0.5" />
+                      <Circle cx="2" cy="2" r="1" fill={MAP_CARD_TITLE} fillOpacity="0.3" />
                     </Pattern>
                   </Defs>
                   <Rect width="100%" height="100%" fill="url(#mapCardDots)" />
                 </Svg>
               </View>
               <View style={styles.mapSearchCardContent}>
-                <TabIcon name="map" color="#FFFFFF" size={24} />
+                <TabIcon name="map" color={MAP_CARD_TITLE} size={24} />
                 <View style={styles.mapSearchCardText}>
-                  <Text style={styles.mapSearchCardTitle}>Search on Map</Text>
-                  <Text style={styles.mapSearchCardSubtitle}>Explore properties by location</Text>
+                  <Text style={[styles.mapSearchCardTitle, { color: MAP_CARD_TITLE }]}>Search on Map</Text>
+                  <Text style={[styles.mapSearchCardSubtitle, { color: MAP_CARD_SUBTITLE }]}>Explore properties by location</Text>
                 </View>
               </View>
-              <View style={styles.mapSearchArrowCircle}>
+              <View style={[styles.mapSearchArrowCircle, { backgroundColor: colors.primary }]}>
                 <TabIcon name="chevron-right" color="#FFFFFF" size={20} />
               </View>
             </TouchableOpacity>
@@ -1023,21 +1028,23 @@ const styles = StyleSheet.create({
   },
   timeGreetingText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-    letterSpacing: 0.5,
+    fontFamily: fonts.medium,
+    color: 'rgba(255,255,255,0.85)',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   welcomeTextDark: {
-    ...typography.h1,
+    fontSize: moderateScale(26),
+    fontFamily: fonts.extraBold,
     color: '#FFFFFF',
-    fontWeight: '700',
     marginBottom: spacing.xs,
-    fontSize: moderateScale(24),
+    lineHeight: moderateScale(32),
   },
   welcomeSubtextDark: {
-    ...typography.body,
-    color: 'rgba(255,255,255,0.6)',
     fontSize: moderateScale(14),
+    fontFamily: fonts.regular,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: moderateScale(20),
   },
   avatarButton: {
     marginLeft: spacing.md,
@@ -1046,15 +1053,13 @@ const styles = StyleSheet.create({
     width: scale(48),
     height: scale(48),
     borderRadius: scale(24),
-    backgroundColor: 'rgba(0,119,192,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
   avatarText: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontFamily: fonts.extraBold,
   },
   avatarStatusDot: {
     position: 'absolute',
@@ -1078,7 +1083,7 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(12),
     paddingHorizontal: spacing.md,
     borderRadius: 9999,
-    backgroundColor: TOGGLE_UNSELECTED_BG,
+    backgroundColor: (TOGGLE_UNSELECTED_BG as string),
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: verticalScale(44),
@@ -1087,12 +1092,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   toggleButtonTextDark: {
-    ...typography.body,
-    color: TOGGLE_UNSELECTED_TEXT,
-    fontWeight: '600',
     fontSize: moderateScale(14),
+    fontFamily: fonts.medium,
+    color: (TOGGLE_UNSELECTED_TEXT as string),
   },
   toggleButtonTextActive: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
   },
   searchSection: {
@@ -1104,7 +1109,7 @@ const styles = StyleSheet.create({
   searchInputContainerRef: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: SEARCH_INPUT_BG,
+    backgroundColor: SEARCH_INPUT_BG as string,
     borderRadius: scale(12),
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -1115,8 +1120,9 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   searchInputRef: {
-    ...typography.body,
-    color: '#1a202c',
+    fontSize: 16,
+    fontFamily: fonts.regular,
+    color: SEARCH_INPUT_TEXT as string,
     padding: 0,
   },
   searchButton: {
@@ -1127,10 +1133,9 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   searchButtonText: {
-    ...typography.body,
-    color: '#FFFFFF',
-    fontWeight: '600',
     fontSize: moderateScale(14),
+    fontFamily: fonts.semiBold,
+    color: '#FFFFFF',
   },
   locationSuggestionsContainer: {
     position: 'absolute',
@@ -1144,7 +1149,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: MAP_CARD_BG,
+    backgroundColor: (MAP_CARD_BG as string),
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginTop: spacing.md,
@@ -1170,16 +1175,13 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
   },
   mapSearchCardTitle: {
-    ...typography.body,
-    color: '#FFFFFF',
-    fontWeight: '700',
     fontSize: 16,
+    fontFamily: fonts.bold,
   },
   mapSearchCardSubtitle: {
-    ...typography.caption,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
     fontSize: 12,
+    fontFamily: fonts.regular,
+    marginTop: 2,
   },
   lightContentArea: {
     flex: 1,
@@ -1199,19 +1201,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sectionTitle: {
-    ...typography.h2,
+    fontSize: 22,
+    fontFamily: fonts.bold,
     color: colors.text,
-    fontWeight: '700',
+    lineHeight: 30,
   },
   sectionSubtitle: {
-    ...typography.caption,
+    fontSize: 14,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     marginTop: spacing.xs,
+    lineHeight: 20,
   },
   seeAllText: {
-    ...typography.body,
+    fontSize: 16,
+    fontFamily: fonts.semiBold,
     color: colors.primary,
-    fontWeight: '600',
   },
   propertiesList: {
     paddingHorizontal: spacing.lg,

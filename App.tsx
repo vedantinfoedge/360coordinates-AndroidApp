@@ -6,7 +6,16 @@
  */
 
 import React, {useEffect} from 'react';
-import {StatusBar, useColorScheme} from 'react-native';
+import {StatusBar, useColorScheme, View, ActivityIndicator} from 'react-native';
+import {useFonts} from '@expo-google-fonts/plus-jakarta-sans/useFonts';
+import {
+  PlusJakartaSans_300Light,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {ErrorBoundary} from './src/components/ErrorBoundary';
@@ -81,6 +90,23 @@ const AppContent: React.FC = () => {
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
+
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_300Light,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAFAFA'}}>
+        <ActivityIndicator size="large" color="#0077C0" />
+      </View>
+    );
+  }
 
   return (
     <ErrorBoundary>

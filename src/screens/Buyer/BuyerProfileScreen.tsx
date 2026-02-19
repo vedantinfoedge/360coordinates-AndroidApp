@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   Image,
-  Platform,
   Animated,
   Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {launchImageLibrary, launchCamera, ImagePickerResponse, MediaType} from 'react-native-image-picker';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -19,10 +18,14 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
+import {fonts} from '../../theme/fonts';
 import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
+
+const TOTAL_INTERACTION_LIMIT = 5;
+const INTERACTION_STORAGE_KEY = 'interaction_remaining';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<BuyerStackParamList, 'Profile'>,
@@ -79,6 +82,30 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     email: userData.email || '',
     address: userData.address || '',
   });
+
+  const [creditsState, setCreditsState] = useState({
+    remaining: TOTAL_INTERACTION_LIMIT,
+    max: TOTAL_INTERACTION_LIMIT,
+  });
+
+  useEffect(() => {
+    const loadCredits = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(INTERACTION_STORAGE_KEY);
+        let remaining = TOTAL_INTERACTION_LIMIT;
+        if (stored !== null) {
+          const parsed = parseInt(stored, 10);
+          if (!isNaN(parsed) && parsed >= 0) {
+            remaining = Math.min(parsed, TOTAL_INTERACTION_LIMIT);
+          }
+        }
+        setCreditsState({remaining, max: TOTAL_INTERACTION_LIMIT});
+      } catch {
+        setCreditsState({remaining: TOTAL_INTERACTION_LIMIT, max: TOTAL_INTERACTION_LIMIT});
+      }
+    };
+    loadCredits();
+  }, []);
 
   // Update profile image when user changes
   React.useEffect(() => {
@@ -275,7 +302,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           {useNativeDriver: true},
         )}
         scrollEventThrottle={16}>
-        {/* Profile Section */}
+        {/* Profile Section - matches image layout */}
         <View style={styles.profileSection}>
           <View style={styles.profileGradient}>
             <View style={styles.avatarContainer}>
@@ -302,62 +329,69 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 )}
                 <View style={styles.cameraIconContainer}>
-                  <TabIcon name="camera" color={colors.surface} size={24} />
+                  <TabIcon name="camera" color={colors.text} size={20} />
                 </View>
               </TouchableOpacity>
             </View>
             <Text style={styles.userName}>{userData.full_name || 'User'}</Text>
             <Text style={styles.userEmail}>{userData.email}</Text>
+
+            {/* Credits Left pill */}
+            <View style={styles.creditsPill}>
+              <TabIcon name="tag" color={colors.textSecondary} size={16} />
+              <Text style={styles.creditsPillText}>
+                Credits Left: {creditsState.remaining}/{creditsState.max}
+              </Text>
+            </View>
+
+            {/* Upload Photo button - light blue */}
             <TouchableOpacity
               style={styles.uploadButton}
               onPress={showImagePicker}
               activeOpacity={0.8}>
+              <TabIcon name="camera" color={colors.textSecondary} size={18} />
               <Text style={styles.uploadButtonText}>
                 {profileImage ? 'Change Photo' : 'Upload Photo'}
               </Text>
             </TouchableOpacity>
-          </View>
-        </View>
 
-        {/* Edit/Cancel Buttons */}
-        <View style={styles.actionButtons}>
-          {!isEditing ? (
-            <TouchableOpacity 
-              style={styles.editButton} 
-              onPress={handleEdit}
-              activeOpacity={0.8}>
-              <View style={styles.editButtonContent}>
-                <TabIcon name="edit" color={colors.primary} size={18} />
-                <Text style={styles.editButtonText}>Edit Profile</Text>
-              </View>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.editActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={handleCancel}
-                activeOpacity={0.8}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+            {/* Edit Profile / Cancel-Save buttons */}
+            {!isEditing ? (
               <TouchableOpacity 
-                style={styles.saveButton} 
-                onPress={handleSave}
+                style={styles.editButton} 
+                onPress={handleEdit}
                 activeOpacity={0.8}>
-                <View style={styles.saveButtonContent}>
-                  <TabIcon name="check" color={colors.surface} size={18} />
-                  <Text style={styles.saveButtonText}>Save</Text>
-                </View>
+                <TabIcon name="edit" color="#FFD54F" size={18} />
+                <Text style={styles.editButtonText}>Edit Profile</Text>
               </TouchableOpacity>
-            </View>
-          )}
+            ) : (
+              <View style={styles.editActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={handleCancel}
+                  activeOpacity={0.8}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.saveButton} 
+                  onPress={handleSave}
+                  activeOpacity={0.8}>
+                  <View style={styles.saveButtonContent}>
+                    <TabIcon name="check" color={colors.surface} size={18} />
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Form Fields */}
         <View style={styles.formSection}>
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <TabIcon name="profile" color={colors.primary} size={18} />
-              <Text style={styles.label}>Full Name</Text>
+              <TabIcon name="profile" color={colors.textSecondary} size={18} />
+              <Text style={styles.label}>FULL NAME</Text>
             </View>
             {isEditing ? (
               <TextInput
@@ -374,8 +408,8 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <TabIcon name="mail" color={colors.primary} size={18} />
-              <Text style={styles.label}>Email</Text>
+              <TabIcon name="mail" color={colors.textSecondary} size={18} />
+              <Text style={styles.label}>EMAIL</Text>
             </View>
             {isEditing ? (
               <View style={styles.lockedInput}>
@@ -392,8 +426,8 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <TabIcon name="phone" color={colors.primary} size={18} />
-              <Text style={styles.label}>Phone Number</Text>
+              <TabIcon name="phone" color={colors.textSecondary} size={18} />
+              <Text style={styles.label}>PHONE NUMBER</Text>
             </View>
             {isEditing ? (
               <View style={styles.lockedInput}>
@@ -586,8 +620,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl + spacing.md,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.primary + '30',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   avatarContainer: {
     marginBottom: spacing.md,
@@ -621,98 +655,108 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
   },
   avatarText: {
-    ...typography.h2,
+    fontFamily: fonts.extraBold,
     color: colors.surface,
     fontSize: 36,
-    fontWeight: '700',
   },
   cameraIconContainer: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3,
+  },
+  creditsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  creditsPillText: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.text,
   },
   cameraIcon: {
     fontSize: 18,
   },
   uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     marginTop: spacing.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: colors.accentLight,
+    borderWidth: 1,
+    borderColor: colors.primary + '40',
   },
   uploadButtonText: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     color: colors.primary,
-    fontWeight: '700',
     fontSize: 15,
   },
   userName: {
-    fontSize: 26,
-    color: colors.secondary,
+    fontFamily: fonts.extraBold,
+    fontSize: 22,
+    color: colors.text,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
-    fontWeight: '700',
-    lineHeight: 32,
+    lineHeight: 28,
   },
   userEmail: {
-    ...typography.body,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     fontSize: 15,
     marginTop: spacing.xs,
   },
-  actionButtons: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
   editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
+    maxWidth: 280,
     backgroundColor: colors.primary,
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.lg,
-    alignItems: 'center',
     shadowColor: colors.primary,
     shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
-  editButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
   editButtonText: {
-    ...typography.body,
+    fontFamily: fonts.bold,
     color: colors.surface,
-    fontWeight: '700',
     fontSize: 16,
   },
   editActions: {
     flexDirection: 'row',
     gap: spacing.md,
+    marginTop: spacing.md,
+    width: '100%',
+    maxWidth: 280,
   },
   cancelButton: {
     flex: 1,
@@ -724,9 +768,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   cancelButtonText: {
-    ...typography.body,
+    fontFamily: fonts.bold,
     color: colors.text,
-    fontWeight: '700',
     fontSize: 16,
   },
   saveButtonContent: {
@@ -747,9 +790,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   saveButtonText: {
-    ...typography.body,
+    fontFamily: fonts.bold,
     color: colors.surface,
-    fontWeight: '700',
     fontSize: 16,
   },
   formSection: {
@@ -774,21 +816,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   label: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '700',
-    fontSize: 13,
+    fontFamily: fonts.bold,
+    color: colors.primary,
+    fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: colors.surfaceSecondary,
+    fontFamily: fonts.regular,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    ...typography.body,
     color: colors.text,
     fontSize: 16,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border,
   },
   textArea: {
@@ -797,7 +838,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   value: {
-    ...typography.body,
+    fontFamily: fonts.regular,
     color: colors.text,
     fontSize: 16,
     paddingVertical: spacing.sm,
@@ -814,7 +855,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lockedInputText: {
-    ...typography.body,
+    fontFamily: fonts.regular,
     color: colors.text,
     fontSize: 16,
     flex: 1,
@@ -825,7 +866,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   lockedLabel: {
-    ...typography.caption,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     fontSize: 12,
     marginLeft: spacing.sm,
@@ -873,10 +914,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent + '15',
   },
   optionText: {
-    ...typography.body,
+    fontFamily: fonts.semiBold,
     color: colors.text,
     fontSize: 16,
-    fontWeight: '600',
   },
   logoutText: {
     color: colors.error,
@@ -924,14 +964,15 @@ const styles = StyleSheet.create({
     fontSize: 50,
   },
   loginTitle: {
-    ...typography.h1,
+    fontFamily: fonts.bold,
+    fontSize: 22,
     color: colors.text,
-    fontWeight: '700',
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
   loginSubtitle: {
-    ...typography.body,
+    fontFamily: fonts.regular,
+    fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -952,13 +993,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   loginButtonText: {
-    ...typography.body,
+    fontFamily: fonts.bold,
     color: colors.surface,
-    fontWeight: '700',
     fontSize: 16,
   },
   loginNote: {
-    ...typography.caption,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     textAlign: 'center',
     fontSize: 12,
@@ -984,14 +1024,14 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   imagePickerModalTitle: {
-    ...typography.h2,
+    fontFamily: fonts.bold,
+    fontSize: 20,
     color: colors.text,
-    fontWeight: '700',
     marginBottom: spacing.xs,
     textAlign: 'center',
   },
   imagePickerModalSubtitle: {
-    ...typography.body,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     marginBottom: spacing.xl,
     textAlign: 'center',
@@ -1018,9 +1058,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   imagePickerOptionText: {
-    ...typography.body,
+    fontFamily: fonts.semiBold,
     color: colors.text,
-    fontWeight: '600',
     fontSize: 14,
   },
   imagePickerCancelButton: {
@@ -1032,9 +1071,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   imagePickerCancelText: {
-    ...typography.body,
+    fontFamily: fonts.semiBold,
     color: colors.textSecondary,
-    fontWeight: '600',
     fontSize: 16,
   },
 });

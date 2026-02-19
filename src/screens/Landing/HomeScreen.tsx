@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/MainStackNavigator';
-import { colors, spacing, typography, borderRadius } from '../../theme';
+import { colors, spacing, typography, borderRadius, fonts } from '../../theme';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
@@ -42,12 +42,17 @@ const getFirstName = (u: { full_name?: string } | null) => {
   return u.full_name.trim().split(/\s+/)[0] || null;
 };
 
-const DARK_HEADER_BG = '#152d4a';
-const TOGGLE_UNSELECTED_BG = 'rgba(255,255,255,0.2)';
-const TOGGLE_UNSELECTED_TEXT = '#94a3b8';
-const SEARCH_INPUT_BG = '#E2E8F0';
-const SEARCH_PLACEHOLDER = '#718096';
-const MAP_CARD_BG = '#5B9BD5';
+const DARK_HEADER_BG = '#1a2a3a';
+const TOGGLE_UNSELECTED_BG = '#E2E8F0';
+const TOGGLE_UNSELECTED_TEXT = '#64748b';
+const SEARCH_INPUT_BG = '#374151';
+const SEARCH_INPUT_TEXT = '#F9FAFB';
+const SEARCH_PLACEHOLDER = '#9CA3AF';
+const MAP_CARD_BG = '#93C5FD';
+const MAP_CARD_TITLE = '#1E40AF';
+const MAP_CARD_SUBTITLE = '#3B82F6';
+const AVATAR_BG = '#60A5FA';
+const AVATAR_TEXT_COLOR = '#1E3A8A';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<MainStackParamList, 'Home'>;
 
@@ -427,7 +432,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         ]}>
         <Animated.ScrollView
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg }]}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           onScroll={(event: { nativeEvent: { contentOffset: { y: number } } }) => {
             const offsetY = event.nativeEvent.contentOffset.y;
@@ -457,8 +462,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   style={styles.avatarButton}
                   onPress={() => navigation.navigate('Profile' as any)}
                   activeOpacity={0.8}>
-                  <View style={styles.avatarContainer}>
-                    <Text style={styles.avatarText}>
+                  <View style={[styles.avatarContainer, { backgroundColor: AVATAR_BG }]}>
+                    <Text style={[styles.avatarText, { color: AVATAR_TEXT_COLOR }]}>
                       {(user?.full_name?.[0] || 'U').toUpperCase()}
                     </Text>
                     <View style={styles.avatarStatusDot} />
@@ -546,17 +551,17 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   <Svg width="100%" height="100%" style={{ position: 'absolute' }}>
                     <Defs>
                       <Pattern id="homeMapCardDots" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
-                        <Circle cx="2" cy="2" r="1" fill="white" fillOpacity="0.5" />
+                        <Circle cx="2" cy="2" r="1" fill={MAP_CARD_TITLE} fillOpacity="0.3" />
                       </Pattern>
                     </Defs>
                     <Rect width="100%" height="100%" fill="url(#homeMapCardDots)" />
                   </Svg>
                 </View>
                 <View style={styles.mapSearchCardContent}>
-                  <TabIcon name="map" color="#FFFFFF" size={24} />
+                  <TabIcon name="map" color={MAP_CARD_TITLE} size={24} />
                   <View style={styles.mapSearchCardText}>
-                    <Text style={styles.mapSearchCardTitle}>Search on Map</Text>
-                    <Text style={styles.mapSearchCardSubtitle}>Explore properties by location</Text>
+                    <Text style={[styles.mapSearchCardTitle, { color: MAP_CARD_TITLE }]}>Search on Map</Text>
+                    <Text style={[styles.mapSearchCardSubtitle, { color: MAP_CARD_SUBTITLE }]}>Explore properties by location</Text>
                   </View>
                 </View>
                 <View style={styles.mapSearchArrowCircle}>
@@ -853,36 +858,36 @@ const styles = StyleSheet.create({
   },
   timeGreetingText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-    letterSpacing: 0.5,
+    fontFamily: fonts.medium,
+    color: 'rgba(255,255,255,0.85)',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   welcomeTextDark: {
-    ...typography.h1,
+    fontSize: moderateScale(26),
+    fontFamily: fonts.extraBold,
     color: '#FFFFFF',
-    fontWeight: '700',
     marginBottom: spacing.xs,
-    fontSize: moderateScale(24),
+    lineHeight: moderateScale(32),
   },
   welcomeSubtextDark: {
-    ...typography.body,
-    color: 'rgba(255,255,255,0.6)',
     fontSize: moderateScale(14),
+    fontFamily: fonts.regular,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: moderateScale(20),
   },
   avatarButton: { marginLeft: spacing.md },
   avatarContainer: {
     width: scale(48),
     height: scale(48),
     borderRadius: scale(24),
-    backgroundColor: 'rgba(0,119,192,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
   avatarText: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontFamily: fonts.extraBold,
   },
   avatarStatusDot: {
     position: 'absolute',
@@ -912,10 +917,9 @@ const styles = StyleSheet.create({
     minHeight: verticalScale(44),
   },
   toggleButtonTextDark: {
-    ...typography.body,
-    color: TOGGLE_UNSELECTED_TEXT,
-    fontWeight: '600',
     fontSize: moderateScale(14),
+    fontFamily: fonts.medium,
+    color: TOGGLE_UNSELECTED_TEXT,
   },
   searchInputContainerRef: {
     flexDirection: 'row',
@@ -927,8 +931,9 @@ const styles = StyleSheet.create({
     minHeight: verticalScale(50),
   },
   searchInputRef: {
-    ...typography.body,
-    color: '#1a202c',
+    fontSize: 16,
+    fontFamily: fonts.regular,
+    color: SEARCH_INPUT_TEXT,
     padding: 0,
   },
   mapSearchCardRef: {
@@ -949,16 +954,13 @@ const styles = StyleSheet.create({
   },
   mapSearchCardText: { marginLeft: spacing.md },
   mapSearchCardTitle: {
-    ...typography.body,
-    color: '#FFFFFF',
-    fontWeight: '700',
     fontSize: 16,
+    fontFamily: fonts.bold,
   },
   mapSearchCardSubtitle: {
-    ...typography.caption,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
     fontSize: 12,
+    fontFamily: fonts.regular,
+    marginTop: 2,
   },
   mapSearchArrowCircle: {
     width: 36,
@@ -1108,6 +1110,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
   toggleButtonTextActive: {
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
   },
   // Section Styling - More breathing room
@@ -1123,8 +1126,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: moderateScale(20),
-    fontWeight: '700',
+    fontSize: moderateScale(22),
+    fontFamily: fonts.bold,
     color: colors.text,
     letterSpacing: -0.3,
     lineHeight: moderateScale(28),

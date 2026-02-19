@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SearchStackParamList } from '../../navigation/SearchNavigator';
-import { colors, spacing, typography, borderRadius } from '../../theme';
+import { colors, spacing, typography, borderRadius, fonts } from '../../theme';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import PropertyCard from '../../components/PropertyCard';
 import { useAuth } from '../../context/AuthContext';
@@ -1743,7 +1743,7 @@ const styles = StyleSheet.create({
   dropdownLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     marginRight: 4,
   },
   dropdownValue: {
@@ -1798,7 +1798,7 @@ const styles = StyleSheet.create({
   },
   dropdownOptionTextActive: {
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   locationSuggestionsContainer: {
     position: 'absolute',
@@ -1839,7 +1839,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.surface,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   filterChevron: {
     fontSize: 10,
@@ -1859,14 +1859,14 @@ const styles = StyleSheet.create({
   resultsCount: {
     ...typography.body,
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.extraBold,
     fontSize: 16,
   },
   clearText: {
     ...typography.body,
     color: colors.primaryLight,
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   sortPillsScroll: {
     maxHeight: 44,
@@ -1890,11 +1890,11 @@ const styles = StyleSheet.create({
   sortPillText: {
     ...typography.caption,
     color: colors.text,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   sortPillTextActive: {
     color: colors.surface,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   listContent: {
     padding: spacing.md,
@@ -1956,7 +1956,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     ...typography.h2,
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.extraBold,
   },
   modalClose: {
     fontSize: 24,
@@ -1978,7 +1978,7 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.text,
     marginBottom: spacing.md,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   filterOptions: {
     flexDirection: 'row',
@@ -2004,7 +2004,7 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: colors.surface,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   filterChipDisabled: {
     opacity: 0.6,
@@ -2055,7 +2055,7 @@ const styles = StyleSheet.create({
   clearButtonText: {
     ...typography.body,
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   applyButton: {
     flex: 1,
@@ -2072,7 +2072,7 @@ const styles = StyleSheet.create({
   applyButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   budgetRangeContainer: {
     flexDirection: 'row',
@@ -2095,7 +2095,7 @@ const styles = StyleSheet.create({
   budgetValue: {
     ...typography.h3,
     color: colors.text,
-    fontWeight: '700',
+    fontFamily: fonts.extraBold,
   },
   sliderContainer: {
     marginBottom: spacing.md,
@@ -2104,7 +2104,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     marginBottom: spacing.sm,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   sliderTrack: {
     height: 6,
@@ -2137,7 +2137,7 @@ const styles = StyleSheet.create({
   sliderButtonText: {
     ...typography.h3,
     color: colors.text,
-    fontWeight: '700',
+    fontFamily: fonts.extraBold,
   },
   sliderInput: {
     width: 80,
@@ -2179,7 +2179,7 @@ const styles = StyleSheet.create({
   floatingMapButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '700',
+    fontFamily: fonts.extraBold,
     fontSize: 16,
   },
 });

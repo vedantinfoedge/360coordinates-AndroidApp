@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, ScrollView } from 'react-native';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography, borderRadius, fonts } from '../theme';
 import { TabIcon } from './navigation/TabIcons';
 import { scale, verticalScale, moderateScale } from '../utils/responsive';
 import CustomAlert from '../utils/alertHelper';
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
   },
   navArrowText: {
     fontSize: moderateScale(24),
-    fontWeight: '500',
+    fontFamily: fonts.medium,
     color: '#222',
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     width: scale(32),
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: moderateScale(11),
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: '#FFFFFF',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
@@ -605,14 +605,14 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: moderateScale(16),
-    fontWeight: '600',
+    fontFamily: fonts.extraBold,
     color: colors.text,
     lineHeight: moderateScale(22),
     marginBottom: scale(4),
   },
   location: {
     fontSize: moderateScale(14),
-    fontWeight: '400',
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     lineHeight: moderateScale(20),
     marginBottom: scale(8),
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   },
   featureTagText: {
     fontSize: moderateScale(12),
-    fontWeight: '500',
+    fontFamily: fonts.medium,
     color: colors.primary,
   },
   priceRow: {
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
   price: {
     flex: 1,
     fontSize: moderateScale(18),
-    fontWeight: '700',
+    fontFamily: fonts.extraBold,
     color: colors.primary,
     letterSpacing: -0.3,
   },
@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
   },
   viewDetailsText: {
     fontSize: moderateScale(14),
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: '#FFFFFF',
     letterSpacing: 0.2,
   },

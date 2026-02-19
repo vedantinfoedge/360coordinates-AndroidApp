@@ -1,3 +1,5 @@
+import { fonts } from './fonts';
+
 export const colors = {
   // Brand colors - Fresh Blue Modern Theme
   primary: '#0077C0', // Vibrant Blue - Primary brand color
@@ -68,58 +70,68 @@ export const spacing = {
 };
 
 export const typography = {
+  fontLight: fonts.light,
+  fontRegular: fonts.regular,
+  fontMedium: fonts.medium,
+  fontSemiBold: fonts.semiBold,
+  fontBold: fonts.bold,
+  fontExtraBold: fonts.extraBold,
   h1: {
     fontSize: 32,
-    fontWeight: '700' as const,
+    fontFamily: fonts.extraBold,
     lineHeight: 40,
     letterSpacing: -0.5,
   },
   h2: {
     fontSize: 22,
-    fontWeight: '700' as const,
+    fontFamily: fonts.extraBold,
     lineHeight: 30,
     letterSpacing: -0.3,
   },
   h3: {
     fontSize: 18,
-    fontWeight: '600' as const,
+    fontFamily: fonts.semiBold,
     lineHeight: 26,
   },
   body: {
     fontSize: 16,
-    fontWeight: '400' as const,
+    fontFamily: fonts.regular,
     lineHeight: 24,
   },
   bodyLarge: {
     fontSize: 18,
-    fontWeight: '400' as const,
+    fontFamily: fonts.regular,
     lineHeight: 28,
   },
   bodySemibold: {
     fontSize: 16,
-    fontWeight: '600' as const,
+    fontFamily: fonts.semiBold,
     lineHeight: 24,
   },
   caption: {
     fontSize: 14,
-    fontWeight: '400' as const,
+    fontFamily: fonts.regular,
     lineHeight: 20,
   },
   captionSemibold: {
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontFamily: fonts.semiBold,
     lineHeight: 20,
   },
   small: {
     fontSize: 12,
-    fontWeight: '400' as const,
+    fontFamily: fonts.regular,
     lineHeight: 16,
   },
   price: {
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontFamily: fonts.extraBold,
     lineHeight: 28,
   },
+  /** Light (300) - for subtle text */
+  light: { fontFamily: fonts.light },
+  /** Medium (500) - for emphasized body */
+  medium: { fontFamily: fonts.medium },
 };
 
 export const borderRadius = {

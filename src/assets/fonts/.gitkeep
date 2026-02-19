@@ -1,0 +1,8 @@
+# Add Plus Jakarta Sans font files here (download from https://fonts.google.com/specimen/Plus+Jakarta+Sans):
+# - PlusJakartaSans-Light.ttf
+# - PlusJakartaSans-Regular.ttf
+# - PlusJakartaSans-Medium.ttf
+# - PlusJakartaSans-SemiBold.ttf
+# - PlusJakartaSans-Bold.ttf
+# - PlusJakartaSans-ExtraBold.ttf
+# Then run: npx react-native-asset
