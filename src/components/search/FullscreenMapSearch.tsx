@@ -14,8 +14,13 @@ export type FullscreenMapSearchProps = CompactSearchBarProps;
 
 const FullscreenMapSearch: React.FC<FullscreenMapSearchProps> = props => {
   return (
-    <View style={styles.mapFullscreenCompactSearch}>
-      <CompactSearchBar {...props} compact={true} />
+    <View
+      style={styles.mapFullscreenCompactSearch}
+      pointerEvents="box-none"
+      collapsable={false}>
+      <View style={styles.searchBarTouchTarget} pointerEvents="auto">
+        <CompactSearchBar {...props} compact={true} />
+      </View>
     </View>
   );
 };
@@ -23,6 +28,10 @@ const FullscreenMapSearch: React.FC<FullscreenMapSearchProps> = props => {
 export type {CompactSearchBarSearchParams};
 
 const styles = StyleSheet.create({
+  searchBarTouchTarget: {
+    zIndex: 1000,
+    elevation: 100,
+  },
   mapFullscreenCompactSearch: {
     backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 12,
@@ -31,8 +40,9 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
-    overflow: 'hidden',
+    elevation: 100,
+    zIndex: 1000,
+    overflow: 'visible',
     paddingTop: 30,
   },
 });

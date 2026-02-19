@@ -73,6 +73,8 @@ interface PropertyMapViewProps {
   fullscreenSearchBar?: React.ReactNode;
   /** Search params from FullscreenMapSearch - used to fetch filtered properties */
   searchParams?: MapSearchParams;
+  /** Optional user location - when provided with no search location, fetches nearby properties */
+  userLocation?: { latitude: number; longitude: number };
 }
 
 /** Normalized API response shape (service may return this or AxiosResponse) */
@@ -110,6 +112,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   selectedPropertyId: propSelectedPropertyId,
   fullscreenSearchBar,
   searchParams,
+  userLocation,
 }) => {
   const { isAuthenticated } = useAuth();
   const navigation = useNavigation<any>();
@@ -122,7 +125,12 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   );
   const [isFavorite, setIsFavorite] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [mapCenter, setMapCenter] = useState<[number, number] | null>(initialCenter);
+  // Use user location as initial center when available and no selected property
+  const effectiveInitialCenter: [number, number] =
+    userLocation && !propSelectedPropertyId
+      ? [userLocation.longitude, userLocation.latitude]
+      : initialCenter;
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(effectiveInitialCenter);
   const [mapZoom, setMapZoom] = useState<number>(initialZoom);
 
   // Store current property ID (from PropertyDetailsScreen) separately
@@ -131,8 +139,8 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   const effectiveListingType = searchParams?.listingType || listingType;
 
   const searchParamsKey = searchParams
-    ? `${searchParams.location}|${searchParams.city}|${searchParams.listingType}|${searchParams.propertyType}|${searchParams.minBudget}|${searchParams.maxBudget}|${searchParams.bedrooms}|${searchParams.area}`
-    : '';
+    ? `${searchParams.location}|${searchParams.city}|${searchParams.listingType}|${searchParams.propertyType}|${searchParams.minBudget}|${searchParams.maxBudget}|${searchParams.bedrooms}|${searchParams.area}|${userLocation ? `${userLocation.latitude},${userLocation.longitude}` : ''}`
+    : userLocation ? `loc:${userLocation.latitude},${userLocation.longitude}` : '';
 
   useEffect(() => {
     if (!initialProperties) {
@@ -156,6 +164,14 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       setProperties(filtered);
     }
   }, [effectiveListingType, initialProperties, searchParamsKey]);
+
+  // When userLocation arrives, center map on it (unless showing a selected property)
+  useEffect(() => {
+    if (userLocation && !propSelectedPropertyId) {
+      setMapCenter([userLocation.longitude, userLocation.latitude]);
+      setMapZoom(14);
+    }
+  }, [userLocation?.latitude, userLocation?.longitude, propSelectedPropertyId]);
 
   // Load selected property and center map on it
   useEffect(() => {
@@ -288,6 +304,8 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       // Special handling for PG/Hostel: Fetch both "PG/Hostel" type AND "Available for Bachelors" (Union)
       if (lt === 'pg-hostel') {
         // Use helper to build params for both queries
+        const loc = (searchParams?.location || '').trim();
+        const city = (searchParams?.city || '').trim();
         const { pgParams, bachelorsParams } = buildPGHostelFetchParams({
           limit: 50,
           location: searchParams?.location,
@@ -296,6 +314,16 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           max_price: searchParams?.maxBudget ? searchParams.maxBudget * 1000 : undefined,
           budget: searchParams?.budget,
         });
+
+        // When no location specified, use user's current location for nearby properties
+        if (!loc && !city && userLocation) {
+          pgParams.latitude = userLocation.latitude;
+          pgParams.longitude = userLocation.longitude;
+          pgParams.radius = 10;
+          bachelorsParams.latitude = userLocation.latitude;
+          bachelorsParams.longitude = userLocation.longitude;
+          bachelorsParams.radius = 10;
+        }
 
         // Add any map-specific overrides if necessary, but helper should suffice for core filters
         // If specific property type is selected (e.g. 1RK vs 1BHK in PG context?), handle it? 
@@ -366,6 +394,13 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           if (loc) params.location = loc;
           if (city) params.city = city;
           if (!loc && city) params.location = city;
+
+          // When no location/city specified, use user's current location for nearby properties
+          if (!loc && !city && userLocation) {
+            params.latitude = userLocation.latitude;
+            params.longitude = userLocation.longitude;
+            params.radius = 10; // 10 km radius for nearby search
+          }
 
           const pt = searchParams.propertyType;
           if (pt && pt !== 'all') {
@@ -591,7 +626,9 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     onPress: () => handleMarkerPress(String(property.id)),
   }));
 
-  if (loading) {
+  // When fullscreenSearchBar is provided, keep it visible during loading so users
+  // can continue interacting with the search bar (fixes CompactSearchBar "not working after search")
+  if (loading && !fullscreenSearchBar) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -669,12 +706,20 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
               {fullscreenSearchBar}
             </View>
           ) : null}
-          <MapViewComponent
+          <View style={styles.mapWrapper}>
+            <MapViewComponent
             initialCenter={mapCenter || initialCenter}
             initialZoom={mapZoom || initialZoom}
             markers={markers}
             interactive={true}
           />
+            {loading && fullscreenSearchBar && (
+              <View style={styles.mapLoadingOverlay} pointerEvents="none">
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.mapLoadingText}>Loading properties...</Text>
+              </View>
+            )}
+          </View>
 
           {/* Selected Property Card - Compact Popup (aside the pin) */}
           {selectedProperty && (
@@ -860,9 +905,27 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
   },
+  mapWrapper: {
+    flex: 1,
+    position: 'relative',
+    zIndex: 1,
+    elevation: 1,
+  },
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapLoadingText: {
+    marginTop: spacing.sm,
+    ...typography.body,
+    color: colors.textSecondary,
+  },
   fullscreenSearchContainer: {
     flexShrink: 0,
-    zIndex: 10,
+    zIndex: 1000,
+    elevation: 100,
     paddingTop: 8,
   },
   propertyCardOverlay: {

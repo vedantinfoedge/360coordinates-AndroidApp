@@ -1,5 +1,6 @@
 import React, {useState, useEffect, useMemo} from 'react';
-import {View, StyleSheet, Text, TouchableOpacity} from 'react-native';
+import {View, StyleSheet, Text, TouchableOpacity, Platform, PermissionsAndroid} from 'react-native';
+import Geolocation from 'react-native-geolocation-service';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
@@ -70,6 +71,35 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
   );
   const [bedrooms, setBedrooms] = useState(initialBedrooms);
   const [area, setArea] = useState(initialArea);
+  const [userLocation, setUserLocation] = useState<{latitude: number; longitude: number} | undefined>(undefined);
+
+  // Fetch current location when opened without a location (e.g. from "Search on Map" button)
+  useEffect(() => {
+    if (initialLocation) return; // Already have a location, skip
+    const fetchCurrentLocation = async () => {
+      if (Platform.OS === 'android') {
+        try {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+        } catch {
+          return;
+        }
+      }
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const {latitude, longitude} = position.coords;
+          setUserLocation({latitude, longitude});
+        },
+        () => {
+          // Silent fail - map will use default center and fetch without nearby filter
+        },
+        {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
+      );
+    };
+    fetchCurrentLocation();
+  }, [initialLocation]);
 
   const activeBudgetSet = useMemo(
     (): BudgetSetType =>
@@ -214,6 +244,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
         selectedPropertyId={propertyId ? String(propertyId) : undefined}
         fullscreenSearchBar={fullscreenSearchBar}
         searchParams={searchParams}
+        userLocation={userLocation}
       />
 
       <TouchableOpacity
