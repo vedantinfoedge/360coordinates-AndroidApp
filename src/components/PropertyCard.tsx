@@ -302,7 +302,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               }}
               activeOpacity={0.7}>
               <View style={styles.actionButtonContainer}>
-                <TabIcon name="link" color={colors.primaryDark} size={18} />
+                <TabIcon name="link" color={colors.textSecondary} size={18} />
               </View>
             </TouchableOpacity>
             <TouchableOpacity
@@ -315,7 +315,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               <View style={styles.actionButtonContainer}>
                 <TabIcon
                   name={(onFavoritePress ? isFavorite : favorite) ? 'heart' : 'heart-outline'}
-                  color={(onFavoritePress ? isFavorite : favorite) ? '#E53935' : colors.primaryDark}
+                  color={(onFavoritePress ? isFavorite : favorite) ? '#E53935' : colors.textSecondary}
                   size={20}
                 />
               </View>
@@ -353,20 +353,54 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <Text style={styles.location} numberOfLines={1}>
             {location}
           </Text>
-          <Text style={styles.price}>{price}</Text>
-
-          {/* View Details Button */}
-          <TouchableOpacity
-            style={styles.viewDetailsButton}
-            onPress={(e: { stopPropagation: () => void }) => {
-              e.stopPropagation();
-              if (onPress) {
-                onPress();
-              }
-            }}
-            activeOpacity={0.8}>
-            <Text style={styles.viewDetailsText}>View Details</Text>
-          </TouchableOpacity>
+          {/* Feature tags - property type, status, area */}
+          {(() => {
+            const tags: string[] = [];
+            if (property?.propertyType) {
+              const typeMap: Record<string, string> = {
+                apartment: 'Apartment', villa: 'Villa', 'farm-house': 'Farm House',
+                bungalow: 'Bungalow', 'independent-house': 'Independent House',
+                'studio-apartment': 'Studio Apartment', penthouse: 'Penthouse',
+                'plot-land': 'Plot / Land', residential: 'Residential', land: 'Land',
+                commercial: 'Commercial', 'pg-hostel': 'PG / Hostel',
+              };
+              const pt = String(property.propertyType).toLowerCase().replace(/\s+/g, '-');
+              tags.push(typeMap[pt] || pt.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+            }
+            const avail = (property?.availabilityStatus || property?.property_status || '').toString().toLowerCase();
+            if (avail && (avail.includes('available') || avail.includes('ready') || avail.includes('completed'))) {
+              tags.push('Ready to Move');
+            }
+            if (property?.area) {
+              const a = String(property.area).trim();
+              if (a && !tags.includes(a)) tags.push(a);
+            }
+            if (tags.length === 0) return null;
+            return (
+              <View style={styles.featureTagsRow}>
+                {tags.slice(0, 3).map((tag, i) => (
+                  <View key={i} style={styles.featureTag}>
+                    <Text style={styles.featureTagText}>{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })()}
+          {/* Price + View Details on same row */}
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{price}</Text>
+            <TouchableOpacity
+              style={styles.viewDetailsButton}
+              onPress={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                if (onPress) {
+                  onPress();
+                }
+              }}
+              activeOpacity={0.8}>
+              <Text style={styles.viewDetailsText}>View Details</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -540,10 +574,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   rentBadge: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1D242B',
   },
   pgBadge: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#1D242B',
   },
   // Project Status Colors
   preLaunchBadge: {
@@ -583,20 +617,44 @@ const styles = StyleSheet.create({
     lineHeight: moderateScale(20),
     marginBottom: scale(8),
   },
+  featureTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: scale(8),
+    marginBottom: scale(10),
+  },
+  featureTag: {
+    paddingHorizontal: scale(10),
+    paddingVertical: scale(4),
+    borderRadius: borderRadius.round,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  featureTagText: {
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+    color: colors.primary,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
   price: {
+    flex: 1,
     fontSize: moderateScale(18),
     fontWeight: '700',
     color: colors.primary,
-    marginBottom: verticalScale(14),
     letterSpacing: -0.3,
   },
   viewDetailsButton: {
     backgroundColor: colors.primary,
     borderRadius: scale(10),
     paddingVertical: verticalScale(12),
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
     minHeight: verticalScale(44),
+    minWidth: 120,
     justifyContent: 'center',
   },
   viewDetailsText: {

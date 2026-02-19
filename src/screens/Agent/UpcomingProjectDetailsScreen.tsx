@@ -27,6 +27,7 @@ import ImageGallery from '../../components/common/ImageGallery';
 import { formatters, capitalize, capitalizeAmenity } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 import { AMENITIES_LIST } from '../../utils/propertyTypeConfig';
+import PropertyDetailsHeader from '../../components/PropertyDetailsHeader';
 import { buyerService } from '../../services/buyer.service';
 import { createLead } from '../../services/leadsService';
 import {
@@ -564,19 +565,41 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
     return null;
   };
 
+  const isLoggedIn = Boolean(user);
+  const isGuest = !isLoggedIn;
+
   return (
     <View style={styles.container}>
-      <View style={[styles.actionButtonsTop, { top: insets.top + spacing.md }]}>
-        <TouchableOpacity style={styles.shareButtonTop} onPress={handleShare} activeOpacity={0.7}>
-          <View style={styles.actionButtonInner}>
-            <TabIcon name="link" color={colors.surface} size={20} />
-          </View>
-        </TouchableOpacity>
-      </View>
+      <PropertyDetailsHeader
+        onProfilePress={() => (navigation as any).navigate('AgentTabs')}
+        onSupportPress={() => navigation.navigate('Support')}
+        onLogoutPress={user ? logout : undefined}
+        onSignInPress={isGuest ? () => (navigation as any).navigate('Auth', { screen: 'Login', params: { returnTo: 'UpcomingProjectDetails', propertyId: route.params.propertyId } }) : undefined}
+        onSignUpPress={isGuest ? () => (navigation as any).navigate('Auth', { screen: 'Register' }) : undefined}
+        showLogout={isLoggedIn}
+        showProfile={isLoggedIn}
+        showSignIn={isGuest}
+        showSignUp={isGuest}
+      />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, isBuyer && { paddingBottom: 160 }]}>
-        {/* Image carousel */}
-        <View style={styles.imageCarouselContainer}>
+      <View style={styles.contentSheet}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, isBuyer && { paddingBottom: 160 }]}>
+          {/* Image carousel */}
+          <View style={styles.imageCarouselContainer}>
+          {/* Back button - top left */}
+          <TouchableOpacity style={styles.imageBackButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <View style={styles.imageBackButtonInner}>
+              <TabIcon name="chevron-left" color={colors.text} size={22} />
+            </View>
+          </TouchableOpacity>
+          {/* Share - top right */}
+          <View style={styles.imageActionButtons}>
+            <TouchableOpacity style={styles.imageActionBtn} onPress={handleShare} activeOpacity={0.7}>
+              <View style={styles.imageActionBtnInner}>
+                <TabIcon name="link" color={colors.text} size={20} />
+              </View>
+            </TouchableOpacity>
+          </View>
           {propertyImages.length > 0 ? (
             <>
               <ScrollView
@@ -648,15 +671,13 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         {/* Header: Title, badge, location, price */}
         <View style={styles.headerSection}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>{capitalize(property.title || 'Project')}</Text>
+            <Text style={styles.title}>{(property.title || 'Project').toUpperCase()}</Text>
             <View style={styles.upcomingBadge}>
               <Text style={styles.upcomingBadgeText}>Upcoming Project</Text>
             </View>
           </View>
           <View style={styles.locationContainer}>
-            <View style={styles.locationIconWrap}>
-              <TabIcon name="location" color={colors.textSecondary} size={18} />
-            </View>
+            <TabIcon name="location" color="#E53935" size={16} />
             <Text style={styles.location}>{property.location || property.city || property.fullAddress || property.address || 'Location not specified'}</Text>
           </View>
           <Text style={styles.priceLabel}>Price Range</Text>
@@ -742,7 +763,11 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         {/* Configurations */}
         {configurations.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Configurations</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Configurations</Text>
+            </View>
+            <View style={styles.sectionDivider} />
             <View style={styles.chipRow}>
               {configurations.map((c, i) => (
                 <View key={i} style={styles.chip}>
@@ -755,13 +780,21 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
         {/* Description */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About this place</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleBar} />
+            <Text style={styles.sectionTitle}>About this Project</Text>
+          </View>
+          <View style={styles.sectionDivider} />
           <Text style={styles.description}>{property.description || 'No description available'}</Text>
         </View>
 
         {/* Project details grid: only show fields that have data from API */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Project Details</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleBar} />
+            <Text style={styles.sectionTitle}>Project Details</Text>
+          </View>
+          <View style={styles.sectionDivider} />
           <View style={styles.detailsGrid}>
             {renderDetail('Builder / Developer', property.builder)}
             {renderDetail('Project Type', property.property_type || property.project_type)}
@@ -812,7 +845,11 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         {/* Amenities - What this place offers (with icons from AMENITIES_LIST) */}
         {amenities.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>What this place offers</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Amenities</Text>
+            </View>
+            <View style={styles.sectionDivider} />
             <View style={styles.amenitiesGrid}>
               {amenities.map((a: string, i: number) => {
                 const id = String(a).trim().toLowerCase().replace(/\s+/g, '_');
@@ -833,7 +870,11 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
         {/* Location / Address - same as property details: address + View on Map button */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleBar} />
+            <Text style={styles.sectionTitle}>Location</Text>
+          </View>
+          <View style={styles.sectionDivider} />
           <Text style={styles.address}>
             {[property.location, hasValidArea ? property.area : null, property.city, property.state].filter(Boolean).join(', ') || property.address || property.fullAddress || 'Address not available'}
           </Text>
@@ -842,6 +883,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
           {property.latitude != null && property.longitude != null && (
             <Text style={styles.coordinates}>Coordinates: {property.latitude}, {property.longitude}</Text>
           )}
+          <View style={styles.mapPlaceholder}>
+            <TabIcon name="map" color={colors.textSecondary} size={40} />
+            <Text style={styles.mapPlaceholderText}>{property.location || property.city || 'Location'}</Text>
+          </View>
           <TouchableOpacity
             style={styles.mapButton}
             onPress={() => {
@@ -850,6 +895,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                 listingType: 'buy',
               });
             }}>
+            <TabIcon name="location" color="#E53935" size={18} />
             <Text style={styles.mapButtonText}>View on Map</Text>
           </TouchableOpacity>
         </View>
@@ -857,7 +903,11 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         {/* Contact & Sales - only show fields that have data from API */}
         {(property.sales_name || property.sales_number || property.mobile_number || property.email_id || property.whatsapp_number || property.alternative_number || property.office_address) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact & Sales</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Contact & Sales</Text>
+            </View>
+            <View style={styles.sectionDivider} />
             <View style={styles.detailsGrid}>
               {renderDetail('Sales Person Name', property.sales_name)}
               {renderDetail('Phone', property.sales_number)}
@@ -873,7 +923,11 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         {/* Project Highlights */}
         {property.project_highlights && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Project Highlights</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Project Highlights</Text>
+            </View>
+            <View style={styles.sectionDivider} />
             <Text style={styles.description}>{property.project_highlights}</Text>
           </View>
         )}
@@ -881,7 +935,11 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         {/* Unique Selling Points */}
         {property.usp && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Unique Selling Points</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Unique Selling Points</Text>
+            </View>
+            <View style={styles.sectionDivider} />
             <Text style={styles.description}>{property.usp}</Text>
           </View>
         )}
@@ -889,7 +947,11 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         {/* Project Brochure */}
         {(property.brochure_url || property.brochure) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Project Brochure</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Project Brochure</Text>
+            </View>
+            <View style={styles.sectionDivider} />
             <TouchableOpacity
               style={styles.brochureButton}
               onPress={() => {
@@ -902,11 +964,19 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
           </View>
         )}
 
-      </ScrollView>
+        </ScrollView>
 
-      {isBuyer && (
-        <>
-          <View style={[styles.buyerActionButtons, { paddingBottom: insets.bottom }]}>
+        {isBuyer && (
+          <>
+            {!interactionLoading && (
+              <View style={styles.creditsRow}>
+                <View style={styles.creditsDot} />
+                <Text style={[styles.creditsText, interactionState.remaining <= 0 && styles.creditsTextError]}>
+                  Credits Left: {interactionState.remaining}/{interactionState.max}
+                </Text>
+              </View>
+            )}
+            <View style={[styles.buyerActionButtons, { paddingBottom: insets.bottom + 8 }]}>
             <TouchableOpacity
               style={[styles.contactButton, (processingContact || interactionLoading) && styles.contactButtonDisabled]}
               onPress={handleViewContact}
@@ -923,15 +993,8 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               </>
             </TouchableOpacity>
           </View>
-          {!interactionLoading && (
-            <View style={[styles.limitContainer, { bottom: (insets.bottom || 0) + 70 }]}>
-              <Text style={[styles.limitText, interactionState.remaining <= 0 && styles.limitTextError]}>
-                Credits Left: {interactionState.remaining} / {interactionState.max}
-              </Text>
-            </View>
-          )}
         </>
-      )}
+        )}
 
       {!isBuyer && (
         <View style={[styles.actionButtons, { paddingBottom: insets.bottom }]}>
@@ -944,7 +1007,8 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
             </>
           </TouchableOpacity>
         </View>
-      )}
+        )}
+      </View>
 
       {/* Contact Modal - Buyer only (Sales details only from upcoming_project_data) */}
       {isBuyer && (
@@ -1069,13 +1133,28 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
   );
 };
 
+const REFERENCE_BG = '#0D1B2A';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: REFERENCE_BG },
+  contentSheet: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.xxl,
+    borderTopRightRadius: borderRadius.xxl,
+    overflow: 'hidden',
+    marginTop: -borderRadius.xxl,
+  },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
   loadingText: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
-  imageCarouselContainer: { height: 300, position: 'relative', marginHorizontal: spacing.md, borderRadius: borderRadius.lg, overflow: 'hidden', backgroundColor: colors.surfaceSecondary },
+  imageCarouselContainer: { height: 300, position: 'relative', marginHorizontal: spacing.md, marginTop: spacing.lg, borderRadius: borderRadius.xl, overflow: 'hidden', backgroundColor: '#D4E4D4' },
+  imageBackButton: { position: 'absolute', top: spacing.md, left: spacing.md, zIndex: 10 },
+  imageBackButtonInner: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.95)', justifyContent: 'center', alignItems: 'center', ...Platform.select({ android: { elevation: 4 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 } }) },
+  imageActionButtons: { position: 'absolute', top: spacing.md, right: spacing.md, flexDirection: 'row', gap: spacing.sm, zIndex: 10 },
+  imageActionBtn: { zIndex: 11 },
+  imageActionBtnInner: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.95)', justifyContent: 'center', alignItems: 'center', ...Platform.select({ android: { elevation: 4 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 } }) },
   imageCarousel: { height: 300, borderRadius: borderRadius.lg },
   imageCarouselContent: { alignItems: 'center' },
   imageContainer: { width: IMAGE_CAROUSEL_WIDTH, height: 300, overflow: 'hidden' },
@@ -1086,9 +1165,6 @@ const styles = StyleSheet.create({
   imageIndicators: { position: 'absolute', bottom: spacing.md, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: spacing.xs, zIndex: 3 },
   indicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
   indicatorActive: { backgroundColor: colors.surface, width: 24 },
-  actionButtonsTop: { position: 'absolute', right: spacing.md, zIndex: 100, flexDirection: 'row', gap: spacing.sm, elevation: 10 },
-  shareButtonTop: { zIndex: 101, elevation: 10 },
-  actionButtonInner: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 4 },
   shareIcon: { fontSize: 18 },
   headerSection: { backgroundColor: colors.surface, padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.border },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm, flexWrap: 'wrap' },
@@ -1105,14 +1181,17 @@ const styles = StyleSheet.create({
   linkText: { color: colors.primary, textDecorationLine: 'underline', fontWeight: '600' },
   brochureButton: { backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start' },
   brochureButtonText: { ...typography.body, color: colors.primary, fontWeight: '600' },
-  mapButton: { backgroundColor: colors.surfaceSecondary, borderRadius: borderRadius.lg, padding: spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '40', marginTop: spacing.md },
+  mapButton: { backgroundColor: colors.surface, borderRadius: borderRadius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 2, borderColor: colors.primary, marginTop: spacing.sm },
   mapButtonText: { ...typography.body, color: colors.primary, fontWeight: '700', fontSize: 16 },
   quickInfo: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.surface, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.sm },
   infoCard: { flex: 1, minWidth: '30%', alignItems: 'center', backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
   infoIconWrap: { marginBottom: spacing.xs },
   infoText: { ...typography.caption, color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  section: { backgroundColor: colors.surface, padding: spacing.xl, marginTop: spacing.lg, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 2, borderBottomColor: colors.primary + '30' },
+  section: { backgroundColor: colors.surface, padding: spacing.xl, marginTop: 0, paddingTop: spacing.xl },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center' },
+  sectionTitleBar: { width: 4, height: 20, borderRadius: 2, backgroundColor: colors.primary, marginRight: spacing.sm },
+  sectionDivider: { height: 1, backgroundColor: 'rgba(29, 36, 43, 0.1)', marginTop: spacing.sm, marginBottom: spacing.lg },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { backgroundColor: colors.surfaceSecondary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.round },
   chipText: { ...typography.caption, color: colors.text, fontWeight: '600', fontSize: 13 },
@@ -1127,6 +1206,8 @@ const styles = StyleSheet.create({
   amenityIcon: { fontSize: 16, color: colors.primary, fontWeight: 'bold' },
   amenityText: { ...typography.body, color: colors.text, fontSize: 14, fontWeight: '500' },
   address: { ...typography.body, color: colors.textSecondary, lineHeight: 24, marginBottom: spacing.xs },
+  mapPlaceholder: { height: 140, backgroundColor: colors.accentLighter, borderRadius: borderRadius.lg, marginTop: spacing.sm, marginBottom: spacing.md, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0, 119, 192, 0.15)' },
+  mapPlaceholderText: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
   addressSub: { ...typography.body, color: colors.textSecondary, lineHeight: 22, fontSize: 14, marginTop: spacing.xs },
   coordinates: { ...typography.caption, color: colors.textSecondary, fontSize: 12, fontStyle: 'italic', marginTop: spacing.xs },
   actionButtons: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, flexDirection: 'row', gap: spacing.md },
@@ -1138,8 +1219,11 @@ const styles = StyleSheet.create({
   chatButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg },
   chatButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
   contactButtonDisabled: { opacity: 0.5 },
-  limitContainer: { position: 'absolute', left: spacing.md, alignItems: 'flex-start' },
-  limitText: { ...typography.caption, fontSize: 14, color: colors.text, backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.primary + '60', fontWeight: '700' },
+  creditsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.sm },
+  creditsDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
+  creditsText: { ...typography.caption, fontSize: 14, color: colors.primary, fontWeight: '600' },
+  creditsTextError: { color: colors.error || '#c62828' },
+  limitText: { ...typography.caption, fontSize: 14, color: colors.text, fontWeight: '600' },
   limitTextError: { color: colors.error || '#c62828' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl, borderTopRightRadius: borderRadius.xl, padding: spacing.lg, maxHeight: '70%' },

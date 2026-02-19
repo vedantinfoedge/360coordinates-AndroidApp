@@ -20,15 +20,34 @@ import { MainStackParamList } from '../../navigation/MainStackNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
-import BuyerHeader from '../../components/BuyerHeader';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
 import { buyerService, Property } from '../../services/buyer.service';
 import { propertyService } from '../../services/property.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import CustomAlert from '../../utils/alertHelper';
+import Svg, { Defs, Pattern, Circle, Rect } from 'react-native-svg';
 import { formatters } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
+
+const getTimeGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'GOOD MORNING';
+  if (h < 17) return 'GOOD AFTERNOON';
+  return 'GOOD EVENING';
+};
+
+const getFirstName = (u: { full_name?: string } | null) => {
+  if (!u || !u.full_name) return null;
+  return u.full_name.trim().split(/\s+/)[0] || null;
+};
+
+const DARK_HEADER_BG = '#152d4a';
+const TOGGLE_UNSELECTED_BG = 'rgba(255,255,255,0.2)';
+const TOGGLE_UNSELECTED_TEXT = '#94a3b8';
+const SEARCH_INPUT_BG = '#E2E8F0';
+const SEARCH_PLACEHOLDER = '#718096';
+const MAP_CARD_BG = '#5B9BD5';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<MainStackParamList, 'Home'>;
 
@@ -398,27 +417,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <BuyerHeader
-        onProfilePress={() => navigation.navigate('Profile' as any)}
-        onSupportPress={() => navigation.navigate('Support' as any)}
-        onLogoutPress={isLoggedIn ? logout : undefined}
-        onSignInPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
-            : undefined
-        }
-        onSignUpPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
-            : undefined
-        }
-        showLogout={isLoggedIn}
-        showProfile={isLoggedIn}
-        showSignIn={isGuest}
-        showSignUp={isGuest}
-        scrollY={scrollY}
-        headerHeight={headerHeight}
-      />
       <Animated.View
         style={[
           styles.content,
@@ -429,7 +427,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         ]}>
         <Animated.ScrollView
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.md }]}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg }]}
           showsVerticalScrollIndicator={false}
           onScroll={(event: { nativeEvent: { contentOffset: { y: number } } }) => {
             const offsetY = event.nativeEvent.contentOffset.y;
@@ -439,95 +437,137 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }>
-          {/* Welcome Section */}
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeText}>
-              Welcome{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''} ❤️
-            </Text>
-            <Text style={styles.welcomeSubtext}>
-              Find your dream property in India
-            </Text>
-          </View>
-
-          {/* Listing Type Toggle Buttons - Buy, Rent, PG/Hostel only */}
-          <View style={styles.toggleSection}>
-            <TouchableOpacity
-              style={[styles.toggleButton, listingType === 'sale' && styles.toggleButtonActive]}
-              onPress={() => setListingType('sale')}>
-              <Text style={[styles.toggleButtonText, listingType === 'sale' && styles.toggleButtonTextActive]}>
-                Buy
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleButton, listingType === 'rent' && styles.toggleButtonActive]}
-              onPress={() => setListingType('rent')}>
-              <Text style={[styles.toggleButtonText, listingType === 'rent' && styles.toggleButtonTextActive]}>
-                Rent
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleButton, listingType === 'pg' && styles.toggleButtonActive]}
-              onPress={() => setListingType('pg')}>
-              <Text style={[styles.toggleButtonText, listingType === 'pg' && styles.toggleButtonTextActive]}>
-                PG/Hostel
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Search Bar with Location Autocomplete */}
-          <View style={styles.searchSection}>
-            <View style={styles.searchContainer}>
-              <View style={styles.searchInputContainer}>
-                <TabIcon name="location" color={colors.textSecondary} size={20} />
-                <View style={styles.searchInputWrapper}>
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search by city, locality, project"
-                    placeholderTextColor={colors.textSecondary}
-                    value={searchLocation || searchQuery}
-                    onChangeText={(text: string) => {
-                      setSearchLocation(text);
-                      setSearchQuery(text);
-                      setShowLocationSuggestions(text.length >= 2);
-                    }}
-                    onSubmitEditing={handleSearch}
-                  />
+          {/* Dark Header Section - matches reference UI */}
+          <View style={styles.darkHeaderSection}>
+            <View style={styles.greetingRow}>
+              <View style={styles.greetingLeft}>
+                <View style={styles.timeGreetingRow}>
+                  <TabIcon name="leaf" color={colors.success} size={16} />
+                  <Text style={styles.timeGreetingText}>{getTimeGreeting()}</Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.searchButton}
-                  onPress={handleSearch}>
-                  <Text style={styles.searchButtonText}>Search</Text>
-                </TouchableOpacity>
+                <Text style={styles.welcomeTextDark}>
+                  Welcome{getFirstName(user) ? `, ${getFirstName(user)}` : ''}
+                </Text>
+                <Text style={styles.welcomeSubtextDark}>
+                  Find your dream property in India
+                </Text>
               </View>
-              {showLocationSuggestions && searchLocation.length >= 2 && (
-                <View style={styles.locationSuggestionsContainer}>
-                  <LocationAutoSuggest
-                    query={searchLocation}
-                    onSelect={handleLocationSelect}
-                    visible={showLocationSuggestions}
-                  />
-                </View>
+              {isLoggedIn && (
+                <TouchableOpacity
+                  style={styles.avatarButton}
+                  onPress={() => navigation.navigate('Profile' as any)}
+                  activeOpacity={0.8}>
+                  <View style={styles.avatarContainer}>
+                    <Text style={styles.avatarText}>
+                      {(user?.full_name?.[0] || 'U').toUpperCase()}
+                    </Text>
+                    <View style={styles.avatarStatusDot} />
+                  </View>
+                </TouchableOpacity>
               )}
             </View>
-            <TouchableOpacity
-              style={styles.mapSearchButton}
-              onPress={() => {
-                try {
-                  navigation.navigate('Search' as any, {
-                    screen: 'PropertyMap',
-                    params: {
-                      listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
-                    },
-                  } as any);
-                } catch (err: any) {
-                  console.error('Error navigating to map:', err);
-                  CustomAlert.alert('Error', 'Map is not available.');
-                }
-              }}
-              activeOpacity={0.8}>
-              <Text style={styles.mapSearchText}>Search on Map</Text>
-            </TouchableOpacity>
+
+            <View style={styles.toggleSection}>
+              <TouchableOpacity
+                style={[styles.toggleButtonDark, listingType === 'sale' && styles.toggleButtonActive]}
+                onPress={() => setListingType('sale')}>
+                <Text style={[styles.toggleButtonTextDark, listingType === 'sale' && styles.toggleButtonTextActive]}>
+                  Buy
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleButtonDark, listingType === 'rent' && styles.toggleButtonActive]}
+                onPress={() => setListingType('rent')}>
+                <Text style={[styles.toggleButtonTextDark, listingType === 'rent' && styles.toggleButtonTextActive]}>
+                  Rent
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleButtonDark, listingType === 'pg' && styles.toggleButtonActive]}
+                onPress={() => setListingType('pg')}>
+                <Text style={[styles.toggleButtonTextDark, listingType === 'pg' && styles.toggleButtonTextActive]}>
+                  PG/Hostel
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchSection}>
+              <View style={styles.searchContainer}>
+                <View style={styles.searchInputContainerRef}>
+                  <TabIcon name="search" color={SEARCH_PLACEHOLDER} size={20} />
+                  <View style={styles.searchInputWrapper}>
+                    <TextInput
+                      style={styles.searchInputRef}
+                      placeholder="City, locality, project..."
+                      placeholderTextColor={SEARCH_PLACEHOLDER}
+                      value={searchLocation || searchQuery}
+                      onChangeText={(text: string) => {
+                        setSearchLocation(text);
+                        setSearchQuery(text);
+                        setShowLocationSuggestions(text.length >= 2);
+                      }}
+                      onSubmitEditing={handleSearch}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.searchButton}
+                    onPress={handleSearch}>
+                    <Text style={styles.searchButtonText}>Search</Text>
+                  </TouchableOpacity>
+                </View>
+                {showLocationSuggestions && searchLocation.length >= 2 && (
+                  <View style={styles.locationSuggestionsContainer}>
+                    <LocationAutoSuggest
+                      query={searchLocation}
+                      onSelect={handleLocationSelect}
+                      visible={showLocationSuggestions}
+                    />
+                  </View>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={styles.mapSearchCardRef}
+                onPress={() => {
+                  try {
+                    navigation.navigate('Search' as any, {
+                      screen: 'PropertyMap',
+                      params: {
+                        listingType: listingType === 'sale' ? 'buy' : listingType === 'pg' ? 'pg-hostel' : listingType,
+                      },
+                    } as any);
+                  } catch (err: any) {
+                    console.error('Error navigating to map:', err);
+                    CustomAlert.alert('Error', 'Map is not available.');
+                  }
+                }}
+                activeOpacity={0.8}>
+                <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                  <Svg width="100%" height="100%" style={{ position: 'absolute' }}>
+                    <Defs>
+                      <Pattern id="homeMapCardDots" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+                        <Circle cx="2" cy="2" r="1" fill="white" fillOpacity="0.5" />
+                      </Pattern>
+                    </Defs>
+                    <Rect width="100%" height="100%" fill="url(#homeMapCardDots)" />
+                  </Svg>
+                </View>
+                <View style={styles.mapSearchCardContent}>
+                  <TabIcon name="map" color="#FFFFFF" size={24} />
+                  <View style={styles.mapSearchCardText}>
+                    <Text style={styles.mapSearchCardTitle}>Search on Map</Text>
+                    <Text style={styles.mapSearchCardSubtitle}>Explore properties by location</Text>
+                  </View>
+                </View>
+                <View style={styles.mapSearchArrowCircle}>
+                  <TabIcon name="chevron-right" color="#FFFFFF" size={20} />
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
+
+          {/* Light content area */}
+          <View style={styles.lightContentArea}>
 
 
           {/* Explore Projects Section */}
@@ -766,6 +806,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               renderItem={renderCityCard}
             />
           </View>
+          </View>
         </Animated.ScrollView>
       </Animated.View>
     </View>
@@ -786,9 +827,155 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: spacing.xxl,
+    paddingTop: 0,
     backgroundColor: '#FAFAFA',
   },
-  // Welcome Section - Modern, spacious design
+  darkHeaderSection: {
+    backgroundColor: DARK_HEADER_BG,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+    borderBottomLeftRadius: borderRadius.xl,
+    borderBottomRightRadius: borderRadius.xl,
+  },
+  greetingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  greetingLeft: { flex: 1 },
+  timeGreetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  timeGreetingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    letterSpacing: 0.5,
+  },
+  welcomeTextDark: {
+    ...typography.h1,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+    fontSize: moderateScale(24),
+  },
+  welcomeSubtextDark: {
+    ...typography.body,
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: moderateScale(14),
+  },
+  avatarButton: { marginLeft: spacing.md },
+  avatarContainer: {
+    width: scale(48),
+    height: scale(48),
+    borderRadius: scale(24),
+    backgroundColor: 'rgba(0,119,192,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  avatarStatusDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.success,
+    borderWidth: 2,
+    borderColor: DARK_HEADER_BG,
+  },
+  toggleSection: {
+    flexDirection: 'row',
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  toggleButtonDark: {
+    flex: 1,
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: spacing.md,
+    borderRadius: 9999,
+    backgroundColor: TOGGLE_UNSELECTED_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: verticalScale(44),
+  },
+  toggleButtonTextDark: {
+    ...typography.body,
+    color: TOGGLE_UNSELECTED_TEXT,
+    fontWeight: '600',
+    fontSize: moderateScale(14),
+  },
+  searchInputContainerRef: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: SEARCH_INPUT_BG,
+    borderRadius: scale(12),
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: verticalScale(50),
+  },
+  searchInputRef: {
+    ...typography.body,
+    color: '#1a202c',
+    padding: 0,
+  },
+  mapSearchCardRef: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: MAP_CARD_BG,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    overflow: 'hidden',
+  },
+  mapSearchCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    zIndex: 1,
+  },
+  mapSearchCardText: { marginLeft: spacing.md },
+  mapSearchCardTitle: {
+    ...typography.body,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  mapSearchCardSubtitle: {
+    ...typography.caption,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 2,
+    fontSize: 12,
+  },
+  mapSearchArrowCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+    zIndex: 1,
+  },
+  lightContentArea: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+    paddingTop: spacing.lg,
+  },
+  // Welcome Section - Modern, spacious design (legacy, kept for structure)
   welcomeSection: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
@@ -809,9 +996,7 @@ const styles = StyleSheet.create({
   },
   // Search Section - Airbnb-inspired search bar
   searchSection: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    marginTop: spacing.sm,
+    marginBottom: 0,
   },
   searchContainer: {
     position: 'relative',
@@ -837,6 +1022,7 @@ const styles = StyleSheet.create({
   },
   searchInputWrapper: {
     flex: 1,
+    marginLeft: spacing.sm,
   },
   searchInput: {
     fontSize: moderateScale(16),

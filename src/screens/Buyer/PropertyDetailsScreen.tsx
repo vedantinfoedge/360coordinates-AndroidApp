@@ -28,7 +28,7 @@ import CustomAlert from '../../utils/alertHelper';
 import {buyerService} from '../../services/buyer.service';
 import {createLead} from '../../services/leadsService';
 import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
-import BuyerHeader from '../../components/BuyerHeader';
+import PropertyDetailsHeader from '../../components/PropertyDetailsHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {Linking} from 'react-native';
@@ -99,6 +99,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [propertyUnlocked, setPropertyUnlocked] = useState(false);
   const [processingContact, setProcessingContact] = useState(false);
   const [processingChat, setProcessingChat] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   useEffect(() => {
     loadPropertyDetails();
@@ -855,11 +856,12 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     : 'Price not available';
   
   const amenities = property.amenities || [];
+  const DESCRIPTION_PREVIEW_LENGTH = 180;
 
   return (
     <View style={styles.container}>
-      {/* Custom Header */}
-      <BuyerHeader
+      {/* 360° COORDINATES Header */}
+      <PropertyDetailsHeader
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support' as never)}
         onLogoutPress={isLoggedIn ? logout : undefined}
@@ -877,45 +879,15 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         showProfile={isLoggedIn}
         showSignIn={isGuest}
         showSignUp={isGuest}
-        scrollY={scrollY}
-        headerHeight={headerHeight}
       />
 
-      {/* Favorite and Share Buttons - Positioned below header */}
-      <View style={[styles.actionButtonsTop, {top: (insets.top + 60)}]}>
-        <TouchableOpacity
-          style={styles.favoriteButton}
-          onPress={(e: any) => {
-            e.stopPropagation();
-            handleToggleFavorite();
-          }}
-          disabled={togglingFavorite}
-          activeOpacity={0.7}>
-          <View style={styles.favoriteButtonInner}>
-            <Text style={styles.favoriteIcon}>
-            {isFavorite ? '❤️' : '🤍'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.shareButtonTop}
-          onPress={(e: any) => {
-            e.stopPropagation();
-            handleShareProperty();
-          }}
-          activeOpacity={0.7}>
-          <View style={styles.favoriteButtonInner}>
-            <Text style={styles.shareIcon}>🔗</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Scrollable Content with Image */}
-      <Animated.ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + spacing.md}]}
+      {/* Content sheet - white with rounded corners over dark background */}
+      <View style={styles.contentSheet}>
+        {/* Scrollable Content with Image */}
+        <Animated.ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
         onScroll={Animated.event(
           [{nativeEvent: {contentOffset: {y: scrollY}}}],
           {useNativeDriver: true},
@@ -923,6 +895,35 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         scrollEventThrottle={16}>
         {/* Image Slider/Carousel - Display ALL property images */}
         <View style={styles.imageCarouselContainer}>
+          {/* Back button - top left */}
+          <TouchableOpacity
+            style={styles.imageBackButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}>
+            <View style={styles.imageBackButtonInner}>
+              <TabIcon name="chevron-left" color={colors.text} size={22} />
+            </View>
+          </TouchableOpacity>
+          {/* Heart & Link - top right */}
+          <View style={styles.imageActionButtons}>
+            <TouchableOpacity
+              style={styles.imageActionBtn}
+              onPress={(e: any) => { e.stopPropagation(); handleToggleFavorite(); }}
+              disabled={togglingFavorite}
+              activeOpacity={0.7}>
+              <View style={styles.imageActionBtnInner}>
+                <TabIcon name={isFavorite ? 'heart' : 'heart-outline'} color={isFavorite ? '#E53935' : colors.text} size={20} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.imageActionBtn}
+              onPress={(e: any) => { e.stopPropagation(); handleShareProperty(); }}
+              activeOpacity={0.7}>
+              <View style={styles.imageActionBtnInner}>
+                <TabIcon name="link" color={colors.text} size={20} />
+              </View>
+            </TouchableOpacity>
+          </View>
           {propertyImages.length > 0 ? (
             <>
           <ScrollView
@@ -1101,91 +1102,123 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
         )}
 
-        {/* Content Sections */}
-        {/* Title and Price */}
+        {/* Content Sections - White card overlaying image */}
+        {/* Title, Location, Price */}
         <View style={styles.headerSection}>
-          <Text style={styles.title}>{capitalize(property.title || 'Property Title')}</Text>
+          <Text style={styles.title}>{(property.title || 'Property Title').toUpperCase()}</Text>
           <View style={styles.locationContainer}>
-            <TabIcon name="location" color={colors.textSecondary} size={18} />
+            <TabIcon name="location" color="#E53935" size={16} />
             <Text style={styles.location}>{property.location || property.city || 'Location not specified'}</Text>
           </View>
-          <Text style={styles.price}>{formattedPrice}</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formattedPrice}</Text>
+            {!isRentListing && <Text style={styles.priceOnwards}>onwards</Text>}
+          </View>
         </View>
 
-        {/* Quick Info */}
+        {/* Quick Info - Beds, Baths, Area, Type */}
         <View style={styles.quickInfo}>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <TabIcon name="bed" color={colors.primary} size={20} />
+              <TabIcon name="bed" color="#8B6914" size={20} />
             </View>
-            <Text style={styles.infoText}>{property.bedrooms} Beds</Text>
+            <Text style={styles.infoLabel}>Beds</Text>
+            <Text style={styles.infoValue}>{property.bedrooms ?? 'N/A'}</Text>
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
               <TabIcon name="bath" color={colors.primary} size={20} />
             </View>
-            <Text style={styles.infoText}>{property.bathrooms} Baths</Text>
+            <Text style={styles.infoLabel}>Baths</Text>
+            <Text style={styles.infoValue}>{property.bathrooms ?? 'N/A'}</Text>
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <TabIcon name="square" color={colors.primary} size={20} />
+              <TabIcon name="square" color={colors.textSecondary} size={20} />
             </View>
-            <Text style={styles.infoText}>{property.area}</Text>
+            <Text style={styles.infoLabel}>Area</Text>
+            <Text style={styles.infoValue}>{property.area ?? 'N/A'}</Text>
           </View>
           <View style={styles.infoCard}>
             <View style={styles.infoIconContainer}>
-              <TabIcon name="building" color={colors.primary} size={20} />
+              <TabIcon name="tag" color="#FFB800" size={20} />
             </View>
-            <Text style={styles.infoText}>{property.floor === '0' || property.floor === 0 ? 'Ground floor' : (property.floor ?? 'N/A')}</Text>
+            <Text style={styles.infoLabel}>Type</Text>
+            <Text style={styles.infoValue}>{isSaleListing ? 'BUY' : isRentListing ? 'RENT' : 'BUY'}</Text>
           </View>
         </View>
 
-        {/* Description */}
+        {/* Description - About this Property */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About this property</Text>
-          <Text style={styles.description}>{property.description || 'No description available'}</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleBar} />
+            <Text style={styles.sectionTitle}>About this Property</Text>
+          </View>
+          <View style={styles.sectionDivider} />
+          <Text style={styles.description} numberOfLines={descriptionExpanded ? undefined : 4}>
+            {property.description || 'No description available'}
+          </Text>
+          {(property.description?.length ?? 0) > DESCRIPTION_PREVIEW_LENGTH && (
+            <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
+              <Text style={styles.readMore}>Read more {'>'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Property Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Property Details</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleBar} />
+            <Text style={styles.sectionTitle}>Property Details</Text>
+          </View>
+          <View style={styles.sectionDivider} />
           <View style={styles.detailsGrid}>
-            {property.age && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Property Age</Text>
-                <Text style={styles.detailValue}>{property.age}</Text>
-              </View>
-            )}
-            {property.total_floors && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Total Floors</Text>
-                <Text style={styles.detailValue}>{property.total_floors}</Text>
-              </View>
-            )}
             {property.facing && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Facing</Text>
+                <Text style={styles.detailLabel}>FACING</Text>
                 <Text style={styles.detailValue}>{property.facing}</Text>
               </View>
             )}
             <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Type</Text>
+              <Text style={styles.detailLabel}>TYPE</Text>
               <Text style={styles.detailValue}>
                 {isSaleListing ? 'For Sale' : isRentListing ? 'For Rent' : property.type === 'buy' ? 'For Sale' : 'For Rent'}
               </Text>
             </View>
             {property.property_type ? (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Property Type</Text>
+              <View style={[styles.detailItem, styles.detailItemFull]}>
+                <Text style={styles.detailLabel}>PROPERTY TYPE</Text>
                 <Text style={styles.detailValue}>{property.property_type}</Text>
               </View>
             ) : null}
+            {property.possession && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>POSSESSION</Text>
+                <Text style={styles.detailValue}>{property.possession}</Text>
+              </View>
+            )}
+            {property.land_area && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>LAND AREA</Text>
+                <Text style={styles.detailValue}>{property.land_area}</Text>
+              </View>
+            )}
+            {property.age && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>PROPERTY AGE</Text>
+                <Text style={styles.detailValue}>{property.age}</Text>
+              </View>
+            )}
+            {property.total_floors && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>TOTAL FLOORS</Text>
+                <Text style={styles.detailValue}>{property.total_floors}</Text>
+              </View>
+            )}
             {isRentListing && hasBachelorsFlag ? (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Available for bachelors</Text>
-                <Text style={styles.detailValue}>
-                  {availableForBachelors ? 'Yes' : 'No'}
-                </Text>
+                <Text style={styles.detailLabel}>AVAILABLE FOR BACHELORS</Text>
+                <Text style={styles.detailValue}>{availableForBachelors ? 'Yes' : 'No'}</Text>
               </View>
             ) : null}
           </View>
@@ -1193,7 +1226,11 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
         {/* Amenities */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Amenities</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleBar} />
+            <Text style={styles.sectionTitle}>Amenities</Text>
+          </View>
+          <View style={styles.sectionDivider} />
           <View style={styles.amenitiesGrid}>
             {amenities.length > 0 ? (
               amenities.map((amenity: string, index: number) => {
@@ -1237,10 +1274,18 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
         {/* Location */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleBar} />
+            <Text style={styles.sectionTitle}>Location</Text>
+          </View>
+          <View style={styles.sectionDivider} />
           <Text style={styles.address}>
             {property.address || property.fullAddress || property.location || 'Address not available'}
           </Text>
+          <View style={styles.mapPlaceholder}>
+            <TabIcon name="map" color={colors.textSecondary} size={40} />
+            <Text style={styles.mapPlaceholderText}>{property.location || property.city || 'Location'}</Text>
+          </View>
           <TouchableOpacity 
             style={styles.mapButton}
             onPress={() => {
@@ -1250,13 +1295,22 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 listingType: property.status === 'rent' ? 'rent' : property.status === 'pg' ? 'pg-hostel' : 'buy',
               });
             }}>
+            <TabIcon name="location" color="#E53935" size={18} />
             <Text style={styles.mapButtonText}>View on Map</Text>
           </TouchableOpacity>
         </View>
       </Animated.ScrollView>
 
-      {/* Fixed Action Buttons */}
-      <View style={[styles.actionButtons, {paddingBottom: insets.bottom}]}>
+        {/* Credits & Fixed Action Buttons */}
+        {user && user.user_type === 'buyer' && !interactionLoading && (
+          <View style={styles.creditsRow}>
+            <View style={styles.creditsDot} />
+            <Text style={[styles.creditsText, interactionState.remaining <= 0 && styles.creditsTextError]}>
+              Credits Left: {interactionState.remaining}/{interactionState.max}
+            </Text>
+          </View>
+        )}
+        <View style={[styles.actionButtons, {paddingBottom: insets.bottom + 8}]}>
         <TouchableOpacity
           style={[
             styles.contactButton,
@@ -1281,18 +1335,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
         </TouchableOpacity>
       </View>
-      
-      {/* Credits Display - Left side for easy visibility */}
-      {user && user.user_type === 'buyer' && !interactionLoading && (
-        <View style={styles.limitContainer}>
-          <Text style={[
-            styles.limitText,
-            interactionState.remaining <= 0 && styles.limitTextError,
-          ]}>
-            Credits Left: {interactionState.remaining} / {interactionState.max}
-          </Text>
-        </View>
-      )}
+      </View>
+      {/* end contentSheet */}
 
       {/* Contact Modal */}
       <Modal
@@ -1489,10 +1533,21 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   );
 };
 
+// Dark blue background from reference UI
+const REFERENCE_BG = '#0D1B2A';
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: REFERENCE_BG,
+  },
+  contentSheet: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.xxl,
+    borderTopRightRadius: borderRadius.xxl,
+    overflow: 'hidden',
+    marginTop: -borderRadius.xxl,
   },
   loadingContainer: {
     flex: 1,
@@ -1510,20 +1565,60 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: verticalScale(100),
+    paddingBottom: verticalScale(120),
   },
   imageCarouselContainer: {
-    height: verticalScale(450),
+    height: verticalScale(340),
     position: 'relative',
-    paddingTop: spacing.md,
-    borderRadius: borderRadius.xl,
     overflow: 'hidden',
     marginHorizontal: spacing.md,
-    marginTop: spacing.xl + spacing.xl,
-    backgroundColor: colors.surfaceSecondary,
+    marginTop: spacing.lg,
+    backgroundColor: '#D4E4D4',
+    borderRadius: borderRadius.xl,
+  },
+  imageBackButton: {
+    position: 'absolute',
+    top: spacing.md,
+    left: spacing.md,
+    zIndex: 10,
+  },
+  imageBackButtonInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      android: { elevation: 4 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
+    }),
+  },
+  imageActionButtons: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    zIndex: 10,
+  },
+  imageActionBtn: {
+    zIndex: 11,
+  },
+  imageActionBtnInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      android: { elevation: 4 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
+    }),
   },
   imageCarousel: {
-    height: verticalScale(410),
+    height: verticalScale(340),
     borderRadius: borderRadius.xl,
   },
   imageCarouselContent: {
@@ -1531,9 +1626,8 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: IMAGE_CAROUSEL_WIDTH,
-    height: verticalScale(410),
+    height: verticalScale(340),
     borderRadius: borderRadius.xl,
-    paddingTop: spacing.md,
     overflow: 'hidden',
   },
   carouselNavButton: {
@@ -1654,26 +1748,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   actionButtonsTop: {
-    position: 'absolute',
-    paddingTop: spacing.xl,
-    paddingRight: spacing.xs,
-    right: spacing.md,
-    zIndex: 100,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    elevation: 10,
-  },
-  favoriteButton: {
-    // Position handled by parent
-    zIndex: 101,
-    elevation: 10,
-  },
-  shareButtonTop: {
-    // Position handled by parent
-    zIndex: 101,
-    elevation: 10,
-  },
-  favoriteButtonInner: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -1706,9 +1780,18 @@ const styles = StyleSheet.create({
   headerSection: {
     backgroundColor: colors.surface,
     padding: spacing.xl,
-    paddingTop: spacing.xl + spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingTop: spacing.lg,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  priceOnwards: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   title: {
     fontSize: 28,
@@ -1741,11 +1824,9 @@ const styles = StyleSheet.create({
   quickInfo: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     gap: spacing.sm,
   },
   infoCard: {
@@ -1764,38 +1845,59 @@ const styles = StyleSheet.create({
   infoIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary + '15', // 15% opacity purple
+    borderRadius: 10,
+    backgroundColor: colors.accentLighter,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
-  infoIcon: {
-    fontSize: 20,
-  },
-  infoText: {
+  infoLabel: {
     ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  infoValue: {
+    ...typography.captionSemibold,
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     textAlign: 'center',
   },
   section: {
     backgroundColor: colors.surface,
     padding: spacing.xl,
-    marginTop: spacing.lg,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
+    marginTop: 0,
+    paddingTop: spacing.xl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionTitleBar: {
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+    marginRight: spacing.sm,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: 'rgba(29, 36, 43, 0.1)',
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: colors.secondary, // Navy
-    marginBottom: spacing.lg,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.primary + '30', // 30% opacity purple accent line
+    color: colors.text,
+  },
+  readMore: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '600',
+    marginTop: spacing.sm,
   },
   description: {
     ...typography.body,
@@ -1811,21 +1913,11 @@ const styles = StyleSheet.create({
   detailItem: {
     width: '47%',
     padding: spacing.lg,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#F5F6F8',
     borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...Platform.select({
-      android: {
-        elevation: 2,
-      },
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: {width: 0, height: 1},
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-      },
-    }),
+  },
+  detailItemFull: {
+    width: '100%',
   },
   detailLabel: {
     ...typography.caption,
@@ -1851,21 +1943,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '47%',
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: colors.surface,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.accentLighter,
     gap: spacing.sm,
     marginBottom: spacing.sm,
-    minHeight: 50,
+    minHeight: 56,
   },
   amenityIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary + '15',
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: colors.accentLighter,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1885,20 +1977,61 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.md,
   },
-  mapButton: {
-    backgroundColor: colors.surfaceSecondary,
+  mapPlaceholder: {
+    height: 140,
+    backgroundColor: colors.accentLighter,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.primary + '40', // Purple border with opacity
-    marginTop: spacing.md,
+    borderColor: 'rgba(0, 119, 192, 0.15)',
+  },
+  mapPlaceholderText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+  },
+  mapButton: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    marginTop: spacing.sm,
   },
   mapButtonText: {
     ...typography.body,
-    color: colors.primary, // Purple text
+    color: colors.primary,
     fontWeight: '700',
     fontSize: 16,
+  },
+  creditsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  creditsDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  creditsText: {
+    ...typography.caption,
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  creditsTextError: {
+    color: colors.error,
   },
   ownerCard: {
     backgroundColor: colors.surfaceSecondary,

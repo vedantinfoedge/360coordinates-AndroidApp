@@ -67,6 +67,7 @@ interface Property {
   name: string;
   location: string;
   price: string; // Formatted price string (e.g., "₹50L", "₹5Cr", "₹10K/month")
+  priceNum?: number; // Raw numeric price for sorting
   type: 'buy' | 'rent' | 'pg-hostel';
   bedrooms: number;
   bathrooms: number;
@@ -145,6 +146,9 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Listed Within filter (within 7 days, 2 weeks, 1 month)
   const [listedWithin, setListedWithin] = useState<string>('');
+
+  // Sort options: 'relevance' | 'price_asc' | 'price_desc'
+  const [sortBy, setSortBy] = useState<'relevance' | 'price_asc' | 'price_desc'>('relevance');
 
   // When navigating to this screen multiple times (e.g. from Buyer dashboard / Home screen),
   // React Navigation may reuse the mounted screen. Sync state from latest route params so
@@ -228,7 +232,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [routeSyncKey]);
 
   const hasInitializedBudgetContext = useRef(false);
-  const searchBarHeight = 175; // Search bar + dropdown row + results header (for padding list below sticky section)
+  const searchBarHeight = 220; // Search bar + dropdown row + results header + sort pills (for padding list below sticky section)
 
   // Property type classification (bedroom filter shown for these types only)
   const bedroomBasedTypes = [
@@ -670,11 +674,13 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             : undefined;
         const availableForBachelors = prop.available_for_bachelors === true || prop.available_for_bachelors === 'true' || prop.available_for_bachelors === 1 || prop.available_for_bachelors === '1';
         const availabilityStatus = (prop.availability_status || prop.availabilityStatus || '').toString();
+        const rawPrice = Number(prop.price || 0);
         return {
           id: prop.id?.toString() || prop.property_id?.toString() || '',
           name: prop.title || prop.property_title || prop.name || 'Untitled Property',
           location: prop.location || prop.city || prop.address || 'Location not specified',
-          price: formatters.price(prop.price || 0, isRent),
+          price: formatters.price(rawPrice, isRent),
+          priceNum: rawPrice,
           type: (isPG ? 'pg-hostel' : isRent ? 'rent' : 'buy') as 'buy' | 'rent' | 'pg-hostel',
           bedrooms: parseInt(prop.bedrooms || '0'),
           bathrooms: parseInt(prop.bathrooms || '0'),
@@ -997,6 +1003,17 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
     return formatBudgetValue(value, budgetUnits);
   }, [budgetUnits, formatBudgetValue]);
 
+  // Sorted properties based on sortBy selection
+  const sortedProperties = useMemo(() => {
+    const list = [...filteredProperties];
+    if (sortBy === 'relevance') return list;
+    return list.sort((a, b) => {
+      const pa = a.priceNum ?? 0;
+      const pb = b.priceNum ?? 0;
+      return sortBy === 'price_asc' ? pa - pb : pb - pa;
+    });
+  }, [filteredProperties, sortBy]);
+
   const renderProperty = ({ item }: { item: Property }) => {
     // Determine property type for PropertyCard
     const propertyType = item.type === 'buy' ? 'buy' : item.type === 'rent' ? 'rent' : 'pg-hostel';
@@ -1031,7 +1048,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={[styles.searchSectionSticky, { paddingTop: insets.top }]}>
         <View style={styles.searchBarContainer}>
           <View style={styles.searchInputWrapper}>
-            <TabIcon name="location" color={colors.textSecondary} size={20} />
+            <TabIcon name="location" color={colors.error} size={20} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search by city"
@@ -1055,17 +1072,6 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               }}
               returnKeyType="search"
             />
-            <TouchableOpacity
-              style={styles.searchBarSearchButton}
-              onPress={() => {
-                const loc = (searchText || '').trim();
-                setLocation(loc);
-                setSearchText(loc);
-                setShowLocationSuggestions(false);
-                setTimeout(() => loadProperties(), 100);
-              }}>
-              <TabIcon name="search" color={colors.primaryDark} size={22} />
-            </TouchableOpacity>
           </View>
           {showLocationSuggestions && searchText.length >= 2 && (
             <View style={styles.locationSuggestionsContainer}>
@@ -1087,8 +1093,8 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setShowFilters(true)}>
-            <Text style={styles.filterIcon}>🔽</Text>
             <Text style={styles.filterText}>Filters</Text>
+            <Text style={styles.filterChevron}>▼</Text>
           </TouchableOpacity>
         </View>
         {/* Quick filters - dropdown theme: Listing type, Property type, Budget */}
@@ -1096,49 +1102,45 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.quickFiltersDropdownRow}>
           {searchMode === 'projects' ? (
             <>
-              {/* Project Status */}
+              {/* Project Status - value-first format */}
               <TouchableOpacity
                 style={[styles.dropdownTrigger, { flex: 1.2 }]}
                 onPress={() => setOpenDropdown(openDropdown === 'projectStatus' ? null : 'projectStatus')}>
-                <Text style={styles.dropdownLabel}>Status</Text>
-                <Text style={styles.dropdownValue} numberOfLines={1}>
-                  {projectStatus || 'Any'}
+                <Text style={styles.dropdownValueFirst} numberOfLines={1}>
+                  Status {projectStatus || 'Any'}
                 </Text>
                 <Text style={styles.dropdownChevron}>{openDropdown === 'projectStatus' ? '▲' : '▼'}</Text>
               </TouchableOpacity>
 
-              {/* Possession Date */}
+              {/* Possession Date - value-first format */}
               <TouchableOpacity
                 style={[styles.dropdownTrigger, { flex: 1.2 }]}
                 onPress={() => setOpenDropdown(openDropdown === 'possessionDate' ? null : 'possessionDate')}>
-                <Text style={styles.dropdownLabel}>Possession</Text>
-                <Text style={styles.dropdownValue} numberOfLines={1}>
-                  {possessionDate || 'Any'}
+                <Text style={styles.dropdownValueFirst} numberOfLines={1}>
+                  Possession {possessionDate || 'Any'}
                 </Text>
                 <Text style={styles.dropdownChevron}>{openDropdown === 'possessionDate' ? '▲' : '▼'}</Text>
               </TouchableOpacity>
             </>
           ) : (
-            /* Standard Property Filters */
+            /* Standard Property Filters - value-first format (Listing Buy ▼) */
             <TouchableOpacity
               style={styles.dropdownTrigger}
               onPress={() => setOpenDropdown(openDropdown === 'listing' ? null : 'listing')}>
-              <Text style={styles.dropdownLabel}>Listing</Text>
-              <Text style={styles.dropdownValue} numberOfLines={1}>
-                {listingType === 'buy' ? 'Buy' : listingType === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
+              <Text style={styles.dropdownValueFirst} numberOfLines={1}>
+                Listing {listingType === 'buy' ? 'Buy' : listingType === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
               </Text>
               <Text style={styles.dropdownChevron}>{openDropdown === 'listing' ? '▲' : '▼'}</Text>
             </TouchableOpacity>
           )}
 
-          {/* Common Filters: Property Type & Budget */}
+          {/* Common Filters: Property Type & Budget - value-first format */}
           <TouchableOpacity
             style={[styles.dropdownTrigger, listingType === 'pg-hostel' && styles.dropdownTriggerDisabled]}
             onPress={() => listingType !== 'pg-hostel' && setOpenDropdown(openDropdown === 'property' ? null : 'property')}
             disabled={listingType === 'pg-hostel'}>
-            <Text style={styles.dropdownLabel}>Property</Text>
-            <Text style={[styles.dropdownValue, listingType === 'pg-hostel' && styles.dropdownValueDisabled]} numberOfLines={1}>
-              {selectedPropertyType === 'all' ? 'All' : selectedPropertyType}
+            <Text style={[styles.dropdownValueFirst, listingType === 'pg-hostel' && styles.dropdownValueDisabled]} numberOfLines={1}>
+              Property {selectedPropertyType === 'all' ? 'All' : selectedPropertyType}
             </Text>
             <Text style={styles.dropdownChevron}>{openDropdown === 'property' ? '▲' : '▼'}</Text>
           </TouchableOpacity>
@@ -1146,9 +1148,8 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             <TouchableOpacity
               style={styles.dropdownTrigger}
               onPress={() => setOpenDropdown(openDropdown === 'budget' ? null : 'budget')}>
-              <Text style={styles.dropdownLabel}>Price</Text>
-              <Text style={styles.dropdownValue} numberOfLines={1}>
-                {minBudget === 0 && maxBudget === maxBudgetForType
+              <Text style={styles.dropdownValueFirst} numberOfLines={1}>
+                Price {minBudget === 0 && maxBudget === maxBudgetForType
                   ? 'Any'
                   : findBudgetLabelForRange({
                     listingType,
@@ -1283,7 +1284,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </TouchableOpacity>
         </Modal>
-        {/* Results Count */}
+        {/* Results Count & Sort */}
         <View style={styles.resultsHeader}>
           <Text style={styles.resultsCount}>
             {filteredProperties.length} Properties Found
@@ -1292,6 +1293,34 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.clearText}>Clear All</Text>
           </TouchableOpacity>
         </View>
+        {/* Sort pills - horizontal scroll */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sortPillsScroll}
+          contentContainerStyle={styles.sortPillsContent}>
+          <TouchableOpacity
+            style={[styles.sortPill, sortBy === 'relevance' && styles.sortPillActive]}
+            onPress={() => setSortBy('relevance')}>
+            <Text style={[styles.sortPillText, sortBy === 'relevance' && styles.sortPillTextActive]}>
+              Relevance
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sortPill, sortBy === 'price_asc' && styles.sortPillActive]}
+            onPress={() => setSortBy('price_asc')}>
+            <Text style={[styles.sortPillText, sortBy === 'price_asc' && styles.sortPillTextActive]}>
+              Price: Low-High
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sortPill, sortBy === 'price_desc' && styles.sortPillActive]}
+            onPress={() => setSortBy('price_desc')}>
+            <Text style={[styles.sortPillText, sortBy === 'price_desc' && styles.sortPillTextActive]}>
+              Price: High-Low
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* Properties List */}
@@ -1302,7 +1331,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       ) : (
         <FlatList
-          data={filteredProperties}
+          data={sortedProperties}
           renderItem={renderProperty}
           keyExtractor={(item: Property) => item.id}
           contentContainerStyle={[styles.listContent, { paddingTop: spacing.md, paddingBottom: 100 }]}
@@ -1322,10 +1351,11 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
         />
       )}
 
-      {/* Floating View on Map Button */}
+      {/* Floating View on Map Button - dark grey, red pin */}
       {!loading && filteredProperties.length > 0 && (
         <TouchableOpacity
           style={styles.floatingMapButton}
+          activeOpacity={0.8}
           onPress={() => {
             try {
               const mapParams: any = {
@@ -1341,7 +1371,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               console.error('Error navigating to map:', error);
             }
           }}>
-          <TabIcon name="location" color={colors.error} size={22} />
+          <TabIcon name="location" color={colors.error} size={20} />
           <Text style={styles.floatingMapButtonText}>View on Map</Text>
         </TouchableOpacity>
       )}
@@ -1692,12 +1722,6 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.sm,
     minWidth: 80,
   },
-  searchBarSearchButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   quickFiltersDropdownRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -1723,6 +1747,12 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   dropdownValue: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    fontSize: 13,
+  },
+  dropdownValueFirst: {
     flex: 1,
     ...typography.body,
     color: colors.text,
@@ -1811,6 +1841,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  filterChevron: {
+    fontSize: 10,
+    color: colors.surface,
+    marginLeft: spacing.xs,
+  },
   resultsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1823,15 +1858,43 @@ const styles = StyleSheet.create({
   },
   resultsCount: {
     ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 16,
   },
   clearText: {
     ...typography.body,
-    color: colors.primary,
-    textDecorationLine: 'underline',
+    color: colors.primaryLight,
     fontSize: 14,
     fontWeight: '500',
+  },
+  sortPillsScroll: {
+    maxHeight: 44,
+  },
+  sortPillsContent: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  sortPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  sortPillActive: {
+    backgroundColor: colors.primary,
+  },
+  sortPillText: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  sortPillTextActive: {
+    color: colors.surface,
+    fontWeight: '600',
   },
   listContent: {
     padding: spacing.md,
@@ -2092,11 +2155,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 30, // Position above bottom tab menu (65px height + some padding)
     alignSelf: 'center',
-    minWidth: 180,
+    minWidth: 200,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: '#1D242B',
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -2115,7 +2178,7 @@ const styles = StyleSheet.create({
   },
   floatingMapButtonText: {
     ...typography.body,
-    color: colors.textblack,
+    color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
   },
