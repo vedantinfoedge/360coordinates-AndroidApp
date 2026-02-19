@@ -29,7 +29,6 @@ import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
 import { buyerService, Property } from '../../services/buyer.service';
 import { propertyService } from '../../services/property.service';
-import { favoriteService } from '../../services/favorite.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters } from '../../utils/formatters';
 
@@ -298,7 +297,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         setProperties(validProperties as Property[]);
         const favorites = (validProperties as Property[])
           .filter(p => p.is_favorite)
-          .map(p => p.id);
+          .map(p => Number(p.id));
         setFavoriteIds(new Set(favorites));
       }
 
@@ -402,7 +401,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
 
       console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
       // Navigate to Search tab (SearchResultsScreen) so tab selection updates correctly
-      navigation.navigate('Search' as never, params as never);
+      navigation.navigate('Search', params);
     } catch (error: any) {
       console.error('Error navigating to search:', error);
       CustomAlert.alert('Error', 'Failed to navigate to search. Please try again.');
@@ -468,7 +467,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       status: listingType === 'sale' ? 'sale' : 'rent',
       searchMode: 'properties', // Explicitly set search mode to properties
     };
-    navigation.navigate('Search' as never, params as never);
+    navigation.navigate('Search', params);
   };
 
   const handleShareProperty = async (property: Property) => {
@@ -728,14 +727,14 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             </View>
             <TouchableOpacity
               onPress={() => {
-                navigation.navigate('Search' as never, {
+                navigation.navigate('Search', {
                   query: '',
                   location: '',
                   listingType: 'buy',
                   status: 'sale',
                   project_type: 'upcoming',
                   searchMode: 'projects',
-                } as never);
+                });
               }}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -767,9 +766,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                           { propertyId: String(item.id) },
                         )
                       }
-                      onFavoritePress={() => handleToggleFavorite(item.id)}
+                      onFavoritePress={() => handleToggleFavorite(Number(item.id))}
                       onSharePress={() => handleShareProperty(item)}
-                      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+                      isFavorite={favoriteIds.has(Number(item.id)) || item.is_favorite || false}
                       property={{
                         ...item,
                         project_status: item.project_status || item.upcoming_project_data?.project_status
@@ -811,7 +810,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
 
                   // Navigate directly to SearchResults screen
                   console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
-                  navigation.navigate('Search' as never, params as never);
+                  navigation.navigate('Search', params);
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   CustomAlert.alert('Error', 'Failed to load all properties. Please try again.');
@@ -855,9 +854,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                       price={formatters.price(item.price, item.status === 'rent')}
                       type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
                       onPress={() => navigation.navigate('PropertyDetails', { propertyId: String(item.id) })}
-                      onFavoritePress={() => handleToggleFavorite(item.id)}
+                      onFavoritePress={() => handleToggleFavorite(Number(item.id))}
                       onSharePress={() => handleShareProperty(item)}
-                      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+                      isFavorite={favoriteIds.has(Number(item.id)) || item.is_favorite || false}
                       property={{
                         ...item,
                         project_status: item.project_status || item.upcoming_project_data?.project_status
@@ -890,13 +889,13 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             </View>
             <TouchableOpacity
               onPress={() => {
-                navigation.navigate('Search' as never, {
+                navigation.navigate('Search', {
                   query: '',
                   location: '',
                   listingType: 'buy',
                   status: 'sale',
                   propertyType: 'Apartment',
-                } as never);
+                });
               }}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -928,9 +927,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                           { propertyId: String(item.id) },
                         )
                       }
-                      onFavoritePress={() => handleToggleFavorite(item.id)}
+                      onFavoritePress={() => handleToggleFavorite(Number(item.id))}
                       onSharePress={() => handleShareProperty(item)}
-                      isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+                      isFavorite={favoriteIds.has(Number(item.id)) || item.is_favorite || false}
                       property={{
                         ...item,
                         project_status: item.project_status || item.upcoming_project_data?.project_status

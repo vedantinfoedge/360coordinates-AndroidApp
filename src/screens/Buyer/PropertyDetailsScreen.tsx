@@ -70,6 +70,61 @@ const IMAGE_CAROUSEL_WIDTH = SCREEN_WIDTH - (spacing.md * 2);
 const TOTAL_INTERACTION_LIMIT = 5;
 const INTERACTION_STORAGE_KEY = 'interaction_remaining';
 
+/**
+ * Extract sales contact from property (from upcoming_project_data).
+ * Supports both camelCase (AddUpcomingProjectPopup) and snake_case (backend).
+ * Also supports salesPersons array - uses first person when available.
+ */
+const getSalesContactFromProperty = (prop: any): {
+  hasSalesContact: boolean;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  landline: string | null;
+  whatsapp: string | null;
+  alternative: string | null;
+  officeAddress: string | null;
+  salesPersons: Array<{ name: string; number: string; email: string; landlineNumber?: string; whatsappNumber?: string; alternativeNumber?: string }>;
+} => {
+  if (!prop) {
+    return { hasSalesContact: false, name: null, phone: null, email: null, landline: null, whatsapp: null, alternative: null, officeAddress: null, salesPersons: [] };
+  }
+  const raw = prop.upcoming_project_data;
+  let data: any = {};
+  if (raw != null) {
+    if (typeof raw === 'string') {
+      try {
+        data = JSON.parse(raw) || {};
+      } catch (_) {
+        data = {};
+      }
+    } else if (typeof raw === 'object' && !Array.isArray(raw)) {
+      data = raw;
+    }
+  }
+  const sp = data.salesPersons && Array.isArray(data.salesPersons) ? data.salesPersons : [];
+  const firstSp = sp[0];
+  const name = prop.salesName ?? prop.sales_name ?? data.salesName ?? data.sales_name ?? firstSp?.name ?? null;
+  const phone = prop.salesNumber ?? prop.sales_number ?? data.salesNumber ?? data.sales_number ?? firstSp?.number ?? null;
+  const email = prop.emailId ?? prop.email_id ?? data.emailId ?? data.email_id ?? firstSp?.email ?? null;
+  const landline = prop.landlineNumber ?? prop.landline_number ?? data.landlineNumber ?? data.landline_number ?? firstSp?.landlineNumber ?? null;
+  const whatsapp = prop.whatsappNumber ?? prop.whatsapp_number ?? data.whatsappNumber ?? data.whatsapp_number ?? firstSp?.whatsappNumber ?? null;
+  const alternative = prop.alternativeNumber ?? prop.alternative_number ?? data.alternativeNumber ?? data.alternative_number ?? firstSp?.alternativeNumber ?? null;
+  const officeAddress = prop.office_address ?? data.office_address ?? prop.fullAddress ?? data.fullAddress ?? null;
+  const hasSalesContact = Boolean(name || phone || email || landline || whatsapp || alternative || officeAddress || sp.length > 0);
+  return {
+    hasSalesContact,
+    name: name && String(name).trim() ? String(name).trim() : null,
+    phone: phone && String(phone).trim() ? String(phone).trim() : null,
+    email: email && String(email).trim() ? String(email).trim() : null,
+    landline: landline && String(landline).trim() ? String(landline).trim() : null,
+    whatsapp: whatsapp && String(whatsapp).trim() ? String(whatsapp).trim() : null,
+    alternative: alternative && String(alternative).trim() ? String(alternative).trim() : null,
+    officeAddress: officeAddress && String(officeAddress).trim() ? String(officeAddress).trim() : null,
+    salesPersons: sp.filter((p: any) => p && (p.name?.trim() || p.number?.trim() || p.email?.trim())),
+  };
+};
+
 const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
   const headerHeight = insets.top + verticalScale(70);
@@ -1306,7 +1361,11 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Owner Contact Details</Text>
+              <Text style={styles.modalTitle}>
+                {property && getSalesContactFromProperty(property).hasSalesContact
+                  ? 'Sales Contact Details'
+                  : 'Owner Contact Details'}
+              </Text>
               <TouchableOpacity onPress={() => {
                 console.log('[PropertyDetails] Close button pressed');
                 setShowContactModal(false);
@@ -1331,67 +1390,105 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             )}
             
             {property ? (
+            <ScrollView style={styles.contactDetailsScroll} showsVerticalScrollIndicator={false}>
             <View style={styles.contactDetails}>
-                {/* Owner Name - Always show */}
-              <View style={styles.contactItem}>
-                <Text style={styles.contactLabel}>Name</Text>
-                <Text style={styles.contactValue}>
-                    {property.seller?.name || 
-                     property.seller_name || 
-                     property.owner?.name || 
-                     property.owner?.full_name || 
-                     'Property Owner'}
-                </Text>
-              </View>
-                
-                {/* Phone - Always show (with "Not available" if missing) */}
-                <View style={styles.contactItem}>
-                  <View style={styles.contactLabelContainer}>
-                    <TabIcon name="phone" color={colors.primary} size={18} />
-                    <Text style={styles.contactLabel}>Phone</Text>
-                  </View>
-                  {(property.seller?.phone || property.seller_phone || property.owner?.phone) ? (
-                    <TouchableOpacity 
-                      style={styles.contactValueContainer}
-                      onPress={() => handlePhonePress(
-                        property.seller?.phone || 
-                        property.seller_phone || 
-                        property.owner?.phone || 
-                        ''
-                      )}>
-                    <Text style={[styles.contactValue, styles.contactLink]}>
-                        {property.seller?.phone || property.seller_phone || property.owner?.phone}
-                    </Text>
-                  </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.contactValue}>Not available</Text>
-              )}
-                </View>
-                
-                {/* Email - Always show (with "Not available" if missing) */}
-                <View style={styles.contactItem}>
-                  <View style={styles.contactLabelContainer}>
-                    <Text style={styles.contactLabelIcon}>✉</Text>
-                    <Text style={styles.contactLabel}>Email</Text>
-                  </View>
-                  {(property.seller?.email || property.seller_email || property.owner?.email) ? (
-                    <TouchableOpacity 
-                      style={styles.contactValueContainer}
-                      onPress={() => handleEmailPress(
-                        property.seller?.email || 
-                        property.seller_email || 
-                        property.owner?.email || 
-                        ''
-                      )}>
-                    <Text style={[styles.contactValue, styles.contactLink]}>
-                        {property.seller?.email || property.seller_email || property.owner?.email}
-                    </Text>
-                  </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.contactValue}>Not available</Text>
-              )}
-                </View>
+                {(() => {
+                  const sales = getSalesContactFromProperty(property);
+                  const useSales = sales.hasSalesContact;
+                  const displayName = useSales
+                    ? sales.name
+                    : (property.seller?.name || property.seller_name || property.owner?.name || property.owner?.full_name || 'Property Owner');
+                  const displayPhone = useSales ? sales.phone : (property.seller?.phone || property.seller_phone || property.owner?.phone);
+                  const displayEmail = useSales ? sales.email : (property.seller?.email || property.seller_email || property.owner?.email);
+                  return (
+                    <>
+                      {/* Name */}
+                      <View style={styles.contactItem}>
+                        <Text style={styles.contactLabel}>{useSales ? 'Sales Person' : 'Name'}</Text>
+                        <Text style={styles.contactValue}>{displayName}</Text>
+                      </View>
+                      {/* Phone */}
+                      <View style={styles.contactItem}>
+                        <View style={styles.contactLabelContainer}>
+                          <TabIcon name="phone" color={colors.primary} size={18} />
+                          <Text style={styles.contactLabel}>Phone</Text>
+                        </View>
+                        {displayPhone ? (
+                          <TouchableOpacity style={styles.contactValueContainer} onPress={() => handlePhonePress(displayPhone)}>
+                            <Text style={[styles.contactValue, styles.contactLink]}>{displayPhone}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text style={styles.contactValue}>Not available</Text>
+                        )}
+                      </View>
+                      {/* Landline (sales only) */}
+                      {useSales && sales.landline && (
+                        <View style={styles.contactItem}>
+                          <Text style={styles.contactLabel}>Landline</Text>
+                          <TouchableOpacity style={styles.contactValueContainer} onPress={() => handlePhonePress(sales.landline || '')}>
+                            <Text style={[styles.contactValue, styles.contactLink]}>{sales.landline}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {/* Email */}
+                      <View style={styles.contactItem}>
+                        <View style={styles.contactLabelContainer}>
+                          <Text style={styles.contactLabelIcon}>✉</Text>
+                          <Text style={styles.contactLabel}>Email</Text>
+                        </View>
+                        {displayEmail ? (
+                          <TouchableOpacity style={styles.contactValueContainer} onPress={() => handleEmailPress(displayEmail)}>
+                            <Text style={[styles.contactValue, styles.contactLink]}>{displayEmail}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text style={styles.contactValue}>Not available</Text>
+                        )}
+                      </View>
+                      {/* WhatsApp (sales only) */}
+                      {useSales && sales.whatsapp && (
+                        <View style={styles.contactItem}>
+                          <Text style={styles.contactLabel}>WhatsApp</Text>
+                          <TouchableOpacity
+                            style={styles.contactValueContainer}
+                            onPress={() => Linking.openURL(`https://wa.me/${(sales.whatsapp || '').replace(/\D/g, '')}`).catch(() => CustomAlert.alert('Error', 'Unable to open WhatsApp'))}>
+                            <Text style={[styles.contactValue, styles.contactLink]}>{sales.whatsapp}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {/* Alternative Number (sales only) */}
+                      {useSales && sales.alternative && (
+                        <View style={styles.contactItem}>
+                          <Text style={styles.contactLabel}>Alternative Number</Text>
+                          <TouchableOpacity style={styles.contactValueContainer} onPress={() => handlePhonePress(sales.alternative || '')}>
+                            <Text style={[styles.contactValue, styles.contactLink]}>{sales.alternative}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {/* Office Address (sales only) */}
+                      {useSales && sales.officeAddress && (
+                        <View style={styles.contactItem}>
+                          <Text style={styles.contactLabel}>Office Address</Text>
+                          <Text style={styles.contactValue}>{sales.officeAddress}</Text>
+                        </View>
+                      )}
+                      {/* Multiple sales persons (sales only, if more than one) */}
+                      {useSales && sales.salesPersons.length > 1 && (
+                        <View style={styles.contactItem}>
+                          <Text style={styles.contactLabel}>Other Sales Contacts</Text>
+                          {sales.salesPersons.slice(1, 5).map((sp: any, idx: number) => (
+                            <View key={idx} style={styles.contactSubItem}>
+                              <Text style={styles.contactSubValue}>
+                                {sp.name}{sp.number ? ` • ${sp.number}` : ''}{sp.email ? ` • ${sp.email}` : ''}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  );
+                })()}
             </View>
+            </ScrollView>
             ) : (
               <View style={styles.contactDetails}>
                 <Text style={styles.contactValue}>Property information not available</Text>
@@ -2051,9 +2148,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '300',
   },
+  contactDetailsScroll: {
+    maxHeight: 320,
+  },
   contactDetails: {
     gap: spacing.xl,
     marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   contactItem: {
     paddingBottom: spacing.lg,
@@ -2089,6 +2190,14 @@ const styles = StyleSheet.create({
   contactLink: {
     color: colors.primary, // Purple for links
     textDecorationLine: 'underline',
+  },
+  contactSubItem: {
+    paddingTop: spacing.xs,
+  },
+  contactSubValue: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 14,
   },
   modalChatButton: {
     backgroundColor: colors.primary, // Purple

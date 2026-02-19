@@ -23,9 +23,24 @@ const tabIcon = (char: string, color: string) => (
   <Text style={{fontSize: 20, fontWeight: '600', color}}>{char}</Text>
 );
 
+export type SearchParams = {
+  query?: string;
+  searchQuery?: string;
+  location?: string;
+  city?: string;
+  propertyType?: string;
+  budget?: string;
+  bedrooms?: string;
+  area?: string;
+  status?: 'sale' | 'rent';
+  listingType?: 'buy' | 'rent' | 'pg-hostel';
+  project_type?: 'upcoming' | null;
+  searchMode?: 'projects' | 'properties';
+};
+
 export type BuyerTabParamList = {
   Home: undefined;
-  Search: undefined;
+  Search: SearchParams | undefined;
   Add: undefined;
   Chats: undefined;
   Profile: undefined;
