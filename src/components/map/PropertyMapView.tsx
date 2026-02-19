@@ -21,6 +21,7 @@ import { Share } from 'react-native';
 import { MAP_CONFIG } from '../../config/mapbox.config';
 import CustomAlert from '../../utils/alertHelper';
 import { PG_HOSTEL_PROPERTY_TYPE, buildPGHostelFetchParams } from '../../utils/propertySearchParams';
+import { geocodeLocation } from '../../utils/geocoding';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 
@@ -172,6 +173,23 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       setMapZoom(14);
     }
   }, [userLocation?.latitude, userLocation?.longitude, propSelectedPropertyId]);
+
+  // When search location changes, geocode and center map on that location
+  useEffect(() => {
+    const loc = (searchParams?.location || searchParams?.city || '').trim();
+    if (!loc || propSelectedPropertyId) return;
+
+    let cancelled = false;
+    const run = async () => {
+      const result = await geocodeLocation(loc);
+      if (cancelled || !result) return;
+      setMapCenter([result.longitude, result.latitude]);
+      setMapZoom(12);
+      log.property(`Map centered on search location: ${loc}`);
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [searchParams?.location, searchParams?.city, propSelectedPropertyId]);
 
   // Load selected property and center map on it
   useEffect(() => {

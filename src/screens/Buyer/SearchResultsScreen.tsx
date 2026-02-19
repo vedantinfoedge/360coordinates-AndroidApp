@@ -37,6 +37,7 @@ import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters } from '../../utils/formatters';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import { buildPGHostelFetchParams, PG_HOSTEL_PROPERTY_TYPE } from '../../utils/propertySearchParams';
+import CustomAlert from '../../utils/alertHelper';
 
 type SearchResultsScreenNavigationProp = NativeStackNavigationProp<SearchStackParamList, 'SearchResults'>;
 
@@ -80,6 +81,7 @@ interface Property {
   availableForBachelors?: boolean;
   availabilityStatus?: string;
   project_type?: string;
+  created_at?: string;
 }
 
 const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
@@ -140,6 +142,9 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   // Project Search Filters
   const [projectStatus, setProjectStatus] = useState<string>('');
   const [possessionDate, setPossessionDate] = useState<string>('');
+
+  // Listed Within filter (within 7 days, 2 weeks, 1 month)
+  const [listedWithin, setListedWithin] = useState<string>('');
 
   // When navigating to this screen multiple times (e.g. from Buyer dashboard / Home screen),
   // React Navigation may reuse the mounted screen. Sync state from latest route params so
@@ -684,11 +689,31 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
           is_favorite: prop.is_favorite || false,
           availableForBachelors,
           availabilityStatus: availabilityStatus || undefined,
+          created_at: prop.created_at || prop.created_date || prop.date_created || undefined,
         };
       });
 
+      // Apply Listed Within filter (client-side)
+      let finalFiltered = formattedProperties;
+      if (listedWithin && searchMode !== 'projects') {
+        const now = Date.now();
+        const msPerDay = 24 * 60 * 60 * 1000;
+        let maxDays: number;
+        if (listedWithin === '7days') maxDays = 7;
+        else if (listedWithin === '2weeks') maxDays = 14;
+        else if (listedWithin === '1month') maxDays = 30;
+        else maxDays = Infinity;
+        const cutoff = now - maxDays * msPerDay;
+        finalFiltered = formattedProperties.filter(p => {
+          const created = p.created_at || '';
+          if (!created) return true;
+          const createdDate = formatters.parseMySQLDateTime(created) || new Date(created);
+          return createdDate.getTime() >= cutoff;
+        });
+      }
+
       setProperties(formattedProperties);
-      setFilteredProperties(formattedProperties);
+      setFilteredProperties(finalFiltered);
     } catch (error) {
       console.error('Error loading properties:', error);
       setProperties([]);
@@ -696,7 +721,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, status, initialLocation, minBudget, maxBudget, maxBudgetForType, isBedroomBased, isAreaBased, isLandProperty, projectTypeFilter, searchMode, projectStatus, possessionDate]);
+  }, [location, searchText, listingType, selectedPropertyType, budget, bedrooms, area, status, initialLocation, minBudget, maxBudget, maxBudgetForType, isBedroomBased, isAreaBased, isLandProperty, projectTypeFilter, searchMode, projectStatus, possessionDate, listedWithin]);
 
   // Track if this is the first render to skip initial search trigger
   const isFirstRender = React.useRef(true);
@@ -724,7 +749,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
       isMounted = false;
       clearTimeout(searchTimeout);
     };
-  }, [location, listingType, selectedPropertyType, budget, bedrooms, area, loadProperties, searchMode, projectStatus, possessionDate]);
+  }, [location, listingType, selectedPropertyType, budget, bedrooms, area, loadProperties, searchMode, projectStatus, possessionDate, listedWithin]);
 
   // Reload when budget preset changes
   useEffect(() => {
@@ -881,6 +906,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
     setArea('');
     setProjectStatus('');
     setPossessionDate('');
+    setListedWithin('');
     setSearchText('');
     setLocation('');
     setTimeout(() => loadProperties(), 100);
@@ -914,6 +940,17 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleToggleFavorite = async (propertyId: string | number) => {
+    if (!isLoggedIn) {
+      CustomAlert.alert(
+        'Login Required',
+        'Please login to add properties to your favorites.',
+        [
+          { text: 'Login', onPress: () => (navigation as any).navigate('Auth', { screen: 'Login' }) },
+          { text: 'Cancel', style: 'cancel' },
+        ],
+      );
+      return;
+    }
     try {
       const { buyerService } = await import('../../services/buyer.service');
       const response = await buyerService.toggleFavorite(propertyId) as any;
@@ -1378,6 +1415,37 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
                           style={[
                             styles.filterChipText,
                             projectStatus === item.value && styles.filterChipTextActive,
+                          ]}>
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Listed Within (Properties Mode only) */}
+              {searchMode !== 'projects' && (
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterLabel}>Listed Within</Text>
+                  <View style={styles.filterOptions}>
+                    {[
+                      { label: 'Any', value: '' },
+                      { label: 'Within 7 days', value: '7days' },
+                      { label: 'Within 2 weeks', value: '2weeks' },
+                      { label: 'Within 1 month', value: '1month' },
+                    ].map(item => (
+                      <TouchableOpacity
+                        key={item.value || 'any-listed'}
+                        style={[
+                          styles.filterChip,
+                          listedWithin === item.value && styles.filterChipActive,
+                        ]}
+                        onPress={() => setListedWithin(item.value)}>
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            listedWithin === item.value && styles.filterChipTextActive,
                           ]}>
                           {item.label}
                         </Text>

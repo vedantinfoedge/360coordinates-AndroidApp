@@ -410,29 +410,42 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleToggleFavorite = async (propertyId: number) => {
+    if (!isLoggedIn) {
+      CustomAlert.alert(
+        'Login Required',
+        'Please login to add properties to your favorites.',
+        [
+          { text: 'Login', onPress: () => (navigation as any).navigate('Auth', { screen: 'Login' }) },
+          { text: 'Cancel', style: 'cancel' },
+        ],
+      );
+      return;
+    }
     try {
       const response = await buyerService.toggleFavorite(propertyId) as any;
       if (response && response.success) {
         // Determine favorite status from response
         const isFavorite = response.data?.is_favorite ?? response.data?.favorite ?? !favoriteIds.has(propertyId);
 
+        const idNum = Number(propertyId);
         const newFavoriteIds = new Set(favoriteIds);
         if (isFavorite) {
-          newFavoriteIds.add(propertyId);
+          newFavoriteIds.add(idNum);
         } else {
-          newFavoriteIds.delete(propertyId);
+          newFavoriteIds.delete(idNum);
         }
         setFavoriteIds(newFavoriteIds);
 
-        // Update property in list
-        setProperties(prev =>
-          prev.map(p =>
-            p.id === propertyId
-              ? { ...p, is_favorite: isFavorite }
-              : p,
-          ),
-        );
+        // Update property in all lists (properties, upcomingProjects, buyNewHomeProperties)
+        const updateIsFavorite = (p: Property) =>
+          Number(p.id) === idNum ? { ...p, is_favorite: isFavorite } : p;
+        setProperties(prev => prev.map(updateIsFavorite));
+        setUpcomingProjects(prev => prev.map(updateIsFavorite));
+        setBuyNewHomeProperties(prev => prev.map(updateIsFavorite));
 
+        if (isFavorite) {
+          CustomAlert.alert('Added to Favorites', 'View in Profile → My Favorites');
+        }
         console.log(`Property ${propertyId} ${isFavorite ? 'added to' : 'removed from'} favorites`);
       } else {
         CustomAlert.alert('Error', (response as any)?.message || 'Failed to update favorite');
@@ -495,9 +508,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             { propertyId: String(item.id) },
           )
         }
-        onFavoritePress={() => handleToggleFavorite(item.id)}
+        onFavoritePress={() => handleToggleFavorite(Number(item.id))}
         onSharePress={() => handleShareProperty(item)}
-        isFavorite={favoriteIds.has(item.id) || item.is_favorite || false}
+        isFavorite={favoriteIds.has(Number(item.id)) || item.is_favorite || false}
         property={{
           ...item,
           project_type: item.project_type,

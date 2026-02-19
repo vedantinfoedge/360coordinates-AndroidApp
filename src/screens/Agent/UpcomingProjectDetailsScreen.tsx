@@ -910,13 +910,13 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         </View>
       )}
 
-      {/* Contact Modal - Buyer only (Sales / Builder contact) */}
+      {/* Contact Modal - Buyer only (Sales person details from Add Project) */}
       {isBuyer && (
         <Modal visible={showContactModal} transparent animationType="slide" onRequestClose={() => setShowContactModal(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Sales / Builder Contact</Text>
+                <Text style={styles.modalTitle}>Sales Person Details</Text>
                 <TouchableOpacity onPress={() => setShowContactModal(false)}>
                   <TabIcon name="close" color={colors.textSecondary} size={20} />
                 </TouchableOpacity>
@@ -934,27 +934,17 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                   <Text style={styles.contactValue}>{property.sales_name || property.seller_name || 'Sales Contact'}</Text>
                 </View>
                 <View style={styles.contactItem}>
-                  <Text style={styles.contactLabel}>📞 Phone</Text>
-                  {(property.sales_number || property.seller_phone) ? (
-                    <TouchableOpacity onPress={() => handlePhonePress(property.sales_number || property.seller_phone || '')}>
-                      <Text style={[styles.contactValue, styles.contactLink]}>{property.sales_number || property.seller_phone}</Text>
+                  <Text style={styles.contactLabel}>Mobile Number</Text>
+                  {(property.mobile_number || property.sales_number || property.seller_phone) ? (
+                    <TouchableOpacity onPress={() => handlePhonePress(property.mobile_number || property.sales_number || property.seller_phone || '')}>
+                      <Text style={[styles.contactValue, styles.contactLink]}>{property.mobile_number || property.sales_number || property.seller_phone}</Text>
                     </TouchableOpacity>
                   ) : (
                     <Text style={styles.contactValue}>Not available</Text>
                   )}
                 </View>
                 <View style={styles.contactItem}>
-                  <Text style={styles.contactLabel}>📱 Mobile</Text>
-                  {property.mobile_number ? (
-                    <TouchableOpacity onPress={() => handlePhonePress(property.mobile_number)}>
-                      <Text style={[styles.contactValue, styles.contactLink]}>{property.mobile_number}</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.contactValue}>Not available</Text>
-                  )}
-                </View>
-                <View style={styles.contactItem}>
-                  <Text style={styles.contactLabel}>✉ Email</Text>
+                  <Text style={styles.contactLabel}>Email</Text>
                   {(property.email_id || property.seller_email) ? (
                     <TouchableOpacity onPress={() => handleEmailPress(property.email_id || property.seller_email || '')}>
                       <Text style={[styles.contactValue, styles.contactLink]}>{property.email_id || property.seller_email}</Text>
@@ -963,32 +953,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                     <Text style={styles.contactValue}>Not available</Text>
                   )}
                 </View>
-                {(property.whatsapp_number || property.alternative_number || property.office_address) && (
-                  <>
-                    {property.whatsapp_number && (
-                      <View style={styles.contactItem}>
-                        <Text style={styles.contactLabel}>WhatsApp</Text>
-                        <TouchableOpacity onPress={() => handlePhonePress(property.whatsapp_number)}>
-                          <Text style={[styles.contactValue, styles.contactLink]}>{property.whatsapp_number}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    {property.alternative_number && (
-                      <View style={styles.contactItem}>
-                        <Text style={styles.contactLabel}>Alternative</Text>
-                        <TouchableOpacity onPress={() => handlePhonePress(property.alternative_number)}>
-                          <Text style={[styles.contactValue, styles.contactLink]}>{property.alternative_number}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    {property.office_address && (
-                      <View style={styles.contactItem}>
-                        <Text style={styles.contactLabel}>Office Address</Text>
-                        <Text style={styles.contactValue}>{property.office_address}</Text>
-                      </View>
-                    )}
-                  </>
-                )}
               </View>
               <TouchableOpacity
                 style={styles.modalChatButton}

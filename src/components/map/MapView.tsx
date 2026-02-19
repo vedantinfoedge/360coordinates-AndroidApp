@@ -71,6 +71,18 @@ const MapViewComponent: React.FC<MapViewProps> = ({
     requestLocationPermission();
   }, []);
 
+  // Animate camera when center or zoom changes (e.g. after location search)
+  useEffect(() => {
+    if (!loading && cameraRef.current && initialCenter) {
+      cameraRef.current.setCamera({
+        centerCoordinate: initialCenter,
+        zoomLevel: initialZoom ?? MAP_CONFIG.DEFAULT_ZOOM,
+        animationDuration: 800,
+        animationMode: 'flyTo',
+      });
+    }
+  }, [initialCenter, initialZoom, loading]);
+
   const requestLocationPermission = async () => {
     if (Platform.OS === 'android') {
       try {

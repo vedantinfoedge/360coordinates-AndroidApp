@@ -165,8 +165,9 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleToggleFavorite = async (propertyId: number | string) => {
     try {
-      // Optimistically remove from list
-      setProperties(prev => prev.filter(prop => prop.id !== propertyId));
+      // Optimistically remove from list (normalize id types for comparison)
+      const idStr = String(propertyId);
+      setProperties(prev => prev.filter(prop => String(prop.id) !== idStr));
 
       // Call API to remove from favorites
       await buyerService.toggleFavorite(propertyId);

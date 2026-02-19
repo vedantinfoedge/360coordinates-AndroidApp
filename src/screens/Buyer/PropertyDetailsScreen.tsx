@@ -445,7 +445,17 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleToggleFavorite = async () => {
     if (!property) return;
-    
+    if (!isLoggedIn) {
+      CustomAlert.alert(
+        'Login Required',
+        'Please login to add properties to your favorites.',
+        [
+          { text: 'Login', onPress: () => (navigation as any).navigate('Auth', { screen: 'Login' }) },
+          { text: 'Cancel', style: 'cancel' },
+        ],
+      );
+      return;
+    }
     try {
       setTogglingFavorite(true);
       // Use buyerService for consistency with other buyer screens

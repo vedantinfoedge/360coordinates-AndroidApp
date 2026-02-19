@@ -486,7 +486,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.optionIconContainer}>
                 <TabIcon name="inquiries" color={colors.primary} size={20} />
               </View>
-              <Text style={styles.optionText}>My Inquiries</Text>
+              <Text style={styles.optionText}>My Chats</Text>
             </View>
             <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>

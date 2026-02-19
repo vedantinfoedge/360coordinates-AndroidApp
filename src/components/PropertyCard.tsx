@@ -135,12 +135,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   };
 
   const handleFavoritePress = () => {
-    // Optimistically update UI
-    setFavorite(!favorite);
     if (onFavoritePress) {
+      // Parent handles API - don't optimistically update; use isFavorite from parent as source of truth
       onFavoritePress();
     } else {
-      // Default behavior
+      // Default behavior when no handler
+      setFavorite(!favorite);
       CustomAlert.alert(
         favorite ? 'Removed from Favorites' : 'Added to Favorites',
         `${name} has been ${favorite ? 'removed from' : 'added to'} your favorites.`,
@@ -314,8 +314,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               activeOpacity={0.7}>
               <View style={styles.actionButtonContainer}>
                 <TabIcon
-                  name={favorite ? 'heart' : 'heart-outline'}
-                  color={favorite ? '#E53935' : colors.primaryDark}
+                  name={(onFavoritePress ? isFavorite : favorite) ? 'heart' : 'heart-outline'}
+                  color={(onFavoritePress ? isFavorite : favorite) ? '#E53935' : colors.primaryDark}
                   size={20}
                 />
               </View>
