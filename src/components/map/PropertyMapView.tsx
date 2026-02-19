@@ -205,6 +205,19 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     }
   }, [propSelectedPropertyId]);
 
+  // When selectedProperty changes (e.g. from PropertyDetails), fetch pin screen position for card placement
+  useEffect(() => {
+    if (!selectedProperty || selectedPinScreenPosition) return;
+    const fetchPosition = async () => {
+      await new Promise(resolve => setTimeout(resolve, 400)); // Wait for map to settle
+      const point = await mapRef.current?.getPointInView([selectedProperty.longitude, selectedProperty.latitude]);
+      if (point) {
+        setSelectedPinScreenPosition({ x: point[0], y: point[1] });
+      }
+    };
+    fetchPosition();
+  }, [selectedProperty?.id]);
+
   const loadSelectedPropertyAndRelated = async () => {
     if (!propSelectedPropertyId) return;
 
@@ -239,6 +252,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
           setSelectedProperty(formattedProperty);
           setSelectedPropertyId(String(currentProperty.id));
+          setSelectedPinScreenPosition(null); // Will be set by useEffect after map settles
           checkFavoriteStatus(String(currentProperty.id));
 
           // Load related properties (same area, similar type) and pass current property
@@ -768,35 +782,32 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                 <View
                   style={[
                     styles.propertyCardWrapper,
-                    selectedPinScreenPosition && {
-                      left: Math.max(
-                        spacing.md,
-                        Math.min(
-                          selectedPinScreenPosition.x - CARD_WIDTH / 2,
-                          SCREEN_WIDTH - CARD_WIDTH - spacing.md,
-                        ),
-                      ),
-                      top: Math.max(
-                        spacing.md,
-                        Math.min(
-                          selectedPinScreenPosition.y - CARD_TOTAL_HEIGHT - POINTER_HEIGHT - 8,
-                          SCREEN_WIDTH * 0.5,
-                        ),
-                      ),
-                    },
+                    selectedPinScreenPosition
+                      ? {
+                          left: Math.max(
+                            spacing.md,
+                            Math.min(
+                              selectedPinScreenPosition.x - CARD_WIDTH / 2,
+                              SCREEN_WIDTH - CARD_WIDTH - spacing.md,
+                            ),
+                          ),
+                          top: Math.max(
+                            spacing.md,
+                            selectedPinScreenPosition.y - CARD_TOTAL_HEIGHT - POINTER_HEIGHT - 8,
+                          ),
+                        }
+                      : { top: spacing.md, right: spacing.md },
                   ]}>
-                  {/* Triangular pointer pointing to the pin */}
-                  <View style={styles.popupCardPointer} />
                   <TouchableOpacity
                     style={styles.propertyCard}
                 activeOpacity={1}
                 onPress={() => {
-                  // Navigate to property details when card is clicked
                   if (onPropertyPress) {
                     onPropertyPress(selectedProperty);
                   }
                   setSelectedProperty(null);
                   setSelectedPropertyId(null);
+                  setSelectedPinScreenPosition(null);
                 }}>
                 {/* Compact Image Section */}
                 <View style={styles.popupCardImageContainer}>
@@ -821,6 +832,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                         e.stopPropagation();
                         setSelectedProperty(null);
                         setSelectedPropertyId(null);
+                        setSelectedPinScreenPosition(null);
                       }}>
                       <TabIcon name="close" color={colors.text} size={18} />
                     </TouchableOpacity>
@@ -875,8 +887,12 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                   </View>
                 </View>
               </TouchableOpacity>
+              {/* Triangular pointer pointing down to the pin */}
+              <View style={styles.popupCardPointer} />
             </View>
+          </View>
           )}
+          </View>
         </View>
       )}
 
@@ -984,17 +1000,32 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   propertyCardOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: spacing.md,
-    paddingRight: spacing.md,
+    alignItems: 'flex-start',
     zIndex: 1000,
     pointerEvents: 'box-none',
+  },
+  propertyCardWrapper: {
+    position: 'absolute',
+    width: CARD_WIDTH,
+    zIndex: 1001,
+    alignItems: 'center',
+  },
+  popupCardPointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: POINTER_HEIGHT,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#FFFFFF',
+    marginTop: -1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   overlayTouchable: {
     position: 'absolute',
@@ -1007,8 +1038,7 @@ const styles = StyleSheet.create({
   propertyCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    width: Math.min(280, SCREEN_WIDTH * 0.75),
-    maxWidth: 280,
+    width: CARD_WIDTH,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,

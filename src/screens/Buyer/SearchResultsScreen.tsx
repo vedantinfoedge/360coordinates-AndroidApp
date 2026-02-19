@@ -1064,7 +1064,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
                 setShowLocationSuggestions(false);
                 setTimeout(() => loadProperties(), 100);
               }}>
-              <Text style={styles.searchBarSearchButtonText}>Search</Text>
+              <TabIcon name="search" color={colors.primaryDark} size={22} />
             </TouchableOpacity>
           </View>
           {showLocationSuggestions && searchText.length >= 2 && (
@@ -1693,16 +1693,10 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   searchBarSearchButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
-    borderRadius: borderRadius.sm,
-  },
-  searchBarSearchButtonText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '600',
-    fontSize: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   quickFiltersDropdownRow: {
     flexDirection: 'row',
