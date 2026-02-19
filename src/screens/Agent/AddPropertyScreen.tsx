@@ -675,8 +675,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
       }
 
       const areaValue = parseFloat(builtUpArea.replace(/[^0-9.]/g, ''));
-      if (builtUpArea.trim() && (isNaN(areaValue) || areaValue <= 0)) {
-        nextErrors.builtUpArea = `${fieldVisibility.areaLabel} must be a positive number`;
+      if (builtUpArea.trim() && (isNaN(areaValue) || areaValue < 100)) {
+        nextErrors.builtUpArea = `${fieldVisibility.areaLabel} must be at least 100 sq.ft`;
+      } else if (builtUpArea.trim() && !isNaN(areaValue) && areaValue > 300000) {
+        nextErrors.builtUpArea = `${fieldVisibility.areaLabel} cannot exceed 300,000 sq.ft`;
       }
 
       // Validate carpet_area <= area
@@ -1468,6 +1470,23 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   Bathrooms {fieldVisibility.bathroomsRequired && <Text style={styles.required}>*</Text>}
                 </Text>
                 <View style={styles.numberButtonsContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.numberButton,
+                      bathrooms === 0 && styles.numberButtonActive,
+                    ]}
+                    onPress={() => {
+                      setBathrooms(0);
+                      clearFieldError('bathrooms');
+                    }}>
+                    <Text
+                      style={[
+                        styles.numberButtonText,
+                        bathrooms === 0 && styles.numberButtonTextActive,
+                      ]}>
+                      0
+                    </Text>
+                  </TouchableOpacity>
                   {[1, 2, 3, 4].map(num => (
                     <TouchableOpacity
                       key={num}
@@ -1567,18 +1586,24 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   placeholderTextColor={colors.textSecondary}
                   value={builtUpArea}
                   onChangeText={(text: string) => {
-                    // Validate plot area limit (3 lac = 300,000 sq ft)
-                    if (fieldVisibility.areaLabel === 'Plot Area') {
-                      const numValue = parseFloat(text.replace(/[^0-9.]/g, ''));
-                      if (!isNaN(numValue) && numValue > 300000) {
+                    setBuiltUpArea(text);
+                    const numValue = parseFloat(text.replace(/[^0-9.]/g, ''));
+                    if (text.trim() && !isNaN(numValue)) {
+                      if (numValue < 100) {
                         setFieldErrors(prev => ({
                           ...prev,
-                          builtUpArea: 'Plot area cannot exceed 3 lac sq ft (300,000 sq ft)',
+                          builtUpArea: `${fieldVisibility.areaLabel} must be at least 100 sq.ft`,
+                        }));
+                        return;
+                      }
+                      if (numValue > 300000) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          builtUpArea: `${fieldVisibility.areaLabel} cannot exceed 300,000 sq.ft`,
                         }));
                         return;
                       }
                     }
-                    setBuiltUpArea(text);
                     clearFieldError('builtUpArea');
                   }}
                   keyboardType="numeric"
@@ -1586,11 +1611,9 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
               {renderFieldError('builtUpArea')}
-              {fieldVisibility.areaLabel === 'Plot Area' && (
-                <Text style={styles.hintText}>
-                  Maximum: 3 lac sq ft (300,000 sq ft)
-                </Text>
-              )}
+              <Text style={styles.hintText}>
+                Min: 100 sq.ft — Max: 300,000 sq.ft
+              </Text>
             </View>
 
             {fieldVisibility.showCarpetArea && (
@@ -1677,6 +1700,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Dropdown
                   label="Property Age"
                   placeholder="Select property age"
+                  required={true}
                   options={[
                     {label: 'New Construction', value: 'New Construction'},
                     {label: 'Less than 1 Year', value: 'Less than 1 Year'},
@@ -1699,6 +1723,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                 <Dropdown
                   label="Furnishing"
                   placeholder="Select furnishing status"
+                  required={true}
                   options={[
                     {label: 'Unfurnished', value: 'Unfurnished'},
                     {label: 'Semi-Furnished', value: 'Semi-Furnished'},

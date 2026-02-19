@@ -90,11 +90,9 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
 
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Subscription Check
-  const isAgent = (user as any)?.role === 'agent';
-  const isPaidSeller = (user as any)?.subscription_status === 'active' || (user as any)?.subscription_status === 'pro';
-  // Allow 10 for Agents or Paid Sellers, 3 for Free Sellers
-  const MAX_PHOTOS = isAgent || isPaidSeller ? 10 : 3;
+  // Image limits: minimum 4, maximum 10
+  const MIN_PHOTOS = 4;
+  const MAX_PHOTOS = 10;
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyStatus, setPropertyStatus] = useState<PropertyStatus>('sell');
   const [propertyType, setPropertyType] = useState<GuidePropertyType | ''>('');
@@ -352,18 +350,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     if (photos.length >= MAX_PHOTOS) {
-      if (!isAgent && !isPaidSeller) {
-        Alert.alert(
-          'Limit Reached',
-          'Free plan allows only 3 images. Upgrade to add more.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Upgrade', onPress: () => navigation.navigate('Subscription' as never) }
-          ]
-        );
-      } else {
-        showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
-      }
+      showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
       return;
     }
 
@@ -390,18 +377,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
         const assetsToAdd = response.assets.slice(0, remainingSlots);
 
         if (photos.length + assetsToAdd.length > MAX_PHOTOS) {
-          if (!isAgent && !isPaidSeller) {
-            Alert.alert(
-              'Limit Reached',
-              'Free plan allows only 3 images. Upgrade to add more.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Upgrade', onPress: () => navigation.navigate('Subscription' as never) }
-              ]
-            );
-          } else {
-            showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
-          }
+          showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
           return;
         }
 
@@ -527,18 +503,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleCameraCapture = async () => {
     if (photos.length >= MAX_PHOTOS) {
-      if (!isAgent && !isPaidSeller) {
-        Alert.alert(
-          'Limit Reached',
-          'Free plan allows only 3 images. Upgrade to add more.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Upgrade', onPress: () => navigation.navigate('Subscription' as never) }
-          ]
-        );
-      } else {
-        showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
-      }
+      showError('Limit Reached', `You can upload maximum ${MAX_PHOTOS} photos`);
       return;
     }
     const hasPermission = await requestCameraCapturePermission();
@@ -658,8 +623,10 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       const areaValue = parseFloat(builtUpArea.replace(/[^0-9.]/g, ''));
-      if (builtUpArea.trim() && (isNaN(areaValue) || areaValue <= 0)) {
-        nextErrors.builtUpArea = `${fieldVisibility.areaLabel} must be a positive number`;
+      if (builtUpArea.trim() && (isNaN(areaValue) || areaValue < 100)) {
+        nextErrors.builtUpArea = `${fieldVisibility.areaLabel} must be at least 100 sq.ft`;
+      } else if (builtUpArea.trim() && !isNaN(areaValue) && areaValue > 300000) {
+        nextErrors.builtUpArea = `${fieldVisibility.areaLabel} cannot exceed 300,000 sq.ft`;
       }
 
       // Validate carpet_area <= area
@@ -1461,6 +1428,23 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   Bathrooms {fieldVisibility.bathroomsRequired && <Text style={styles.required}>*</Text>}
                 </Text>
                 <View style={styles.numberButtonsContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.numberButton,
+                      bathrooms === 0 && styles.numberButtonActive,
+                    ]}
+                    onPress={() => {
+                      setBathrooms(0);
+                      clearFieldError('bathrooms');
+                    }}>
+                    <Text
+                      style={[
+                        styles.numberButtonText,
+                        bathrooms === 0 && styles.numberButtonTextActive,
+                      ]}>
+                      0
+                    </Text>
+                  </TouchableOpacity>
                   {[1, 2, 3, 4].map(num => (
                     <TouchableOpacity
                       key={num}
@@ -1560,18 +1544,24 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   placeholderTextColor={colors.textSecondary}
                   value={builtUpArea}
                   onChangeText={(text: string) => {
-                    // Validate plot area limit (3 lac = 300,000 sq ft)
-                    if (fieldVisibility.areaLabel === 'Plot Area') {
-                      const numValue = parseFloat(text.replace(/[^0-9.]/g, ''));
-                      if (!isNaN(numValue) && numValue > 300000) {
+                    setBuiltUpArea(text);
+                    const numValue = parseFloat(text.replace(/[^0-9.]/g, ''));
+                    if (text.trim() && !isNaN(numValue)) {
+                      if (numValue < 100) {
                         setFieldErrors(prev => ({
                           ...prev,
-                          builtUpArea: 'Plot area cannot exceed 3 lac sq ft (300,000 sq ft)',
+                          builtUpArea: `${fieldVisibility.areaLabel} must be at least 100 sq.ft`,
+                        }));
+                        return;
+                      }
+                      if (numValue > 300000) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          builtUpArea: `${fieldVisibility.areaLabel} cannot exceed 300,000 sq.ft`,
                         }));
                         return;
                       }
                     }
-                    setBuiltUpArea(text);
                     clearFieldError('builtUpArea');
                   }}
                   keyboardType="numeric"
@@ -1579,11 +1569,9 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.areaUnit}>sq.ft</Text>
               </View>
               {renderFieldError('builtUpArea')}
-              {fieldVisibility.areaLabel === 'Plot Area' && (
-                <Text style={styles.hintText}>
-                  Maximum: 3 lac sq ft (300,000 sq ft)
-                </Text>
-              )}
+              <Text style={styles.hintText}>
+                Min: 100 sq.ft — Max: 300,000 sq.ft
+              </Text>
             </View>
 
             {fieldVisibility.showCarpetArea && (
