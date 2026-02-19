@@ -1303,7 +1303,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               console.error('Error navigating to map:', error);
             }
           }}>
-          <TabIcon name="map" color={colors.surface} size={22} />
+          <TabIcon name="location" color={colors.error} size={22} />
           <Text style={styles.floatingMapButtonText}>View on Map</Text>
         </TouchableOpacity>
       )}
