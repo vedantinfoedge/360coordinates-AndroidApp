@@ -475,7 +475,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
       if (hasBudgetFilter) {
         const budgetUnits = getBudgetUnitsForSelection(
           listingType,
-          selectedPropertyType === 'all' ? undefined : selectedPropertyType,
+          selectedPropertyType === 'all' ? '' : selectedPropertyType,
         );
         const multiplier = budgetUnits === 'lakhs' ? 100000 : 1000;
         searchParams.min_price = String(Math.round(minBudget * multiplier));
@@ -1034,7 +1034,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             <TabIcon name="location" color={colors.textSecondary} size={20} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by city, locality, project"
+              placeholder="Search by city"
               placeholderTextColor={colors.textSecondary}
               value={searchText}
               onChangeText={(text: string) => {
@@ -1689,7 +1689,7 @@ const styles = StyleSheet.create({
     flex: 1,
     ...typography.body,
     color: colors.text,
-    padding: 0,
+    paddingLeft: spacing.sm,
     minWidth: 80,
   },
   searchBarSearchButton: {

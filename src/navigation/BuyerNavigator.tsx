@@ -6,7 +6,11 @@ import type {BuyerTabParamList} from '../components/navigation/BuyerTabNavigator
 /** Re-export for screens that navigate within the tab stack (e.g. PropertyDetails). */
 export type BuyerStackParamList = BuyerTabParamList;
 
-const Stack = createNativeStackNavigator<BuyerStackParamList>();
+type BuyerNavigatorParamList = {
+  BuyerTabs: undefined;
+};
+
+const Stack = createNativeStackNavigator<BuyerNavigatorParamList>();
 
 const BuyerNavigator = () => {
   return (

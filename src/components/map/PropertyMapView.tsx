@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import MapViewComponent, { MapViewHandle } from './MapView';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -43,6 +44,8 @@ export interface MapSearchParams {
   maxBudget?: number;
   bedrooms?: string;
   area?: string;
+  /** [lng, lat] from autocomplete - used for immediate map centering without geocoding */
+  searchCoordinates?: [number, number];
 }
 
 // Check if Mapbox is available
@@ -64,6 +67,7 @@ interface Property {
   latitude: number;
   longitude: number;
   cover_image?: string;
+  images?: string[];
   property_type?: string;
 }
 
@@ -88,6 +92,28 @@ interface ApiResponseWithData<T = unknown> {
   success?: boolean;
   message?: string;
   data?: T;
+}
+
+/** Extract and fix image URLs from API prop (images can be string[] or {url}[]) */
+function buildPropertyImages(prop: any): string[] | undefined {
+  const list: string[] = [];
+  const seen = new Set<string>();
+  const add = (val: string | null | undefined) => {
+    const u = fixImageUrl(val);
+    if (u && !seen.has(u)) {
+      seen.add(u);
+      list.push(u);
+    }
+  };
+  add(prop.cover_image || prop.image);
+  const imgs = prop.images;
+  if (imgs && Array.isArray(imgs)) {
+    imgs.forEach((item: any) => {
+      const url = typeof item === 'string' ? item : item?.url;
+      add(url);
+    });
+  }
+  return list.length > 0 ? list : undefined;
 }
 
 const categoryMap: { [key: string]: string } = {
@@ -131,8 +157,29 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   );
   const [selectedPinScreenPosition, setSelectedPinScreenPosition] = useState<{ x: number; y: number } | null>(null);
   const mapRef = useRef<MapViewHandle>(null);
+  const popupImageScrollRef = useRef<{ scrollTo: (opts: { x: number; animated?: boolean }) => void } | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Build image URLs for popup card slider (cover + images, deduplicated)
+  const popupImageUrls = React.useMemo(() => {
+    if (!selectedProperty) return [];
+    const list: string[] = [];
+    const seen = new Set<string>();
+    const add = (url: string | null | undefined) => {
+      const u = fixImageUrl(url);
+      if (u && !seen.has(u)) {
+        seen.add(u);
+        list.push(u);
+      }
+    };
+    add(selectedProperty.cover_image);
+    if (selectedProperty.images?.length) {
+      selectedProperty.images.forEach(add);
+    }
+    return list;
+  }, [selectedProperty?.id, selectedProperty?.cover_image, selectedProperty?.images]);
+
   // Use user location as initial center when available and no selected property
   const effectiveInitialCenter: [number, number] =
     userLocation && !propSelectedPropertyId
@@ -181,10 +228,19 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     }
   }, [userLocation?.latitude, userLocation?.longitude, propSelectedPropertyId]);
 
-  // When search location changes, geocode and center map on that location
+  // When search location changes, center map on that area (use coordinates if available, else geocode)
   useEffect(() => {
     const loc = (searchParams?.location || searchParams?.city || '').trim();
     if (!loc || propSelectedPropertyId) return;
+
+    // Use coordinates directly when available (from autocomplete selection) - instant map move
+    if (searchParams?.searchCoordinates && searchParams.searchCoordinates.length >= 2) {
+      const [lng, lat] = searchParams.searchCoordinates;
+      setMapCenter([lng, lat]);
+      setMapZoom(12);
+      log.property(`Map centered on search coordinates: ${loc}`);
+      return;
+    }
 
     let cancelled = false;
     const run = async () => {
@@ -196,7 +252,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     };
     run();
     return () => { cancelled = true; };
-  }, [searchParams?.location, searchParams?.city, propSelectedPropertyId]);
+  }, [searchParams?.location, searchParams?.city, searchParams?.searchCoordinates, propSelectedPropertyId]);
 
   // Load selected property and center map on it
   useEffect(() => {
@@ -204,6 +260,14 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       loadSelectedPropertyAndRelated();
     }
   }, [propSelectedPropertyId]);
+
+  // Reset popup image slider when selected property changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    setTimeout(() => {
+      popupImageScrollRef.current?.scrollTo({ x: 0, animated: false });
+    }, 50);
+  }, [selectedProperty?.id]);
 
   // When selectedProperty changes (e.g. from PropertyDetails), fetch pin screen position for card placement
   useEffect(() => {
@@ -248,6 +312,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
             latitude: lat,
             longitude: lng,
             cover_image: currentProperty.cover_image || currentProperty.image,
+            images: buildPropertyImages(currentProperty),
           };
 
           setSelectedProperty(formattedProperty);
@@ -308,6 +373,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
             latitude: parseFloat(prop.latitude),
             longitude: parseFloat(prop.longitude),
             cover_image: prop.cover_image || prop.image,
+            images: buildPropertyImages(prop),
           }));
 
         // Always add current property to the list if provided (for pinning on map)
@@ -414,6 +480,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           latitude: parseFloat(prop.latitude),
           longitude: parseFloat(prop.longitude),
           cover_image: prop.cover_image || prop.image,
+          images: buildPropertyImages(prop),
         }));
 
         setProperties(mergedProperties);
@@ -505,6 +572,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
               latitude: parseFloat(prop.latitude),
               longitude: parseFloat(prop.longitude),
               cover_image: prop.cover_image || prop.image,
+              images: buildPropertyImages(prop),
             }));
           setProperties(formattedProperties);
           log.property(`Loaded ${formattedProperties.length} properties for map (filter: ${lt})`);
@@ -809,18 +877,55 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                   setSelectedPropertyId(null);
                   setSelectedPinScreenPosition(null);
                 }}>
-                {/* Compact Image Section */}
+                {/* Compact Image Section - Slider when multiple images */}
                 <View style={styles.popupCardImageContainer}>
-                  {selectedProperty.cover_image ? (
+                  {popupImageUrls.length === 0 ? (
+                    <View style={styles.popupCardImagePlaceholder}>
+                      <TabIcon name="camera" color={colors.textSecondary} size={32} />
+                    </View>
+                  ) : popupImageUrls.length === 1 ? (
                     <Image
-                      source={{ uri: fixImageUrl(selectedProperty.cover_image) }}
+                      source={{ uri: popupImageUrls[0] }}
                       style={styles.popupCardImage}
                       resizeMode="cover"
                     />
                   ) : (
-                    <View style={styles.popupCardImagePlaceholder}>
-                      <TabIcon name="camera" color={colors.textSecondary} size={32} />
-                    </View>
+                    <>
+                      <ScrollView
+                        ref={popupImageScrollRef}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        onMomentumScrollEnd={(e: { nativeEvent: { contentOffset: { x: number } } }) => {
+                          const offsetX = e.nativeEvent.contentOffset.x;
+                          const idx = Math.round(offsetX / CARD_WIDTH);
+                          setCurrentImageIndex(Math.min(idx, popupImageUrls.length - 1));
+                        }}
+                        decelerationRate="fast"
+                        style={styles.popupCardImageSlider}
+                        contentContainerStyle={styles.popupCardImageSliderContent}
+                      >
+                        {popupImageUrls.map((uri, index) => (
+                          <Image
+                            key={`popup-img-${index}`}
+                            source={{ uri }}
+                            style={[styles.popupCardImage, { width: CARD_WIDTH }]}
+                            resizeMode="cover"
+                          />
+                        ))}
+                      </ScrollView>
+                      <View style={styles.popupCardDots}>
+                        {popupImageUrls.map((_, index) => (
+                          <View
+                            key={`dot-${index}`}
+                            style={[
+                              styles.popupCardDot,
+                              index === currentImageIndex && styles.popupCardDotActive,
+                            ]}
+                          />
+                        ))}
+                      </View>
+                    </>
                   )}
 
                   {/* Image Overlay - Compact */}
@@ -1058,6 +1163,34 @@ const styles = StyleSheet.create({
   popupCardImage: {
     width: '100%',
     height: '100%',
+  },
+  popupCardImageSlider: {
+    width: CARD_WIDTH,
+    height: CARD_IMAGE_HEIGHT,
+  },
+  popupCardImageSliderContent: {
+    flexDirection: 'row',
+  },
+  popupCardDots: {
+    position: 'absolute',
+    bottom: 8,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  popupCardDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  popupCardDotActive: {
+    backgroundColor: '#FFFFFF',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   popupCardImagePlaceholder: {
     width: '100%',

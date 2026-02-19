@@ -2,17 +2,10 @@ import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {View, Text} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import BuyerDashboardScreen from '../../screens/Buyer/BuyerDashboardScreen';
 import ChatNavigator from '../../navigation/ChatNavigator';
-import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
-import SearchResultsScreen from '../../screens/Buyer/SearchResultsScreen';
-import AllPropertiesScreen from '../../screens/Buyer/AllPropertiesScreen';
-import PropertyDetailsScreen from '../../screens/Buyer/PropertyDetailsScreen';
-import PropertyMapScreen from '../../screens/Buyer/PropertyMapScreen';
-import SupportScreen from '../../screens/Buyer/SupportScreen';
-import UpcomingProjectDetailsScreen from '../../screens/Agent/UpcomingProjectDetailsScreen';
-import FavoritesScreen from '../../screens/FavoritesScreen';
-import RecentlyViewedScreen from '../../screens/Buyer/RecentlyViewedScreen';
+import HomeStackNavigator from '../../navigation/HomeStackNavigator';
+import SearchStackNavigator from '../../navigation/SearchStackNavigator';
+import ProfileStackNavigator from '../../navigation/ProfileStackNavigator';
 import AddTabScreen from '../../screens/Buyer/AddTabScreen';
 import {ArcFABProvider} from '../../context/ArcFABContext';
 import BuyerCustomTabBar from './BuyerCustomTabBar';
@@ -96,16 +89,16 @@ const BuyerTabNavigator = () => {
           tabBar={props => <BuyerCustomTabBar {...props} />}>
       <Tab.Screen
         name="Home"
-        component={BuyerDashboardScreen}
+        component={HomeStackNavigator}
         options={{
           title: 'Explore',
-          headerShown: false, // Hide default header for custom header
+          headerShown: false,
           tabBarIcon: ({color}) => tabIcon('H', color),
         }}
       />
       <Tab.Screen
         name="Search"
-        component={SearchResultsScreen}
+        component={SearchStackNavigator}
         initialParams={{
           query: '',
           location: '',
@@ -116,7 +109,7 @@ const BuyerTabNavigator = () => {
           bedrooms: '',
           area: '',
           status: '',
-          listingType: 'all', // Show all properties by default
+          listingType: 'all',
         } as any}
         options={{
           title: 'Search',
@@ -146,10 +139,10 @@ const BuyerTabNavigator = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={BuyerProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           title: 'Profile',
-          headerShown: false, // Hide default header for custom header
+          headerShown: false,
           tabBarIcon: ({color}) => tabIcon('P', color),
         }}
       />
@@ -159,81 +152,7 @@ const BuyerTabNavigator = () => {
         options={{
           title: 'Chat',
           headerShown: false,
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="Favorites"
-        component={FavoritesScreen}
-        options={{
-          title: 'Favorites',
-          headerShown: false, // Hide default header for custom header
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="RecentlyViewed"
-        component={RecentlyViewedScreen}
-        options={{
-          title: 'Recently Viewed',
-          headerShown: false,
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="PropertyList"
-        component={SearchResultsScreen}
-        options={{
-          title: 'Properties',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="SearchResults"
-        component={SearchResultsScreen}
-        options={{
-          title: 'Search Results',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="AllProperties"
-        component={AllPropertiesScreen}
-        options={{
-          title: 'All Properties',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="PropertyDetails"
-        component={PropertyDetailsScreen}
-        options={{
-          title: 'Property Details',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="UpcomingProjectDetails"
-        component={UpcomingProjectDetailsScreen}
-        options={{
-          title: 'Upcoming Project Details',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="PropertyMap"
-        component={PropertyMapScreen}
-        options={{
-          title: 'Map',
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
-      <Tab.Screen
-        name="Support"
-        component={SupportScreen}
-        options={{
-          title: 'Support',
-          tabBarButton: () => null, // Hide from tab bar
+          tabBarButton: () => null,
         }}
       />
         </Tab.Navigator>

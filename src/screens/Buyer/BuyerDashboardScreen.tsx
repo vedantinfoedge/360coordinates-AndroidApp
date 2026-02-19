@@ -400,8 +400,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       params.searchMode = 'properties';
 
       console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
-      // Navigate to Search tab (SearchResultsScreen) so tab selection updates correctly
-      navigation.navigate('Search', params);
+      (navigation as any).navigate('Search', { screen: 'SearchResults', params });
     } catch (error: any) {
       console.error('Error navigating to search:', error);
       CustomAlert.alert('Error', 'Failed to navigate to search. Please try again.');
@@ -467,7 +466,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       status: listingType === 'sale' ? 'sale' : 'rent',
       searchMode: 'properties', // Explicitly set search mode to properties
     };
-    navigation.navigate('Search', params);
+    (navigation as any).navigate('Search', { screen: 'SearchResults', params });
   };
 
   const handleShareProperty = async (property: Property) => {
@@ -727,13 +726,16 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             </View>
             <TouchableOpacity
               onPress={() => {
-                navigation.navigate('Search', {
-                  query: '',
-                  location: '',
-                  listingType: 'buy',
-                  status: 'sale',
-                  project_type: 'upcoming',
-                  searchMode: 'projects',
+                (navigation as any).navigate('Search', {
+                  screen: 'SearchResults',
+                  params: {
+                    query: '',
+                    location: '',
+                    listingType: 'buy',
+                    status: 'sale',
+                    project_type: 'upcoming',
+                    searchMode: 'projects',
+                  },
                 });
               }}>
               <Text style={styles.seeAllText}>See All</Text>
@@ -810,7 +812,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
 
                   // Navigate directly to SearchResults screen
                   console.log('[BuyerDashboard] Navigating to SearchResults with params:', params);
-                  navigation.navigate('Search', params);
+                  (navigation as any).navigate('Search', { screen: 'SearchResults', params });
                 } catch (error: any) {
                   console.error('Error navigating to all properties:', error);
                   CustomAlert.alert('Error', 'Failed to load all properties. Please try again.');
@@ -894,12 +896,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             </View>
             <TouchableOpacity
               onPress={() => {
-                navigation.navigate('Search', {
-                  query: '',
-                  location: '',
-                  listingType: 'buy',
-                  status: 'sale',
-                  propertyType: 'Apartment',
+                (navigation as any).navigate('Search', {
+                  screen: 'SearchResults',
+                  params: {
+                    query: '',
+                    location: '',
+                    listingType: 'buy',
+                    status: 'sale',
+                    propertyType: 'Apartment',
+                  },
                 });
               }}>
               <Text style={styles.seeAllText}>See All</Text>

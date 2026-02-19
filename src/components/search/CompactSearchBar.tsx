@@ -29,6 +29,8 @@ export interface CompactSearchBarSearchParams {
   maxBudget: number;
   bedrooms: string;
   area: string;
+  /** Coordinates [lng, lat] from autocomplete selection - used for immediate map centering */
+  coordinates?: [number, number];
 }
 
 export interface CompactSearchBarProps {
@@ -179,11 +181,23 @@ const CompactSearchBar: React.FC<CompactSearchBarProps> = ({
     });
   };
 
-  const handleLocationSelect = (locationData: {name?: string; placeName?: string}) => {
+  const handleLocationSelect = (locationData: {name?: string; placeName?: string; coordinates?: [number, number]}) => {
     const name = locationData.name || locationData.placeName || '';
     onSearchTextChange(name);
     onLocationChange(name);
     setShowLocationSuggestions(false);
+    // Trigger search with coordinates for immediate map centering
+    onSearch({
+      location: name,
+      listingType,
+      propertyType: selectedPropertyType,
+      budget,
+      minBudget,
+      maxBudget,
+      bedrooms,
+      area,
+      coordinates: locationData.coordinates,
+    });
   };
 
   return (

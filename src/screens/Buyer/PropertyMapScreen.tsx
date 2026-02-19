@@ -144,8 +144,11 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
 
   const listingTypeForMap = listingType;
 
+  const [searchCoordinates, setSearchCoordinates] = useState<[number, number] | undefined>(undefined);
+
   const searchParams: MapSearchParams = {
     location,
+    city: location || undefined,
     listingType: listingTypeForMap,
     propertyType: selectedPropertyType,
     budget,
@@ -153,6 +156,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
     maxBudget,
     bedrooms,
     area,
+    searchCoordinates,
   };
 
   const handleSearch = (p: CompactSearchBarSearchParams) => {
@@ -165,6 +169,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
     setMaxBudget(p.maxBudget);
     setBedrooms(p.bedrooms);
     setArea(p.area);
+    setSearchCoordinates(p.coordinates);
   };
 
   const handleListingTypeChange = (type: ListingType) => {
@@ -217,21 +222,34 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
       if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
-        navigation.navigate('SearchResults', {
-          listingType: listingType,
+        const params = {
+          listingType,
           location,
           propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
           budget: budget || undefined,
           bedrooms: bedrooms || undefined,
           area: area || undefined,
-        } as never);
+        };
+        const tabNav = navigation.getParent?.()?.getParent?.();
+        if (tabNav) {
+          (tabNav as any).navigate('Search', { screen: 'SearchResults', params });
+        } else {
+          (navigation as any).navigate('Search', { screen: 'SearchResults', params });
+        }
       }
     } catch (error: any) {
       console.error('Error navigating back to list:', error);
-      navigation.navigate('SearchResults', {
-        listingType: listingType,
-        location,
-      } as never);
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        const tabNav = navigation.getParent?.()?.getParent?.();
+        if (tabNav) {
+          (tabNav as any).navigate('Search', {
+            screen: 'SearchResults',
+            params: { listingType, location },
+          });
+        }
+      }
     }
   };
 
