@@ -338,7 +338,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             <Text style={styles.userName}>{userData.full_name || 'User'}</Text>
             <Text style={styles.userEmail}>{userData.email}</Text>
             <View style={styles.creditsBadge}>
-              <TabIcon name="dollar" color={colors.textSecondary} size={16} />
+              <TabIcon name="credits" color={colors.textSecondary} size={16} />
               <Text style={styles.creditsBadgeText}>
                 Credits Left: {creditsState.remaining}/{creditsState.max}
               </Text>

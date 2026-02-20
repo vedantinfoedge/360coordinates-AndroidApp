@@ -51,7 +51,8 @@ export type TabIconName =
   | 'map'
   | 'heart'
   | 'heart-outline'
-  | 'leaf';
+  | 'leaf'
+  | 'credits';
 
 type Props = { name: TabIconName; color: string; size?: number };
 
@@ -360,6 +361,13 @@ export function TabIcon({ name, color, size = SIZE }: Props) {
       return (
         <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <Path d="M11 20A7 7 0 0 1 9.5 3.5 5.5 5.5 0 0 1 21 10c0 2.5-2 5-5 7l-5 3" />
+        </Svg>
+      );
+    case 'credits':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M12 2a10 10 0 010 20 10 10 0 010-20z" />
+          <Path d="M12 6a6 6 0 010 12 6 6 0 010-12z" />
         </Svg>
       );
     default:
