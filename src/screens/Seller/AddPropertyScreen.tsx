@@ -28,6 +28,22 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AMENITY_GAP = spacing.xs;
 const AMENITY_COLS = 4;
 const AMENITY_ITEM_WIDTH = (SCREEN_WIDTH - 2 * spacing.xl - (AMENITY_COLS - 1) * AMENITY_GAP) / AMENITY_COLS;
+
+// 360 Coordinates reference UI colors
+const REF = {
+  navy: '#0B1F3A',
+  blue: '#1565C0',
+  blueLight: '#1E88E5',
+  sky: '#E8F4FD',
+  grayBg: '#F2F5FA',
+  grayInput: '#F4F7FB',
+  grayText: '#8A97A8',
+  textDark: '#0D1B2E',
+  textMid: '#3D5068',
+  green: '#00C48C',
+  red: '#F44336',
+  border: '#E2E8F0',
+};
 import Dropdown from '../../components/common/Dropdown';
 import { propertyService } from '../../services/property.service';
 import { sellerService } from '../../services/seller.service';
@@ -124,6 +140,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
   const [availableForBachelors, setAvailableForBachelors] = useState(false);
   const stepScrollViewRef = useRef<{ scrollTo: (opts: { y: number; animated?: boolean }) => void } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   const clearFieldError = useCallback((field: string) => {
     setFieldErrors(prev => {

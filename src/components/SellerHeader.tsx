@@ -25,7 +25,11 @@ interface SellerHeaderProps {
   onBuyPropertyPress?: () => void; // Switch to buyer dashboard to browse properties
   subscriptionDays?: number;
   scrollY?: InstanceType<typeof Animated.Value>; // For hide/show on scroll
+  /** Navy variant for dashboard - dark navy background with white elements */
+  variant?: 'default' | 'navy';
 }
+
+const NAVY_BG = '#0B1F3A';
 
 const SellerHeader: React.FC<SellerHeaderProps> = ({
   onProfilePress,
@@ -35,7 +39,9 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
   onBuyPropertyPress,
   subscriptionDays,
   scrollY,
+  variant = 'default',
 }) => {
+  const isNavy = variant === 'navy';
   const [menuVisible, setMenuVisible] = useState(false);
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(-300)).current;
@@ -103,9 +109,10 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
         {
           paddingTop: insets.top,
           transform: scrollY ? [{translateY: headerTranslateY}] : [],
+          backgroundColor: isNavy ? NAVY_BG : colors.background,
         }
       ]}>
-      <View style={styles.header}>
+      <View style={[styles.header, isNavy && styles.headerNavy]}>
         {/* Logo */}
         <TouchableOpacity
           style={styles.logoContainer}
@@ -127,7 +134,8 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
               style={[
                 styles.trialBadge,
                 subscriptionDays <= 7 && styles.trialBadgeUrgent,
-                subscriptionDays <= 7 && {transform: [{scale: pulseAnim}]},
+                isNavy && styles.trialBadgeNavy,
+                subscriptionDays <= 7 && !isNavy && {transform: [{scale: pulseAnim}]},
               ]}>
               <Text style={styles.trialBadgeText}>
                 {subscriptionDays} {subscriptionDays === 1 ? 'day' : 'days'} left
@@ -137,13 +145,13 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({
 
           {/* Hamburger Menu - switch to buyer removed per product */}
           <TouchableOpacity
-            style={styles.menuButton}
+            style={[styles.menuButton, isNavy && styles.menuButtonNavy]}
             onPress={() => setMenuVisible(true)}
             activeOpacity={0.7}>
             <View style={styles.hamburger}>
-              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
-              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
-              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive]} />
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive, isNavy && styles.hamburgerLineNavy, isNavy && menuVisible && styles.hamburgerLineNavyActive]} />
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive, isNavy && styles.hamburgerLineNavy, isNavy && menuVisible && styles.hamburgerLineNavyActive]} />
+              <View style={[styles.hamburgerLine, menuVisible && styles.hamburgerLineActive, isNavy && styles.hamburgerLineNavy, isNavy && menuVisible && styles.hamburgerLineNavyActive]} />
             </View>
           </TouchableOpacity>
         </View>
@@ -312,11 +320,27 @@ const styles = StyleSheet.create({
   hamburgerLine: {
     width: '100%',
     height: 2,
-    backgroundColor: colors.secondary, // Dark navy blue
+    backgroundColor: colors.secondary,
     borderRadius: 1,
+  },
+  headerNavy: {
+    backgroundColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  trialBadgeNavy: {
+    backgroundColor: '#1E88E5',
+  },
+  menuButtonNavy: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   hamburgerLineActive: {
     backgroundColor: colors.primary,
+  },
+  hamburgerLineNavy: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  hamburgerLineNavyActive: {
+    backgroundColor: '#60B4FF',
   },
   modalOverlay: {
     flex: 1,

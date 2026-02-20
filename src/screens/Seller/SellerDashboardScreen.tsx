@@ -9,13 +9,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
-  ImageBackground,
   Animated,
   Dimensions,
   Easing,
   Platform,
   InteractionManager,
+  StatusBar,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -30,8 +31,34 @@ import CustomAlert from '../../utils/alertHelper';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters } from '../../utils/formatters';
 import { DEBUG_SELLER_CRASH, SELLER_DASHBOARD_SAFE_MODE } from '../../config/debugCrash';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { verticalScale } from '../../utils/responsive';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const HEADER_HEIGHT = verticalScale(48);
+
+// Reference UI colors (360 Coordinates)
+const REF = {
+  navy: '#0B1F3A',
+  blue: '#1565C0',
+  blueLight: '#1E88E5',
+  sky: '#E8F4FD',
+  grayBg: '#F2F5FA',
+  grayText: '#8A97A8',
+  textDark: '#0D1B2E',
+  textMid: '#3D5068',
+  purple: '#7C4DFF',
+  yellow: '#FFB300',
+  green: '#00C48C',
+  siBlue: '#E3F2FD',
+  siPurple: '#EDE7F6',
+  siYellow: '#FFF8E1',
+  siGreen: '#E8F5E9',
+  aiIndigo: '#E8EAF6',
+  aiTeal: '#E0F2F1',
+  badgeSale: '#E3F2FD',
+  badgeRent: '#FFF8E1',
+};
 
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { SellerTabParamList } from '../../components/navigation/SellerTabNavigator';
@@ -84,7 +111,15 @@ const AnimatedAddPropertyButton = React.memo(({ onPress }: { onPress: () => void
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.9}>
-        <Text style={styles.addPropertyButtonText}>+ Add Property</Text>
+        {/* @ts-expect-error - LinearGradient children types */}
+        <LinearGradient
+          colors={[REF.blueLight, REF.blue]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.addPropertyButtonGradient}>
+          <TabIcon name="plus" color="#fff" size={18} />
+          <Text style={styles.addPropertyButtonText}>Add New Property</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -146,14 +181,14 @@ const AnimatedStatCard = React.memo(({
     }
   };
 
-  // Determine badge text color based on background
   const getBadgeTextColor = () => {
-    if (!badgeColor) return '#059669';
-    if (badgeColor === '#D1FAE5') return '#059669'; // Green bg -> green text
-    if (badgeColor === '#FEE2E2') return '#DC2626'; // Red bg -> red text
-    if (badgeColor === '#E3F6FF') return colors.primary; // Blue bg -> blue text
-    if (badgeColor === '#F3F4F6') return '#6B7280'; // Gray bg -> gray text
-    return '#059669';
+    if (!badgeColor) return REF.blue;
+    if (badgeColor === REF.siGreen) return '#059669';
+    if (badgeColor === '#FEE2E2') return '#DC2626';
+    if (badgeColor === REF.siBlue || badgeColor === REF.badgeSale) return REF.blue;
+    if (badgeColor === REF.badgeRent) return '#F9A825';
+    if (badgeColor === '#F1F3F5') return REF.grayText;
+    return REF.blue;
   };
 
   const CardWrapper = onPress ? TouchableOpacity : View;
@@ -188,10 +223,10 @@ const AnimatedStatCard = React.memo(({
         {statusPills && (
           <View style={styles.statusPills}>
             <View style={styles.statusPill}>
-              <Text style={styles.statusPillText}>{statusPills.sale} Sale</Text>
+              <Text style={[styles.statusPillText, { color: REF.blue }]}>{statusPills.sale} Sale</Text>
             </View>
             <View style={[styles.statusPill, styles.statusPillRent]}>
-              <Text style={styles.statusPillText}>{statusPills.rent} Rent</Text>
+              <Text style={[styles.statusPillText, { color: '#F9A825' }]}>{statusPills.rent} Rent</Text>
             </View>
           </View>
         )}
@@ -206,12 +241,16 @@ const AnimatedQuickActionCard = React.memo(({
   description,
   onPress,
   delay = 0,
+  iconColor = REF.blue,
+  iconBgColor = REF.siBlue,
 }: {
   iconName: TabIconName;
   title: string;
   description: string;
   onPress: () => void;
   delay?: number;
+  iconColor?: string;
+  iconBgColor?: string;
 }) => {
   const cardAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -257,8 +296,8 @@ const AnimatedQuickActionCard = React.memo(({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.8}>
-        <View style={styles.quickActionIconContainer}>
-          <TabIcon name={iconName} color={colors.primary} size={20} />
+        <View style={[styles.quickActionIconContainer, { backgroundColor: iconBgColor }]}>
+          <TabIcon name={iconName} color={iconColor} size={20} />
         </View>
         <Text style={styles.quickActionTitle}>{title}</Text>
         <Text style={styles.quickActionDescription}>{description}</Text>
@@ -304,6 +343,7 @@ const AnimatedSeeAllButton = React.memo(({ onPress, children }: {
 });
 
 const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user, logout, switchUserRole } = useAuth();
   const [switchingRole, setSwitchingRole] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
@@ -957,16 +997,24 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
     ? formatters.daysRemaining(stats.subscription.end_date)
     : 0;
 
+  const firstName = user?.full_name ? String(user.full_name).split(' ')[0] ?? '' : '';
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good Morning';
+    if (h < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  })();
+
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={REF.navy} />
       <SellerHeader
+        variant="navy"
         onProfilePress={() => navigation.navigate('Profile')}
         onSupportPress={() => navigation.navigate('Support' as never)}
         onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
         onBuyPropertyPress={async () => {
-          // Switch role to buyer and navigate to Buyer dashboard
-          if (switchingRole) return; // Prevent multiple clicks
-
+          if (switchingRole) return;
           try {
             setSwitchingRole(true);
             await switchUserRole('buyer');
@@ -987,6 +1035,58 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         scrollY={scrollY}
       />
 
+      {/* Navy welcome section */}
+      <View style={[styles.navyHeader, { paddingTop: insets.top + HEADER_HEIGHT + 14 }]}>
+        <View style={styles.welcomeCard}>
+          <View style={styles.welcomeLeft}>
+            <Text style={styles.welcomeGreeting}>{greeting.toUpperCase()}</Text>
+            <Text style={styles.welcomeName}>
+              Welcome, <Text style={styles.welcomeNameHighlight}>{firstName || 'Seller'}</Text>
+            </Text>
+            <Text style={styles.welcomeSub}>Here's what's happening with your properties today</Text>
+          </View>
+          {/* @ts-expect-error - LinearGradient children types */}
+          <LinearGradient
+            colors={[REF.blueLight, REF.blue]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.welcomeAvatar}>
+            <Text style={styles.welcomeAvatarText}>{getInitials(user?.full_name || 'S')}</Text>
+          </LinearGradient>
+        </View>
+        <View style={styles.addBtnWrap}>
+          <AnimatedAddPropertyButton
+            onPress={async () => {
+              try {
+                const statsResponse: any = await sellerService.getDashboardStats();
+                if (statsResponse && statsResponse.success && statsResponse.data) {
+                  const currentCount = statsResponse.data.total_properties || 0;
+                  const planType = statsResponse.data.subscription?.plan_type || 'free';
+                  const limits: { [key: string]: number } = {
+                    free: 3,
+                    basic: 10,
+                    pro: 10,
+                    premium: 10,
+                  };
+                  const limit = limits[planType] || limits.free;
+                  if (limit > 0 && currentCount >= limit) {
+                    CustomAlert.alert(
+                      'Property limit reached',
+                      `Property limit reached. You can list up to ${limit} properties in your current plan.`,
+                      [{ text: 'OK' }]
+                    );
+                    return;
+                  }
+                }
+                navigation.navigate('AddProperty');
+              } catch (error) {
+                navigation.navigate('AddProperty');
+              }
+            }}
+          />
+        </View>
+      </View>
+
       <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -1004,52 +1104,8 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }],
           }}>
-          {/* Seller Header Box */}
-          <View style={styles.sellerHeaderContainer}>
-            <View style={styles.sellerHeaderBox}>
-              <View style={styles.sellerHeaderContent}>
-                <Text style={styles.sellerGreeting}>
-                  Welcome{user?.full_name ? `, ${String(user.full_name).split(' ')[0] ?? ''}` : ''} ❤️
-                </Text>
-                <Text style={styles.sellerSubtitle}>
-                  Here's what's happening with your properties today
-                </Text>
-              </View>
-              <AnimatedAddPropertyButton
-                onPress={async () => {
-                  // Check property limit before navigating (free: 3, basic/pro/premium: 10)
-                  try {
-                    const statsResponse: any = await sellerService.getDashboardStats();
-                    if (statsResponse && statsResponse.success && statsResponse.data) {
-                      const currentCount = statsResponse.data.total_properties || 0;
-                      const planType = statsResponse.data.subscription?.plan_type || 'free';
-                      const limits: { [key: string]: number } = {
-                        free: 3,
-                        basic: 10,
-                        pro: 10,
-                        premium: 10,
-                      };
-                      const limit = limits[planType] || limits.free;
-                      if (limit > 0 && currentCount >= limit) {
-                        CustomAlert.alert(
-                          'Property limit reached',
-                          `Property limit reached. You can list up to ${limit} properties in your current plan.`,
-                          [{ text: 'OK' }]
-                        );
-                        return;
-                      }
-                    }
-                    navigation.navigate('AddProperty');
-                  } catch (error) {
-                    // If check fails, still allow navigation (will be checked again in AddPropertyScreen)
-                    navigation.navigate('AddProperty');
-                  }
-                }}
-              />
-            </View>
-          </View>
-
-          {/* Statistics Cards (2x2 Grid) with Animations */}
+          {/* Overview Section */}
+          <Text style={styles.sectionLabel}>OVERVIEW</Text>
           <Animated.View
             style={[
               styles.statsGrid,
@@ -1060,21 +1116,21 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             {/* Card 1: Total Properties */}
             <AnimatedStatCard
               iconName="home"
-              iconColor={colors.primary}
-              iconBgColor="#E3F6FF"
+              iconColor={REF.blue}
+              iconBgColor={REF.siBlue}
               number={stats.total_properties}
               label="Total Properties"
               badge={`${stats.active_properties} Active`}
-              badgeColor="#D1FAE5"
+              badgeColor={REF.siBlue}
               onPress={() => navigation.navigate('AllListings')}
               delay={0}
             />
 
-            {/* Card 2: People Showed Interest (Views) */}
+            {/* Card 2: Views */}
             <AnimatedStatCard
               iconName="eye"
-              iconColor="#8B5CF6"
-              iconBgColor="#F3E8FF"
+              iconColor={REF.purple}
+              iconBgColor={REF.siPurple}
               number={formatters.formatNumber(stats.total_views)}
               label="Views"
               badge={stats.views_percentage_change > 0
@@ -1082,19 +1138,19 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 : stats.views_percentage_change < 0
                   ? `${stats.views_percentage_change}%`
                   : 'Active'}
-              badgeColor={stats.views_percentage_change > 0 ? '#D1FAE5' : stats.views_percentage_change < 0 ? '#FEE2E2' : '#E3F6FF'}
+              badgeColor={stats.views_percentage_change > 0 ? REF.siGreen : stats.views_percentage_change < 0 ? '#FEE2E2' : '#F1F3F5'}
               delay={100}
             />
 
             {/* Card 3: Total Leads */}
             <AnimatedStatCard
               iconName="chats"
-              iconColor="#F59E0B"
-              iconBgColor="#FEF3C7"
+              iconColor={REF.yellow}
+              iconBgColor={REF.siYellow}
               number={stats.total_inquiries}
               label="Total Leads"
               badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
-              badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F3F4F6'}
+              badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F1F3F5'}
               onPress={() => navigation.navigate('Leads')}
               delay={200}
             />
@@ -1102,8 +1158,8 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             {/* Card 4: Listing Status */}
             <AnimatedStatCard
               iconName="list"
-              iconColor="#10B981"
-              iconBgColor="#D1FAE5"
+              iconColor={REF.green}
+              iconBgColor={REF.siGreen}
               number={(stats.properties_by_status?.sale ?? 0) + (stats.properties_by_status?.rent ?? 0)}
               label="Listing Status"
               statusPills={{
@@ -1114,12 +1170,15 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
             />
           </Animated.View>
 
-          {/* Quick Actions Grid (2x2) with Animations */}
+          {/* Quick Actions Section */}
+          <Text style={styles.sectionLabel}>QUICK ACTIONS</Text>
           <View style={styles.quickActionsGrid}>
             <AnimatedQuickActionCard
               iconName="plus"
               title="Add New Property"
               description="List a new property for sale or rent"
+              iconColor={REF.blue}
+              iconBgColor={REF.siBlue}
               onPress={async () => {
                 // Check property limit before navigating (free: 3, basic/pro/premium: 10)
                 try {
@@ -1156,6 +1215,8 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
               iconName="edit"
               title="Manage Properties"
               description="Edit, update or remove listings"
+              iconColor="#5C6BC0"
+              iconBgColor={REF.aiIndigo}
               onPress={() => navigation.navigate('AllListings')}
               delay={100}
             />
@@ -1164,6 +1225,8 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
               iconName="chats"
               title="View Leads"
               description="See leads from buyers who viewed contact"
+              iconColor={REF.yellow}
+              iconBgColor={REF.siYellow}
               onPress={() => navigation.navigate('Leads')}
               delay={200}
             />
@@ -1172,25 +1235,26 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
               iconName="profile"
               title="Update Profile"
               description="Manage your account settings"
+              iconColor="#009688"
+              iconBgColor={REF.aiTeal}
               onPress={() => navigation.navigate('Profile')}
               delay={300}
             />
           </View>
 
-          {/* Recent Properties Section */}
+          {/* Your Properties Section */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <View style={[styles.sectionIconContainer, { backgroundColor: '#E0F2FE' }]}>
-                  <TabIcon name="home" size={20} color={colors.primary} />
-                </View>
-                <Text style={styles.sectionTitle}>Your Properties</Text>
+            <View style={styles.yourPropsHeader}>
+              <View style={styles.yourPropsTitle}>
+                <TabIcon name="home" size={18} color={REF.blue} />
+                <Text style={styles.yourPropsTitleText}>Your Properties</Text>
               </View>
-              <AnimatedSeeAllButton
-                onPress={() => navigation.navigate('AllListings')}>
-                <Text style={styles.viewAllText}>View All</Text>
-                <Text style={styles.viewAllArrow}>›</Text>
-              </AnimatedSeeAllButton>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AllListings')}
+                style={styles.viewAllBtn}
+                activeOpacity={0.7}>
+                <Text style={styles.viewAllBtnText}>View All ›</Text>
+              </TouchableOpacity>
             </View>
             {(recentProperties?.length ?? 0) > 0 ? (
               <FlatList
@@ -1201,19 +1265,25 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 showsVerticalScrollIndicator={false}
               />
             ) : (
-              <View style={styles.emptyState}>
-                <View style={[styles.emptyStateIconContainer, { backgroundColor: '#F3F4F6', padding: 16, borderRadius: 50 }]}>
-                  <TabIcon name="home" size={64} color="#9CA3AF" />
+              <View style={styles.emptyProps}>
+                <View style={styles.emptyIll}>
+                  <TabIcon name="home" size={32} color={REF.blue} />
                 </View>
-                <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
-                <Text style={styles.emptyStateText}>
-                  Start by adding your first property to get started
-                </Text>
+                <Text style={styles.emptyPropsTitle}>No Properties Listed</Text>
+                <Text style={styles.emptyPropsSub}>Start by adding your first property to get started</Text>
                 <TouchableOpacity
-                  style={styles.emptyStateButton}
+                  style={styles.emptyAddBtn}
                   onPress={() => navigation.navigate('AddProperty')}
                   activeOpacity={0.8}>
-                  <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
+                  {/* @ts-expect-error - LinearGradient children types */}
+                  <LinearGradient
+                    colors={[REF.blueLight, REF.blue]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.emptyAddBtnGradient}>
+                    <TabIcon name="plus" color="#fff" size={14} />
+                    <Text style={styles.emptyAddBtnText}>Add Property</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             )}
@@ -1227,7 +1297,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA', // Clean off-white background
+    backgroundColor: REF.grayBg,
   },
   loadingContainer: {
     flex: 1,
@@ -1263,99 +1333,125 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: REF.grayBg,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingTop: spacing.xxl, // Minimal top padding since header starts hidden
+    padding: 16,
+    paddingTop: 0,
     paddingBottom: spacing.xxl,
   },
-  sellerHeaderContainer: {
-    marginBottom: spacing.xl,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 6,
+  navyHeader: {
+    backgroundColor: REF.navy,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 20,
   },
-  sellerHeaderBox: {
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
-    paddingTop: spacing.xl + spacing.sm,
-    paddingBottom: spacing.xl + spacing.md,
-    minHeight: 180,
+  welcomeCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  welcomeLeft: { flex: 1 },
+  welcomeGreeting: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  welcomeName: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  welcomeNameHighlight: { color: '#60B4FF' },
+  welcomeSub: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  welcomeAvatar: {
+    width: 52,
+    height: 52,
     borderRadius: 16,
-    shadowColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: REF.blue,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 4,
   },
-  sellerHeaderContent: {
-    marginBottom: spacing.lg,
-    zIndex: 1,
+  welcomeAvatarText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
   },
-  sellerGreeting: {
-    fontSize: 26,
-    color: '#1D242B',
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-    lineHeight: 34,
-  },
-  sellerSubtitle: {
-    ...typography.body,
-    color: '#6B7280',
-    fontSize: 14,
-    lineHeight: 22,
+  addBtnWrap: {
+    marginTop: 12,
   },
   addPropertyButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-    marginTop: spacing.md,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
+    width: '100%',
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: REF.blue,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 6,
     minHeight: 48,
+  },
+  addPropertyButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    gap: 7,
   },
   addPropertyButtonText: {
-    ...typography.body,
-    color: colors.surface,
+    color: '#fff',
     fontWeight: '700',
-    fontSize: 15,
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: REF.grayText,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+    paddingHorizontal: 4,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: spacing.xl,
+    marginBottom: 16,
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
   statCard: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: 4,
+    borderRadius: 16,
+    padding: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 2,
-    minHeight: 180, // Ensure equal height for all stat cards
-    justifyContent: 'flex-start',
   },
   statCardIcon: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    backgroundColor: '#E3F6FF', // Light blue background
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.md,
@@ -1364,18 +1460,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   statNumber: {
-    fontSize: 32,
-    color: '#1D242B', // Dark Charcoal
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-    lineHeight: 40,
+    fontSize: 26,
+    fontWeight: '800',
+    color: REF.textDark,
+    lineHeight: 28,
+    marginBottom: 3,
   },
   statLabel: {
-    ...typography.caption,
-    color: '#6B7280', // Refined gray
     fontSize: 12,
-    marginBottom: spacing.sm,
+    color: REF.grayText,
     fontWeight: '500',
+    marginBottom: 8,
   },
   activeBadge: {
     backgroundColor: '#D1FAE5', // Light green tint
@@ -1412,46 +1507,42 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   statusPill: {
-    backgroundColor: '#E3F6FF', // Light blue
+    backgroundColor: REF.badgeSale,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: spacing.xs + 2,
     borderRadius: 20,
   },
   statusPillRent: {
-    backgroundColor: '#FEF3C7', // Light orange tint
+    backgroundColor: REF.badgeRent,
   },
   statusPillText: {
     ...typography.caption,
-    color: colors.primary,
     fontSize: 11,
     fontWeight: '600',
   },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: spacing.xl,
+    marginBottom: 16,
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
   quickActionCard: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: 4,
-    alignItems: 'center',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: 'flex-start',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 2,
-    minHeight: 130,
-    justifyContent: 'center',
   },
   quickActionIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#E3F6FF', // Light blue
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm + 2,
@@ -1460,22 +1551,43 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   quickActionTitle: {
-    ...typography.body,
-    color: '#1D242B', // Dark Charcoal
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '700',
+    color: REF.textDark,
+    marginBottom: 3,
   },
   quickActionDescription: {
-    ...typography.caption,
-    color: '#6B7280',
-    fontSize: 11,
-    textAlign: 'center',
-    lineHeight: 16,
+    fontSize: 10.5,
+    color: REF.grayText,
+    lineHeight: 15,
   },
   section: {
     marginBottom: spacing.xl + spacing.sm,
+  },
+  yourPropsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  yourPropsTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  yourPropsTitleText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: REF.textDark,
+  },
+  viewAllBtn: {
+    paddingVertical: 4,
+  },
+  viewAllBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: REF.blueLight,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1493,7 +1605,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#E3F6FF', // Light blue
+    backgroundColor: '#E3F6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1508,7 +1620,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    color: '#1D242B', // Dark Charcoal
+    color: '#1D242B',
     fontWeight: '700',
     lineHeight: 26,
   },
@@ -1667,6 +1779,65 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 28,
   },
+  emptyProps: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#D0E4F7',
+    borderStyle: 'dashed',
+    padding: 28,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  emptyIll: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#D0E8FB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyPropsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: REF.textDark,
+    marginBottom: 5,
+  },
+  emptyPropsSub: {
+    fontSize: 12,
+    color: REF.grayText,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  emptyAddBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: REF.blue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  emptyAddBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 24,
+    gap: 6,
+  },
+  emptyAddBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   emptyState: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -1681,7 +1852,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: '#E3F6FF', // Light blue
+    backgroundColor: '#E3F6FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.lg,
@@ -1691,7 +1862,7 @@ const styles = StyleSheet.create({
   },
   emptyStateTitle: {
     fontSize: 18,
-    color: '#1D242B', // Dark Charcoal
+    color: '#1D242B',
     fontWeight: '700',
     marginBottom: spacing.sm,
     textAlign: 'center',
