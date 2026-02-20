@@ -501,7 +501,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             activeOpacity={0.7}>
             <View style={styles.optionLeft}>
               <View style={styles.optionIconContainer}>
-                <TabIcon name="heart" color={colors.primary} size={20} />
+                <TabIcon name="heart" color="#E53935" size={20} />
               </View>
               <Text style={styles.optionText}>My Favorites</Text>
             </View>
