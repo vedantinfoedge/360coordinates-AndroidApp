@@ -1125,16 +1125,16 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   {propertyStatus === 'sell' ? (
                     // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
-                      colors={['#0077C0', '#005A94']}
+                      colors={[REF.blueLight, REF.blue]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.typeButtonGradient}>
-                      <TabIcon name="tag" color={colors.surface} size={20} />
+                      <TabIcon name="tag" color={colors.surface} size={14} />
                       <Text style={styles.typeButtonTextSelected}>Sell</Text>
                     </LinearGradient>
                   ) : (
                     <View style={styles.typeButtonUnselected}>
-                      <TabIcon name="tag" color={colors.surface} size={20} />
+                      <TabIcon name="tag" color={REF.grayText} size={14} />
                       <Text style={styles.typeButtonText}>Sell</Text>
                     </View>
                   )}
@@ -1146,16 +1146,16 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   {propertyStatus === 'rent' ? (
                     // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
                     <LinearGradient
-                      colors={['#0077C0', '#005A94']}
+                      colors={[REF.blueLight, REF.blue]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.typeButtonGradient}>
-                      <TabIcon name="key" color={colors.surface} size={20} />
+                      <TabIcon name="key" color={colors.surface} size={14} />
                       <Text style={styles.typeButtonTextSelected}>Rent</Text>
                     </LinearGradient>
                   ) : (
                     <View style={styles.typeButtonUnselected}>
-                      <TabIcon name="key" color={colors.surface} size={20} />
+                      <TabIcon name="key" color={REF.grayText} size={14} />
                       <Text style={styles.typeButtonText}>Rent</Text>
                     </View>
                   )}
@@ -1190,8 +1190,8 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                       // Clear amenities when property type changes (they'll be filtered)
                       setSelectedAmenities([]);
                     }}>
-                    <View style={styles.propertyTypeIconWrap}>
-                      <TabIcon name={PROPERTY_TYPE_ICONS[type.value] || 'home'} color={propertyType === type.value ? colors.surface : colors.textSecondary} size={22} />
+                    <View style={[styles.propertyTypeIconWrap, propertyType === type.value && styles.propertyTypeIconWrapActive]}>
+                      <Text style={styles.propertyTypeEmoji}>{type.icon}</Text>
                     </View>
                     <Text
                       style={[
@@ -1285,7 +1285,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   onPress={() => setLocationPickerVisible(true)}>
                   {/* @ts-expect-error - LinearGradient works but TypeScript types are incorrect */}
                   <LinearGradient
-                    colors={['#0077C0', '#005A94']}
+                    colors={[REF.blueLight, REF.blue]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.mapButtonGradient}>
@@ -1976,10 +1976,18 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.summaryButton}>
-              <Text style={styles.summaryButtonText}>Listing Summary</Text>
+            <TouchableOpacity
+              style={styles.summaryToggle}
+              onPress={() => setSummaryExpanded(!summaryExpanded)}
+              activeOpacity={0.7}>
+              <TabIcon name="file-text" color={REF.blue} size={15} />
+              <Text style={styles.summaryToggleText}>View Listing Summary</Text>
+              <View style={{ transform: [{ rotate: summaryExpanded ? '-90deg' : '0deg' }] }}>
+                <TabIcon name="chevron-right" color={REF.blue} size={14} />
+              </View>
             </TouchableOpacity>
 
+            {summaryExpanded && (
             <View style={styles.listingSummary}>
               <Text style={styles.summaryTitle}>Listing Summary</Text>
               <View style={styles.summaryRow}>
@@ -2021,6 +2029,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
               )}
             </View>
+            )}
           </View>
         );
 
@@ -2048,15 +2057,12 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
         presentationStyle="overFullScreen"
         statusBarTranslucent={true}
         onRequestClose={handleClose}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            {/* @ts-expect-error SafeAreaView accepts style at runtime (types incomplete) */}
-            <SafeAreaView style={styles.safeArea}>
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>Loading property details...</Text>
-              </View>
-            </SafeAreaView>
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
+          {/* @ts-expect-error LinearGradient children types */}
+          <LinearGradient colors={[REF.navy, '#1a3a6b']} style={StyleSheet.absoluteFill} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={REF.blueLight} />
+            <Text style={[styles.loadingText, { color: colors.surface }]}>Loading property details...</Text>
           </View>
         </View>
       </Modal>
@@ -2072,136 +2078,171 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
       statusBarTranslucent={true}
       onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          {/* @ts-expect-error SafeAreaView accepts style at runtime (types incomplete) */}
-          <SafeAreaView style={styles.safeArea}>
+        {/* Dark blue gradient background (360 Coordinates style) */}
+        {/* @ts-expect-error LinearGradient children types */}
+        <LinearGradient
+          colors={[REF.navy, '#1a3a6b']}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.sheetWrapper}>
+          <View style={styles.sheet}>
             <KeyboardAvoidingView
-              style={styles.safeArea}
+              style={styles.sheetInner}
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+              {/* Sheet handle */}
+              <View style={styles.sheetHandle} />
+
               {/* Restricted edit banner for older listings */}
               {isEditMode && isLimitedEdit && (
                 <View style={styles.limitedBanner}>
                   <Text style={styles.limitedBannerTitle}>Limited Edit Mode</Text>
                   <Text style={styles.limitedBannerText}>
-                    This listing is more than 24 hours old. You can only edit the Title and Pricing fields (price, negotiable, security deposit, maintenance). Other details are locked.
+                    This listing is more than 24 hours old. You can only edit the Title and Pricing fields.
                   </Text>
                 </View>
               )}
 
               {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.headerTitle}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>
                   {isEditMode ? 'Edit Property' : 'List Your Property'}
                 </Text>
-                <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-                  <TabIcon name="close" color={colors.surface} size={20} />
+                <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.7}>
+                  <TabIcon name="close" color={REF.textMid} size={14} />
                 </TouchableOpacity>
               </View>
 
-              {/* Progress Steps */}
+              {/* Step indicators with connectors */}
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                style={styles.progressContainer}
-                contentContainerStyle={styles.progressContent}>
-                {steps.map((step) => {
+                style={styles.stepsWrap}
+                contentContainerStyle={styles.stepsRowContent}>
+                {steps.map((step, index) => {
                   const status = getStepStatus(step.id);
                   return (
-                    <TouchableOpacity
-                      key={step.id}
-                      style={styles.stepItem}
-                      onPress={() => {
-                        if (status === 'completed' || status === 'active') {
-                          setCurrentStep(step.id);
-                        }
-                      }}
-                      disabled={status === 'pending'}>
-                      <View
-                        style={[
-                          styles.stepCircle,
-                          status === 'completed' && styles.stepCircleCompleted,
-                          status === 'active' && styles.stepCircleActive,
-                        ]}>
-                        {status === 'completed' ? (
-                          <TabIcon name="check" color={colors.surface} size={12} />
-                        ) : (
-                          <View style={styles.stepIconWrap}>
-                            <TabIcon name={step.iconName} color={currentStep >= step.id ? colors.surface : colors.textSecondary} size={18} />
-                          </View>
-                        )}
-                      </View>
-                      <Text
-                        style={[
-                          styles.stepLabel,
-                          status === 'completed' && styles.stepLabelCompleted,
-                          status === 'active' && styles.stepLabelActive,
-                        ]}
-                        numberOfLines={1}>
-                        {step.name}
-                      </Text>
-                    </TouchableOpacity>
+                    <React.Fragment key={step.id}>
+                      <TouchableOpacity
+                        style={styles.stepItem}
+                        onPress={() => {
+                          if (status === 'completed' || status === 'active') {
+                            setCurrentStep(step.id);
+                          }
+                        }}
+                        disabled={status === 'pending'}
+                        activeOpacity={0.7}>
+                        <View
+                          style={[
+                            styles.stepCircle,
+                            status === 'completed' && styles.stepCircleCompleted,
+                            status === 'active' && styles.stepCircleActive,
+                          ]}>
+                          {status === 'completed' ? (
+                            <TabIcon name="check" color={colors.surface} size={14} />
+                          ) : (
+                            <TabIcon
+                              name={step.iconName}
+                              color={status === 'active' ? colors.surface : REF.grayText}
+                              size={17}
+                            />
+                          )}
+                        </View>
+                        <Text
+                          style={[
+                            styles.stepLabel,
+                            status === 'completed' && styles.stepLabelCompleted,
+                            status === 'active' && styles.stepLabelActive,
+                          ]}
+                          numberOfLines={1}>
+                          {step.name}
+                        </Text>
+                      </TouchableOpacity>
+                      {index < steps.length - 1 && (
+                        <View
+                          style={[
+                            styles.stepConnector,
+                            currentStep > step.id && styles.stepConnectorDone,
+                          ]}
+                        />
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </ScrollView>
+
+              {/* Progress bar */}
+              <View style={styles.progressBarWrap}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${(currentStep / totalSteps) * 100}%` },
+                  ]}
+                />
+              </View>
 
               {/* Content */}
               <ScrollView
                 ref={stepScrollViewRef}
                 style={styles.content}
                 contentContainerStyle={styles.contentContainer}
-                showsVerticalScrollIndicator={true}
+                showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag">
                 {renderStepContent()}
               </ScrollView>
 
               {/* Footer */}
-              <View style={styles.footer}>
-                {currentStep > 1 && (
-                  <TouchableOpacity style={styles.backButton} onPress={handlePrevious}>
-                    <TabIcon name="chevron-left" color={colors.surface} size={22} />
-                    <Text style={styles.backButtonText}>Back</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.nextButton, isSubmitting && styles.disabledButton]}
-                  onPress={handleNext}
-                  disabled={isSubmitting}>
-                  {currentStep === totalSteps ? (
-                    // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
-                    <LinearGradient
-                      colors={isSubmitting ? ['#CCCCCC', '#999999'] : ['#43A047', '#2E7D32']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.publishButtonGradient}>
-                      {isSubmitting ? (
-                        <ActivityIndicator size="small" color={colors.surface} />
-                      ) : (
-                        <TabIcon name="check" color={colors.surface} size={20} />
-                      )}
-                      <Text style={styles.publishButtonText}>
-                        {isSubmitting ? 'Submitting...' : 'Publish Listing'}
-                      </Text>
-                    </LinearGradient>
-                  ) : (
-                    // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
-                    <LinearGradient
-                      colors={['#0077C0', '#005A94']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.nextButtonGradient}>
-                      <Text style={styles.nextButtonText}>Next</Text>
-                      <Text style={styles.nextButtonArrow}>→</Text>
-                    </LinearGradient>
+              <View style={styles.sheetFooter}>
+                <Text style={styles.stepCounter}>
+                  Step <Text style={styles.stepCounterNum}>{currentStep}</Text> of {totalSteps}
+                </Text>
+                <View style={styles.footerRow}>
+                  {currentStep > 1 && (
+                    <TouchableOpacity style={styles.backButton} onPress={handlePrevious} activeOpacity={0.7}>
+                      <Text style={styles.backButtonText}>← Back</Text>
+                    </TouchableOpacity>
                   )}
-                </TouchableOpacity>
+                  <TouchableOpacity style={styles.cancelButton} onPress={handleClose} activeOpacity={0.7}>
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.nextButton, isSubmitting && styles.disabledButton]}
+                    onPress={handleNext}
+                    disabled={isSubmitting}
+                    activeOpacity={0.9}>
+                    {currentStep === totalSteps ? (
+                      // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
+                      <LinearGradient
+                        colors={isSubmitting ? ['#CCCCCC', '#999999'] : ['#2E7D32', '#1B5E20']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.publishButtonGradient}>
+                        {isSubmitting ? (
+                          <ActivityIndicator size="small" color={colors.surface} />
+                        ) : (
+                          <TabIcon name="check" color={colors.surface} size={15} />
+                        )}
+                        <Text style={styles.publishButtonText}>
+                          {isSubmitting ? 'Submitting...' : 'Publish Listing'}
+                        </Text>
+                      </LinearGradient>
+                    ) : (
+                      // @ts-expect-error - LinearGradient works but TypeScript types are incorrect
+                      <LinearGradient
+                        colors={[REF.blueLight, REF.blue]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.nextButtonGradient}>
+                        <Text style={styles.nextButtonText}>Next</Text>
+                        <TabIcon name="chevron-right" color={colors.surface} size={14} />
+                      </LinearGradient>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             </KeyboardAvoidingView>
-          </SafeAreaView>
+          </View>
         </View>
       </View>
     </Modal>
@@ -2211,21 +2252,110 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
     zIndex: 9999,
     elevation: 9999,
   },
-  modalContainer: {
-    width: '95%',
-    maxWidth: 600,
-    height: '90%',
+  sheetWrapper: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '92%',
     overflow: 'hidden',
-    zIndex: 10000,
-    elevation: 10000,
+  },
+  sheetInner: {
+    flex: 1,
+    maxHeight: '100%',
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: REF.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 0,
+  },
+  sheetTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: REF.textDark,
+    letterSpacing: -0.3,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    backgroundColor: REF.grayBg,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepsWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+  },
+  stepsRowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 4,
+  },
+  stepItem: {
+    alignItems: 'center',
+  },
+  stepConnector: {
+    width: 28,
+    height: 2,
+    backgroundColor: REF.border,
+    marginHorizontal: 4,
+    marginBottom: 22,
+    borderRadius: 1,
+  },
+  stepConnectorDone: {
+    backgroundColor: REF.green,
+  },
+  progressBarWrap: {
+    height: 3,
+    backgroundColor: REF.grayBg,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: REF.blue,
+    borderRadius: 2,
+  },
+  sheetFooter: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: REF.border,
+    backgroundColor: colors.surface,
+  },
+  stepCounter: {
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '600',
+    color: REF.grayText,
+    marginBottom: 8,
+  },
+  stepCounterNum: {
+    color: REF.blue,
+    fontWeight: '800',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
   },
   safeArea: {
     flex: 1,
@@ -2263,66 +2393,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    minHeight: 70,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    flexShrink: 0,
-  },
-  headerTitle: {
-    ...typography.h1,
-    fontSize: 24,
-    color: colors.text,
-    fontWeight: '700',
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 20,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  progressContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    maxHeight: 100,
-  },
-  progressContent: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs,
-  },
-  stepItem: {
-    alignItems: 'center',
-    minWidth: 60,
-    marginRight: spacing.sm,
-  },
   stepCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.border,
-    justifyContent: 'center',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: REF.grayBg,
+    borderWidth: 2,
+    borderColor: REF.border,
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    justifyContent: 'center',
   },
   stepCircleCompleted: {
-    backgroundColor: '#43A047',
+    backgroundColor: REF.green,
+    borderColor: REF.green,
   },
   stepCircleActive: {
-    backgroundColor: '#0077C0',
+    backgroundColor: REF.blue,
+    borderColor: REF.blue,
+    shadowColor: REF.blue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 4,
   },
   stepIconWrap: {
     alignItems: 'center',
@@ -2337,43 +2429,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   stepLabel: {
-    ...typography.caption,
     fontSize: 10,
-    lineHeight: 12,
-    color: colors.textSecondary,
+    fontWeight: '600',
+    color: REF.grayText,
     textAlign: 'center',
+    marginTop: 5,
   },
   stepLabelCompleted: {
-    color: '#43A047',
+    color: REF.green,
     fontWeight: '600',
   },
   stepLabelActive: {
-    color: '#0077C0',
+    color: REF.blue,
     fontWeight: '700',
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    padding: spacing.xl,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
     flexGrow: 1,
   },
   stepContent: {
     paddingBottom: spacing.lg,
   },
   stepTitle: {
-    ...typography.h1,
-    fontSize: 24,
-    color: colors.text,
-    marginBottom: spacing.xs,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
+    color: REF.textDark,
+    letterSpacing: -0.2,
+    marginBottom: 3,
   },
   stepSubtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.xl,
-    fontSize: 14,
+    fontSize: 12,
+    color: REF.grayText,
+    marginBottom: 18,
   },
   inputContainer: {
     marginBottom: spacing.lg,
@@ -2387,24 +2478,22 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   label: {
-    ...typography.caption,
-    color: colors.text,
-    marginBottom: spacing.sm,
-    fontWeight: '600',
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '700',
+    color: REF.textMid,
+    marginBottom: 6,
   },
   required: {
-    color: '#E53935',
+    color: REF.red,
   },
   input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    ...typography.body,
-    color: colors.text,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: REF.grayInput,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 13,
+    color: REF.textDark,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   textArea: {
     height: 120,
@@ -2425,39 +2514,38 @@ const styles = StyleSheet.create({
   },
   typeButtonsContainer: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: 10,
   },
   typeButton: {
     flex: 1,
-    borderRadius: borderRadius.md,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   typeButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
+    paddingVertical: 12,
+    gap: 6,
   },
   typeButtonUnselected: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: 12,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    gap: spacing.xs,
+    borderWidth: 2,
+    borderColor: REF.border,
+    borderRadius: 12,
+    gap: 6,
   },
   typeButtonIcon: {
     fontSize: 18,
   },
   typeButtonText: {
-    ...typography.body,
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '700',
+    color: REF.grayText,
   },
   typeButtonTextSelected: {
     ...typography.body,
@@ -2473,22 +2561,21 @@ const styles = StyleSheet.create({
     marginHorizontal: -spacing.xs / 2, // Negative margin for spacing
   },
   propertyTypeButton: {
-    width: '48%', // Two columns with space between
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    width: '48%',
+    backgroundColor: REF.grayInput,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: 14,
+    padding: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 100,
-    marginHorizontal: spacing.xs / 2, // Half margin on each side
-    marginBottom: spacing.md,
+    minHeight: 90,
+    marginHorizontal: '1%',
+    marginBottom: 8,
   },
   propertyTypeButtonActive: {
-    borderColor: '#0077C0',
-    borderWidth: 2,
-    backgroundColor: '#E3F6FF',
+    borderColor: REF.blue,
+    backgroundColor: REF.sky,
   },
   propertyTypeIcon: {
     fontSize: 32,
@@ -2505,8 +2592,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   propertyTypeTextActive: {
-    color: '#0077C0',
-    fontWeight: '600',
+    color: REF.blue,
+    fontWeight: '700',
   },
   mapContainer: {
     marginTop: spacing.md,
@@ -2577,18 +2664,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   numberButton: {
-    width: 60,
-    height: 50,
+    width: 52,
+    height: 44,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: REF.border,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   numberButtonActive: {
-    backgroundColor: '#0077C0',
-    borderColor: '#0077C0',
+    backgroundColor: REF.blue,
+    borderColor: REF.blue,
   },
   numberButtonText: {
     ...typography.body,
@@ -2645,20 +2732,18 @@ const styles = StyleSheet.create({
   },
   amenityButton: {
     width: AMENITY_ITEM_WIDTH,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
+    backgroundColor: REF.grayInput,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: 12,
+    padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 80,
-    paddingHorizontal: spacing.xs,
+    minHeight: 75,
   },
   amenityButtonActive: {
-    borderColor: '#0077C0',
-    borderWidth: 2,
-    backgroundColor: '#E3F6FF',
+    borderColor: REF.blue,
+    backgroundColor: REF.sky,
   },
   amenityIcon: {
     fontSize: 24,
@@ -2679,14 +2764,14 @@ const styles = StyleSheet.create({
   },
   photoUploadArea: {
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: '#C5D8F0',
     borderStyle: 'dashed',
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    borderRadius: 16,
+    padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 120,
-    backgroundColor: '#FAFAFA',
+    minHeight: 130,
+    backgroundColor: REF.sky,
   },
   photoUploadIcon: {
     fontSize: 32,
@@ -2714,12 +2799,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: 14,
     paddingHorizontal: spacing.lg,
-    backgroundColor: '#E8F4FD',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: REF.border,
   },
   photosPreview: {
     flexDirection: 'row',
@@ -2808,11 +2893,11 @@ const styles = StyleSheet.create({
   priceInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingLeft: spacing.md,
+    backgroundColor: REF.grayInput,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    paddingLeft: 14,
   },
   currencySymbol: {
     ...typography.body,
@@ -2848,8 +2933,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#0077C0',
-    borderColor: '#0077C0',
+    backgroundColor: REF.blue,
+    borderColor: REF.blue,
   },
   checkboxCheck: {
     color: colors.surface,
@@ -2861,25 +2946,28 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
   },
-  summaryButton: {
-    backgroundColor: '#E3F6FF',
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+  summaryToggle: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    gap: 8,
+    backgroundColor: REF.sky,
+    borderWidth: 1.5,
+    borderColor: '#C5D8F0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
   },
-  summaryButtonText: {
-    ...typography.body,
-    color: '#0077C0',
-    fontSize: 14,
-    fontWeight: '600',
+  summaryToggleText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: REF.blue,
   },
   listingSummary: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: REF.grayInput,
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 8,
   },
   summaryTitle: {
     ...typography.h3,
@@ -2919,11 +3007,12 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    gap: spacing.xs,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: REF.border,
+    backgroundColor: colors.surface,
   },
   backButtonIcon: {
     ...typography.body,
@@ -2932,30 +3021,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   backButtonText: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
-    fontSize: 16,
+    fontSize: 13,
+    fontWeight: '700',
+    color: REF.textMid,
   },
   cancelButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flex: 1,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: REF.border,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelButtonText: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
-    fontSize: 16,
+    fontSize: 13,
+    fontWeight: '700',
+    color: REF.textMid,
   },
   nextButton: {
-    flex: 1,
-    borderRadius: borderRadius.md,
+    flex: 2,
+    borderRadius: 13,
     overflow: 'hidden',
   },
   disabledButton: {
