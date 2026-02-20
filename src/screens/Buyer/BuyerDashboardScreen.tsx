@@ -578,6 +578,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
     );
+<<<<<<< Updated upstream
+        contentContainerStyle={styles.scrollContent}
+=======
+>>>>>>> Stashed changes
   }
 
   return (
