@@ -1,10 +1,19 @@
-import { fonts } from './fonts';
+// Plus Jakarta Sans - font family for reference UI
+export const fonts = {
+  light: 'PlusJakartaSans-Light',      // 300
+  regular: 'PlusJakartaSans-Regular',  // 400
+  medium: 'PlusJakartaSans-Medium',    // 500
+  semiBold: 'PlusJakartaSans-SemiBold',// 600
+  bold: 'PlusJakartaSans-Bold',        // 700
+  extraBold: 'PlusJakartaSans-ExtraBold', // 800 - headings, prices, names
+};
 
 export const colors = {
   // Brand colors - Fresh Blue Modern Theme
   primary: '#0077C0', // Vibrant Blue - Primary brand color
-  primaryDark: '#005A94', // Darker blue for pressed states
-  primaryLight: '#3399D6', // Lighter blue for hover/active
+  primaryDark: '#005a91', // Darker blue for pressed states (reference)
+  primaryLight: '#C7EEFF', // Light sky blue - reference chip values
+  primaryXlight: '#e8f7ff', // Very light blue - Clear All pill, meta tags
   secondary: '#1D242B', // Dark Charcoal - Secondary accents
   accent: '#C7EEFF', // Light Sky Blue - Accent color
   cta: '#0077C0', // Vibrant Blue - CTA / Primary Buttons
@@ -24,11 +33,13 @@ export const colors = {
   text: '#1D242B', // Dark charcoal for excellent readability
   textPrimary: '#1D242B', // Dark Charcoal - Primary text / headings
   textSecondary: '#5A6978', // Blue-gray for secondary text
+  sub: '#5a6a76', // Reference - subdued text (same as textSecondary)
   textTertiary: '#8B97A6', // Lighter gray for hints
   textblack: '#000000', // Black text color 
   
   // UI elements
   border: '#E1E8ED', // Soft blue-tinted border
+  borderRef: '#d6ecf7', // Reference UI - sort chips, card border
   borderLight: '#F0F4F8', // Very light border
   borderFocus: '#0077C0', // Blue border for focus states
   disabled: '#CBD5DC', // Disabled state
@@ -84,7 +95,7 @@ export const typography = {
   },
   h2: {
     fontSize: 22,
-    fontFamily: fonts.extraBold,
+    fontFamily: fonts.bold,
     lineHeight: 30,
     letterSpacing: -0.3,
   },
@@ -128,10 +139,6 @@ export const typography = {
     fontFamily: fonts.extraBold,
     lineHeight: 28,
   },
-  /** Light (300) - for subtle text */
-  light: { fontFamily: fonts.light },
-  /** Medium (500) - for emphasized body */
-  medium: { fontFamily: fonts.medium },
 };
 
 export const borderRadius = {

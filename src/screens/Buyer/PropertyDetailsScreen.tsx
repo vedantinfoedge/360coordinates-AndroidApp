@@ -28,7 +28,6 @@ import CustomAlert from '../../utils/alertHelper';
 import {buyerService} from '../../services/buyer.service';
 import {createLead} from '../../services/leadsService';
 import {fixImageUrl, isValidImageUrl, validateAndProcessPropertyImages, PropertyImage} from '../../utils/imageHelper';
-import PropertyDetailsHeader from '../../components/PropertyDetailsHeader';
 import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {Linking} from 'react-native';
@@ -860,27 +859,6 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   return (
     <View style={styles.container}>
-      {/* 360° COORDINATES Header */}
-      <PropertyDetailsHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support' as never)}
-        onLogoutPress={isLoggedIn ? logout : undefined}
-        onSignInPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
-            : undefined
-        }
-        onSignUpPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
-            : undefined
-        }
-        showLogout={isLoggedIn}
-        showProfile={isLoggedIn}
-        showSignIn={isGuest}
-        showSignUp={isGuest}
-      />
-
       {/* Content sheet - white with rounded corners over dark background */}
       <View style={styles.contentSheet}>
         {/* Scrollable Content with Image */}
@@ -1154,7 +1132,6 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.sectionTitleBar} />
             <Text style={styles.sectionTitle}>About this Property</Text>
           </View>
-          <View style={styles.sectionDivider} />
           <Text style={styles.description} numberOfLines={descriptionExpanded ? undefined : 4}>
             {property.description || 'No description available'}
           </Text>
@@ -1171,7 +1148,6 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.sectionTitleBar} />
             <Text style={styles.sectionTitle}>Property Details</Text>
           </View>
-          <View style={styles.sectionDivider} />
           <View style={styles.detailsGrid}>
             {property.facing && (
               <View style={styles.detailItem}>
@@ -1230,7 +1206,6 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.sectionTitleBar} />
             <Text style={styles.sectionTitle}>Amenities</Text>
           </View>
-          <View style={styles.sectionDivider} />
           <View style={styles.amenitiesGrid}>
             {amenities.length > 0 ? (
               amenities.map((amenity: string, index: number) => {
@@ -1278,7 +1253,6 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.sectionTitleBar} />
             <Text style={styles.sectionTitle}>Location</Text>
           </View>
-          <View style={styles.sectionDivider} />
           <Text style={styles.address}>
             {property.address || property.fullAddress || property.location || 'Address not available'}
           </Text>
@@ -1302,15 +1276,18 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       </Animated.ScrollView>
 
         {/* Credits & Fixed Action Buttons */}
-        {user && user.user_type === 'buyer' && !interactionLoading && (
-          <View style={styles.creditsRow}>
-            <View style={styles.creditsDot} />
-            <Text style={[styles.creditsText, interactionState.remaining <= 0 && styles.creditsTextError]}>
-              Credits Left: {interactionState.remaining}/{interactionState.max}
-            </Text>
-          </View>
-        )}
-        <View style={[styles.actionButtons, {paddingBottom: insets.bottom + 8}]}>
+        <View style={[styles.bottomCta, {paddingBottom: insets.bottom + 8}]}>
+          {user && user.user_type === 'buyer' && !interactionLoading && (
+            <View style={styles.creditsRow}>
+              <View style={styles.creditsBadge}>
+                <View style={styles.creditsDot} />
+                <Text style={[styles.creditsText, interactionState.remaining <= 0 && styles.creditsTextError]}>
+                  Credits Left: {interactionState.remaining} / {interactionState.max}
+                </Text>
+              </View>
+            </View>
+          )}
+          <View style={styles.ctaRow}>
         <TouchableOpacity
           style={[
             styles.contactButton,
@@ -1335,6 +1312,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
         </TouchableOpacity>
       </View>
+        </View>
       </View>
       {/* end contentSheet */}
 
@@ -1533,8 +1511,8 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   );
 };
 
-// Dark blue background from reference UI
-const REFERENCE_BG = '#0D1B2A';
+// Reference UI: gradient 135deg #1D242B → #0077C0; phone bg #FAFAFA
+const REFERENCE_BG = '#1D242B';
 
 const styles = StyleSheet.create({
   container: {
@@ -1543,11 +1521,10 @@ const styles = StyleSheet.create({
   },
   contentSheet: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderTopLeftRadius: borderRadius.xxl,
     borderTopRightRadius: borderRadius.xxl,
     overflow: 'hidden',
-    marginTop: -borderRadius.xxl,
   },
   loadingContainer: {
     flex: 1,
@@ -1573,48 +1550,49 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginHorizontal: spacing.md,
     marginTop: spacing.lg,
-    backgroundColor: '#D4E4D4',
+    paddingTop: spacing.md,
+    backgroundColor: '#c8dfe8',
     borderRadius: borderRadius.xl,
   },
   imageBackButton: {
     position: 'absolute',
-    top: spacing.md,
-    left: spacing.md,
+    top: 14,
+    left: 14,
     zIndex: 10,
   },
   imageBackButtonInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
       android: { elevation: 4 },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 10 },
     }),
   },
   imageActionButtons: {
     position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
+    top: 14,
+    right: 14,
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 8,
     zIndex: 10,
   },
   imageActionBtn: {
     zIndex: 11,
   },
   imageActionBtnInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
       android: { elevation: 4 },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 10 },
     }),
   },
   imageCarousel: {
@@ -1681,14 +1659,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   indicator: {
-    width: scale(8),
-    height: scale(8),
-    borderRadius: scale(4),
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   indicatorActive: {
     backgroundColor: colors.surface,
-    width: scale(24),
+    width: 18,
+    borderRadius: 3,
   },
   imageCounter: {
     position: 'absolute',
@@ -1779,8 +1758,11 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: colors.surface,
-    padding: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 8,
+    borderBottomColor: colors.background,
   },
   priceRow: {
     flexDirection: 'row',
@@ -1789,16 +1771,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   priceOnwards: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: 13,
+    color: colors.sub,
     fontWeight: '500',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.secondary, // Dark Charcoal #1D242B
-    marginBottom: spacing.sm,
-    lineHeight: 36,
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 10,
+    lineHeight: 25,
+    letterSpacing: -0.3,
   },
   locationContainer: {
     flexDirection: 'row',
@@ -1810,66 +1793,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   location: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.textSecondary,
+    fontSize: 13,
+    color: colors.sub,
     flex: 1,
   },
   price: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: colors.primary, // Blue #0077C0
-    marginTop: spacing.xs,
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: -0.5,
   },
   quickInfo: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'space-between',
-    gap: spacing.sm,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 10,
+    borderBottomWidth: 8,
+    borderBottomColor: colors.background,
   },
   infoCard: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: colors.surfaceSecondary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.primaryXlight,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.borderLight,
-    minHeight: 80,
+    borderColor: colors.borderRef,
     justifyContent: 'center',
-    gap: spacing.xs,
+    gap: 6,
   },
   infoIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: colors.accentLighter,
+    backgroundColor: colors.primaryXlight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: 0,
   },
   infoLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.sub,
     textAlign: 'center',
   },
   infoValue: {
-    ...typography.captionSemibold,
+    fontSize: 12,
+    fontWeight: '800',
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
     textAlign: 'center',
   },
   section: {
     backgroundColor: colors.surface,
-    padding: spacing.xl,
-    marginTop: 0,
-    paddingTop: spacing.xl,
+    padding: 20,
+    borderBottomWidth: 8,
+    borderBottomColor: colors.background,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1877,87 +1857,93 @@ const styles = StyleSheet.create({
   },
   sectionTitleBar: {
     width: 4,
-    height: 20,
+    height: 18,
     borderRadius: 2,
     backgroundColor: colors.primary,
-    marginRight: spacing.sm,
+    marginRight: 8,
   },
   sectionDivider: {
-    height: 1,
-    backgroundColor: 'rgba(29, 36, 43, 0.1)',
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    height: 2,
+    backgroundColor: colors.primaryLight,
+    marginTop: 10,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
     color: colors.text,
+    paddingBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primaryLight,
+    marginBottom: 16,
+    flex: 1,
   },
   readMore: {
-    ...typography.body,
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.primary,
-    fontWeight: '600',
-    marginTop: spacing.sm,
+    marginTop: 8,
   },
   description: {
-    ...typography.body,
-    color: colors.textSecondary,
-    lineHeight: 26,
-    fontSize: 16,
+    fontSize: 13,
+    color: colors.sub,
+    lineHeight: 22,
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    gap: 10,
   },
   detailItem: {
     width: '47%',
-    padding: spacing.lg,
-    backgroundColor: '#F5F6F8',
-    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderRef,
   },
   detailItemFull: {
     width: '100%',
   },
   detailLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.sub,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
   detailValue: {
-    ...typography.body,
+    fontSize: 14,
+    fontWeight: '800',
     color: colors.text,
-    fontWeight: '700',
-    fontSize: 16,
+    lineHeight: 20,
   },
   amenitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    gap: 10,
   },
   amenityItem: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '47%',
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.background,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.accentLighter,
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-    minHeight: 56,
+    borderColor: colors.borderRef,
+    gap: 10,
   },
   amenityIconContainer: {
     width: 36,
     height: 36,
-    borderRadius: 8,
-    backgroundColor: colors.accentLighter,
+    borderRadius: 10,
+    backgroundColor: colors.primaryXlight,
+    borderWidth: 1,
+    borderColor: colors.borderRef,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1965,70 +1951,83 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   amenityText: {
-    ...typography.body,
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '500',
     flex: 1,
-    flexShrink: 1,
+    lineHeight: 16,
   },
   address: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
+    fontSize: 13,
+    color: colors.sub,
+    marginBottom: 14,
+    lineHeight: 22,
   },
   mapPlaceholder: {
-    height: 140,
-    backgroundColor: colors.accentLighter,
-    borderRadius: borderRadius.lg,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    height: 120,
+    backgroundColor: '#b8d5ea',
+    borderRadius: 16,
+    marginBottom: 12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0, 119, 192, 0.15)',
+    borderColor: colors.borderRef,
   },
   mapPlaceholderText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
+    fontSize: 11,
+    color: colors.sub,
+    fontWeight: '600',
+    marginTop: 4,
   },
   mapButton: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    backgroundColor: colors.primaryXlight,
+    borderRadius: 14,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    marginTop: spacing.sm,
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: colors.borderRef,
   },
   mapButtonText: {
-    ...typography.body,
-    color: colors.primary,
+    fontSize: 14,
     fontWeight: '700',
-    fontSize: 16,
+    color: colors.primary,
   },
   creditsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
+    gap: 6,
+    marginBottom: 8,
+  },
+  creditsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: colors.borderRef,
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
+    ...Platform.select({
+      android: { elevation: 2 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+    }),
   },
   creditsDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: colors.primary,
   },
   creditsText: {
-    ...typography.caption,
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.text,
   },
   creditsTextError: {
     color: colors.error,
@@ -2085,17 +2084,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
-  actionButtons: {
+  bottomCta: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
     backgroundColor: colors.surface,
-    padding: spacing.md,
-    gap: spacing.md,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 8,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.borderRef,
     ...Platform.select({
       android: {
         elevation: 8,
@@ -2108,53 +2107,53 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  ctaRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   contactButton: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.lg,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: colors.primary, // Purple border
-    minHeight: 52,
+    borderColor: colors.primary,
+    minHeight: 48,
   },
   contactButtonText: {
-    ...typography.body,
-    color: colors.primary, // Purple text
+    fontSize: 14,
     fontWeight: '700',
-    fontSize: 16,
+    color: colors.primary,
   },
   chatButton: {
-    flex: 1,
-    backgroundColor: colors.primary, // Purple background
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.lg,
+    flex: 1.4,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 48,
     ...Platform.select({
-      android: {
-        elevation: 4,
-      },
+      android: { elevation: 6 },
       ios: {
         shadowColor: colors.primary,
         shadowOffset: {width: 0, height: 4},
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOpacity: 0.35,
+        shadowRadius: 14,
       },
     }),
   },
   chatButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 8,
   },
   chatButtonText: {
-    ...typography.body,
-    color: colors.surface,
+    fontSize: 14,
     fontWeight: '700',
-    fontSize: 16,
+    color: colors.surface,
   },
   modalOverlay: {
     flex: 1,

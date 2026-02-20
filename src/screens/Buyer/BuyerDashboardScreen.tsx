@@ -12,6 +12,8 @@ import {
   RefreshControl,
   Share,
   Animated,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -28,7 +30,10 @@ import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import PropertyCard from '../../components/PropertyCard';
 import { buyerService, Property } from '../../services/buyer.service';
 import { propertyService } from '../../services/property.service';
+import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Defs, Pattern, Circle, Rect } from 'react-native-svg';
+
+const Gradient = LinearGradient as React.ComponentType<any>;
 import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters } from '../../utils/formatters';
 
@@ -74,18 +79,14 @@ const getFirstName = (user: { full_name?: string } | null) => {
   return user.full_name.trim().split(/\s+/)[0] || null;
 };
 
-// Reference UI colors - exact match
-const DARK_HEADER_BG = '#1a2a3a';           // Dark charcoal
-const TOGGLE_UNSELECTED_BG = '#E2E8F0';     // Light grey - ref has light bg + dark text
-const TOGGLE_UNSELECTED_TEXT = '#64748b';   // Dark grey text
-const SEARCH_INPUT_BG = '#374151';          // Dark grey input
-const SEARCH_INPUT_TEXT = '#F9FAFB';
-const SEARCH_PLACEHOLDER = '#9CA3AF';       // Light grey placeholder
-const MAP_CARD_BG = '#93C5FD';              // Light blue card
-const MAP_CARD_TITLE = '#1E40AF';           // Dark blue text on map card
-const MAP_CARD_SUBTITLE = '#3B82F6';        // Lighter blue
-const AVATAR_BG = '#60A5FA';                // Light blue circle
-const AVATAR_TEXT_COLOR = '#1E3A8A';        // Dark blue S
+// HTML reference colors (:root)
+const DARK = '#1D242B';
+const PRIMARY = '#0077C0';
+const PRIMARY_LIGHT = '#C7EEFF';
+const PRIMARY_XLIGHT = '#e8f7ff';
+const PRIMARY_DARK = '#005a91';
+const SUB = '#5a6a76';
+const BORDER = '#d6ecf7';
 
 const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const { user, logout, isAuthenticated, switchUserRole } = useAuth();
@@ -135,6 +136,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLocation, setSearchLocation] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerHeight = insets.top + verticalScale(70);
@@ -602,24 +604,63 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.timeGreetingText}>{getTimeGreeting()}</Text>
               </View>
               <Text style={styles.welcomeTextDark}>
-                Welcome{getFirstName(user) ? `, ${getFirstName(user)}` : ''}
+                Welcome{getFirstName(user) ? ', ' : ''}
+                {getFirstName(user) ? (
+                  <Text style={{ color: PRIMARY_LIGHT }}>{getFirstName(user)}</Text>
+                ) : null}
               </Text>
               <Text style={styles.welcomeSubtextDark}>
                 Find your dream property in India
               </Text>
             </View>
             {isLoggedIn && (
-              <TouchableOpacity
-                style={styles.avatarButton}
-                onPress={() => navigation.navigate('Profile')}
-                activeOpacity={0.8}>
-                <View style={[styles.avatarContainer, { backgroundColor: AVATAR_BG }]}>
-                  <Text style={[styles.avatarText, { color: AVATAR_TEXT_COLOR }]}>
-                    {(user?.full_name?.[0] || 'U').toUpperCase()}
-                  </Text>
-                  <View style={styles.avatarStatusDot} />
-                </View>
-              </TouchableOpacity>
+              <View style={styles.avatarWrapper}>
+                <TouchableOpacity
+                  style={styles.avatarButton}
+                  onPress={() => setShowAvatarDropdown(true)}
+                  activeOpacity={0.8}>
+                  <Gradient
+                    colors={[PRIMARY, PRIMARY_LIGHT]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.avatarContainer}>
+                    <Text style={styles.avatarText}>{ (user?.full_name?.[0] || 'U').toUpperCase()}</Text>
+                    <View style={styles.avatarStatusDot} />
+                  </Gradient>
+                </TouchableOpacity>
+                <Modal
+                  visible={showAvatarDropdown}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setShowAvatarDropdown(false)}>
+                  <View style={styles.avatarDropdownOverlay}>
+                    <Pressable
+                      style={StyleSheet.absoluteFill}
+                      onPress={() => setShowAvatarDropdown(false)}
+                    />
+                    <View style={[styles.avatarDropdown, { top: insets.top + verticalScale(90) }]}>
+                      <Pressable
+                        style={styles.avatarDropdownItem}
+                        onPress={() => {
+                          setShowAvatarDropdown(false);
+                          navigation.navigate('Profile');
+                        }}>
+                        <TabIcon name="profile" color={colors.text} size={18} />
+                        <Text style={styles.avatarDropdownItemText}>Profile</Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.avatarDropdownItem}
+                        onPress={() => {
+                          setShowAvatarDropdown(false);
+                          logout();
+                        }}>
+                        <TabIcon name="logout" color={colors.text} size={18} />
+                        <Text style={styles.avatarDropdownItemText}>Logout</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </Modal>
+              </View>
             )}
           </View>
 
@@ -652,12 +693,12 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.searchSection}>
             <View style={styles.searchContainer}>
               <View style={styles.searchInputContainerRef}>
-                <TabIcon name="search" color={SEARCH_PLACEHOLDER} size={20} />
+                <TabIcon name="search" color="rgba(199,238,255,0.6)" size={20} />
                 <View style={styles.searchInputWrapper}>
                   <TextInput
                     style={styles.searchInputRef}
-                    placeholder="City, locality, project..."
-                    placeholderTextColor={SEARCH_PLACEHOLDER}
+                    placeholder="City, locality, project…"
+                    placeholderTextColor="rgba(199,238,255,0.4)"
                     value={searchLocation || searchQuery}
                     onChangeText={(text: string) => {
                       setSearchLocation(text);
@@ -684,7 +725,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            {/* Search on Map Card - light blue with white dots pattern, arrow in blue circle */}
+            {/* Map Banner - gradient + white text per HTML */}
             <TouchableOpacity
               style={styles.mapSearchCardRef}
               onPress={() => {
@@ -698,25 +739,33 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 }
               }}
               activeOpacity={0.8}>
+              <Gradient
+                colors={[PRIMARY, PRIMARY_DARK]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
               <View style={StyleSheet.absoluteFill} pointerEvents="none">
                 <Svg width="100%" height="100%" style={{ position: 'absolute' }}>
                   <Defs>
-                    <Pattern id="mapCardDots" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
-                      <Circle cx="2" cy="2" r="1" fill={MAP_CARD_TITLE} fillOpacity="0.3" />
+                    <Pattern id="mapCardDots" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+                      <Circle cx="2" cy="2" r="1" fill={PRIMARY_LIGHT} fillOpacity="0.22" />
                     </Pattern>
                   </Defs>
                   <Rect width="100%" height="100%" fill="url(#mapCardDots)" />
                 </Svg>
               </View>
               <View style={styles.mapSearchCardContent}>
-                <TabIcon name="map" color={MAP_CARD_TITLE} size={24} />
-                <View style={styles.mapSearchCardText}>
-                  <Text style={[styles.mapSearchCardTitle, { color: MAP_CARD_TITLE }]}>Search on Map</Text>
-                  <Text style={[styles.mapSearchCardSubtitle, { color: MAP_CARD_SUBTITLE }]}>Explore properties by location</Text>
+                <View style={styles.mapIconWrap}>
+                  <TabIcon name="location" color="#FFFFFF" size={22} />
                 </View>
-              </View>
-              <View style={[styles.mapSearchArrowCircle, { backgroundColor: colors.primary }]}>
-                <TabIcon name="chevron-right" color="#FFFFFF" size={20} />
+                <View style={styles.mapSearchCardText}>
+                  <Text style={styles.mapSearchCardTitle}>Search on Map</Text>
+                  <Text style={styles.mapSearchCardSubtitle}>Explore properties by location</Text>
+                </View>
+                <View style={styles.mapArrowCircle}>
+                  <TabIcon name="chevron-right" color="#FFFFFF" size={18} />
+                </View>
               </View>
             </TouchableOpacity>
           </View>
@@ -747,7 +796,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                   },
                 });
               }}>
-              <Text style={styles.seeAllText}>See All</Text>
+              <View style={styles.seeAllPill}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </View>
             </TouchableOpacity>
           </View>
           {upcomingProjects.length > 0 ? (
@@ -827,7 +878,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                   CustomAlert.alert('Error', 'Failed to load all properties. Please try again.');
                 }
               }}>
-              <Text style={styles.seeAllText}>See All</Text>
+              <View style={styles.seeAllPill}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </View>
             </TouchableOpacity>
           </View>
           {loading ? (
@@ -916,7 +969,9 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                   },
                 });
               }}>
-              <Text style={styles.seeAllText}>See All</Text>
+              <View style={styles.seeAllPill}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </View>
             </TouchableOpacity>
           </View>
           {buyNewHomeProperties.length > 0 ? (
@@ -1004,7 +1059,7 @@ const styles = StyleSheet.create({
   },
   // Dark header section (theme from reference image)
   darkHeaderSection: {
-    backgroundColor: DARK_HEADER_BG,
+    backgroundColor: DARK,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
@@ -1016,6 +1071,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: spacing.md,
+    paddingTop: spacing.lg,
   },
   greetingLeft: {
     flex: 1,
@@ -1027,9 +1083,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   timeGreetingText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: fonts.medium,
-    color: 'rgba(255,255,255,0.85)',
+    color: PRIMARY_LIGHT,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -1046,8 +1102,39 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     lineHeight: moderateScale(20),
   },
+  avatarWrapper: { position: 'relative' },
   avatarButton: {
     marginLeft: spacing.md,
+  },
+  avatarDropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  avatarDropdown: {
+    position: 'absolute',
+    right: spacing.lg,
+    zIndex: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.md,
+    minWidth: 160,
+    paddingVertical: spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  avatarDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  avatarDropdownItemText: {
+    fontSize: 16,
+    fontFamily: fonts.medium,
+    color: colors.text,
   },
   avatarContainer: {
     width: scale(48),
@@ -1056,10 +1143,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(199,238,255,0.3)',
+    shadowColor: DARK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   avatarText: {
     fontSize: 20,
     fontFamily: fonts.extraBold,
+    color: DARK,
   },
   avatarStatusDot: {
     position: 'absolute',
@@ -1070,7 +1165,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.success,
     borderWidth: 2,
-    borderColor: DARK_HEADER_BG,
+    borderColor: DARK,
   },
   toggleSection: {
     flexDirection: 'row',
@@ -1083,18 +1178,21 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(12),
     paddingHorizontal: spacing.md,
     borderRadius: 9999,
-    backgroundColor: (TOGGLE_UNSELECTED_BG as string),
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(199,238,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: verticalScale(44),
   },
   toggleButtonActive: {
     backgroundColor: colors.primary,
+    borderWidth: 0,
   },
   toggleButtonTextDark: {
     fontSize: moderateScale(14),
     fontFamily: fonts.medium,
-    color: (TOGGLE_UNSELECTED_TEXT as string),
+    color: 'rgba(199,238,255,0.6)',
   },
   toggleButtonTextActive: {
     fontFamily: fonts.bold,
@@ -1109,7 +1207,9 @@ const styles = StyleSheet.create({
   searchInputContainerRef: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: SEARCH_INPUT_BG as string,
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(199,238,255,0.25)',
     borderRadius: scale(12),
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -1122,7 +1222,7 @@ const styles = StyleSheet.create({
   searchInputRef: {
     fontSize: 16,
     fontFamily: fonts.regular,
-    color: SEARCH_INPUT_TEXT as string,
+    color: '#FFFFFF',
     padding: 0,
   },
   searchButton: {
@@ -1149,39 +1249,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: (MAP_CARD_BG as string),
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginTop: spacing.md,
     overflow: 'hidden',
-  },
-  mapSearchArrowCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: spacing.sm,
-    zIndex: 1,
+    minHeight: 72,
   },
   mapSearchCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     zIndex: 1,
+    justifyContent: 'space-between',
+  },
+  mapIconWrap: {
+    marginRight: spacing.md,
+    zIndex: 1,
   },
   mapSearchCardText: {
-    marginLeft: spacing.md,
+    flex: 1,
   },
   mapSearchCardTitle: {
     fontSize: 16,
     fontFamily: fonts.bold,
+    color: '#FFFFFF',
   },
   mapSearchCardSubtitle: {
     fontSize: 12,
     fontFamily: fonts.regular,
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
+  },
+  mapArrowCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+    zIndex: 1,
   },
   lightContentArea: {
     flex: 1,
@@ -1201,10 +1308,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontFamily: fonts.bold,
+    fontSize: 17,
+    fontFamily: fonts.extraBold,
     color: colors.text,
-    lineHeight: 30,
+    lineHeight: 24,
   },
   sectionSubtitle: {
     fontSize: 14,
@@ -1213,8 +1320,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     lineHeight: 20,
   },
+  seeAllPill: {
+    backgroundColor: PRIMARY_XLIGHT,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 9999,
+  },
   seeAllText: {
-    fontSize: 16,
+    fontSize: 12,
     fontFamily: fonts.semiBold,
     color: colors.primary,
   },

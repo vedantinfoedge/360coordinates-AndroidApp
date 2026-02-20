@@ -6,7 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  SafeAreaView,
   Image,
+  Platform,
   Animated,
   Modal,
 } from 'react-native';
@@ -18,14 +20,10 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/AppNavigator';
 import {BuyerStackParamList} from '../../navigation/BuyerNavigator';
 import {colors, spacing, typography, borderRadius} from '../../theme';
-import {fonts} from '../../theme/fonts';
 import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
-
-const TOTAL_INTERACTION_LIMIT = 5;
-const INTERACTION_STORAGE_KEY = 'interaction_remaining';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<BuyerStackParamList, 'Profile'>,
@@ -36,12 +34,40 @@ type Props = {
   navigation: ProfileScreenNavigationProp;
 };
 
+const TOTAL_INTERACTION_LIMIT = 5;
+const INTERACTION_STORAGE_KEY = 'interaction_remaining';
+
 const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
   const {user, logout, isAuthenticated} = useAuth();
   const insets = useSafeAreaInsets();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(30)).current;
   const scrollY = React.useRef(new Animated.Value(0)).current;
+
+  const [creditsState, setCreditsState] = useState({
+    remaining: TOTAL_INTERACTION_LIMIT,
+    max: TOTAL_INTERACTION_LIMIT,
+  });
+
+  useEffect(() => {
+    const loadCredits = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(INTERACTION_STORAGE_KEY);
+        if (stored !== null) {
+          const parsed = parseInt(stored, 10);
+          if (!isNaN(parsed) && parsed >= 0) {
+            setCreditsState({
+              remaining: Math.min(parsed, TOTAL_INTERACTION_LIMIT),
+              max: TOTAL_INTERACTION_LIMIT,
+            });
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadCredits();
+  }, []);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -82,30 +108,6 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     email: userData.email || '',
     address: userData.address || '',
   });
-
-  const [creditsState, setCreditsState] = useState({
-    remaining: TOTAL_INTERACTION_LIMIT,
-    max: TOTAL_INTERACTION_LIMIT,
-  });
-
-  useEffect(() => {
-    const loadCredits = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(INTERACTION_STORAGE_KEY);
-        let remaining = TOTAL_INTERACTION_LIMIT;
-        if (stored !== null) {
-          const parsed = parseInt(stored, 10);
-          if (!isNaN(parsed) && parsed >= 0) {
-            remaining = Math.min(parsed, TOTAL_INTERACTION_LIMIT);
-          }
-        }
-        setCreditsState({remaining, max: TOTAL_INTERACTION_LIMIT});
-      } catch {
-        setCreditsState({remaining: TOTAL_INTERACTION_LIMIT, max: TOTAL_INTERACTION_LIMIT});
-      }
-    };
-    loadCredits();
-  }, []);
 
   // Update profile image when user changes
   React.useEffect(() => {
@@ -302,7 +304,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           {useNativeDriver: true},
         )}
         scrollEventThrottle={16}>
-        {/* Profile Section - matches image layout */}
+        {/* Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.profileGradient}>
             <View style={styles.avatarContainer}>
@@ -329,22 +331,18 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                   </View>
                 )}
                 <View style={styles.cameraIconContainer}>
-                  <TabIcon name="camera" color={colors.text} size={20} />
+                  <TabIcon name="camera" color={colors.text} size={24} />
                 </View>
               </TouchableOpacity>
             </View>
             <Text style={styles.userName}>{userData.full_name || 'User'}</Text>
             <Text style={styles.userEmail}>{userData.email}</Text>
-
-            {/* Credits Left pill */}
-            <View style={styles.creditsPill}>
-              <TabIcon name="tag" color={colors.textSecondary} size={16} />
-              <Text style={styles.creditsPillText}>
+            <View style={styles.creditsBadge}>
+              <TabIcon name="dollar" color={colors.textSecondary} size={16} />
+              <Text style={styles.creditsBadgeText}>
                 Credits Left: {creditsState.remaining}/{creditsState.max}
               </Text>
             </View>
-
-            {/* Upload Photo button - light blue */}
             <TouchableOpacity
               style={styles.uploadButton}
               onPress={showImagePicker}
@@ -354,43 +352,44 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                 {profileImage ? 'Change Photo' : 'Upload Photo'}
               </Text>
             </TouchableOpacity>
-
-            {/* Edit Profile / Cancel-Save buttons */}
-            {!isEditing ? (
-              <TouchableOpacity 
-                style={styles.editButton} 
-                onPress={handleEdit}
-                activeOpacity={0.8}>
-                <TabIcon name="edit" color="#FFD54F" size={18} />
-                <Text style={styles.editButtonText}>Edit Profile</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.editActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleCancel}
-                  activeOpacity={0.8}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.saveButton} 
-                  onPress={handleSave}
-                  activeOpacity={0.8}>
-                  <View style={styles.saveButtonContent}>
-                    <TabIcon name="check" color={colors.surface} size={18} />
-                    <Text style={styles.saveButtonText}>Save</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            )}
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={handleEdit}
+              activeOpacity={0.8}>
+              <TabIcon name="edit" color="#FFC107" size={18} />
+              <Text style={styles.editButtonText}>Edit Profile</Text>
+            </TouchableOpacity>
           </View>
         </View>
+
+        {/* Cancel/Save when editing */}
+        {isEditing && (
+          <View style={styles.actionButtons}>
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancel}
+                activeOpacity={0.8}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSave}
+                activeOpacity={0.8}>
+                <View style={styles.saveButtonContent}>
+                  <TabIcon name="check" color={colors.surface} size={18} />
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Form Fields */}
         <View style={styles.formSection}>
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <TabIcon name="profile" color={colors.textSecondary} size={18} />
+              <TabIcon name="profile" color={colors.primary} size={18} />
               <Text style={styles.label}>FULL NAME</Text>
             </View>
             {isEditing ? (
@@ -408,7 +407,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <TabIcon name="mail" color={colors.textSecondary} size={18} />
+              <TabIcon name="mail" color={colors.primary} size={18} />
               <Text style={styles.label}>EMAIL</Text>
             </View>
             {isEditing ? (
@@ -426,7 +425,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
-              <TabIcon name="phone" color={colors.textSecondary} size={18} />
+              <TabIcon name="phone" color={colors.primary} size={18} />
               <Text style={styles.label}>PHONE NUMBER</Text>
             </View>
             {isEditing ? (
@@ -449,7 +448,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
               <TabIcon name="phone" color={colors.primary} size={18} />
-              <Text style={styles.label}>Alternate Mobile (Optional)</Text>
+              <Text style={styles.label}>ALTERNATE MOBILE (OPTIONAL)</Text>
             </View>
             {isEditing ? (
               <TextInput
@@ -471,7 +470,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
           <View style={styles.inputContainer}>
             <View style={styles.labelContainer}>
               <TabIcon name="location" color={colors.primary} size={18} />
-              <Text style={styles.label}>Address</Text>
+              <Text style={styles.label}>ADDRESS</Text>
             </View>
             {isEditing ? (
               <TextInput
@@ -620,8 +619,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl + spacing.md,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomWidth: 3,
+    borderBottomColor: colors.primary + '30',
   },
   avatarContainer: {
     marginBottom: spacing.md,
@@ -655,17 +654,18 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
   },
   avatarText: {
-    fontFamily: fonts.extraBold,
+    ...typography.h2,
     color: colors.surface,
     fontSize: 36,
+    fontWeight: '700',
   },
   cameraIconContainer: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
@@ -673,26 +673,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 3,
-  },
-  creditsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: borderRadius.round,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  creditsPillText: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: colors.text,
+    elevation: 4,
   },
   cameraIcon: {
     fontSize: 18,
@@ -706,28 +689,64 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.accentLight,
-    borderWidth: 1,
-    borderColor: colors.primary + '40',
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    alignSelf: 'stretch',
   },
   uploadButtonText: {
-    fontFamily: fonts.medium,
-    color: colors.primary,
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '700',
     fontSize: 15,
   },
   userName: {
-    fontFamily: fonts.extraBold,
-    fontSize: 22,
-    color: colors.text,
+    fontSize: 26,
+    color: colors.secondary,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
-    lineHeight: 28,
+    fontWeight: '700',
+    lineHeight: 32,
   },
   userEmail: {
-    fontFamily: fonts.regular,
+    ...typography.body,
     color: colors.textSecondary,
     fontSize: 15,
     marginTop: spacing.xs,
+  },
+  creditsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.round,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  creditsBadgeText: {
+    ...typography.caption,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionButtons: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   editButton: {
     flexDirection: 'row',
@@ -735,8 +754,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     marginTop: spacing.md,
-    width: '100%',
-    maxWidth: 280,
     backgroundColor: colors.primary,
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.lg,
@@ -745,18 +762,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+    alignSelf: 'stretch',
+  },
+  editButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   editButtonText: {
-    fontFamily: fonts.bold,
+    ...typography.body,
     color: colors.surface,
+    fontWeight: '700',
     fontSize: 16,
   },
   editActions: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginTop: spacing.md,
-    width: '100%',
-    maxWidth: 280,
   },
   cancelButton: {
     flex: 1,
@@ -768,8 +789,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   cancelButtonText: {
-    fontFamily: fonts.bold,
+    ...typography.body,
     color: colors.text,
+    fontWeight: '700',
     fontSize: 16,
   },
   saveButtonContent: {
@@ -790,8 +812,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   saveButtonText: {
-    fontFamily: fonts.bold,
+    ...typography.body,
     color: colors.surface,
+    fontWeight: '700',
     fontSize: 16,
   },
   formSection: {
@@ -816,20 +839,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   label: {
-    fontFamily: fonts.bold,
+    ...typography.caption,
     color: colors.primary,
-    fontSize: 12,
+    fontWeight: '700',
+    fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
-    fontFamily: fonts.regular,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
+    ...typography.body,
     color: colors.text,
     fontSize: 16,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
   },
   textArea: {
@@ -838,7 +862,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   value: {
-    fontFamily: fonts.regular,
+    ...typography.body,
     color: colors.text,
     fontSize: 16,
     paddingVertical: spacing.sm,
@@ -855,7 +879,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lockedInputText: {
-    fontFamily: fonts.regular,
+    ...typography.body,
     color: colors.text,
     fontSize: 16,
     flex: 1,
@@ -866,7 +890,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   lockedLabel: {
-    fontFamily: fonts.regular,
+    ...typography.caption,
     color: colors.textSecondary,
     fontSize: 12,
     marginLeft: spacing.sm,
@@ -914,9 +938,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent + '15',
   },
   optionText: {
-    fontFamily: fonts.semiBold,
+    ...typography.body,
     color: colors.text,
     fontSize: 16,
+    fontWeight: '600',
   },
   logoutText: {
     color: colors.error,
@@ -964,15 +989,14 @@ const styles = StyleSheet.create({
     fontSize: 50,
   },
   loginTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 22,
+    ...typography.h1,
     color: colors.text,
+    fontWeight: '700',
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
   loginSubtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
+    ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -993,12 +1017,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   loginButtonText: {
-    fontFamily: fonts.bold,
+    ...typography.body,
     color: colors.surface,
+    fontWeight: '700',
     fontSize: 16,
   },
   loginNote: {
-    fontFamily: fonts.regular,
+    ...typography.caption,
     color: colors.textSecondary,
     textAlign: 'center',
     fontSize: 12,
@@ -1024,14 +1049,14 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   imagePickerModalTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 20,
+    ...typography.h2,
     color: colors.text,
+    fontWeight: '700',
     marginBottom: spacing.xs,
     textAlign: 'center',
   },
   imagePickerModalSubtitle: {
-    fontFamily: fonts.regular,
+    ...typography.body,
     color: colors.textSecondary,
     marginBottom: spacing.xl,
     textAlign: 'center',
@@ -1058,8 +1083,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   imagePickerOptionText: {
-    fontFamily: fonts.semiBold,
+    ...typography.body,
     color: colors.text,
+    fontWeight: '600',
     fontSize: 14,
   },
   imagePickerCancelButton: {
@@ -1071,8 +1097,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   imagePickerCancelText: {
-    fontFamily: fonts.semiBold,
+    ...typography.body,
     color: colors.textSecondary,
+    fontWeight: '600',
     fontSize: 16,
   },
 });

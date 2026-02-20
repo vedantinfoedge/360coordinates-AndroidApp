@@ -1,10 +1,18 @@
 /**
  * Firebase Cloud Messaging (FCM) Notification Service
  * Handles push notifications for new chat messages
+ * Uses lazy require to avoid startup crash if Firebase fails to initialize
  */
 
-import messaging from '@react-native-firebase/messaging';
 import {Platform} from 'react-native';
+
+function getMessaging() {
+  try {
+    return require('@react-native-firebase/messaging').default;
+  } catch {
+    return null;
+  }
+}
 
 type NotificationType = 'info' | 'success' | 'error' | 'warning';
 
@@ -25,6 +33,8 @@ class NotificationService {
    */
   async requestPermission(): Promise<string | null> {
     try {
+      const messaging = getMessaging();
+      if (!messaging) return null;
       const authStatus = await messaging().requestPermission();
       const enabled =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
@@ -57,6 +67,8 @@ class NotificationService {
    */
   async getToken(): Promise<string | null> {
     try {
+      const messaging = getMessaging();
+      if (!messaging) return null;
       if (!this.fcmToken) {
         this.fcmToken = await messaging().getToken();
       }
@@ -97,8 +109,15 @@ class NotificationService {
    * Initialize notification listeners
    */
   initialize() {
+    try {
+      const messaging = getMessaging();
+      if (!messaging) {
+        console.warn('[Notifications] Firebase Messaging not available');
+        return;
+      }
+      const m = messaging();
     // Foreground message handler - app is open
-    messaging().onMessage(async remoteMessage => {
+    m.onMessage(async remoteMessage => {
       console.log('[Notifications] Message received in foreground:', remoteMessage);
       
       // Trigger chat list refresh when new message notification arrives
@@ -126,8 +145,7 @@ class NotificationService {
     // This is required for React Native Firebase - must be at top level
 
     // Notification opened from quit state
-    messaging()
-      .getInitialNotification()
+    m.getInitialNotification()
       .then(remoteMessage => {
         if (remoteMessage) {
           console.log('[Notifications] Notification opened from quit state:', remoteMessage);
@@ -136,7 +154,7 @@ class NotificationService {
       });
 
     // Notification opened from background state
-    messaging().onNotificationOpenedApp(remoteMessage => {
+    m.onNotificationOpenedApp(remoteMessage => {
       console.log('[Notifications] Notification opened from background:', remoteMessage);
       // Trigger refresh when notification is opened
       if (remoteMessage.data?.type === 'chat' || remoteMessage.notification) {
@@ -146,12 +164,15 @@ class NotificationService {
     });
 
     // Token refresh handler
-    messaging().onTokenRefresh(token => {
+    m.onTokenRefresh(token => {
       console.log('[Notifications] FCM Token refreshed:', token);
       this.fcmToken = token;
       // TODO: Update token in backend
       // await api.post('/users/fcm-token', { fcmToken: token });
     });
+    } catch (e) {
+      console.warn('[Notifications] Initialize failed:', e?.message || e);
+    }
   }
 
   /**

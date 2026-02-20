@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Animated,
+  FlatList,
   ScrollView,
   TextInput,
   Modal,
@@ -112,6 +113,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [chatFilter, setChatFilter] = useState<'all' | 'unread'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [buyerSearchQuery, setBuyerSearchQuery] = useState('');
   const [propertyCache, setPropertyCache] = useState<Record<string, any>>({});
   const [buyerCache, setBuyerCache] = useState<Record<string, { name: string; profile_image?: string }>>({});
   const [buyerDetailsCache, setBuyerDetailsCache] = useState<Record<string, BuyerDetails>>({});
@@ -123,6 +125,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
   const [cardMode, setCardMode] = useState<'buyer' | 'owner'>('buyer');
   const [selectedOwnerPropertyId, setSelectedOwnerPropertyId] = useState<string | null>(null);
   const [selectedOwnerRole, setSelectedOwnerRole] = useState<'agent' | 'seller' | null>(null);
+  const [selectedChatItemForModal, setSelectedChatItemForModal] = useState<ChatListItem | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const previousUserTypeRef = useRef<string | undefined>(undefined);
 
@@ -1254,6 +1257,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
       setSelectedOwnerPropertyId(null);
       setSelectedOwnerRole(null);
       setSelectedBuyerId(buyerId);
+      setSelectedChatItemForModal(item);
       setBuyerCardVisible(true);
       setBuyerCardError(null);
 
@@ -1318,6 +1322,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
       setSelectedOwnerPropertyId(propertyIdStr);
       setSelectedOwnerRole(item.receiverRole ?? null);
       setSelectedBuyerId(null);
+      setSelectedChatItemForModal(item);
       setBuyerCardVisible(true);
       setBuyerCardError(null);
 
@@ -1438,10 +1443,20 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
           {item.image ? (
             <Image
               source={{ uri: item.image }}
-              style={[styles.avatar, styles.avatarImage, item.unreadCount > 0 && styles.avatarUnread]}
+              style={[
+                styles.avatar,
+                styles.avatarImage,
+                (user?.user_type || '').toLowerCase() === 'buyer' && styles.avatarBuyer,
+                item.unreadCount > 0 && styles.avatarUnread,
+              ]}
             />
           ) : (
-            <View style={[styles.avatar, item.unreadCount > 0 && styles.avatarUnread]}>
+            <View
+              style={[
+                styles.avatar,
+                (user?.user_type || '').toLowerCase() === 'buyer' && styles.avatarBuyer,
+                item.unreadCount > 0 && styles.avatarUnread,
+              ]}>
               <Text style={styles.avatarText}>{initials}</Text>
             </View>
           )}
@@ -1603,8 +1618,20 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
     });
   };
 
+  const filterByBuyerSearch = (list: ChatListItem[]) => {
+    const q = buyerSearchQuery.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(item => {
+      const name = (item.name || '').toLowerCase();
+      const last = (item.lastMessage || '').toLowerCase();
+      const prop = (item.propertyTitle || '').toLowerCase();
+      return name.includes(q) || last.includes(q) || prop.includes(q);
+    });
+  };
+
   const filteredChatList = filterByUnread(chatList);
   const agentFilteredChatList = filterBySearch(filterByUnread(chatList));
+  const buyerFilteredChatList = filterByBuyerSearch(filterByUnread(chatList));
 
   const chatStats = {
     total: chatList.length,
@@ -1639,33 +1666,30 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Buyer UI: keep existing header */}
+      {/* Buyer UI: "My Chats" dark header matching reference HTML */}
       {!isAgentOrSeller && (
-        <BuyerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={isLoggedIn ? logout : undefined}
-          onSignInPress={
-            isGuest
-              ? () =>
-                (navigation as any).navigate('Auth', {
-                  screen: 'Login',
-                  params: { returnTo: 'Chats' },
-                })
-              : undefined
-          }
-          onSignUpPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
-              : undefined
-          }
-          showLogout={isLoggedIn}
-          showProfile={isLoggedIn}
-          showSignIn={isGuest}
-          showSignUp={isGuest}
-          scrollY={scrollY}
-          headerHeight={headerHeight}
-        />
+        <View style={[styles.buyerChatTopBar, { paddingTop: insets.top + 14 }]}>
+          <View style={styles.buyerTopBarRow}>
+            <Text style={styles.buyerTopTitle}>
+              My <Text style={styles.buyerTopTitleAccent}>Chats</Text>
+            </Text>
+            {chatStats.unread > 0 && (
+              <View style={styles.unreadBadgeTop}>
+                <Text style={styles.unreadBadgeTopText}>{chatStats.unread} unread</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.chatSearchBar}>
+            <TabIcon name="search" color={colors.primaryLight} size={16} />
+            <TextInput
+              style={styles.chatSearchInput}
+              placeholder="Search conversations…"
+              placeholderTextColor="rgba(199,238,255,0.4)"
+              value={buyerSearchQuery}
+              onChangeText={setBuyerSearchQuery}
+            />
+          </View>
+        </View>
       )}
 
       {/* Agent & Seller UI: "My Inquiries" layout (search + stat pills) */}
@@ -1723,19 +1747,45 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Seller UI: keep existing simple filter bar - REMOVED to match Agent UI */}
 
-      {(isAgentOrSeller ? agentFilteredChatList.length > 0 : chatList.length > 0) ? (
+      {(isAgentOrSeller ? agentFilteredChatList.length > 0 : buyerFilteredChatList.length > 0) ? (
+        !isAgentOrSeller ? (
+          <View style={styles.buyerListWrapper}>
+            <View style={styles.chatListCard}>
+              <FlatList
+                data={buyerFilteredChatList}
+                renderItem={renderChatItem}
+                keyExtractor={(item: ChatListItem) => item.id}
+                ListHeaderComponent={
+                  <Text style={styles.sectionLabel}>RECENT</Text>
+                }
+                contentContainerStyle={styles.buyerListContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    colors={[colors.primary]}
+                    tintColor={colors.primary}
+                  />
+                }
+              />
+            </View>
+            <View style={styles.emptyHint}>
+              <Text style={styles.emptyHintEmoji}>💬</Text>
+              <Text style={styles.emptyHintText}>Start a conversation from any listing</Text>
+            </View>
+          </View>
+        ) : (
         <Animated.FlatList
-          data={isAgentOrSeller ? agentFilteredChatList : chatList}
+          data={agentFilteredChatList}
           renderItem={renderChatItem}
           keyExtractor={(item: ChatListItem) => item.id}
           contentContainerStyle={[
             styles.listContent,
             {
-              paddingTop: isAgentOrSeller
-                ? spacing.md
-                : insets.top + 60 + spacing.md * 2,
-              paddingHorizontal: isAgentOrSeller ? spacing.md : undefined,
-              paddingBottom: isAgentOrSeller ? spacing.xl : undefined,
+              paddingTop: spacing.md,
+              paddingHorizontal: spacing.md,
+              paddingBottom: spacing.xl,
             },
           ]}
           showsVerticalScrollIndicator={false}
@@ -1753,110 +1803,183 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
             />
           }
         />
+        )
       ) : (
-        <View style={[styles.emptyContainer, { paddingTop: isAgentOrSeller ? spacing.xl : insets.top + 60 + spacing.md * 2 }]}>
+        <View style={[styles.emptyContainer, { paddingTop: isAgentOrSeller ? spacing.xl : spacing.xl }]}>
           <View style={styles.emptyIconWrap}>
-            <TabIcon name="inquiries" color={colors.textSecondary} size={64} />
+            {isAgentOrSeller ? (
+              <TabIcon name="inquiries" color={colors.textSecondary} size={64} />
+            ) : (
+              <Text style={styles.emptyHintEmoji}>💬</Text>
+            )}
           </View>
           <Text style={styles.emptyText}>
-            {chatFilter === 'unread' ? 'No unread chats' : searchQuery.trim() ? 'No chats found' : 'No chats yet'}
+            {isAgentOrSeller
+              ? (chatFilter === 'unread' ? 'No unread chats' : searchQuery.trim() ? 'No chats found' : 'No chats yet')
+              : (buyerSearchQuery.trim() ? 'No chats found' : 'No chats yet')}
           </Text>
           <Text style={styles.emptySubtext}>
-            {chatFilter === 'unread'
-              ? 'You have no unread messages'
-              : searchQuery.trim()
+            {isAgentOrSeller
+              ? (chatFilter === 'unread'
+                ? 'You have no unread messages'
+                : searchQuery.trim()
+                  ? 'Try adjusting your search'
+                  : 'Start a conversation by chatting with a buyer or property owner')
+              : (buyerSearchQuery.trim()
                 ? 'Try adjusting your search'
-                : 'Start a conversation by chatting with a buyer or property owner'}
+                : 'Start a conversation from any listing')}
           </Text>
         </View>
       )}
 
-      {/* Buyer or Owner details popup card (opens on avatar tap) */}
+      {/* Contact Info modal (opens on avatar tap) - Call, Delete, Email only */}
       <Modal
         visible={buyerCardVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setBuyerCardVisible(false)}>
-        <Pressable style={styles.buyerCardOverlay} onPress={() => setBuyerCardVisible(false)}>
-          <Pressable style={styles.buyerCard} onPress={() => { }}>
-            <View style={styles.buyerCardHeader}>
-              <Text style={styles.buyerCardTitle}>{cardTitle}</Text>
-              <TouchableOpacity onPress={() => setBuyerCardVisible(false)} activeOpacity={0.7}>
-                <TabIcon name="close" color={colors.text} size={20} />
-              </TouchableOpacity>
-            </View>
+        <View style={[styles.contactInfoModal, { paddingTop: insets.top }]}>
+          <View style={styles.contactInfoHeader}>
+            <TouchableOpacity
+              style={styles.contactInfoBackBtn}
+              onPress={() => setBuyerCardVisible(false)}
+              activeOpacity={0.7}>
+              <Text style={styles.contactInfoBackText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.contactInfoTitle}>Contact Info</Text>
+          </View>
 
-            {buyerCardLoading ? (
-              <View style={styles.buyerCardLoading}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={styles.buyerCardLoadingText}>Loading...</Text>
-              </View>
-            ) : buyerCardError ? (
+          {buyerCardLoading ? (
+            <View style={styles.contactInfoLoading}>
+              <ActivityIndicator size="small" color={colors.primaryLight} />
+              <Text style={styles.contactInfoLoadingText}>Loading...</Text>
+            </View>
+          ) : buyerCardError ? (
+            <View style={styles.contactInfoBody}>
               <Text style={styles.buyerCardError}>{buyerCardError}</Text>
-            ) : cardPerson ? (
-              <View style={styles.buyerCardBody}>
-                <View style={styles.buyerCardTopRow}>
-                  {cardPerson.profile_image ? (
-                    <Image source={{ uri: cardPerson.profile_image }} style={styles.buyerCardAvatar} />
-                  ) : (
-                    <View style={[styles.buyerCardAvatar, styles.buyerCardAvatarFallback]}>
-                      <Text style={styles.buyerCardAvatarText}>
-                        {String(cardPerson.name || '?')
-                          .trim()
-                          .split(' ')
-                          .map(n => n[0])
-                          .join('')
-                          .toUpperCase()
-                          .slice(0, 2)}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.buyerCardTopInfo}>
-                    <Text style={styles.buyerCardName} numberOfLines={2}>
-                      {cardPerson.name || (cardMode === 'buyer' ? 'Buyer' : 'Property Owner')}
+            </View>
+          ) : cardPerson ? (
+            <>
+              <View style={styles.contactInfoHero}>
+                {cardPerson.profile_image ? (
+                  <Image source={{ uri: cardPerson.profile_image }} style={styles.contactInfoBigAvatar} />
+                ) : (
+                  <View style={styles.contactInfoBigAvatar}>
+                    <Text style={styles.contactInfoBigAvatarText}>
+                      {String(cardPerson.name || '?')
+                        .trim()
+                        .split(' ')
+                        .map(n => n[0])
+                        .join('')
+                        .toUpperCase()
+                        .slice(0, 2)}
                     </Text>
-                    {cardMode === 'buyer' && (
-                      <Text style={styles.buyerCardMeta}>Member since: {memberSinceText}</Text>
-                    )}
+                  </View>
+                )}
+                <Text style={styles.contactInfoName}>
+                  {cardPerson.name || (cardMode === 'buyer' ? 'Buyer' : 'Property Owner')}
+                </Text>
+                <Text style={styles.contactInfoSince}>
+                  📅 Member since {cardMode === 'buyer' ? memberSinceText : '—'}
+                </Text>
+                <View style={styles.ownerActions}>
+                  <TouchableOpacity
+                    style={styles.ownerActionItem}
+                    onPress={() => {
+                      if (cardPerson.phone) Linking.openURL(`tel:${cardPerson.phone}`);
+                      else CustomAlert.alert('Info', 'Phone number not available.');
+                    }}
+                    activeOpacity={0.7}>
+                    <View style={styles.ownerActionIcon}>
+                      <Text style={styles.ownerActionEmoji}>📞</Text>
+                    </View>
+                    <Text style={styles.ownerActionLabel}>Call</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.ownerActionItem}
+                    onPress={() => {
+                      setBuyerCardVisible(false);
+                      if (selectedChatItemForModal?.chatRoomId) {
+                        CustomAlert.alert(
+                          'Delete conversation?',
+                          'This will remove the entire chat and all messages for both participants. This cannot be undone.',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Delete',
+                              style: 'destructive',
+                              onPress: async () => {
+                                const ok = await chatService.deleteConversation(selectedChatItemForModal.chatRoomId);
+                                if (ok) loadChatRooms();
+                                else CustomAlert.alert('Error', 'Could not delete conversation.');
+                              },
+                            },
+                          ],
+                        );
+                      }
+                    }}
+                    activeOpacity={0.7}>
+                    <View style={styles.ownerActionIcon}>
+                      <Text style={styles.ownerActionEmoji}>🗑️</Text>
+                    </View>
+                    <Text style={styles.ownerActionLabel}>Delete</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.ownerActionItem}
+                    onPress={() => {
+                      if (cardPerson.email) Linking.openURL(`mailto:${cardPerson.email}`);
+                      else CustomAlert.alert('Info', 'Email not available.');
+                    }}
+                    activeOpacity={0.7}>
+                    <View style={styles.ownerActionIcon}>
+                      <Text style={styles.ownerActionEmoji}>✉️</Text>
+                    </View>
+                    <Text style={styles.ownerActionLabel}>Email</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <ScrollView style={styles.contactInfoScroll} showsVerticalScrollIndicator={false}>
+                <View style={styles.contactInfoSection}>
+                  <Text style={styles.contactInfoSectionLabel}>CONTACT DETAILS</Text>
+                  <View style={styles.infoRow}>
+                    <View style={styles.infoIcon}>
+                      <Text>📞</Text>
+                    </View>
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Mobile Number</Text>
+                      <TouchableOpacity
+                        onPress={() => cardPerson.phone && Linking.openURL(`tel:${cardPerson.phone}`)}>
+                        <Text style={[styles.infoValue, styles.infoValueLink]}>
+                          {cardPerson.phone || '—'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <View style={styles.infoIcon}>
+                      <Text>✉️</Text>
+                    </View>
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Email Address</Text>
+                      <TouchableOpacity
+                        onPress={() => cardPerson.email && Linking.openURL(`mailto:${cardPerson.email}`)}>
+                        <Text style={[styles.infoValue, styles.infoValueLink]}>
+                          {cardPerson.email || '—'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-
-                <View style={styles.buyerCardField}>
-                  <Text style={styles.buyerCardLabel}>Phone</Text>
-                  {cardPerson.phone ? (
-                    <TouchableOpacity
-                      onPress={() => Linking.openURL(`tel:${cardPerson.phone}`)}
-                      activeOpacity={0.7}>
-                      <Text style={[styles.buyerCardValue, styles.buyerCardLink]}>
-                        {cardPerson.phone}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.buyerCardValue}>—</Text>
-                  )}
-                </View>
-                <View style={styles.buyerCardField}>
-                  <Text style={styles.buyerCardLabel}>Email</Text>
-                  {cardPerson.email ? (
-                    <TouchableOpacity
-                      onPress={() => Linking.openURL(`mailto:${cardPerson.email}`)}
-                      activeOpacity={0.7}>
-                      <Text style={[styles.buyerCardValue, styles.buyerCardLink]}>
-                        {cardPerson.email}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.buyerCardValue}>—</Text>
-                  )}
-                </View>
-              </View>
-            ) : (
+              </ScrollView>
+            </>
+          ) : (
+            <View style={styles.contactInfoBody}>
               <Text style={styles.buyerCardError}>
                 {cardMode === 'owner' ? 'Owner details not available.' : 'Buyer details not available.'}
               </Text>
-            )}
-          </Pressable>
-        </Pressable>
+            </View>
+          )}
+        </View>
       </Modal>
     </View>
   );
@@ -1993,7 +2116,164 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 
-  // Buyer details popup card
+  // Contact Info modal (full screen, Call/Delete/Email only)
+  contactInfoModal: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  contactInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: colors.secondary,
+  },
+  contactInfoBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactInfoBackText: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  contactInfoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(199,238,255,0.8)',
+  },
+  contactInfoHero: {
+    backgroundColor: colors.secondary,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  contactInfoBigAvatar: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderWidth: 3,
+    borderColor: 'rgba(199,238,255,0.3)',
+  },
+  contactInfoBigAvatarText: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  contactInfoName: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  contactInfoSince: {
+    fontSize: 12,
+    color: 'rgba(199,238,255,0.6)',
+  },
+  ownerActions: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 18,
+  },
+  ownerActionItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  ownerActionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(199,238,255,0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(199,238,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ownerActionEmoji: {
+    fontSize: 20,
+  },
+  ownerActionLabel: {
+    fontSize: 11,
+    color: 'rgba(199,238,255,0.7)',
+    fontWeight: '600',
+  },
+  contactInfoScroll: {
+    flex: 1,
+  },
+  contactInfoSection: {
+    backgroundColor: colors.surface,
+    paddingTop: 8,
+  },
+  contactInfoSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderRef,
+  },
+  infoIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: colors.primaryXlight,
+    borderWidth: 1,
+    borderColor: colors.borderRef,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: colors.sub,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  infoValueLink: {
+    color: colors.primary,
+  },
+  contactInfoLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.lg,
+  },
+  contactInfoLoadingText: {
+    fontSize: 14,
+    color: colors.primaryLight,
+    fontWeight: '600',
+  },
+  contactInfoBody: {
+    padding: spacing.lg,
+  },
+  // Buyer details popup card (legacy - kept for fallback)
   buyerCardOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -2105,14 +2385,106 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xs,
     flexGrow: 1,
   },
+  // Buyer "My Chats" dark header
+  buyerChatTopBar: {
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  buyerTopBarRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  buyerTopTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  buyerTopTitleAccent: {
+    color: colors.primaryLight,
+  },
+  unreadBadgeTop: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  unreadBadgeTopText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  chatSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(199,238,255,0.2)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  chatSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#FFFFFF',
+    padding: 0,
+  },
+  buyerListWrapper: {
+    flex: 1,
+    backgroundColor: colors.background,
+    paddingBottom: 16,
+  },
+  chatListCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderRef,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.sub,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  buyerListContent: {
+    paddingBottom: 8,
+  },
+  emptyHint: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  emptyHintEmoji: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  emptyHintText: {
+    fontSize: 13,
+    color: colors.sub,
+  },
   // WhatsApp-style chat item
   chatItem: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E0E0E0',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderRef,
     alignItems: 'center',
     minHeight: 72,
   },
@@ -2127,6 +2499,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0,
+  },
+  avatarBuyer: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   avatarImage: {
     backgroundColor: 'transparent',
@@ -2161,10 +2538,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   propertyTitle: {
-    fontSize: 13,
-    color: '#667781',
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginTop: 2,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   timestamp: {
     fontSize: 13,

@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Linking,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -99,6 +101,8 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const [firebaseUnsubscribe, setFirebaseUnsubscribe] = useState<(() => void) | null>(null);
   const [participantName, setParticipantName] = useState<string>(userName || '');
   const [counterpartyPhone, setCounterpartyPhone] = useState<string | null>(null);
+  const [counterpartyEmail, setCounterpartyEmail] = useState<string | null>(null);
+  const [contactInfoVisible, setContactInfoVisible] = useState(false);
   const flatListRef = useRef<FlatListScrollRef | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inquirySentForPropertyRef = useRef<number | null>(null);
@@ -156,7 +160,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     const currentUserType = (user?.user_type || '').toLowerCase();
     const isBuyer = currentUserType === 'buyer';
 
-    const fetchPhone = async () => {
+    const fetchContact = async () => {
       try {
         if (isBuyer && propertyId) {
           const res = await buyerService.getPropertyDetails(propertyId);
@@ -167,23 +171,37 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
             property?.owner?.phone ||
             property?.seller?.phone ||
             null;
-          if (!cancelled && phone) setCounterpartyPhone(String(phone).trim() || null);
-          else if (!cancelled) setCounterpartyPhone(null);
+          const email =
+            property?.seller_email ||
+            property?.owner?.email ||
+            property?.seller?.email ||
+            null;
+          if (!cancelled) {
+            setCounterpartyPhone(phone ? String(phone).trim() || null : null);
+            setCounterpartyEmail(email ? String(email).trim() || null : null);
+          }
         } else if (!isBuyer && userId) {
           const res: any = await sellerService.getBuyer(userId);
           const payload = res?.data?.buyer ?? res?.data?.user ?? res?.data ?? res?.buyer ?? res ?? null;
           const phone =
             payload?.phone || payload?.mobile || payload?.buyer_phone || null;
-          if (!cancelled && phone) setCounterpartyPhone(String(phone).trim() || null);
-          else if (!cancelled) setCounterpartyPhone(null);
+          const email = payload?.email || payload?.buyer_email || null;
+          if (!cancelled) {
+            setCounterpartyPhone(phone ? String(phone).trim() || null : null);
+            setCounterpartyEmail(email ? String(email).trim() || null : null);
+          }
         } else if (!cancelled && !paramCounterpartyPhone) {
           setCounterpartyPhone(null);
+          setCounterpartyEmail(null);
         }
       } catch (_) {
-        if (!cancelled) setCounterpartyPhone(null);
+        if (!cancelled) {
+          setCounterpartyPhone(null);
+          setCounterpartyEmail(null);
+        }
       }
     };
-    fetchPhone();
+    fetchContact();
     return () => {
       cancelled = true;
     };
@@ -562,44 +580,50 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   }, [userName, user?.user_type]);
 
   return (
-    <View style={[styles.container, {paddingTop: insets.top, paddingBottom: insets.bottom}]}>
-      {/* Custom Header: back, avatar, name, phone */}
-      <View style={styles.chatHeader}>
+    <View style={[styles.container, {paddingBottom: insets.bottom}]}>
+      {/* Custom Header: extends to top (no white space), back, avatar, name, call, more */}
+      <View style={[styles.chatHeader, { paddingTop: insets.top }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
-          <TabIcon name="chevron-left" color={colors.text} size={24} />
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
-        <View style={styles.headerAvatar}>
-          <Text style={styles.headerAvatarText} numberOfLines={1}>
-            {participantName
-              .trim()
-              .split(/\s+/)
-              .slice(0, 2)
-              .map((w) => (w[0] || '').toUpperCase())
-              .join('') || '?'}
-          </Text>
-        </View>
-        <View style={styles.headerInfo}>
+        <TouchableOpacity
+          style={styles.headerAvatarWrap}
+          onPress={() => setContactInfoVisible(true)}
+          activeOpacity={0.8}>
+          <View style={styles.headerAvatar}>
+            <Text style={styles.headerAvatarText} numberOfLines={1}>
+              {participantName
+                .trim()
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((w) => (w[0] || '').toUpperCase())
+                .join('') || '?'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.headerInfo}
+          onPress={() => setContactInfoVisible(true)}
+          activeOpacity={0.8}>
           <Text style={styles.headerName} numberOfLines={1}>
             {participantName}
           </Text>
-          {receiverRole && (
-            <Text style={styles.headerRole} numberOfLines={1}>
-              {receiverRole === 'agent' ? 'Agent' : receiverRole === 'seller' ? 'Seller' : 'Buyer'}
-            </Text>
-          )}
-        </View>
+          <Text style={styles.headerStatus}>
+            {(receiverRole === 'agent' ? 'Agent' : receiverRole === 'seller' ? 'Seller' : 'Buyer')}
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity
-          style={styles.headerActionButton}
+          style={styles.headerActionBtn}
           onPress={handlePhonePress}
           accessibilityLabel="Call">
           <Text style={styles.headerActionText}>📞</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.headerActionButton}
-          onPress={handleDeleteConversation}
-          accessibilityLabel="Delete conversation">
+          style={styles.headerActionBtn}
+          onPress={() => setContactInfoVisible(true)}
+          accessibilityLabel="Contact Info">
           <Text style={styles.headerActionText}>⋮</Text>
         </TouchableOpacity>
       </View>
@@ -689,6 +713,112 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Contact Info modal - Call, Delete, Email only */}
+      <Modal
+        visible={contactInfoVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setContactInfoVisible(false)}>
+        <View style={[styles.contactInfoModal, { paddingTop: insets.top }]}>
+          <View style={styles.contactInfoHeader}>
+            <TouchableOpacity
+              style={styles.contactInfoBackBtn}
+              onPress={() => setContactInfoVisible(false)}
+              activeOpacity={0.7}>
+              <Text style={styles.contactInfoBackText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.contactInfoTitle}>Contact Info</Text>
+          </View>
+          <View style={styles.contactInfoHero}>
+            <View style={styles.contactInfoBigAvatar}>
+              <Text style={styles.contactInfoBigAvatarText}>
+                {participantName
+                  .trim()
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((w) => (w[0] || '').toUpperCase())
+                  .join('') || '?'}
+              </Text>
+            </View>
+            <Text style={styles.contactInfoName}>{participantName}</Text>
+            <Text style={styles.contactInfoSince}>📅 Member since</Text>
+            <View style={styles.ownerActions}>
+              <TouchableOpacity
+                style={styles.ownerActionItem}
+                onPress={() => {
+                  setContactInfoVisible(false);
+                  handlePhonePress();
+                }}
+                activeOpacity={0.7}>
+                <View style={styles.ownerActionIcon}>
+                  <Text style={styles.ownerActionEmoji}>📞</Text>
+                </View>
+                <Text style={styles.ownerActionLabel}>Call</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.ownerActionItem}
+                onPress={() => {
+                  setContactInfoVisible(false);
+                  handleDeleteConversation();
+                }}
+                activeOpacity={0.7}>
+                <View style={styles.ownerActionIcon}>
+                  <Text style={styles.ownerActionEmoji}>🗑️</Text>
+                </View>
+                <Text style={styles.ownerActionLabel}>Delete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.ownerActionItem}
+                onPress={() => {
+                  const email = counterpartyEmail?.trim();
+                  if (email) Linking.openURL(`mailto:${email}`);
+                  else CustomAlert.alert('Info', 'Email not available.');
+                  setContactInfoVisible(false);
+                }}
+                activeOpacity={0.7}>
+                <View style={styles.ownerActionIcon}>
+                  <Text style={styles.ownerActionEmoji}>✉️</Text>
+                </View>
+                <Text style={styles.ownerActionLabel}>Email</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <ScrollView style={styles.contactInfoScroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.contactInfoSection}>
+              <Text style={styles.contactInfoSectionLabel}>CONTACT DETAILS</Text>
+              <View style={styles.infoRow}>
+                <View style={styles.infoIcon}>
+                  <Text>📞</Text>
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Mobile Number</Text>
+                  <TouchableOpacity
+                    onPress={() => counterpartyPhone && Linking.openURL(`tel:${counterpartyPhone}`)}>
+                    <Text style={[styles.infoValue, styles.infoValueLink]}>
+                      {counterpartyPhone || '—'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.infoRow}>
+                <View style={styles.infoIcon}>
+                  <Text>✉️</Text>
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Email Address</Text>
+                  <TouchableOpacity
+                    onPress={() => counterpartyEmail && Linking.openURL(`mailto:${counterpartyEmail}`)}>
+                    <Text style={[styles.infoValue, styles.infoValueLink]}>
+                      {counterpartyEmail || '—'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -701,24 +831,28 @@ const styles = StyleSheet.create({
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    height: 60,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingBottom: 18,
+    minHeight: 72,
+    backgroundColor: colors.secondary,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: 12,
   },
   backButtonText: {
-    fontSize: 24,
-    color: colors.primary,
+    fontSize: 18,
+    color: '#FFFFFF',
     fontWeight: '600',
+  },
+  headerAvatarWrap: {
+    marginRight: 12,
   },
   headerInfo: {
     flex: 1,
@@ -726,45 +860,69 @@ const styles = StyleSheet.create({
   },
   headerName: {
     ...typography.h3,
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  headerRole: {
-    ...typography.small,
-    color: colors.textSecondary,
-    marginTop: 2,
+  headerStatus: {
+    fontSize: 11,
+    color: 'rgba(199,238,255,0.65)',
+    marginTop: 1,
   },
   headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
   },
   headerAvatarText: {
-    ...typography.body,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '900',
     color: colors.surface,
   },
-  headerActionButton: {
-    width: 40,
-    height: 40,
+  headerActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
   },
   headerActionText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  propBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: colors.primaryXlight || '#e8f7ff',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border || colors.borderRef,
+  },
+  propBarIcon: {
     fontSize: 20,
+  },
+  propBarText: {
+    flex: 1,
+  },
+  propBarTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
   },
   messagesContainer: {
     flex: 1,
   },
   messagesList: {
-    padding: spacing.md,
+    padding: 14,
     paddingBottom: spacing.sm,
+    backgroundColor: '#f0f4f8',
   },
   messageContainer: {
     marginBottom: spacing.sm,
@@ -900,6 +1058,149 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontSize: 14,
     color: colors.text,
+  },
+  // Contact Info modal (Call, Delete, Email only)
+  contactInfoModal: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  contactInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: colors.secondary,
+  },
+  contactInfoBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactInfoBackText: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  contactInfoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(199,238,255,0.8)',
+  },
+  contactInfoHero: {
+    backgroundColor: colors.secondary,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  contactInfoBigAvatar: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderWidth: 3,
+    borderColor: 'rgba(199,238,255,0.3)',
+  },
+  contactInfoBigAvatarText: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  contactInfoName: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  contactInfoSince: {
+    fontSize: 12,
+    color: 'rgba(199,238,255,0.6)',
+  },
+  ownerActions: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 18,
+  },
+  ownerActionItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  ownerActionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(199,238,255,0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(199,238,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ownerActionEmoji: {
+    fontSize: 20,
+  },
+  ownerActionLabel: {
+    fontSize: 11,
+    color: 'rgba(199,238,255,0.7)',
+    fontWeight: '600',
+  },
+  contactInfoScroll: {
+    flex: 1,
+  },
+  contactInfoSection: {
+    backgroundColor: colors.surface,
+    paddingTop: 8,
+  },
+  contactInfoSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderRef || colors.border,
+  },
+  infoIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: colors.primaryXlight || '#e8f7ff',
+    borderWidth: 1,
+    borderColor: colors.borderRef || colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  infoValueLink: {
+    color: colors.primary,
   },
 });
 

@@ -3,7 +3,6 @@
  */
 
 import { AppRegistry } from 'react-native';
-import messaging from '@react-native-firebase/messaging';
 import App from './App';
 import { name as appName } from './app.json';
 
@@ -21,11 +20,11 @@ try {
   // ignore if ErrorUtils not available
 }
 
-// Register background message handler (must be called before AppRegistry)
-// This handles notifications when app is in background or quit state
-messaging().setBackgroundMessageHandler(async remoteMessage => {
-  console.log('[Notifications] Message handled in background:', remoteMessage);
-  // Background messages are handled here - no UI updates needed
-});
+// Firebase background message handler disabled to prevent startup crash.
+// Re-enable after verifying Firebase config (google-services.json package_name matches applicationId).
+// try {
+//   const messaging = require('@react-native-firebase/messaging').default;
+//   messaging().setBackgroundMessageHandler(async remoteMessage => {});
+// } catch (e) { console.warn('[Notifications] Firebase Messaging:', e?.message); }
 
 AppRegistry.registerComponent(appName, () => App);

@@ -12,6 +12,8 @@ import {
   Share,
   RefreshControl,
   Animated,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -26,7 +28,10 @@ import { buyerService, Property } from '../../services/buyer.service';
 import { propertyService } from '../../services/property.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import CustomAlert from '../../utils/alertHelper';
+import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Defs, Pattern, Circle, Rect } from 'react-native-svg';
+
+const Gradient = LinearGradient as React.ComponentType<any>;
 import { formatters } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 
@@ -42,17 +47,11 @@ const getFirstName = (u: { full_name?: string } | null) => {
   return u.full_name.trim().split(/\s+/)[0] || null;
 };
 
-const DARK_HEADER_BG = '#1a2a3a';
-const TOGGLE_UNSELECTED_BG = '#E2E8F0';
-const TOGGLE_UNSELECTED_TEXT = '#64748b';
-const SEARCH_INPUT_BG = '#374151';
-const SEARCH_INPUT_TEXT = '#F9FAFB';
-const SEARCH_PLACEHOLDER = '#9CA3AF';
-const MAP_CARD_BG = '#93C5FD';
-const MAP_CARD_TITLE = '#1E40AF';
-const MAP_CARD_SUBTITLE = '#3B82F6';
-const AVATAR_BG = '#60A5FA';
-const AVATAR_TEXT_COLOR = '#1E3A8A';
+const DARK = '#1D242B';
+const PRIMARY = '#0077C0';
+const PRIMARY_LIGHT = '#C7EEFF';
+const PRIMARY_XLIGHT = '#e8f7ff';
+const PRIMARY_DARK = '#005a91';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<MainStackParamList, 'Home'>;
 
@@ -95,6 +94,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLocation, setSearchLocation] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -451,24 +451,63 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.timeGreetingText}>{getTimeGreeting()}</Text>
                 </View>
                 <Text style={styles.welcomeTextDark}>
-                  Welcome{getFirstName(user) ? `, ${getFirstName(user)}` : ''}
+                  Welcome{getFirstName(user) ? ', ' : ''}
+                  {getFirstName(user) ? (
+                    <Text style={{ color: PRIMARY_LIGHT }}>{getFirstName(user)}</Text>
+                  ) : null}
                 </Text>
                 <Text style={styles.welcomeSubtextDark}>
                   Find your dream property in India
                 </Text>
               </View>
               {isLoggedIn && (
-                <TouchableOpacity
-                  style={styles.avatarButton}
-                  onPress={() => navigation.navigate('Profile' as any)}
-                  activeOpacity={0.8}>
-                  <View style={[styles.avatarContainer, { backgroundColor: AVATAR_BG }]}>
-                    <Text style={[styles.avatarText, { color: AVATAR_TEXT_COLOR }]}>
-                      {(user?.full_name?.[0] || 'U').toUpperCase()}
-                    </Text>
-                    <View style={styles.avatarStatusDot} />
-                  </View>
-                </TouchableOpacity>
+                <View style={styles.avatarWrapper}>
+                  <TouchableOpacity
+                    style={styles.avatarButton}
+                    onPress={() => setShowAvatarDropdown(true)}
+                    activeOpacity={0.8}>
+                    <Gradient
+                      colors={[PRIMARY, PRIMARY_LIGHT]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.avatarContainer}>
+                      <Text style={styles.avatarText}>{(user?.full_name?.[0] || 'U').toUpperCase()}</Text>
+                      <View style={styles.avatarStatusDot} />
+                    </Gradient>
+                  </TouchableOpacity>
+                  <Modal
+                    visible={showAvatarDropdown}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setShowAvatarDropdown(false)}>
+                    <View style={styles.avatarDropdownOverlay}>
+                      <Pressable
+                        style={StyleSheet.absoluteFill}
+                        onPress={() => setShowAvatarDropdown(false)}
+                      />
+                      <View style={[styles.avatarDropdown, { top: insets.top + verticalScale(90) }]}>
+                        <Pressable
+                          style={styles.avatarDropdownItem}
+                          onPress={() => {
+                            setShowAvatarDropdown(false);
+                            navigation.navigate('Profile' as any);
+                          }}>
+                          <TabIcon name="profile" color={colors.text} size={18} />
+                          <Text style={styles.avatarDropdownItemText}>Profile</Text>
+                        </Pressable>
+                        <Pressable
+                          style={styles.avatarDropdownItem}
+                          onPress={() => {
+                            setShowAvatarDropdown(false);
+                            logout();
+                          }}>
+                          <TabIcon name="logout" color={colors.text} size={18} />
+                          <Text style={styles.avatarDropdownItemText}>Logout</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </Modal>
+                </View>
               )}
             </View>
 
@@ -499,12 +538,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.searchSection}>
               <View style={styles.searchContainer}>
                 <View style={styles.searchInputContainerRef}>
-                  <TabIcon name="search" color={SEARCH_PLACEHOLDER} size={20} />
+                  <TabIcon name="search" color="rgba(199,238,255,0.6)" size={20} />
                   <View style={styles.searchInputWrapper}>
                     <TextInput
                       style={styles.searchInputRef}
-                      placeholder="City, locality, project..."
-                      placeholderTextColor={SEARCH_PLACEHOLDER}
+                      placeholder="City, locality, project…"
+                      placeholderTextColor="rgba(199,238,255,0.4)"
                       value={searchLocation || searchQuery}
                       onChangeText={(text: string) => {
                         setSearchLocation(text);
@@ -547,25 +586,33 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   }
                 }}
                 activeOpacity={0.8}>
+                <Gradient
+                  colors={[PRIMARY, PRIMARY_DARK]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
                 <View style={StyleSheet.absoluteFill} pointerEvents="none">
                   <Svg width="100%" height="100%" style={{ position: 'absolute' }}>
                     <Defs>
-                      <Pattern id="homeMapCardDots" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
-                        <Circle cx="2" cy="2" r="1" fill={MAP_CARD_TITLE} fillOpacity="0.3" />
+                      <Pattern id="homeMapCardDots" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+                        <Circle cx="2" cy="2" r="1" fill={PRIMARY_LIGHT} fillOpacity="0.22" />
                       </Pattern>
                     </Defs>
                     <Rect width="100%" height="100%" fill="url(#homeMapCardDots)" />
                   </Svg>
                 </View>
                 <View style={styles.mapSearchCardContent}>
-                  <TabIcon name="map" color={MAP_CARD_TITLE} size={24} />
-                  <View style={styles.mapSearchCardText}>
-                    <Text style={[styles.mapSearchCardTitle, { color: MAP_CARD_TITLE }]}>Search on Map</Text>
-                    <Text style={[styles.mapSearchCardSubtitle, { color: MAP_CARD_SUBTITLE }]}>Explore properties by location</Text>
+                  <View style={styles.mapIconWrap}>
+                    <TabIcon name="location" color="#FFFFFF" size={22} />
                   </View>
-                </View>
-                <View style={styles.mapSearchArrowCircle}>
-                  <TabIcon name="chevron-right" color="#FFFFFF" size={20} />
+                  <View style={styles.mapSearchCardText}>
+                    <Text style={styles.mapSearchCardTitle}>Search on Map</Text>
+                    <Text style={styles.mapSearchCardSubtitle}>Explore properties by location</Text>
+                  </View>
+                  <View style={styles.mapArrowCircle}>
+                    <TabIcon name="chevron-right" color="#FFFFFF" size={18} />
+                  </View>
                 </View>
               </TouchableOpacity>
             </View>
@@ -598,7 +645,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     },
                   } as any);
                 }}>
-                <Text style={styles.seeAllText}>See All</Text>
+                <View style={styles.seeAllPill}>
+                  <Text style={styles.seeAllText}>See All</Text>
+                </View>
               </TouchableOpacity>
             </View>
             {upcomingProjects.length > 0 ? (
@@ -672,7 +721,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     CustomAlert.alert('Error', 'Failed to load all properties. Please try again.');
                   }
                 }}>
-                <Text style={styles.seeAllText}>See All</Text>
+                <View style={styles.seeAllPill}>
+                  <Text style={styles.seeAllText}>See All</Text>
+                </View>
               </TouchableOpacity>
             </View>
             {loading ? (
@@ -756,7 +807,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     },
                   } as any);
                 }}>
-                <Text style={styles.seeAllText}>See All</Text>
+                <View style={styles.seeAllPill}>
+                  <Text style={styles.seeAllText}>See All</Text>
+                </View>
               </TouchableOpacity>
             </View>
             {buyNewHomeProperties.length > 0 ? (
@@ -836,7 +889,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   darkHeaderSection: {
-    backgroundColor: DARK_HEADER_BG,
+    backgroundColor: DARK,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
@@ -848,6 +901,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: spacing.md,
+    paddingTop: spacing.lg,
   },
   greetingLeft: { flex: 1 },
   timeGreetingRow: {
@@ -857,9 +911,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   timeGreetingText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: fonts.medium,
-    color: 'rgba(255,255,255,0.85)',
+    color: PRIMARY_LIGHT,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -876,7 +930,38 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     lineHeight: moderateScale(20),
   },
+  avatarWrapper: { position: 'relative' },
   avatarButton: { marginLeft: spacing.md },
+  avatarDropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  avatarDropdown: {
+    position: 'absolute',
+    right: spacing.lg,
+    zIndex: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.md,
+    minWidth: 160,
+    paddingVertical: spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  avatarDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  avatarDropdownItemText: {
+    fontSize: 16,
+    fontFamily: fonts.medium,
+    color: colors.text,
+  },
   avatarContainer: {
     width: scale(48),
     height: scale(48),
@@ -884,10 +969,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(199,238,255,0.3)',
+    shadowColor: DARK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   avatarText: {
     fontSize: 20,
     fontFamily: fonts.extraBold,
+    color: DARK,
   },
   avatarStatusDot: {
     position: 'absolute',
@@ -898,7 +991,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.success,
     borderWidth: 2,
-    borderColor: DARK_HEADER_BG,
+    borderColor: DARK,
   },
   toggleSection: {
     flexDirection: 'row',
@@ -911,20 +1004,32 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(12),
     paddingHorizontal: spacing.md,
     borderRadius: 9999,
-    backgroundColor: TOGGLE_UNSELECTED_BG,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(199,238,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: verticalScale(44),
   },
+  toggleButtonActive: {
+    backgroundColor: colors.primary,
+    borderWidth: 0,
+  },
   toggleButtonTextDark: {
     fontSize: moderateScale(14),
     fontFamily: fonts.medium,
-    color: TOGGLE_UNSELECTED_TEXT,
+    color: 'rgba(199,238,255,0.6)',
+  },
+  toggleButtonTextActive: {
+    fontFamily: fonts.bold,
+    color: '#FFFFFF',
   },
   searchInputContainerRef: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: SEARCH_INPUT_BG,
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(199,238,255,0.25)',
     borderRadius: scale(12),
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -933,40 +1038,47 @@ const styles = StyleSheet.create({
   searchInputRef: {
     fontSize: 16,
     fontFamily: fonts.regular,
-    color: SEARCH_INPUT_TEXT,
+    color: '#FFFFFF',
     padding: 0,
   },
   mapSearchCardRef: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: MAP_CARD_BG,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginTop: spacing.md,
     overflow: 'hidden',
+    minHeight: 72,
   },
   mapSearchCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     zIndex: 1,
+    justifyContent: 'space-between',
   },
-  mapSearchCardText: { marginLeft: spacing.md },
+  mapIconWrap: {
+    marginRight: spacing.md,
+    zIndex: 1,
+  },
+  mapSearchCardText: { flex: 1 },
   mapSearchCardTitle: {
     fontSize: 16,
     fontFamily: fonts.bold,
+    color: '#FFFFFF',
   },
   mapSearchCardSubtitle: {
     fontSize: 12,
     fontFamily: fonts.regular,
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
   },
-  mapSearchArrowCircle: {
+  mapArrowCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.primary,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.sm,
@@ -1074,45 +1186,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-  // Toggle Section - Pill-shaped buttons
-  toggleSection: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    gap: scale(10),
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: verticalScale(12),
-    paddingHorizontal: scale(16),
-    borderRadius: scale(24),
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: verticalScale(44),
-  },
-  toggleButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  toggleButtonText: {
-    fontSize: moderateScale(14),
-    fontWeight: '600',
-    color: colors.textSecondary,
-    letterSpacing: 0.1,
-  },
-  toggleButtonTextActive: {
-    fontFamily: fonts.bold,
-    color: '#FFFFFF',
-  },
   // Section Styling - More breathing room
   section: {
     marginTop: spacing.xl + scale(8),
@@ -1126,11 +1199,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: moderateScale(22),
-    fontFamily: fonts.bold,
+    fontSize: 17,
+    fontFamily: fonts.extraBold,
     color: colors.text,
-    letterSpacing: -0.3,
-    lineHeight: moderateScale(28),
+    lineHeight: 24,
     flex: 1,
     paddingRight: spacing.md,
   },
@@ -1141,11 +1213,16 @@ const styles = StyleSheet.create({
     marginTop: scale(4),
     lineHeight: moderateScale(20),
   },
+  seeAllPill: {
+    backgroundColor: PRIMARY_XLIGHT,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 9999,
+  },
   seeAllText: {
-    fontSize: moderateScale(15),
-    fontWeight: '600',
+    fontSize: 12,
+    fontFamily: fonts.semiBold,
     color: colors.primary,
-    paddingVertical: scale(4),
   },
   // Properties List - Better spacing
   propertiesList: {

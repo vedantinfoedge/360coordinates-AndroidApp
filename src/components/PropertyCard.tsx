@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, ScrollView } from 'react-native';
-import { colors, spacing, typography, borderRadius, fonts } from '../theme';
+import { colors, spacing, typography, borderRadius } from '../theme';
 import { TabIcon } from './navigation/TabIcons';
 import { scale, verticalScale, moderateScale } from '../utils/responsive';
 import CustomAlert from '../utils/alertHelper';
@@ -350,9 +350,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <Text style={styles.name} numberOfLines={1}>
             {capitalize(name)}
           </Text>
-          <Text style={styles.location} numberOfLines={1}>
-            {location}
-          </Text>
+          <View style={styles.locationRow}>
+            <TabIcon name="location" color={colors.error} size={14} />
+            <Text style={styles.location} numberOfLines={1}>
+              {location}
+            </Text>
+          </View>
           {/* Feature tags - property type, status, area */}
           {(() => {
             const tags: string[] = [];
@@ -376,11 +379,23 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               if (a && !tags.includes(a)) tags.push(a);
             }
             if (tags.length === 0) return null;
+            const getTagStyle = (t: string) => {
+              const lower = t.toLowerCase();
+              if (lower.includes('ready') || lower.includes('available') || lower.includes('move')) return [styles.featureTag, styles.featureTagGreen];
+              if (lower.includes('under') || lower.includes('construction')) return [styles.featureTag, styles.featureTagAmber];
+              return styles.featureTag;
+            };
+            const getTagTextStyle = (t: string) => {
+              const lower = t.toLowerCase();
+              if (lower.includes('ready') || lower.includes('available') || lower.includes('move')) return [styles.featureTagText, styles.featureTagGreenText];
+              if (lower.includes('under') || lower.includes('construction')) return [styles.featureTagText, styles.featureTagAmberText];
+              return styles.featureTagText;
+            };
             return (
               <View style={styles.featureTagsRow}>
                 {tags.slice(0, 3).map((tag, i) => (
-                  <View key={i} style={styles.featureTag}>
-                    <Text style={styles.featureTagText}>{tag}</Text>
+                  <View key={i} style={getTagStyle(tag)}>
+                    <Text style={getTagTextStyle(tag)}>{tag}</Text>
                   </View>
                 ))}
               </View>
@@ -407,29 +422,35 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   );
 };
 
-// Modern Airbnb-inspired card styling (responsive)
-const CARD_RADIUS = scale(16);
+// Reference card styling - 20px radius, 340px height, 60/40 image/body
+const CARD_RADIUS = 20;
 const CARD_SHADOW = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.08,
-  shadowRadius: 16,
+  shadowColor: '#0077C0',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.10,
+  shadowRadius: 18,
   elevation: 4,
-  backgroundColor: '#fff', // Ensure shadow works on iOS
+  backgroundColor: '#fff',
+  borderWidth: 1,
+  borderColor: colors.borderRef,
 };
+
+const CARD_HEIGHT = 300;
 
 const styles = StyleSheet.create({
   card: {
-    width: scale(300),
+    width: '100%',
+    maxWidth: scale(340),
+    height: CARD_HEIGHT,
     borderRadius: CARD_RADIUS,
-    marginRight: spacing.lg,
     overflow: 'hidden',
     ...CARD_SHADOW,
-    marginBottom: 8, // Add margin bottom to avoid cutting off shadow
+    marginHorizontal: 20,
+    marginBottom: 14,
   },
   imageContainer: {
     position: 'relative',
-    height: verticalScale(200),
+    flex: 0.65,
     overflow: 'hidden',
     backgroundColor: colors.surfaceSecondary,
   },
@@ -454,35 +475,30 @@ const styles = StyleSheet.create({
   },
   navArrow: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: scale(44),
-    minWidth: scale(44),
+    right: 10,
+    top: '50%',
+    marginTop: -14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 11,
   },
   navArrowLeft: {
-    left: scale(4),
+    right: 'auto',
+    left: 10,
   },
   navArrowRight: {
-    right: scale(4),
+    right: 10,
+    left: 'auto',
   },
   navArrowText: {
-    fontSize: moderateScale(24),
-    fontFamily: fonts.medium,
-    color: '#222',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.text,
     textAlign: 'center',
-    lineHeight: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    overflow: 'hidden',
   },
   navArrowDisabled: {
     opacity: 0.3,
@@ -499,16 +515,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   dot: {
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
   dotActive: {
     backgroundColor: '#FFFFFF',
-    width: scale(7),
-    height: scale(7),
-    borderRadius: scale(4),
+    width: 14,
+    height: 5,
+    borderRadius: 3,
   },
   imagePlaceholder: {
     width: '100%',
@@ -532,10 +548,10 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   actionButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -558,17 +574,19 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    bottom: verticalScale(12),
-    left: scale(12),
-    paddingHorizontal: scale(10),
-    paddingVertical: verticalScale(5),
-    borderRadius: scale(6),
+    bottom: 10,
+    left: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
     zIndex: 5,
     pointerEvents: 'none',
   },
   projectBadge: {
+    bottom: 'auto',
+    top: 12,
     left: 'auto',
-    right: scale(12),
+    right: 12,
   },
   buyBadge: {
     backgroundColor: colors.primary,
@@ -593,29 +611,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, // Blue
   },
   badgeText: {
-    fontSize: moderateScale(11),
-    fontFamily: fonts.semiBold,
+    fontSize: 9,
+    fontFamily: typography.fontBold,
     color: '#FFFFFF',
-    letterSpacing: 0.3,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   infoContainer: {
-    padding: scale(16),
-    paddingTop: verticalScale(14),
+    flex: 0.35,
+    paddingHorizontal: 14,
+    paddingTop: 11,
+    paddingBottom: 12,
+    justifyContent: 'space-between',
   },
   name: {
-    fontSize: moderateScale(16),
-    fontFamily: fonts.extraBold,
+    fontSize: 13,
+    fontFamily: typography.fontExtraBold,
     color: colors.text,
-    lineHeight: moderateScale(22),
-    marginBottom: scale(4),
+    lineHeight: 17,
+    marginBottom: 2,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(4),
+    marginBottom: scale(8),
   },
   location: {
+    flex: 1,
     fontSize: moderateScale(14),
-    fontFamily: fonts.regular,
+    fontWeight: '400',
     color: colors.textSecondary,
     lineHeight: moderateScale(20),
-    marginBottom: scale(8),
   },
   featureTagsRow: {
     flexDirection: 'row',
@@ -627,41 +654,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(10),
     paddingVertical: scale(4),
     borderRadius: borderRadius.round,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: colors.primaryXlight,
   },
   featureTagText: {
     fontSize: moderateScale(12),
-    fontFamily: fonts.medium,
+    fontWeight: '500',
     color: colors.primary,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.md,
+    gap: 10,
+    marginTop: 8,
   },
   price: {
     flex: 1,
-    fontSize: moderateScale(18),
-    fontFamily: fonts.extraBold,
+    fontSize: 17,
+    fontFamily: typography.fontExtraBold,
     color: colors.primary,
-    letterSpacing: -0.3,
   },
   viewDetailsButton: {
+    flex: 1,
+    marginBottom: 20,
     backgroundColor: colors.primary,
-    borderRadius: scale(10),
-    paddingVertical: verticalScale(12),
-    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 0,
+    paddingBottom: 10,
     alignItems: 'center',
-    minHeight: verticalScale(44),
-    minWidth: 120,
     justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
   },
   viewDetailsText: {
-    fontSize: moderateScale(14),
-    fontFamily: fonts.semiBold,
+    fontSize: 13,
+    fontFamily: typography.fontBold,
     color: '#FFFFFF',
-    letterSpacing: 0.2,
   },
 });
 

@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SearchStackParamList } from '../../navigation/SearchNavigator';
-import { colors, spacing, typography, borderRadius, fonts } from '../../theme';
+import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import PropertyCard from '../../components/PropertyCard';
 import { useAuth } from '../../context/AuthContext';
@@ -1044,15 +1044,15 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      {/* Sticky search bar and filters */}
-      <View style={[styles.searchSectionSticky, { paddingTop: insets.top }]}>
+      {/* Dark top bar - search + filter chips (reference) */}
+      <View style={[styles.topBarDark, { paddingTop: insets.top }]}>
         <View style={styles.searchBarContainer}>
           <View style={styles.searchInputWrapper}>
             <TabIcon name="location" color={colors.error} size={20} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search by city"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor="rgba(199,238,255,0.45)"
               value={searchText}
               onChangeText={(text: string) => {
                 setSearchText(text);
@@ -1072,6 +1072,17 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               }}
               returnKeyType="search"
             />
+            <TouchableOpacity
+              onPress={() => {
+                const loc = (searchText || '').trim();
+                setLocation(loc);
+                setSearchText(loc);
+                setShowLocationSuggestions(false);
+                setTimeout(() => loadProperties(), 100);
+              }}
+              style={styles.searchIconButton}>
+              <TabIcon name="search" color="#FFFFFF" size={20} />
+            </TouchableOpacity>
           </View>
           {showLocationSuggestions && searchText.length >= 2 && (
             <View style={styles.locationSuggestionsContainer}>
@@ -1093,8 +1104,8 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setShowFilters(true)}>
-            <Text style={styles.filterText}>Filters</Text>
             <Text style={styles.filterChevron}>▼</Text>
+            <Text style={styles.filterText}> Filters</Text>
           </TouchableOpacity>
         </View>
         {/* Quick filters - dropdown theme: Listing type, Property type, Budget */}
@@ -1102,35 +1113,38 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.quickFiltersDropdownRow}>
           {searchMode === 'projects' ? (
             <>
-              {/* Project Status - value-first format */}
+              {/* Project Status */}
               <TouchableOpacity
                 style={[styles.dropdownTrigger, { flex: 1.2 }]}
                 onPress={() => setOpenDropdown(openDropdown === 'projectStatus' ? null : 'projectStatus')}>
-                <Text style={styles.dropdownValueFirst} numberOfLines={1}>
-                  Status {projectStatus || 'Any'}
+                <Text style={styles.dropdownLabelDark}>Status </Text>
+                <Text style={styles.dropdownValueDark} numberOfLines={1}>
+                  {projectStatus || 'Any'}
                 </Text>
-                <Text style={styles.dropdownChevron}>{openDropdown === 'projectStatus' ? '▲' : '▼'}</Text>
+                <Text style={styles.dropdownChevron}>▾</Text>
               </TouchableOpacity>
 
-              {/* Possession Date - value-first format */}
+              {/* Possession Date */}
               <TouchableOpacity
                 style={[styles.dropdownTrigger, { flex: 1.2 }]}
                 onPress={() => setOpenDropdown(openDropdown === 'possessionDate' ? null : 'possessionDate')}>
-                <Text style={styles.dropdownValueFirst} numberOfLines={1}>
-                  Possession {possessionDate || 'Any'}
+                <Text style={styles.dropdownLabelDark}>Possession </Text>
+                <Text style={styles.dropdownValueDark} numberOfLines={1}>
+                  {possessionDate || 'Any'}
                 </Text>
-                <Text style={styles.dropdownChevron}>{openDropdown === 'possessionDate' ? '▲' : '▼'}</Text>
+                <Text style={styles.dropdownChevron}>▾</Text>
               </TouchableOpacity>
             </>
           ) : (
-            /* Standard Property Filters - value-first format (Listing Buy ▼) */
+            /* Standard Property Filters - label + value (reference) */
             <TouchableOpacity
               style={styles.dropdownTrigger}
               onPress={() => setOpenDropdown(openDropdown === 'listing' ? null : 'listing')}>
-              <Text style={styles.dropdownValueFirst} numberOfLines={1}>
-                Listing {listingType === 'buy' ? 'Buy' : listingType === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
+              <Text style={styles.dropdownLabelDark}>Listing </Text>
+              <Text style={styles.dropdownValueDark} numberOfLines={1}>
+                {listingType === 'buy' ? 'Buy' : listingType === 'pg-hostel' ? 'PG/Hostel' : 'Rent'}
               </Text>
-              <Text style={styles.dropdownChevron}>{openDropdown === 'listing' ? '▲' : '▼'}</Text>
+              <Text style={styles.dropdownChevron}>▾</Text>
             </TouchableOpacity>
           )}
 
@@ -1139,17 +1153,19 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             style={[styles.dropdownTrigger, listingType === 'pg-hostel' && styles.dropdownTriggerDisabled]}
             onPress={() => listingType !== 'pg-hostel' && setOpenDropdown(openDropdown === 'property' ? null : 'property')}
             disabled={listingType === 'pg-hostel'}>
-            <Text style={[styles.dropdownValueFirst, listingType === 'pg-hostel' && styles.dropdownValueDisabled]} numberOfLines={1}>
-              Property {selectedPropertyType === 'all' ? 'All' : selectedPropertyType}
+            <Text style={[styles.dropdownLabelDark, listingType === 'pg-hostel' && styles.dropdownValueDisabled]}>Property </Text>
+            <Text style={[styles.dropdownValueDark, listingType === 'pg-hostel' && styles.dropdownValueDisabled]} numberOfLines={1}>
+              {selectedPropertyType === 'all' ? 'All' : selectedPropertyType}
             </Text>
-            <Text style={styles.dropdownChevron}>{openDropdown === 'property' ? '▲' : '▼'}</Text>
+            <Text style={styles.dropdownChevron}>▾</Text>
           </TouchableOpacity>
           {searchMode !== 'projects' && (
             <TouchableOpacity
               style={styles.dropdownTrigger}
               onPress={() => setOpenDropdown(openDropdown === 'budget' ? null : 'budget')}>
-              <Text style={styles.dropdownValueFirst} numberOfLines={1}>
-                Price {minBudget === 0 && maxBudget === maxBudgetForType
+              <Text style={styles.dropdownLabelDark}>Price </Text>
+              <Text style={styles.dropdownValueDark} numberOfLines={1}>
+                {minBudget === 0 && maxBudget === maxBudgetForType
                   ? 'Any'
                   : findBudgetLabelForRange({
                     listingType,
@@ -1160,10 +1176,14 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
                   }) ||
                   `${formatBudgetDisplay(minBudget)}-${formatBudgetDisplay(maxBudget)}`}
               </Text>
-              <Text style={styles.dropdownChevron}>{openDropdown === 'budget' ? '▲' : '▼'}</Text>
+              <Text style={styles.dropdownChevron}>▾</Text>
             </TouchableOpacity>
           )}
         </View>
+      </View>
+
+      {/* Light scroll body - results, sort, cards */}
+      <View style={styles.scrollBodyWrapper}>
         {/* Dropdown options modal */}
         <Modal visible={openDropdown !== null} transparent animationType="fade">
           <TouchableOpacity style={styles.dropdownBackdrop} activeOpacity={1} onPress={() => setOpenDropdown(null)}>
@@ -1284,16 +1304,18 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </TouchableOpacity>
         </Modal>
-        {/* Results Count & Sort */}
+        {/* Results bar & sort - inside scroll body (reference) */}
+        {/* Results Count & Sort - "89" blue, "Properties Found" dark (reference) */}
         <View style={styles.resultsHeader}>
-          <Text style={styles.resultsCount}>
-            {filteredProperties.length} Properties Found
-          </Text>
-          <TouchableOpacity onPress={clearFilters}>
-            <Text style={styles.clearText}>Clear All</Text>
+          <View style={styles.resultsCountRow}>
+            <Text style={styles.resultsCountNumber}>{filteredProperties.length}</Text>
+            <Text style={styles.resultsCountLabel}> Properties Found</Text>
+          </View>
+          <TouchableOpacity style={styles.clearAllPill} onPress={clearFilters}>
+            <Text style={styles.clearAllPillText}>Clear All</Text>
           </TouchableOpacity>
         </View>
-        {/* Sort pills - horizontal scroll */}
+        {/* Sort pills - reference styling */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1321,10 +1343,9 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             </Text>
           </TouchableOpacity>
         </ScrollView>
-      </View>
 
-      {/* Properties List */}
-      {loading ? (
+        {/* Properties List */}
+        {loading ? (
         <View style={[styles.loadingContainer, { paddingTop: searchBarHeight }]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading properties...</Text>
@@ -1349,9 +1370,10 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           }
         />
-      )}
+        )}
+      </View>
 
-      {/* Floating View on Map Button - dark grey, red pin */}
+      {/* Floating View on Map - above bottom tab menu */}
       {!loading && filteredProperties.length > 0 && (
         <TouchableOpacity
           style={styles.floatingMapButton}
@@ -1663,87 +1685,85 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
           </View>
-        </View >
-      </Modal >
-    </View >
+        </View>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.text,
+  },
+  topBarDark: {
+    backgroundColor: colors.text,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 20,
+    zIndex: 10,
+  },
+  scrollBodyWrapper: {
+    flex: 1,
     backgroundColor: colors.background,
-  },
-  searchSection: {
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    width: '100%',
-    position: 'relative',
-    zIndex: 10,
-  },
-  searchSectionSticky: {
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    zIndex: 10,
+    zIndex: 1,
   },
   listScroll: {
     flex: 1,
   },
   searchBarContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
+    gap: 10,
     alignItems: 'center',
+    marginBottom: 14,
+    marginTop: 6,
     position: 'relative',
   },
   searchInputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.09)',
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: 'rgba(199,238,255,0.2)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  searchIcon: {
-    fontSize: 20,
-    marginRight: spacing.sm,
+  searchIconButton: {
+    padding: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: {
     flex: 1,
-    ...typography.body,
-    color: colors.text,
-    paddingLeft: spacing.sm,
+    fontSize: 14,
+    fontFamily: typography.fontRegular,
+    color: colors.surface,
+    paddingLeft: 0,
     minWidth: 80,
   },
   quickFiltersDropdownRow: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    gap: spacing.sm,
+    gap: 8,
   },
   dropdownTrigger: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: borderRadius.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    minHeight: 44,
+    borderColor: 'rgba(199,238,255,0.18)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minHeight: 40,
   },
   dropdownLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontFamily: fonts.semiBold,
+    fontWeight: '600',
     marginRight: 4,
   },
   dropdownValue: {
@@ -1754,9 +1774,20 @@ const styles = StyleSheet.create({
   },
   dropdownValueFirst: {
     flex: 1,
-    ...typography.body,
-    color: colors.text,
-    fontSize: 13,
+    fontSize: 12,
+    fontFamily: typography.fontSemiBold,
+    color: 'rgba(199,238,255,0.75)',
+  },
+  dropdownLabelDark: {
+    fontSize: 12,
+    fontFamily: typography.fontSemiBold,
+    color: 'rgba(199,238,255,0.75)',
+  },
+  dropdownValueDark: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: typography.fontBold,
+    color: colors.primaryLight,
   },
   dropdownTriggerDisabled: {
     opacity: 0.6,
@@ -1765,8 +1796,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   dropdownChevron: {
-    fontSize: 10,
-    color: colors.textSecondary,
+    fontSize: 9,
+    color: 'rgba(199,238,255,0.6)',
   },
   dropdownBackdrop: {
     flex: 1,
@@ -1798,7 +1829,7 @@ const styles = StyleSheet.create({
   },
   dropdownOptionTextActive: {
     color: colors.primary,
-    fontFamily: fonts.semiBold,
+    fontWeight: '600',
   },
   locationSuggestionsContainer: {
     position: 'absolute',
@@ -1821,90 +1852,137 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 7,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 6,
   },
   filterIcon: {
     fontSize: 14,
     color: colors.surface,
   },
   filterText: {
-    ...typography.body,
+    fontFamily: typography.fontBold,
+    fontSize: 13,
     color: colors.surface,
-    fontSize: 14,
-    fontFamily: fonts.semiBold,
   },
   filterChevron: {
     fontSize: 10,
     color: colors.surface,
-    marginLeft: spacing.xs,
   },
   resultsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 10,
   },
-  resultsCount: {
-    ...typography.body,
+  resultsCountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  resultsCountNumber: {
+    fontFamily: typography.fontExtraBold,
+    fontSize: 15,
     color: colors.primary,
-    fontFamily: fonts.extraBold,
-    fontSize: 16,
   },
-  clearText: {
-    ...typography.body,
-    color: colors.primaryLight,
-    fontSize: 14,
-    fontFamily: fonts.medium,
+  resultsCountLabel: {
+    fontFamily: typography.fontExtraBold,
+    fontSize: 15,
+    color: colors.text,
+  },
+  clearAllPill: {
+    backgroundColor: colors.primaryXlight,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  clearAllPillText: {
+    fontFamily: typography.fontBold,
+    fontSize: 12,
+    color: colors.primary,
   },
   sortPillsScroll: {
     maxHeight: 44,
   },
   sortPillsContent: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    gap: 8,
     alignItems: 'center',
   },
   sortPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.round,
-    backgroundColor: colors.surfaceSecondary,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.borderRef,
   },
   sortPillActive: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 4,
   },
   sortPillText: {
-    ...typography.caption,
-    color: colors.text,
-    fontFamily: fonts.medium,
+    fontFamily: typography.fontSemiBold,
+    fontSize: 12,
+    color: colors.sub,
   },
   sortPillTextActive: {
     color: colors.surface,
-    fontFamily: fonts.semiBold,
   },
   listContent: {
-    padding: spacing.md,
+    paddingHorizontal: 0,
+    paddingTop: spacing.sm,
+    paddingBottom: 120,
   },
   propertyCardStyle: {
     width: '100%',
-    marginRight: 0,
+    maxWidth: 340,
+    marginHorizontal: 20,
+    alignSelf: 'center',
   },
   propertySeparator: {
-    height: spacing.md,
+    height: 0,
+  },
+  floatingMapButton: {
+    position: 'absolute',
+    bottom: 20,
+    zIndex: 999,
+    left: '50%',
+    marginLeft: -100,
+    width: 200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.text,
+    borderRadius: 50,
+    paddingTop: 13,
+    paddingBottom: 17,
+    paddingHorizontal: 26,
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 28,
+    elevation: 12,
+    gap: 10,
+  },
+  floatingMapButtonText: {
+    fontFamily: typography.fontBold,
+    fontSize: 14,
+    color: colors.surface,
   },
   loadingContainer: {
     flex: 1,
@@ -1956,7 +2034,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     ...typography.h2,
     color: colors.primary,
-    fontFamily: fonts.extraBold,
+    fontWeight: '700',
   },
   modalClose: {
     fontSize: 24,
@@ -1978,7 +2056,7 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.text,
     marginBottom: spacing.md,
-    fontFamily: fonts.semiBold,
+    fontWeight: '600',
   },
   filterOptions: {
     flexDirection: 'row',
@@ -2004,7 +2082,7 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: colors.surface,
-    fontFamily: fonts.semiBold,
+    fontWeight: '600',
   },
   filterChipDisabled: {
     opacity: 0.6,
@@ -2055,7 +2133,7 @@ const styles = StyleSheet.create({
   clearButtonText: {
     ...typography.body,
     color: colors.primary,
-    fontFamily: fonts.semiBold,
+    fontWeight: '600',
   },
   applyButton: {
     flex: 1,
@@ -2072,7 +2150,7 @@ const styles = StyleSheet.create({
   applyButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontFamily: fonts.semiBold,
+    fontWeight: '600',
   },
   budgetRangeContainer: {
     flexDirection: 'row',
@@ -2095,7 +2173,7 @@ const styles = StyleSheet.create({
   budgetValue: {
     ...typography.h3,
     color: colors.text,
-    fontFamily: fonts.extraBold,
+    fontWeight: '700',
   },
   sliderContainer: {
     marginBottom: spacing.md,
@@ -2104,7 +2182,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     marginBottom: spacing.sm,
-    fontFamily: fonts.semiBold,
+    fontWeight: '600',
   },
   sliderTrack: {
     height: 6,
@@ -2137,7 +2215,7 @@ const styles = StyleSheet.create({
   sliderButtonText: {
     ...typography.h3,
     color: colors.text,
-    fontFamily: fonts.extraBold,
+    fontWeight: '700',
   },
   sliderInput: {
     width: 80,
@@ -2150,37 +2228,6 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     textAlign: 'center',
-  },
-  floatingMapButton: {
-    position: 'absolute',
-    bottom: 30, // Position above bottom tab menu (65px height + some padding)
-    alignSelf: 'center',
-    minWidth: 200,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1D242B',
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    gap: spacing.sm,
-  },
-  floatingMapButtonIcon: {
-    fontSize: 20,
-  },
-  floatingMapButtonText: {
-    ...typography.body,
-    color: colors.surface,
-    fontFamily: fonts.extraBold,
-    fontSize: 16,
   },
 });
 
