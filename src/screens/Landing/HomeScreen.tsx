@@ -432,7 +432,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         ]}>
         <Animated.ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, {
+            paddingTop: insets.top + spacing.lg,
+            paddingBottom: Math.max(spacing.xxl * 3, insets.bottom + 110), // Tab bar clearance so View Details button stays fully visible
+          }]}
           showsVerticalScrollIndicator={false}
           onScroll={(event: { nativeEvent: { contentOffset: { y: number } } }) => {
             const offsetY = event.nativeEvent.contentOffset.y;
@@ -884,7 +887,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: spacing.xxl,
     paddingTop: 0,
     backgroundColor: '#FAFAFA',
   },
@@ -1224,10 +1226,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semiBold,
     color: colors.primary,
   },
-  // Properties List - Better spacing
+  // Properties List - Extra paddingBottom so View Details button clears tab bar
   propertiesList: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxl + verticalScale(24),
   },
   carouselCard: {
     width: scale(280),

@@ -584,7 +584,10 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <Animated.ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, {
+          paddingTop: insets.top + spacing.lg,
+          paddingBottom: Math.max(verticalScale(spacing.xxl * 3), insets.bottom + 110), // Tab bar clearance so View Details stays fully visible
+        }]}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -1344,7 +1347,8 @@ const styles = StyleSheet.create({
   },
   carouselList: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxl + verticalScale(24), // Extra space so View Details button isn't clipped
   },
   carouselCard: {
     width: scale(300),
