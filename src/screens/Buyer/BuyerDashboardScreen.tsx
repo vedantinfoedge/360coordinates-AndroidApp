@@ -585,7 +585,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       <Animated.ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, {
-          paddingTop: insets.top + spacing.lg,
+          paddingTop: 0,
           paddingBottom: Math.max(verticalScale(spacing.xxl * 3), insets.bottom + 110), // Tab bar clearance so View Details stays fully visible
         }]}
         showsVerticalScrollIndicator={false}
@@ -598,7 +598,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }>
         {/* Dark Header Section */}
-        <View style={styles.darkHeaderSection}>
+        <View style={[styles.darkHeaderSection, { paddingTop: insets.top + spacing.md }]}>
           {/* Greeting row: time + avatar */}
           <View style={styles.greetingRow}>
             <View style={styles.greetingLeft}>
@@ -1064,7 +1064,6 @@ const styles = StyleSheet.create({
   darkHeaderSection: {
     backgroundColor: DARK,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
     borderBottomLeftRadius: borderRadius.xl,
     borderBottomRightRadius: borderRadius.xl,

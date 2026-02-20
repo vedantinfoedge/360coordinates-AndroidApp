@@ -433,7 +433,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <Animated.ScrollView
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, {
-            paddingTop: insets.top + spacing.lg,
+            paddingTop: 0,
             paddingBottom: Math.max(spacing.xxl * 3, insets.bottom + 110), // Tab bar clearance so View Details button stays fully visible
           }]}
           showsVerticalScrollIndicator={false}
@@ -446,7 +446,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }>
           {/* Dark Header Section - matches reference UI */}
-          <View style={styles.darkHeaderSection}>
+          <View style={[styles.darkHeaderSection, { paddingTop: insets.top + spacing.md }]}>
             <View style={styles.greetingRow}>
               <View style={styles.greetingLeft}>
                 <View style={styles.timeGreetingRow}>
@@ -893,7 +893,6 @@ const styles = StyleSheet.create({
   darkHeaderSection: {
     backgroundColor: DARK,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
     borderBottomLeftRadius: borderRadius.xl,
     borderBottomRightRadius: borderRadius.xl,
