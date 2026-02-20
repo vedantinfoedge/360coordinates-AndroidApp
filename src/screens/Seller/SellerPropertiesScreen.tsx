@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,19 +12,273 @@ import {
   TextInput,
   Modal,
   Animated,
+  Easing,
+  ScrollView,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Svg, { Path, Rect } from 'react-native-svg';
 import CustomAlert from '../../utils/alertHelper';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import { useAuth } from '../../context/AuthContext';
-import SellerHeader from '../../components/SellerHeader';
 import { sellerService, DashboardStats } from '../../services/seller.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters, capitalize } from '../../utils/formatters';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Reference UI colors (360 Coordinates design)
+const UI = {
+  navy: '#0B1F3A',
+  blue: '#1565C0',
+  blueLight: '#1E88E5',
+  sky: '#E8F4FD',
+  grayBg: '#F2F5FA',
+  grayText: '#8A97A8',
+  textDark: '#0D1B2E',
+  textMid: '#3D5068',
+  white: '#FFFFFF',
+};
+
+// Empty state illustration with orbit + house (matches reference)
+const EmptyStateIllustration: React.FC<{
+  onAddProperty: () => void;
+  onLearnListings?: () => void;
+}> = ({ onAddProperty, onLearnListings }) => {
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 12000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [spinAnim]);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, [floatAnim]);
+
+  const spinRotate = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+  const floatY = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -6],
+  });
+
+  return (
+    <View style={emptyStyles.emptyState}>
+      <View style={emptyStyles.illustrationWrap}>
+        <View style={emptyStyles.illBg} />
+        <Animated.View style={[emptyStyles.illOrbit, { transform: [{ rotate: spinRotate }] }]}>
+          <View style={emptyStyles.illDot} />
+        </Animated.View>
+        <Animated.View style={[emptyStyles.illHouse, { transform: [{ translateY: floatY }] }]}>
+          <Svg width={58} height={58} viewBox="0 0 64 64">
+            <Path d="M32 10L10 29H16V55H29V41H35V55H48V29H54L32 10Z" fill="none" stroke={UI.blue} strokeWidth={2.2} strokeLinejoin="round" />
+            <Path d="M32 10L10 29H16V55H29V41H35V55H48V29H54L32 10Z" fill={UI.blue} opacity={0.08} />
+            <Rect x={26} y={41} width={12} height={14} rx={2} stroke={UI.blue} strokeWidth={1.8} fill="none" />
+            <Rect x={20} y={33} width={7} height={7} rx={1.5} fill="#60B4FF" opacity={0.6} />
+            <Rect x={37} y={33} width={7} height={7} rx={1.5} fill="#60B4FF" opacity={0.6} />
+          </Svg>
+        </Animated.View>
+      </View>
+      <Text style={emptyStyles.emptyTitle}>No Properties Yet</Text>
+      <Text style={emptyStyles.emptySub}>List your property and reach thousands of buyers & renters across India</Text>
+
+      <View style={emptyStyles.tipCard}>
+        <Text style={emptyStyles.tipEmoji}>💡</Text>
+        <Text style={emptyStyles.tipText}>
+          <Text style={emptyStyles.tipBold}>Pro Tip:</Text> Properties with clear photos get <Text style={emptyStyles.tipBold}>3× more inquiries</Text> than those without.
+        </Text>
+      </View>
+
+      <View style={emptyStyles.featuresRow}>
+        <View style={emptyStyles.feat}>
+          <View style={[emptyStyles.featIcon, emptyStyles.featIcon1]}>
+            <Text style={emptyStyles.featIconEmoji}>📸</Text>
+          </View>
+          <Text style={emptyStyles.featLabel}>Photo Gallery</Text>
+          <Text style={emptyStyles.featSub}>Up to 10 photos</Text>
+        </View>
+        <View style={emptyStyles.feat}>
+          <View style={[emptyStyles.featIcon, emptyStyles.featIcon2]}>
+            <Text style={emptyStyles.featIconEmoji}>👁️</Text>
+          </View>
+          <Text style={emptyStyles.featLabel}>Track Views</Text>
+          <Text style={emptyStyles.featSub}>Live stats</Text>
+        </View>
+        <View style={emptyStyles.feat}>
+          <View style={[emptyStyles.featIcon, emptyStyles.featIcon3]}>
+            <Text style={emptyStyles.featIconEmoji}>💬</Text>
+          </View>
+          <Text style={emptyStyles.featLabel}>Direct Chat</Text>
+          <Text style={emptyStyles.featSub}>With buyers</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity style={emptyStyles.ctaBtn} onPress={onAddProperty} activeOpacity={0.9}>
+        <LinearGradient
+          colors={[UI.blueLight, UI.blue]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={emptyStyles.ctaBtnGradient}>
+          <TabIcon name="plus" color={UI.white} size={16} />
+          <Text style={emptyStyles.ctaBtnText}>Add Your First Property</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onLearnListings} activeOpacity={0.7}>
+        <Text style={emptyStyles.secLink}>Learn how listings work →</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const emptyStyles = StyleSheet.create({
+  emptyState: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 10, paddingBottom: 16 },
+  illustrationWrap: { width: 130, height: 130, marginBottom: 22, position: 'relative' },
+  illBg: {
+    width: 130,
+    height: 130,
+    backgroundColor: '#D0E8FB',
+    borderRadius: 40,
+  },
+  illOrbit: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -54,
+    marginLeft: -54,
+    width: 108,
+    height: 108,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(21,101,192,0.25)',
+    borderRadius: 54,
+  },
+  illDot: {
+    width: 7,
+    height: 7,
+    backgroundColor: UI.blueLight,
+    borderRadius: 3.5,
+    position: 'absolute',
+    top: -4,
+    left: '50%',
+    marginLeft: -3.5,
+    shadowColor: UI.blueLight,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  illHouse: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -29,
+    marginLeft: -29,
+  },
+  emptyTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: UI.textDark,
+    textAlign: 'center',
+    letterSpacing: -0.2,
+    marginBottom: 7,
+    fontFamily: typography.fontExtraBold,
+  },
+  emptySub: {
+    fontSize: 12.5,
+    color: UI.grayText,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 240,
+    marginBottom: 20,
+  },
+  tipCard: {
+    backgroundColor: UI.white,
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 18,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+    borderLeftWidth: 3,
+    borderLeftColor: UI.blueLight,
+  },
+  tipEmoji: { fontSize: 17 },
+  tipText: { fontSize: 12, color: UI.textMid, lineHeight: 18, flex: 1 },
+  tipBold: { fontWeight: '700', color: UI.textDark },
+  featuresRow: { flexDirection: 'row', gap: 8, marginBottom: 20, width: '100%' },
+  feat: {
+    flex: 1,
+    backgroundColor: UI.white,
+    borderRadius: 13,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  featIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 7,
+  },
+  featIcon1: { backgroundColor: '#FFF4E5' },
+  featIcon2: { backgroundColor: '#E8F5E9' },
+  featIcon3: { backgroundColor: '#EDE7F6' },
+  featIconEmoji: { fontSize: 15 },
+  featLabel: { fontSize: 10, fontWeight: '700', color: UI.textDark },
+  featSub: { fontSize: 9, color: UI.grayText, marginTop: 2 },
+  ctaBtn: {
+    width: '100%',
+    borderRadius: 15,
+    marginBottom: 9,
+    overflow: 'hidden',
+    shadowColor: UI.blue,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.38,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  ctaBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+  },
+  ctaBtnText: { color: UI.white, fontSize: 14, fontWeight: '700', letterSpacing: 0.2 },
+  secLink: { fontSize: 12, color: UI.blueLight, fontWeight: '600', marginBottom: 8 },
+});
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -35,11 +289,11 @@ interface Property {
   title: string;
   location: string;
   price: string;
-  status: 'active' | 'pending' | 'sold';
+  status: 'active' | 'pending' | 'sold' | 'sale' | 'rent';
   created_at?: string;
 }
 
-type StatusFilter = 'all' | 'sale' | 'rent';
+type StatusFilter = 'all' | 'sale' | 'rent' | 'sold';
 type SortOption = 'newest' | 'oldest' | 'price-high' | 'price-low';
 
 const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
@@ -53,9 +307,6 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
-
-  // Scroll animation for header hide/show
-  const scrollY = useRef(new Animated.Value(0)).current;
 
   // Check property limit before adding
   // According to backend: Sellers have limits based on subscription (free=3, basic=10, pro=10, premium=10)
@@ -403,7 +654,11 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(prop => prop.status === statusFilter);
+      if (statusFilter === 'sold') {
+        filtered = filtered.filter(prop => prop.is_active === 0 || prop.is_active === false || prop.status === 'sold');
+      } else {
+        filtered = filtered.filter(prop => prop.status === statusFilter);
+      }
     }
 
     // Apply sort
@@ -515,6 +770,9 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
   const handleViewDetails = (propertyId: string) => {
     navigation.navigate('PropertyDetails', { propertyId });
   };
+
+  const listedCount = dashboardStats?.total_properties ?? allProperties.length;
+  const inquiriesCount = dashboardStats?.total_inquiries ?? allProperties.reduce((sum, p) => sum + (p.inquiry_count || p.inquiries || 0), 0);
 
   const renderProperty = ({ item }: { item: any }) => {
     // Safety check for item
@@ -628,51 +886,77 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
+  const insets = useSafeAreaInsets();
+
+  const handleLearnListings = () => {
+    navigation.navigate('Support' as never);
+  };
+
   return (
     <View style={styles.container}>
-      <SellerHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
-        onSubscriptionPress={() => navigation.navigate('Subscription')}
-        onLogoutPress={logout}
-        scrollY={scrollY}
-      />
-      <View style={[styles.header, { marginTop: spacing.xxl }]}>
-        <Text style={styles.headerTitle}>My Properties</Text>
-        <View style={styles.headerButtons}>
+      {/* Navy header — matches reference */}
+      <View style={[styles.headerNavy, { paddingTop: insets.top }]}>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>My <Text style={styles.headerTitleAccent}>Properties</Text></Text>
           <TouchableOpacity
-            style={[styles.viewPlansButton, { marginRight: spacing.sm }]}
-            onPress={() => navigation.navigate('Subscription')}>
-            <Text style={styles.viewPlansButtonText}>View Plans</Text>
+            style={styles.btnAdd}
+            onPress={handleAddProperty}
+            activeOpacity={0.85}>
+            <LinearGradient
+              colors={[UI.blueLight, UI.blue]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.btnAddGradient}>
+              <TabIcon name="plus" color={UI.white} size={10} />
+              <Text style={styles.btnAddText}>Add Property</Text>
+            </LinearGradient>
           </TouchableOpacity>
+        </View>
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statNum}>{listedCount}</Text>
+            <Text style={styles.statLabel}>Listed</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statNum}>{inquiriesCount}</Text>
+            <Text style={styles.statLabel}>Inquiries</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Search bar */}
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBar}>
+          <TabIcon name="search" color={UI.grayText} size={15} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search your properties..."
+            placeholderTextColor={UI.grayText}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
           <TouchableOpacity
-            style={styles.addButton}
-            onPress={handleAddProperty}>
-            <Text style={styles.addButtonText}>+ Add Property</Text>
+            style={styles.filterBtn}
+            onPress={() => setShowFilterModal(true)}
+            activeOpacity={0.7}>
+            <TabIcon name="settings" color={UI.blue} size={14} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Search and Filter Bar */}
-      <View style={styles.searchBar}>
-        <View style={styles.searchInputContainer}>
-          <View style={styles.searchIconContainer}>
-            <TabIcon name="search" color={colors.textSecondary} size={18} />
-          </View>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search properties..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={colors.textSecondary}
-          />
-        </View>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilterModal(true)}
-          activeOpacity={0.7}>
-          <TabIcon name="settings" color={colors.primary} size={20} />
-        </TouchableOpacity>
+      {/* Filter tabs */}
+      <View style={styles.tabs}>
+        {(['all', 'sale', 'rent', 'sold'] as StatusFilter[]).map(tab => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, statusFilter === tab ? styles.tabActive : styles.tabInactive]}
+            onPress={() => setStatusFilter(tab)}
+            activeOpacity={0.8}>
+            <Text style={[styles.tabText, statusFilter === tab && styles.tabTextActive]}>
+              {tab === 'all' ? 'All' : tab === 'sale' ? 'For Sale' : tab === 'rent' ? 'For Rent' : 'Sold'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Filter Modal */}
@@ -693,7 +977,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.filterSection}>
               <Text style={styles.filterLabel}>Status</Text>
               <View style={styles.filterOptions}>
-                {(['all', 'sale', 'rent'] as StatusFilter[]).map(status => (
+                {(['all', 'sale', 'rent', 'sold'] as StatusFilter[]).map(status => (
                   <TouchableOpacity
                     key={status}
                     style={[
@@ -707,7 +991,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
                         styles.filterOptionText,
                         statusFilter === status && styles.filterOptionTextActive,
                       ]}>
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                      {status === 'all' ? 'All' : status === 'sale' ? 'For Sale' : status === 'rent' ? 'For Rent' : 'Sold'}
                     </Text>
                     {statusFilter === status && (
                       <View style={styles.filterOptionCheck}>
@@ -765,24 +1049,12 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.loadingText}>Loading properties...</Text>
         </View>
       ) : properties.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <TabIcon name="home" color="#9CA3AF" size={48} />
-          </View>
-          <Text style={styles.emptyTitle}>No Properties Listed</Text>
-          <Text style={styles.emptySubtext}>
-            Start by adding your first property to showcase it to potential buyers
-          </Text>
-          <Text style={styles.emptyTip}>
-            💡 Tip: Add clear photos and detailed descriptions to attract more inquiries
-          </Text>
-          <TouchableOpacity
-            style={styles.emptyAddButton}
-            onPress={handleAddProperty}
-            activeOpacity={0.8}>
-            <Text style={styles.emptyAddButtonText}>+ Add Your First Property</Text>
-          </TouchableOpacity>
-        </View>
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentInner}
+          showsVerticalScrollIndicator={false}>
+          <EmptyStateIllustration onAddProperty={handleAddProperty} onLearnListings={handleLearnListings} />
+        </ScrollView>
       ) : (
         <>
           {filteredAndSortedProperties.length === 0 && searchQuery ? (
@@ -796,7 +1068,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            <Animated.FlatList
+            <FlatList
               data={filteredAndSortedProperties}
               renderItem={renderProperty}
               keyExtractor={(item: any, index: number) => String(item.id || item.property_id || index)}
@@ -805,24 +1077,25 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
               }
               showsVerticalScrollIndicator={false}
-              onScroll={Animated.event(
-                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                { useNativeDriver: true }
-              )}
-              scrollEventThrottle={16}
             />
           )}
         </>
       )}
 
-      {/* Floating Action Button - Same as Agent */}
+      {/* Floating Action Button */}
       {allProperties.length > 0 && (
         <TouchableOpacity
           style={styles.fab}
           onPress={handleAddProperty}
-          activeOpacity={0.8}>
-          <TabIcon name="plus" color={colors.surface} size={24} />
-          <Text style={styles.fabText}>New Property</Text>
+          activeOpacity={0.85}>
+          <LinearGradient
+            colors={[UI.blueLight, UI.blue]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}>
+            <TabIcon name="plus" color={UI.white} size={20} />
+            <Text style={styles.fabText}>New Property</Text>
+          </LinearGradient>
         </TouchableOpacity>
       )}
     </View>
@@ -832,14 +1105,159 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA', // Clean off-white
+    backgroundColor: UI.grayBg,
+  },
+  headerNavy: {
+    backgroundColor: UI.navy,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 14,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 16,
+    minHeight: 40,
+  },
+  headerTitle: {
+    color: UI.white,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    flex: 1,
+  },
+  headerTitleAccent: {
+    color: '#60B4FF',
+  },
+  btnAdd: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: UI.blue,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  btnAddGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+  },
+  btnAddText: {
+    color: UI.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+  },
+  statNum: {
+    color: UI.white,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  statLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 3,
+  },
+  searchWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 8,
+    backgroundColor: UI.grayBg,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: UI.white,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 44,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: UI.textDark,
+    padding: 0,
+  },
+  filterBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: UI.sky,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabs: {
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    backgroundColor: UI.grayBg,
+  },
+  tab: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  tabActive: {
+    backgroundColor: UI.blue,
+    shadowColor: UI.blue,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  tabInactive: {
+    backgroundColor: UI.white,
+  },
+  tabText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: UI.grayText,
+  },
+  tabTextActive: {
+    color: UI.white,
+  },
+  scrollContent: {
+    flex: 1,
+    backgroundColor: UI.grayBg,
+  },
+  scrollContentInner: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   listContent: {
-    padding: spacing.lg,
+    padding: 20,
     paddingTop: spacing.md,
+    paddingBottom: 100,
+    backgroundColor: UI.grayBg,
   },
   propertyCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: UI.white,
     borderRadius: 16,
     marginBottom: spacing.lg,
     overflow: 'hidden',
@@ -938,7 +1356,7 @@ const styles = StyleSheet.create({
   },
   propertyPrice: {
     fontSize: 20,
-    color: colors.primary,
+    color: UI.blue,
     fontWeight: '700',
     flex: 1,
   },
@@ -952,62 +1370,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1D242B', // Dark Charcoal
-    flex: 1,
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  viewPlansButton: {
-    backgroundColor: '#E3F6FF', // Light blue
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: 10,
-    minWidth: 90,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewPlansButtonText: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  addButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: 10,
-    minWidth: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addButtonText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '600',
-    fontSize: 13,
+    backgroundColor: UI.grayBg,
   },
   emptyIconContainer: {
     width: 80,
@@ -1056,7 +1419,7 @@ const styles = StyleSheet.create({
     minWidth: 220,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primary,
+    shadowColor: UI.blue,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -1095,7 +1458,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.primary,
+    backgroundColor: UI.blue,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 10,
@@ -1264,7 +1627,7 @@ const styles = StyleSheet.create({
     minHeight: 42,
   },
   filterOptionActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: UI.blue,
   },
   filterOptionText: {
     ...typography.body,
@@ -1300,9 +1663,9 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   sortOptionActive: {
-    backgroundColor: '#E3F6FF', // Light blue
+    backgroundColor: UI.sky,
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: UI.blue,
   },
   sortOptionText: {
     ...typography.body,
@@ -1312,14 +1675,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sortOptionTextActive: {
-    color: colors.primary,
+    color: UI.blue,
     fontWeight: '600',
   },
   sortOptionCheck: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.primary,
+    backgroundColor: UI.blue,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.sm,
@@ -1330,12 +1693,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   applyButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: UI.blue,
     paddingVertical: spacing.md,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: spacing.lg,
-    shadowColor: colors.primary,
+    shadowColor: UI.blue,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -1355,34 +1718,27 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: spacing.xl,
     right: spacing.lg,
-    backgroundColor: colors.cta || '#0066CC', // Fallback to blue if cta not defined
-    borderRadius: borderRadius.xl,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    borderRadius: 25,
+    overflow: 'hidden',
+    shadowColor: UI.blue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  fabGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.primaryDark || '#004C99',
-    shadowColor: colors.primaryDark || '#004C99',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-    zIndex: 1000,
-  },
-  fabIcon: {
-    fontSize: 24,
-    color: colors.accentLight || '#FFFFFF',
-    fontWeight: 'bold',
-    lineHeight: 28,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   fabText: {
-    ...typography.body,
-    color: colors.accentLight || '#FFFFFF', // White text
+    color: UI.white,
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 14,
   },
 });
 
