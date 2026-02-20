@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
     flex: 0.48,
     paddingHorizontal: 14,
     paddingTop: 11,
-    paddingBottom: 12,
+    paddingBottom: 18,
     justifyContent: 'space-between',
   },
   name: {
@@ -675,6 +675,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 0,
     paddingBottom: 10,
+    marginBottom: 6,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.primary,
