@@ -426,6 +426,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         style={[
           styles.content,
           {
+<<<<<<< Updated upstream
+          contentContainerStyle={styles.scrollContent}
+=======
+>>>>>>> Stashed changes
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }],
           },
