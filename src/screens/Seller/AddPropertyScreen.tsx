@@ -24,7 +24,7 @@ import { SellerStackParamList } from '../../navigation/SellerNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon, TabIconName } from '../../components/navigation/TabIcons';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const AMENITY_GAP = spacing.xs;
 const AMENITY_COLS = 4;
 const AMENITY_ITEM_WIDTH = (SCREEN_WIDTH - 2 * spacing.xl - (AMENITY_COLS - 1) * AMENITY_GAP) / AMENITY_COLS;
@@ -55,6 +55,7 @@ import { formatters } from '../../utils/formatters';
 import { USE_FIREBASE_STORAGE } from '../../config/firebaseStorage.config';
 import { isFirebaseStorageAvailable } from '../../services/firebaseStorageProperty.service';
 import { useAuth } from '../../context/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LocationPicker from '../../components/map/LocationPicker';
 import LocationAutoSuggest from '../../components/search/LocationAutoSuggest';
 import StateAutoSuggest from '../../components/search/StateAutoSuggest';
@@ -96,6 +97,7 @@ const AMENITY_ICONS: Record<string, TabIconName> = {
 
 const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<SellerStackParamList, 'AddProperty'>>();
   const routeParams = (route.params as any) || {};
   const isEditMode = !!routeParams.propertyId;
@@ -1103,7 +1105,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Spacious 3BHK Apartment with Sea View"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={REF.grayText}
                 value={propertyTitle}
                 onChangeText={(text: string) => {
                   setPropertyTitle(text);
@@ -1237,7 +1239,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Enter locality, area or landmark"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={REF.grayText}
                   value={location}
                   onChangeText={(text: string) => {
                     setLocation(text);
@@ -1333,7 +1335,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Enter state"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={REF.grayText}
                   value={state}
                   onChangeText={(text: string) => {
                     stateAutoFilledFromLocation.current = false;
@@ -1358,7 +1360,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Enter additional address details (building name, landmark, etc.)"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={REF.grayText}
                 value={additionalAddress}
                 onChangeText={setAdditionalAddress}
                 multiline
@@ -1558,7 +1560,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={[styles.input, styles.areaInput]}
                   placeholder={fieldVisibility.areaLabel === 'Plot Area' ? 'Enter plot area' : 'Enter area'}
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={REF.grayText}
                   value={builtUpArea}
                   onChangeText={(text: string) => {
                     setBuiltUpArea(text);
@@ -1598,7 +1600,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   <TextInput
                     style={[styles.input, styles.areaInput]}
                     placeholder="Enter area"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={REF.grayText}
                     value={carpetArea}
                     onChangeText={(text: string) => {
                       setCarpetArea(text);
@@ -1618,7 +1620,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="e.g., 5"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={REF.grayText}
                   value={floor}
                   onChangeText={(text: string) => {
                     setFloor(text.replace(/[^0-9]/g, ''));
@@ -1636,7 +1638,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Total floors in building"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={REF.grayText}
                   value={totalFloors}
                   onChangeText={(text: string) => {
                     setTotalFloors(text.replace(/[^0-9]/g, ''));
@@ -1763,7 +1765,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Describe your property in detail (minimum 100 characters required). Mention unique features, nearby landmarks, connectivity, etc. Note: Mobile numbers and email addresses are not allowed."
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={REF.grayText}
                 value={description}
                 onChangeText={(text: string) => {
                   setDescription(text);
@@ -1894,7 +1896,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={[styles.input, styles.priceInput]}
                   placeholder={propertyStatus === 'sell' ? 'Enter expected price' : 'Enter monthly rent'}
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={REF.grayText}
                   value={expectedPrice}
                   onChangeText={(text: string) => {
                     setExpectedPrice(text);
@@ -1930,7 +1932,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                     <TextInput
                       style={[styles.input, styles.priceInput]}
                       placeholder="Enter deposit amount"
-                      placeholderTextColor={colors.textSecondary}
+                      placeholderTextColor={REF.grayText}
                       value={depositAmount}
                       onChangeText={setDepositAmount}
                       keyboardType="numeric"
@@ -1968,7 +1970,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={[styles.input, styles.priceInput]}
                   placeholder="Enter monthly maintenance"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={REF.grayText}
                   value={maintenance}
                   onChangeText={setMaintenance}
                   keyboardType="numeric"
@@ -2077,14 +2079,16 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
       presentationStyle="overFullScreen"
       statusBarTranslucent={true}
       onRequestClose={handleClose}>
-      <View style={styles.modalOverlay}>
-        {/* Dark blue gradient background (360 Coordinates style) */}
-        {/* @ts-expect-error LinearGradient children types */}
-        <LinearGradient
-          colors={[REF.navy, '#1a3a6b']}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.sheetWrapper}>
+      <View style={[styles.modalOverlay, { backgroundColor: REF.navy }]}>
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {React.createElement(LinearGradient as any, {
+            colors: [REF.navy, '#1a3a6b'],
+            style: StyleSheet.absoluteFill,
+            start: { x: 0, y: 0 },
+            end: { x: 1, y: 1 },
+          })}
+        </View>
+        <View style={styles.sheetWrapper} pointerEvents="box-none">
           <View style={styles.sheet}>
             <KeyboardAvoidingView
               style={styles.sheetInner}
@@ -2193,7 +2197,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
               </ScrollView>
 
               {/* Footer */}
-              <View style={styles.sheetFooter}>
+              <View style={[styles.sheetFooter, { paddingBottom: Math.max(24, insets.bottom) }]}>
                 <Text style={styles.stepCounter}>
                   Step <Text style={styles.stepCounterNum}>{currentStep}</Text> of {totalSteps}
                 </Text>
@@ -2252,18 +2256,19 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    zIndex: 9999,
-    elevation: 9999,
   },
   sheetWrapper: {
     flex: 1,
     justifyContent: 'flex-end',
+    zIndex: 10,
+    elevation: 10,
   },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '92%',
+    height: SCREEN_HEIGHT * 0.92,
+    maxHeight: SCREEN_HEIGHT * 0.92,
     overflow: 'hidden',
   },
   sheetInner: {
@@ -2582,14 +2587,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   propertyTypeIconWrap: {
-    marginBottom: spacing.xs,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  propertyTypeIconWrapActive: {
+    backgroundColor: 'rgba(21,101,192,0.1)',
+  },
+  propertyTypeEmoji: {
+    fontSize: 18,
   },
   propertyTypeText: {
-    ...typography.body,
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: REF.textMid,
     textAlign: 'center',
+    lineHeight: 14,
   },
   propertyTypeTextActive: {
     color: REF.blue,
