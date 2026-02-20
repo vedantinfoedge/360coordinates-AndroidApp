@@ -714,7 +714,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Contact Info modal - Call, Delete, Email only */}
+      {/* Buyer Profile modal - Delete, Call, Email only */}
       <Modal
         visible={contactInfoVisible}
         transparent
@@ -728,7 +728,11 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
               activeOpacity={0.7}>
               <Text style={styles.contactInfoBackText}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.contactInfoTitle}>Contact Info</Text>
+            <Text style={styles.contactInfoTitle}>
+              {user?.user_type === 'buyer'
+                ? (receiverRole === 'agent' ? 'Agent Details' : 'Seller Details')
+                : 'Buyer Profile'}
+            </Text>
           </View>
           <View style={styles.contactInfoHero}>
             <View style={styles.contactInfoBigAvatar}>
@@ -742,45 +746,43 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
               </Text>
             </View>
             <Text style={styles.contactInfoName}>{participantName}</Text>
-            <Text style={styles.contactInfoSince}>📅 Member since</Text>
-            <View style={styles.ownerActions}>
+            <Text style={styles.contactInfoSince}>
+              {user?.user_type === 'buyer'
+                ? (receiverRole === 'agent' ? 'Agent' : 'Seller') + ' · Member since'
+                : 'Buyer · Member since'}
+            </Text>
+            <View style={styles.profileActions}>
               <TouchableOpacity
-                style={styles.ownerActionItem}
-                onPress={() => {
-                  setContactInfoVisible(false);
-                  handlePhonePress();
-                }}
-                activeOpacity={0.7}>
-                <View style={styles.ownerActionIcon}>
-                  <Text style={styles.ownerActionEmoji}>📞</Text>
-                </View>
-                <Text style={styles.ownerActionLabel}>Call</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.ownerActionItem}
+                style={[styles.profileActionBtn, styles.profileActionBtnSecondary]}
                 onPress={() => {
                   setContactInfoVisible(false);
                   handleDeleteConversation();
                 }}
-                activeOpacity={0.7}>
-                <View style={styles.ownerActionIcon}>
-                  <Text style={styles.ownerActionEmoji}>🗑️</Text>
-                </View>
-                <Text style={styles.ownerActionLabel}>Delete</Text>
+                activeOpacity={0.8}>
+                <TabIcon name="trash" color="#FFFFFF" size={13} />
+                <Text style={styles.profileActionLabel}>Delete</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.ownerActionItem}
+                style={[styles.profileActionBtn, styles.profileActionBtnPrimary]}
+                onPress={() => {
+                  setContactInfoVisible(false);
+                  handlePhonePress();
+                }}
+                activeOpacity={0.8}>
+                <TabIcon name="phone" color="#FFFFFF" size={13} />
+                <Text style={styles.profileActionLabel}>Call</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.profileActionBtn, styles.profileActionBtnSecondary]}
                 onPress={() => {
                   const email = counterpartyEmail?.trim();
                   if (email) Linking.openURL(`mailto:${email}`);
                   else CustomAlert.alert('Info', 'Email not available.');
                   setContactInfoVisible(false);
                 }}
-                activeOpacity={0.7}>
-                <View style={styles.ownerActionIcon}>
-                  <Text style={styles.ownerActionEmoji}>✉️</Text>
-                </View>
-                <Text style={styles.ownerActionLabel}>Email</Text>
+                activeOpacity={0.8}>
+                <TabIcon name="mail" color="#FFFFFF" size={13} />
+                <Text style={styles.profileActionLabel}>Email</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1122,6 +1124,38 @@ const styles = StyleSheet.create({
   contactInfoSince: {
     fontSize: 12,
     color: 'rgba(199,238,255,0.6)',
+  },
+  profileActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  profileActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  profileActionBtnPrimary: {
+    backgroundColor: '#1565C0',
+    shadowColor: '#1565C0',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  profileActionBtnSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  profileActionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   ownerActions: {
     flexDirection: 'row',

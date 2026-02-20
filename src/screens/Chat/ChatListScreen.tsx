@@ -1402,9 +1402,13 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
       );
     };
 
+    const isAgentOrSellerItem = (user?.user_type || '').toLowerCase() === 'seller' || (user?.user_type || '').toLowerCase() === 'agent';
     return (
       <TouchableOpacity
-        style={styles.chatItem}
+        style={[
+          isAgentOrSellerItem ? styles.sellerChatItem : styles.chatItem,
+          item.unreadCount > 0 && isAgentOrSellerItem && styles.sellerChatItemUnread,
+        ]}
         onPress={async () => {
           // Mark chat as read when opening conversation
           if (item.unreadCount > 0 && user?.id) {
@@ -1432,6 +1436,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
         onLongPress={handleDeleteConversation}
         delayLongPress={400}
         activeOpacity={0.7}>
+        {isAgentOrSellerItem && item.unreadCount > 0 && <View style={styles.sellerChatItemUnreadBar} />}
         {/* Avatar - Show image or initials */}
         <TouchableOpacity
           style={styles.avatarContainer}
@@ -1462,7 +1467,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
           )}
         </TouchableOpacity>
 
-        {/* Chat Info - WhatsApp style */}
+        {/* Chat Info */}
         <View style={styles.chatInfo}>
           <View style={styles.chatHeader}>
             <Text style={[styles.chatName, item.unreadCount > 0 && styles.chatNameUnread]} numberOfLines={1}>
@@ -1470,11 +1475,14 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
             <Text style={styles.timestamp}>{item.timestamp}</Text>
           </View>
-          {/* Only show property title for buyers, not for sellers/agents */}
-          {user?.user_type === 'buyer' && item.propertyTitle && (
-            <Text style={styles.propertyTitle} numberOfLines={1}>
-              {capitalize(item.propertyTitle)}
-            </Text>
+          {/* Property tag for both buyer and seller/agent (reference UI) */}
+          {item.propertyTitle && (
+            <View style={styles.chatPropertyTag}>
+              <TabIcon name="home" color="#1565C0" size={9} />
+              <Text style={styles.chatPropertyTagText} numberOfLines={1}>
+                {capitalize(item.propertyTitle)}
+              </Text>
+            </View>
           )}
           <View style={styles.messageRow}>
             <Text
@@ -1665,7 +1673,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
   const cardPerson = cardMode === 'owner' ? selectedOwner : selectedBuyer;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isAgentOrSeller && styles.containerSeller]}>
       {/* Buyer UI: "My Chats" dark header matching reference HTML */}
       {!isAgentOrSeller && (
         <View style={[styles.buyerChatTopBar, { paddingTop: insets.top + 14 }]}>
@@ -1692,55 +1700,77 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       )}
 
-      {/* Agent & Seller UI: "My Inquiries" layout (search + stat pills) */}
+      {/* Agent & Seller UI: "My Chats" layout (reference HTML) */}
       {isAgentOrSeller && (
         <>
-          <View style={[styles.searchBar, { paddingTop: insets.top + spacing.md }]}>
-            <View style={styles.searchInputContainer}>
-              <TabIcon name="search" color={colors.textSecondary} size={20} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by buyer, message, or property..."
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.filterButton}
-              onPress={() => setChatFilter(prev => (prev === 'all' ? 'unread' : 'all'))}
-              activeOpacity={0.85}>
-              <Text style={styles.filterButtonText}>
-                {chatFilter === 'all' ? 'All' : 'Unread'}
+          <View style={[styles.sellerChatHeader, { paddingTop: insets.top + 14 }]}>
+            <View style={styles.sellerHeaderRow}>
+              <Text style={styles.sellerHeaderTitle}>
+                My <Text style={styles.sellerHeaderTitleAccent}>Chats</Text>
               </Text>
-            </TouchableOpacity>
+              {chatStats.unread > 0 && (
+                <View style={styles.sellerUnreadBadge}>
+                  <Text style={styles.sellerUnreadBadgeText}>{chatStats.unread} Unread</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.sellerSearchRow}>
+              <View style={styles.sellerSearchBar}>
+                <TabIcon name="search" color="rgba(255,255,255,0.45)" size={14} />
+                <TextInput
+                  style={styles.sellerSearchInput}
+                  placeholder="Search buyer, message, property…"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.sellerChip, chatFilter === 'all' && styles.sellerChipActive]}
+                onPress={() => setChatFilter('all')}
+                activeOpacity={0.8}>
+                <Text style={[styles.sellerChipText, chatFilter === 'all' && styles.sellerChipTextActive]}>All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sellerChip, chatFilter === 'unread' && styles.sellerChipActive]}
+                onPress={() => setChatFilter('unread')}
+                activeOpacity={0.8}>
+                <Text style={[styles.sellerChipText, chatFilter === 'unread' && styles.sellerChipTextActive]}>Unread</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statsGridItem}>
-              <View style={[styles.statPill, styles.statPillPrimary]}>
-                <Text style={styles.statPillNumber}>{chatStats.total}</Text>
-                <Text style={styles.statPillLabel}>Total</Text>
-              </View>
+          <View style={styles.sellerStatsRow}>
+            <TouchableOpacity
+              style={[styles.sellerStatPill, styles.sellerStatPillActive]}
+              onPress={() => setChatFilter('all')}
+              activeOpacity={0.8}>
+              <Text style={[styles.sellerStatNum, styles.sellerStatNumActive]}>{chatStats.total}</Text>
+              <Text style={[styles.sellerStatLbl, styles.sellerStatLblActive]}>Total</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sellerStatPill}
+              onPress={() => setChatFilter('unread')}
+              activeOpacity={0.8}>
+              <Text style={[styles.sellerStatNum, { color: '#FF5252' }]}>{chatStats.unread}</Text>
+              <Text style={styles.sellerStatLbl}>Unread</Text>
+            </TouchableOpacity>
+            <View style={styles.sellerStatPill}>
+              <Text style={styles.sellerStatNum}>{chatStats.read}</Text>
+              <Text style={styles.sellerStatLbl}>Read</Text>
             </View>
-            <View style={styles.statsGridItem}>
-              <View style={[styles.statPill, styles.statPillDanger]}>
-                <Text style={styles.statPillNumber}>{chatStats.unread}</Text>
-                <Text style={styles.statPillLabel}>New / Unread</Text>
-              </View>
+            <View style={styles.sellerStatPill}>
+              <Text style={[styles.sellerStatNum, { color: '#00C48C' }]}>{chatStats.active}</Text>
+              <Text style={styles.sellerStatLbl}>Active 7d</Text>
             </View>
-            <View style={styles.statsGridItem}>
-              <View style={[styles.statPill, styles.statPillNeutral]}>
-                <Text style={styles.statPillNumber}>{chatStats.read}</Text>
-                <Text style={styles.statPillLabel}>Read</Text>
-              </View>
-            </View>
-            <View style={styles.statsGridItem}>
-              <View style={[styles.statPill, styles.statPillSuccess]}>
-                <Text style={styles.statPillNumber}>{chatStats.active}</Text>
-                <Text style={styles.statPillLabel}>Active (7d)</Text>
-              </View>
-            </View>
+          </View>
+
+          <View style={styles.sellerSectionHeader}>
+            <Text style={styles.sellerSectionTitle}>RECENT CONVERSATIONS</Text>
+            <TouchableOpacity style={styles.sellerSortBtn} activeOpacity={0.7}>
+              <TabIcon name="list" color="#1E88E5" size={11} />
+              <Text style={styles.sellerSortText}>Sort</Text>
+            </TouchableOpacity>
           </View>
         </>
       )}
@@ -1776,33 +1806,44 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </View>
         ) : (
-        <Animated.FlatList
-          data={agentFilteredChatList}
-          renderItem={renderChatItem}
-          keyExtractor={(item: ChatListItem) => item.id}
-          contentContainerStyle={[
-            styles.listContent,
-            {
-              paddingTop: spacing.md,
-              paddingHorizontal: spacing.md,
-              paddingBottom: spacing.xl,
-            },
-          ]}
-          showsVerticalScrollIndicator={false}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true }
-          )}
-          scrollEventThrottle={16}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[colors.primary]}
-              tintColor={colors.primary}
-            />
-          }
-        />
+        <View style={styles.sellerChatListWrap}>
+          <Animated.FlatList
+            data={agentFilteredChatList}
+            renderItem={renderChatItem}
+            keyExtractor={(item: ChatListItem) => item.id}
+            contentContainerStyle={[
+              styles.sellerListContent,
+              {
+                paddingBottom: spacing.xl,
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: true }
+            )}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={['#1565C0']}
+                tintColor="#1565C0"
+              />
+            }
+            ListFooterComponent={
+              <View style={styles.sellerTipNudge}>
+                <View style={styles.sellerTipIcon}>
+                  <TabIcon name="chats" color="#1565C0" size={17} />
+                </View>
+                <View>
+                  <Text style={styles.sellerTipTitle}>Reply quickly to get more leads</Text>
+                  <Text style={styles.sellerTipSub}>Buyers prefer sellers who respond within 1 hour</Text>
+                </View>
+              </View>
+            }
+          />
+        </View>
         )
       ) : (
         <View style={[styles.emptyContainer, { paddingTop: isAgentOrSeller ? spacing.xl : spacing.xl }]}>
@@ -1832,7 +1873,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       )}
 
-      {/* Contact Info modal (opens on avatar tap) - Call, Delete, Email only */}
+      {/* Buyer Profile modal (opens on avatar tap) - Delete, Call, Email only */}
       <Modal
         visible={buyerCardVisible}
         transparent
@@ -1846,7 +1887,10 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
               activeOpacity={0.7}>
               <Text style={styles.contactInfoBackText}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.contactInfoTitle}>Contact Info</Text>
+            <Text style={styles.contactInfoTitle}>
+              {cardMode === 'buyer' ? 'Buyer Profile' : selectedOwnerRole === 'agent' ? 'Agent Details' : 'Seller Details'}
+            </Text>
+            <View style={styles.contactInfoHeaderSpacer} />
           </View>
 
           {buyerCardLoading ? (
@@ -1882,21 +1926,9 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.contactInfoSince}>
                   📅 Member since {cardMode === 'buyer' ? memberSinceText : '—'}
                 </Text>
-                <View style={styles.ownerActions}>
+                <View style={styles.profileActions}>
                   <TouchableOpacity
-                    style={styles.ownerActionItem}
-                    onPress={() => {
-                      if (cardPerson.phone) Linking.openURL(`tel:${cardPerson.phone}`);
-                      else CustomAlert.alert('Info', 'Phone number not available.');
-                    }}
-                    activeOpacity={0.7}>
-                    <View style={styles.ownerActionIcon}>
-                      <Text style={styles.ownerActionEmoji}>📞</Text>
-                    </View>
-                    <Text style={styles.ownerActionLabel}>Call</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.ownerActionItem}
+                    style={[styles.profileActionBtn, styles.profileActionBtnSecondary]}
                     onPress={() => {
                       setBuyerCardVisible(false);
                       if (selectedChatItemForModal?.chatRoomId) {
@@ -1918,23 +1950,29 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
                         );
                       }
                     }}
-                    activeOpacity={0.7}>
-                    <View style={styles.ownerActionIcon}>
-                      <Text style={styles.ownerActionEmoji}>🗑️</Text>
-                    </View>
-                    <Text style={styles.ownerActionLabel}>Delete</Text>
+                    activeOpacity={0.8}>
+                    <TabIcon name="trash" color="#FFFFFF" size={13} />
+                    <Text style={styles.profileActionLabel}>Delete</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.ownerActionItem}
+                    style={[styles.profileActionBtn, styles.profileActionBtnPrimary]}
+                    onPress={() => {
+                      if (cardPerson.phone) Linking.openURL(`tel:${cardPerson.phone}`);
+                      else CustomAlert.alert('Info', 'Phone number not available.');
+                    }}
+                    activeOpacity={0.8}>
+                    <TabIcon name="phone" color="#FFFFFF" size={13} />
+                    <Text style={styles.profileActionLabel}>Call</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.profileActionBtn, styles.profileActionBtnSecondary]}
                     onPress={() => {
                       if (cardPerson.email) Linking.openURL(`mailto:${cardPerson.email}`);
                       else CustomAlert.alert('Info', 'Email not available.');
                     }}
-                    activeOpacity={0.7}>
-                    <View style={styles.ownerActionIcon}>
-                      <Text style={styles.ownerActionEmoji}>✉️</Text>
-                    </View>
-                    <Text style={styles.ownerActionLabel}>Email</Text>
+                    activeOpacity={0.8}>
+                    <TabIcon name="mail" color="#FFFFFF" size={13} />
+                    <Text style={styles.profileActionLabel}>Email</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1990,6 +2028,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  containerSeller: {
+    backgroundColor: '#F2F5FA',
+  },
   chatFilterBar: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -2015,7 +2056,238 @@ const styles = StyleSheet.create({
   chatFilterTextActive: {
     color: '#FFFFFF',
   },
-  // Agent (My Inquiries style) header controls
+  // Seller/Agent "My Chats" reference UI
+  sellerChatHeader: {
+    backgroundColor: '#0B1F3A',
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+  },
+  sellerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingTop: 4,
+  },
+  sellerHeaderTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  sellerHeaderTitleAccent: {
+    color: '#60B4FF',
+  },
+  sellerUnreadBadge: {
+    backgroundColor: '#FF5252',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  sellerUnreadBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sellerSearchRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  sellerSearchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    gap: 8,
+  },
+  sellerSearchInput: {
+    flex: 1,
+    fontSize: 12,
+    color: '#FFFFFF',
+    padding: 0,
+  },
+  sellerChip: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  sellerChipActive: {
+    backgroundColor: '#1E88E5',
+    borderColor: '#1E88E5',
+  },
+  sellerChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.65)',
+  },
+  sellerChipTextActive: {
+    color: '#FFFFFF',
+  },
+  sellerStatsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 8,
+  },
+  sellerStatPill: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 13,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sellerStatPillActive: {
+    borderWidth: 2,
+    borderColor: '#1565C0',
+    backgroundColor: '#E8F4FD',
+  },
+  sellerStatNumActive: {
+    color: '#1565C0',
+  },
+  sellerStatLblActive: {
+    color: '#1565C0',
+  },
+  sellerStatNum: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0D1B2E',
+    lineHeight: 1,
+    marginBottom: 3,
+  },
+  sellerStatLbl: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#8A97A8',
+  },
+  sellerSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  sellerSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8A97A8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  sellerSortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sellerSortText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1E88E5',
+  },
+  sellerChatListWrap: {
+    flex: 1,
+    backgroundColor: '#F2F5FA',
+    paddingHorizontal: 14,
+  },
+  sellerListContent: {
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  sellerTipNudge: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#E2E8F0',
+  },
+  sellerTipIcon: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#E8F4FD',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sellerTipTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0D1B2E',
+    marginBottom: 2,
+  },
+  sellerTipSub: {
+    fontSize: 11,
+    color: '#8A97A8',
+  },
+  sellerChatItem: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  sellerChatItemUnread: {
+    borderColor: 'rgba(21,101,192,0.2)',
+  },
+  sellerChatItemUnreadBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: '#1565C0',
+    borderTopLeftRadius: 3,
+    borderBottomLeftRadius: 3,
+  },
+  chatPropertyTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E8F4FD',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginBottom: 3,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  chatPropertyTagText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#1565C0',
+  },
+
+  // Agent (My Inquiries style) header controls - legacy
   searchBar: {
     flexDirection: 'row',
     padding: spacing.md,
@@ -2128,7 +2400,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 12,
-    backgroundColor: colors.secondary,
+    backgroundColor: '#0B1F3A',
   },
   contactInfoBackBtn: {
     width: 36,
@@ -2144,12 +2416,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   contactInfoTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: 'rgba(199,238,255,0.8)',
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  contactInfoHeaderSpacer: {
+    width: 36,
   },
   contactInfoHero: {
-    backgroundColor: colors.secondary,
+    backgroundColor: '#0B1F3A',
     paddingVertical: 20,
     paddingHorizontal: 24,
     alignItems: 'center',
@@ -2206,6 +2482,41 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(199,238,255,0.7)',
     fontWeight: '600',
+  },
+  profileActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  profileActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  profileActionBtnPrimary: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    // Linear gradient simulated - use primary blue
+    backgroundColor: '#1565C0',
+    shadowColor: '#1565C0',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  profileActionBtnSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  profileActionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   contactInfoScroll: {
     flex: 1,

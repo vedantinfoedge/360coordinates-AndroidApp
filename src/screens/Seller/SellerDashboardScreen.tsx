@@ -15,6 +15,7 @@ import {
   Platform,
   InteractionManager,
   StatusBar,
+  Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,17 +26,14 @@ import { SellerStackParamList } from '../../navigation/SellerNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon, TabIconName } from '../../components/navigation/TabIcons';
 import { useAuth } from '../../context/AuthContext';
-import SellerHeader from '../../components/SellerHeader';
 import { sellerService, DashboardStats } from '../../services/seller.service';
 import CustomAlert from '../../utils/alertHelper';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters } from '../../utils/formatters';
 import { DEBUG_SELLER_CRASH, SELLER_DASHBOARD_SAFE_MODE } from '../../config/debugCrash';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { verticalScale } from '../../utils/responsive';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HEADER_HEIGHT = verticalScale(48);
 
 // Reference UI colors (360 Coordinates)
 const REF = {
@@ -344,14 +342,14 @@ const AnimatedSeeAllButton = React.memo(({ onPress, children }: {
 
 const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const { user, logout, switchUserRole } = useAuth();
-  const [switchingRole, setSwitchingRole] = useState(false);
+  const { user, logout } = useAuth();
+  const [avatarMenuVisible, setAvatarMenuVisible] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Performance optimization: cache timestamp to prevent excessive API calls
   const lastFetchTimeRef = useRef<number>(0);
@@ -364,7 +362,6 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const statsAnim = useRef(new Animated.Value(0)).current;
-  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     console.log('[DEBUG RoleSwitch] 12. SellerDashboardScreen MOUNTED - user:', !!user, 'user_type:', user?.user_type, 'DEBUG_SELLER_CRASH:', DEBUG_SELLER_CRASH, 'SELLER_DASHBOARD_SAFE_MODE:', SELLER_DASHBOARD_SAFE_MODE);
@@ -821,7 +818,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         <PropertyImageCard
           imageUrl={imageUrl}
           propertyId={String(item.id)}
-          onPress={() => navigation.navigate('PropertyDetails', { propertyId: String(item.id) })}
+          onPress={() => (navigation as any).navigate('PropertyDetails', { propertyId: String(item.id) })}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           style={styles.propertyCard}>
@@ -923,23 +920,6 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   if (user.user_type === 'agent') {
     return (
       <View style={styles.container}>
-        <SellerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onSubscriptionPress={() => navigation.navigate('Subscription')}
-          onBuyPropertyPress={async () => {
-            // Set dashboard preference and navigate to Buyer dashboard
-            await AsyncStorage.setItem('@target_dashboard', 'buyer');
-            await AsyncStorage.setItem('@user_dashboard_preference', 'buyer');
-            (navigation as any).reset({
-              index: 0,
-              routes: [{ name: 'MainTabs' }],
-            });
-          }}
-          onLogoutPress={async () => {
-            await logout();
-          }}
-        />
         <View style={styles.loadingContainer}>
           <View style={styles.errorIconWrap}>
             <TabIcon name="alert" color={colors.textSecondary} size={48} />
@@ -956,23 +936,6 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   if (loading && !dashboardStats) {
     return (
       <View style={styles.container}>
-        <SellerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onSubscriptionPress={() => navigation.navigate('Subscription')}
-          onBuyPropertyPress={async () => {
-            // Set dashboard preference and navigate to Buyer dashboard
-            await AsyncStorage.setItem('@target_dashboard', 'buyer');
-            await AsyncStorage.setItem('@user_dashboard_preference', 'buyer');
-            (navigation as any).reset({
-              index: 0,
-              routes: [{ name: 'MainTabs' }],
-            });
-          }}
-          onLogoutPress={async () => {
-            await logout();
-          }}
-        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading dashboard...</Text>
@@ -993,10 +956,6 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
     subscription: null,
   };
 
-  const daysRemaining = stats.subscription?.end_date
-    ? formatters.daysRemaining(stats.subscription.end_date)
-    : 0;
-
   const firstName = user?.full_name ? String(user.full_name).split(' ')[0] ?? '' : '';
   const greeting = (() => {
     const h = new Date().getHours();
@@ -1008,104 +967,113 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={REF.navy} />
-      <SellerHeader
-        variant="navy"
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support' as never)}
-        onSubscriptionPress={() => navigation.navigate('Subscription' as never)}
-        onBuyPropertyPress={async () => {
-          if (switchingRole) return;
-          try {
-            setSwitchingRole(true);
-            await switchUserRole('buyer');
-          } catch (error: any) {
-            console.error('[SellerDashboard] Error switching role:', error);
-            CustomAlert.alert(
-              'Role Switch Failed',
-              error?.message || 'Failed to switch to buyer dashboard. Please try again.',
-            );
-          } finally {
-            setSwitchingRole(false);
-          }
-        }}
-        onLogoutPress={async () => {
-          await logout();
-        }}
-        subscriptionDays={daysRemaining}
-        scrollY={scrollY}
-      />
 
-      {/* Navy welcome section */}
-      <View style={[styles.navyHeader, { paddingTop: insets.top + HEADER_HEIGHT + 14 }]}>
-        <View style={styles.welcomeCard}>
-          <View style={styles.welcomeLeft}>
-            <Text style={styles.welcomeGreeting}>{greeting.toUpperCase()}</Text>
-            <Text style={styles.welcomeName}>
-              Welcome, <Text style={styles.welcomeNameHighlight}>{firstName || 'Seller'}</Text>
-            </Text>
-            <Text style={styles.welcomeSub}>Here's what's happening with your properties today</Text>
+      <Modal
+        visible={avatarMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarMenuVisible(false)}>
+        <TouchableOpacity
+          style={styles.avatarMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setAvatarMenuVisible(false)}>
+          <View style={styles.avatarMenu}>
+            <TouchableOpacity
+              style={styles.avatarMenuItem}
+              onPress={() => {
+                setAvatarMenuVisible(false);
+                navigation.navigate('Profile');
+              }}
+              activeOpacity={0.7}>
+              <TabIcon name="profile" color={REF.blue} size={20} />
+              <Text style={styles.avatarMenuItemText}>Profile</Text>
+            </TouchableOpacity>
+            <View style={styles.avatarMenuDivider} />
+            <TouchableOpacity
+              style={styles.avatarMenuItem}
+              onPress={async () => {
+                setAvatarMenuVisible(false);
+                await logout();
+              }}
+              activeOpacity={0.7}>
+              <TabIcon name="logout" color="#DC2626" size={20} />
+              <Text style={[styles.avatarMenuItemText, styles.avatarMenuLogoutText]}>Log out</Text>
+            </TouchableOpacity>
           </View>
-          {/* @ts-expect-error - LinearGradient children types */}
-          <LinearGradient
-            colors={[REF.blueLight, REF.blue]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.welcomeAvatar}>
-            <Text style={styles.welcomeAvatarText}>{getInitials(user?.full_name || 'S')}</Text>
-          </LinearGradient>
-        </View>
-        <View style={styles.addBtnWrap}>
-          <AnimatedAddPropertyButton
-            onPress={async () => {
-              try {
-                const statsResponse: any = await sellerService.getDashboardStats();
-                if (statsResponse && statsResponse.success && statsResponse.data) {
-                  const currentCount = statsResponse.data.total_properties || 0;
-                  const planType = statsResponse.data.subscription?.plan_type || 'free';
-                  const limits: { [key: string]: number } = {
-                    free: 3,
-                    basic: 10,
-                    pro: 10,
-                    premium: 10,
-                  };
-                  const limit = limits[planType] || limits.free;
-                  if (limit > 0 && currentCount >= limit) {
-                    CustomAlert.alert(
-                      'Property limit reached',
-                      `Property limit reached. You can list up to ${limit} properties in your current plan.`,
-                      [{ text: 'OK' }]
-                    );
-                    return;
-                  }
-                }
-                navigation.navigate('AddProperty');
-              } catch (error) {
-                navigation.navigate('AddProperty');
-              }
-            }}
-          />
-        </View>
-      </View>
+        </TouchableOpacity>
+      </Modal>
 
       <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 0 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
-        scrollEventThrottle={16}>
+        >
+        {/* Navy welcome section - scrolls with content */}
+        <View style={[styles.navyHeader, { paddingTop: insets.top + 14, marginHorizontal: -16 }]}>
+          <View style={styles.welcomeCard}>
+            <View style={styles.welcomeLeft}>
+              <Text style={styles.welcomeGreeting}>{greeting.toUpperCase()}</Text>
+              <Text style={styles.welcomeName}>
+                Welcome, <Text style={styles.welcomeNameHighlight}>{firstName || 'Seller'}</Text>
+              </Text>
+              <Text style={styles.welcomeSub}>Here's what's happening with your properties today</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setAvatarMenuVisible(true)}
+              activeOpacity={0.8}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              {/* @ts-expect-error - LinearGradient children types */}
+              <LinearGradient
+                colors={[REF.blueLight, REF.blue]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.welcomeAvatar}>
+                <Text style={styles.welcomeAvatarText}>{getInitials(user?.full_name || 'S')}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.addBtnWrap}>
+            <AnimatedAddPropertyButton
+              onPress={async () => {
+                try {
+                  const statsResponse: any = await sellerService.getDashboardStats();
+                  if (statsResponse && statsResponse.success && statsResponse.data) {
+                    const currentCount = statsResponse.data.total_properties || 0;
+                    const planType = statsResponse.data.subscription?.plan_type || 'free';
+                    const limits: { [key: string]: number } = {
+                      free: 3,
+                      basic: 10,
+                      pro: 10,
+                      premium: 10,
+                    };
+                    const limit = limits[planType] || limits.free;
+                    if (limit > 0 && currentCount >= limit) {
+                      CustomAlert.alert(
+                        'Property limit reached',
+                        `Property limit reached. You can list up to ${limit} properties in your current plan.`,
+                        [{ text: 'OK' }]
+                      );
+                      return;
+                    }
+                  }
+                  (navigation as any).navigate('AddProperty');
+                } catch (error) {
+                  (navigation as any).navigate('AddProperty');
+                }
+              }}
+            />
+          </View>
+        </View>
         <Animated.View
           style={{
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }],
           }}>
           {/* Overview Section */}
-          <Text style={styles.sectionLabel}>OVERVIEW</Text>
+          <Text style={[styles.sectionLabel, styles.sectionLabelFirst]}>OVERVIEW</Text>
           <Animated.View
             style={[
               styles.statsGrid,
@@ -1202,10 +1170,10 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                       return;
                     }
                   }
-                  navigation.navigate('AddProperty');
+                  (navigation as any).navigate('AddProperty');
                 } catch (error) {
                   // If check fails, still allow navigation (will be checked again in AddPropertyScreen)
-                  navigation.navigate('AddProperty');
+                  (navigation as any).navigate('AddProperty');
                 }
               }}
               delay={0}
@@ -1273,7 +1241,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.emptyPropsSub}>Start by adding your first property to get started</Text>
                 <TouchableOpacity
                   style={styles.emptyAddBtn}
-                  onPress={() => navigation.navigate('AddProperty')}
+                  onPress={() => (navigation as any).navigate('AddProperty')}
                   activeOpacity={0.8}>
                   {/* @ts-expect-error - LinearGradient children types */}
                   <LinearGradient
@@ -1394,6 +1362,45 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
+  avatarMenuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 60,
+    paddingRight: 20,
+  },
+  avatarMenu: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    minWidth: 160,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  avatarMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  avatarMenuItemText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  avatarMenuLogoutText: {
+    color: '#DC2626',
+  },
+  avatarMenuDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 12,
+  },
   addBtnWrap: {
     marginTop: 12,
   },
@@ -1430,6 +1437,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 10,
     paddingHorizontal: 4,
+  },
+  sectionLabelFirst: {
+    paddingTop: 16,
   },
   statsGrid: {
     flexDirection: 'row',
