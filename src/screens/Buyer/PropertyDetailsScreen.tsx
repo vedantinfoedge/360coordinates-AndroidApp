@@ -39,6 +39,8 @@ import {
   ViewedProperty,
 } from '../../services/viewedProperties.service';
 import {capitalize, capitalizeAmenity} from '../../utils/formatters';
+import {geocodeLocation} from '../../utils/geocoding';
+import MapViewComponent from '../../components/map/MapView';
 
 // Import WebView with error handling
 let WebView: any = null;
@@ -98,6 +100,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [propertyUnlocked, setPropertyUnlocked] = useState(false);
   const [processingContact, setProcessingContact] = useState(false);
   const [processingChat, setProcessingChat] = useState(false);
+  const [mapCoordinates, setMapCoordinates] = useState<[number, number] | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   useEffect(() => {
@@ -143,6 +146,32 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       setPropertyUnlocked(false);
     }
   }, [property?.id]);
+
+  // Resolve map coordinates from property (lat/lng or geocode)
+  useEffect(() => {
+    if (!property) {
+      setMapCoordinates(null);
+      return;
+    }
+    const lat = property.latitude != null ? parseFloat(property.latitude) : NaN;
+    const lng = property.longitude != null ? parseFloat(property.longitude) : NaN;
+    if (!isNaN(lat) && !isNaN(lng)) {
+      setMapCoordinates([lng, lat]);
+      return;
+    }
+    const address = property.location || property.address || property.city || property.fullAddress;
+    if (!address) {
+      setMapCoordinates(null);
+      return;
+    }
+    geocodeLocation(address).then(result => {
+      if (result) {
+        setMapCoordinates([result.longitude, result.latitude]);
+      } else {
+        setMapCoordinates(null);
+      }
+    });
+  }, [property]);
 
   // Handle return from login - auto show contact details if user just logged in
   useEffect(() => {
@@ -1256,18 +1285,51 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           <Text style={styles.address}>
             {property.address || property.fullAddress || property.location || 'Address not available'}
           </Text>
-          <View style={styles.mapPlaceholder}>
-            <TabIcon name="map" color={colors.textSecondary} size={40} />
-            <Text style={styles.mapPlaceholderText}>{property.location || property.city || 'Location'}</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.mapButton}
+          <TouchableOpacity
+            style={styles.mapContainer}
             onPress={() => {
-              // Navigate to map with current property pinned
               navigation.navigate('PropertyMap', {
                 propertyId: property.id,
                 listingType: property.status === 'rent' ? 'rent' : property.status === 'pg' ? 'pg-hostel' : 'buy',
-              });
+                location: property.location || property.city || '',
+                city: property.city || property.location || '',
+              } as never);
+            }}
+            activeOpacity={0.9}>
+            {mapCoordinates ? (
+              <View style={styles.embeddedMapWrapper}>
+                <MapViewComponent
+                  initialCenter={mapCoordinates}
+                  initialZoom={14}
+                  markers={[{
+                    id: 'property',
+                    coordinate: mapCoordinates,
+                    color: '#E53935',
+                  }]}
+                  interactive={false}
+                  style={styles.embeddedMap}
+                />
+                <View style={styles.mapOverlay}>
+                  <TabIcon name="location" color="#E53935" size={18} />
+                  <Text style={styles.mapOverlayText}>Tap to open in map</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.mapPlaceholder}>
+                <TabIcon name="map" color={colors.textSecondary} size={40} />
+                <Text style={styles.mapPlaceholderText}>{property.location || property.city || 'Location'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.mapButton}
+            onPress={() => {
+              navigation.navigate('PropertyMap', {
+                propertyId: property.id,
+                listingType: property.status === 'rent' ? 'rent' : property.status === 'pg' ? 'pg-hostel' : 'buy',
+                location: property.location || property.city || '',
+                city: property.city || property.location || '',
+              } as never);
             }}>
             <TabIcon name="location" color="#E53935" size={18} />
             <Text style={styles.mapButtonText}>View on Map</Text>
@@ -1545,12 +1607,12 @@ const styles = StyleSheet.create({
     paddingBottom: verticalScale(120),
   },
   imageCarouselContainer: {
-    height: verticalScale(340),
+    height: verticalScale(380),
     position: 'relative',
     overflow: 'hidden',
     marginHorizontal: spacing.md,
     marginTop: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.lg,
     backgroundColor: '#c8dfe8',
     borderRadius: borderRadius.xl,
   },
@@ -1963,15 +2025,48 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     lineHeight: 22,
   },
-  mapPlaceholder: {
+  mapContainer: {
     height: 120,
-    backgroundColor: '#b8d5ea',
     borderRadius: 16,
     marginBottom: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.borderRef,
+  },
+  embeddedMapWrapper: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  embeddedMap: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  mapOverlayText: {
+    fontSize: 12,
+    color: colors.sub,
+    fontWeight: '600',
+  },
+  mapPlaceholder: {
+    flex: 1,
+    height: '100%',
+    backgroundColor: '#b8d5ea',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mapPlaceholderText: {
     fontSize: 11,

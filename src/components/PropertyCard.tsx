@@ -401,21 +401,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               </View>
             );
           })()}
-          {/* Price + View Details on same row */}
+          {/* Price row + Full-width View Details button */}
           <View style={styles.priceRow}>
             <Text style={styles.price}>{price}</Text>
-            <TouchableOpacity
-              style={styles.viewDetailsButton}
-              onPress={(e: { stopPropagation: () => void }) => {
-                e.stopPropagation();
-                if (onPress) {
-                  onPress();
-                }
-              }}
-              activeOpacity={0.8}>
-              <Text style={styles.viewDetailsText}>View Details</Text>
-            </TouchableOpacity>
           </View>
+          <TouchableOpacity
+            style={styles.viewDetailsButton}
+            onPress={(e: { stopPropagation: () => void }) => {
+              e.stopPropagation();
+              if (onPress) onPress();
+            }}
+            activeOpacity={0.8}>
+            <Text style={styles.viewDetailsText}>View Details</Text>
+          </TouchableOpacity>
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -435,7 +433,7 @@ const CARD_SHADOW = {
   borderColor: colors.borderRef,
 };
 
-const CARD_HEIGHT = 300;
+const CARD_HEIGHT = 320;
 
 const styles = StyleSheet.create({
   card: {
@@ -450,7 +448,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-    flex: 0.65,
+    flex: 0.52,
     overflow: 'hidden',
     backgroundColor: colors.surfaceSecondary,
   },
@@ -618,7 +616,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   infoContainer: {
-    flex: 0.35,
+    flex: 0.48,
     paddingHorizontal: 14,
     paddingTop: 11,
     paddingBottom: 12,
@@ -662,21 +660,16 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
     marginTop: 8,
+    marginBottom: 10,
   },
   price: {
-    flex: 1,
     fontSize: 17,
     fontFamily: typography.fontExtraBold,
     color: colors.primary,
   },
   viewDetailsButton: {
-    flex: 1,
-    marginBottom: 20,
+    width: '100%',
     backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 9,
