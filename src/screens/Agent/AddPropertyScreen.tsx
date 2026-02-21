@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  type LayoutChangeEvent,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, RouteProp} from '@react-navigation/native';
@@ -124,7 +125,20 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
   const [maintenance, setMaintenance] = useState('');
   const [availableForBachelors, setAvailableForBachelors] = useState(false);
   const stepScrollViewRef = useRef<{scrollTo: (opts: {y: number; animated?: boolean}) => void} | null>(null);
+  const fieldLayouts = useRef<Record<string, number>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const STEP_FIELD_ORDER: Record<number, string[]> = {
+    1: ['propertyTitle', 'propertyType'],
+    2: ['location', 'state', 'bedrooms', 'bathrooms', 'balconies', 'builtUpArea', 'carpetArea', 'floor', 'totalFloors', 'facing', 'propertyAge', 'furnishing'],
+    3: ['selectedAmenities', 'description'],
+    4: ['photos'],
+    5: ['expectedPrice'],
+  };
+
+  const captureFieldLayout = useCallback((field: string) => (e: LayoutChangeEvent) => {
+    fieldLayouts.current[field] = e.nativeEvent.layout.y;
+  }, []);
 
   const clearFieldError = useCallback((field: string) => {
     setFieldErrors(prev => {
@@ -751,6 +765,15 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors);
+      const order = STEP_FIELD_ORDER[currentStep];
+      const firstErrorKey = order?.find((k) => nextErrors[k]) ?? Object.keys(nextErrors)[0];
+      const y = firstErrorKey ? fieldLayouts.current[firstErrorKey] : undefined;
+      if (firstErrorKey && y !== undefined && stepScrollViewRef.current) {
+        stepScrollViewRef.current.scrollTo({
+          y: Math.max(0, y - 60),
+          animated: true,
+        });
+      }
       return;
     }
 
@@ -1123,7 +1146,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               Let's start with the basic details of your property
             </Text>
 
-            <View style={styles.inputContainer}>
+            <View style={styles.inputContainer} onLayout={captureFieldLayout('propertyTitle')}>
               <Text style={styles.label}>
                 Property Title <Text style={styles.required}>*</Text>
               </Text>
@@ -1192,7 +1215,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
 
             <View
               style={styles.inputContainer}
-              pointerEvents={isLimitedEdit ? 'none' : 'auto'}>
+              pointerEvents={isLimitedEdit ? 'none' : 'auto'}
+              onLayout={captureFieldLayout('propertyType')}>
               <Text style={styles.label}>
                 Property Type <Text style={styles.required}>*</Text>
               </Text>
@@ -1254,7 +1278,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               Tell us more about your property specifications
             </Text>
 
-            <View style={styles.inputContainer}>
+            <View style={styles.inputContainer} onLayout={captureFieldLayout('location')}>
               <Text style={styles.label}>
                 Location <Text style={styles.required}>*</Text>
               </Text>
@@ -1350,7 +1374,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               onClose={() => setLocationPickerVisible(false)}
             />
 
-            <View style={styles.inputContainer}>
+            <View style={styles.inputContainer} onLayout={captureFieldLayout('state')}>
               <Text style={styles.label}>
                 State <Text style={styles.required}>*</Text>
               </Text>
@@ -1393,7 +1417,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             {fieldVisibility.showBedrooms && (
-              <View style={styles.inputContainer}>
+              <View style={styles.inputContainer} onLayout={captureFieldLayout('bedrooms')}>
                 <Text style={styles.label}>
                   {propertyType === 'Studio Apartment' ? 'Studio' : 'Bedrooms'} 
                   {fieldVisibility.bedroomsRequired && <Text style={styles.required}>*</Text>}
@@ -1465,7 +1489,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             )}
 
             {fieldVisibility.showBathrooms && (
-              <View style={styles.inputContainer}>
+              <View style={styles.inputContainer} onLayout={captureFieldLayout('bathrooms')}>
                 <Text style={styles.label}>
                   Bathrooms {fieldVisibility.bathroomsRequired && <Text style={styles.required}>*</Text>}
                 </Text>
@@ -1530,7 +1554,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             )}
 
             {fieldVisibility.showBalconies && (
-              <View style={styles.inputContainer}>
+              <View style={styles.inputContainer} onLayout={captureFieldLayout('balconies')}>
                 <Text style={styles.label}>Balconies <Text style={styles.required}>*</Text></Text>
                 <View style={styles.numberButtonsContainer}>
                   {[0, 1, 2, 3].map(num => (
@@ -1575,7 +1599,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </View>
             )}
 
-            <View style={styles.inputContainer}>
+            <View style={styles.inputContainer} onLayout={captureFieldLayout('builtUpArea')}>
               <Text style={styles.label}>
                 {fieldVisibility.areaLabel} <Text style={styles.required}>*</Text>
               </Text>
@@ -1617,7 +1641,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             {fieldVisibility.showCarpetArea && (
-              <View style={styles.inputContainer}>
+              <View style={styles.inputContainer} onLayout={captureFieldLayout('carpetArea')}>
                 <Text style={styles.label}>Carpet Area</Text>
                 <View style={styles.areaInputContainer}>
                   <TextInput
@@ -1638,7 +1662,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             )}
 
             {fieldVisibility.showFloor && (
-              <View style={styles.inputContainer}>
+              <View style={styles.inputContainer} onLayout={captureFieldLayout('floor')}>
                 <Text style={styles.label}>Floor Number <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={styles.input}
@@ -1656,7 +1680,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             )}
 
             {fieldVisibility.showTotalFloors && (
-              <View style={styles.inputContainer}>
+              <View style={styles.inputContainer} onLayout={captureFieldLayout('totalFloors')}>
                 <Text style={styles.label}>Total Floors <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={styles.input}
@@ -1673,6 +1697,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               </View>
             )}
 
+            <View onLayout={captureFieldLayout('facing')}>
             <Dropdown
               label="Facing"
               placeholder="Select facing direction"
@@ -1694,9 +1719,10 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               }}
             />
             {renderFieldError('facing')}
+            </View>
 
             {fieldVisibility.showAge && (
-              <>
+              <View onLayout={captureFieldLayout('propertyAge')}>
                 <Dropdown
                   label="Property Age"
                   placeholder="Select property age"
@@ -1715,11 +1741,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   }}
                 />
                 {renderFieldError('propertyAge')}
-              </>
+              </View>
             )}
 
             {fieldVisibility.showFurnishing && (
-              <>
+              <View onLayout={captureFieldLayout('furnishing')}>
                 <Dropdown
                   label="Furnishing"
                   placeholder="Select furnishing status"
@@ -1736,7 +1762,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   }}
                 />
                 {renderFieldError('furnishing')}
-              </>
+              </View>
             )}
           </View>
         );
@@ -1749,7 +1775,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               Select the amenities available and describe your property.
             </Text>
 
-            <View style={styles.inputContainer}>
+            <View style={styles.inputContainer} onLayout={captureFieldLayout('selectedAmenities')}>
               <Text style={styles.label}>Select Amenities</Text>
               <View style={styles.amenitiesGrid}>
                 {availableAmenities.map(amenity => (
@@ -1779,7 +1805,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               {renderFieldError('selectedAmenities')}
             </View>
 
-            <View style={styles.inputContainer}>
+            <View style={styles.inputContainer} onLayout={captureFieldLayout('description')}>
               <Text style={styles.label}>
                 Property Description <Text style={styles.required}>*</Text>
               </Text>
@@ -1818,6 +1844,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               Add 4–10 high-quality photos of your property (minimum 4 required)
             </Text>
 
+            <View onLayout={captureFieldLayout('photos')}>
             <TouchableOpacity 
               style={styles.photoUploadArea}
               onPress={() => {
@@ -1845,6 +1872,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <Text style={styles.photoUploadText}>Take photo with camera</Text>
             </TouchableOpacity>
             {renderFieldError('photos')}
+            </View>
 
             {photos.length > 0 && (
               <View style={styles.photosPreview}>
@@ -1946,7 +1974,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
             <Text style={styles.stepTitle}>Pricing Details</Text>
             <Text style={styles.stepSubtitle}>Set the right price for your property</Text>
 
-            <View style={styles.inputContainer}>
+            <View style={styles.inputContainer} onLayout={captureFieldLayout('expectedPrice')}>
               <Text style={styles.label}>
                 {propertyStatus === 'sell' ? 'Expected Price' : 'Monthly Rent'} <Text style={styles.required}>*</Text>
               </Text>
