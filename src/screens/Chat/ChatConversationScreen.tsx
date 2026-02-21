@@ -161,6 +161,16 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     const currentUserType = (user?.user_type || '').toLowerCase();
     const isBuyer = currentUserType === 'buyer';
 
+    // Resolve propertyId from conversationId (format: minId_maxId_propertyId) when not in params
+    let resolvedPropertyId: number | null = propertyId ? Number(propertyId) : null;
+    if ((!resolvedPropertyId || Number.isNaN(resolvedPropertyId)) && conversationId) {
+      const parts = String(conversationId).split('_');
+      if (parts.length >= 3) {
+        const parsed = Number(parts[2]);
+        if (!Number.isNaN(parsed) && parsed > 0) resolvedPropertyId = parsed;
+      }
+    }
+
     const formatMemberSince = (raw: string | number | undefined | null): string | null => {
       if (raw == null || String(raw).trim() === '') return null;
       const d = new Date(String(raw));
@@ -171,11 +181,12 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
 
     const fetchContact = async () => {
       try {
-        if (isBuyer && propertyId) {
-          const res = await buyerService.getPropertyDetails(propertyId);
+        if (isBuyer && resolvedPropertyId) {
+          // Use propertyService to get normalized response (merges owner/seller from data)
+          const res = await propertyService.getPropertyDetails(resolvedPropertyId);
           const data = (res as any)?.data;
           const property = data?.property ?? data;
-          const owner = property?.owner ?? property?.seller;
+          const owner = property?.owner ?? property?.seller ?? data?.owner ?? data?.seller;
           const phone =
             property?.seller_phone ||
             property?.owner?.phone ||
@@ -186,13 +197,17 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
             property?.owner?.email ||
             property?.seller?.email ||
             null;
-          // Backend details.php returns seller.created_at; align with website ChatUs.jsx
+          // Backend details.php: SELECT u.created_at as seller_created_at → may be nested or flat
           const memberSinceRaw =
             property?.seller?.created_at ||
+            property?.seller_created_at ||
+            (data?.seller as any)?.created_at ||
+            (data?.seller_created_at as string) ||
             owner?.created_at ||
             owner?.member_since ||
             owner?.joined_at ||
             property?.owner?.created_at ||
+            (data?.owner as any)?.created_at ||
             null;
           if (!cancelled) {
             setCounterpartyPhone(phone ? String(phone).trim() || null : null);
@@ -234,7 +249,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     return () => {
       cancelled = true;
     };
-  }, [user?.user_type, userId, propertyId, paramCounterpartyPhone]);
+  }, [user?.user_type, userId, propertyId, conversationId, paramCounterpartyPhone]);
 
   const handlePhonePress = () => {
     const raw = counterpartyPhone?.trim();
