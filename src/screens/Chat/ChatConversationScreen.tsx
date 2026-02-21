@@ -102,6 +102,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const [participantName, setParticipantName] = useState<string>(userName || '');
   const [counterpartyPhone, setCounterpartyPhone] = useState<string | null>(null);
   const [counterpartyEmail, setCounterpartyEmail] = useState<string | null>(null);
+  const [counterpartyMemberSince, setCounterpartyMemberSince] = useState<string | null>(null);
   const [contactInfoVisible, setContactInfoVisible] = useState(false);
   const flatListRef = useRef<FlatListScrollRef | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -160,12 +161,21 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     const currentUserType = (user?.user_type || '').toLowerCase();
     const isBuyer = currentUserType === 'buyer';
 
+    const formatMemberSince = (raw: string | number | undefined | null): string | null => {
+      if (raw == null || String(raw).trim() === '') return null;
+      const d = new Date(String(raw));
+      if (Number.isNaN(d.getTime())) return null;
+      // Match website format: "March 2024"
+      return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    };
+
     const fetchContact = async () => {
       try {
         if (isBuyer && propertyId) {
           const res = await buyerService.getPropertyDetails(propertyId);
           const data = (res as any)?.data;
           const property = data?.property ?? data;
+          const owner = property?.owner ?? property?.seller;
           const phone =
             property?.seller_phone ||
             property?.owner?.phone ||
@@ -176,9 +186,18 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
             property?.owner?.email ||
             property?.seller?.email ||
             null;
+          // Backend details.php returns seller.created_at; align with website ChatUs.jsx
+          const memberSinceRaw =
+            property?.seller?.created_at ||
+            owner?.created_at ||
+            owner?.member_since ||
+            owner?.joined_at ||
+            property?.owner?.created_at ||
+            null;
           if (!cancelled) {
             setCounterpartyPhone(phone ? String(phone).trim() || null : null);
             setCounterpartyEmail(email ? String(email).trim() || null : null);
+            setCounterpartyMemberSince(formatMemberSince(memberSinceRaw));
           }
         } else if (!isBuyer && userId) {
           const res: any = await sellerService.getBuyer(userId);
@@ -186,18 +205,28 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           const phone =
             payload?.phone || payload?.mobile || payload?.buyer_phone || null;
           const email = payload?.email || payload?.buyer_email || null;
+          const memberSinceRaw =
+            payload?.created_at ||
+            payload?.createdAt ||
+            payload?.member_since ||
+            payload?.joined_at ||
+            payload?.created_date ||
+            null;
           if (!cancelled) {
             setCounterpartyPhone(phone ? String(phone).trim() || null : null);
             setCounterpartyEmail(email ? String(email).trim() || null : null);
+            setCounterpartyMemberSince(formatMemberSince(memberSinceRaw));
           }
         } else if (!cancelled && !paramCounterpartyPhone) {
           setCounterpartyPhone(null);
           setCounterpartyEmail(null);
+          setCounterpartyMemberSince(null);
         }
       } catch (_) {
         if (!cancelled) {
           setCounterpartyPhone(null);
           setCounterpartyEmail(null);
+          setCounterpartyMemberSince(null);
         }
       }
     };
@@ -748,8 +777,8 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
             <Text style={styles.contactInfoName}>{participantName}</Text>
             <Text style={styles.contactInfoSince}>
               {user?.user_type === 'buyer'
-                ? (receiverRole === 'agent' ? 'Agent' : 'Seller') + ' · Member since'
-                : 'Buyer · Member since'}
+                ? (receiverRole === 'agent' ? 'Agent' : 'Seller') + ' · Member since ' + (counterpartyMemberSince || '—')
+                : 'Buyer · Member since ' + (counterpartyMemberSince || '—')}
             </Text>
             <View style={styles.profileActions}>
               <TouchableOpacity

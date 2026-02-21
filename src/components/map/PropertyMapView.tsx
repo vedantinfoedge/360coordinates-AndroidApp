@@ -914,6 +914,33 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
                           />
                         ))}
                       </ScrollView>
+                      {/* Carousel nav buttons */}
+                      <TouchableOpacity
+                        style={[styles.popupCardNavButton, styles.popupCardNavButtonLeft]}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          if (currentImageIndex <= 0) return;
+                          const newIndex = currentImageIndex - 1;
+                          setCurrentImageIndex(newIndex);
+                          popupImageScrollRef.current?.scrollTo({ x: newIndex * CARD_WIDTH, animated: true });
+                        }}
+                        activeOpacity={0.7}
+                        disabled={currentImageIndex <= 0}>
+                        <Text style={[styles.popupCardNavButtonText, currentImageIndex <= 0 && styles.popupCardNavButtonDisabled]}>‹</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.popupCardNavButton, styles.popupCardNavButtonRight]}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          if (currentImageIndex >= popupImageUrls.length - 1) return;
+                          const newIndex = currentImageIndex + 1;
+                          setCurrentImageIndex(newIndex);
+                          popupImageScrollRef.current?.scrollTo({ x: newIndex * CARD_WIDTH, animated: true });
+                        }}
+                        activeOpacity={0.7}
+                        disabled={currentImageIndex >= popupImageUrls.length - 1}>
+                        <Text style={[styles.popupCardNavButtonText, currentImageIndex >= popupImageUrls.length - 1 && styles.popupCardNavButtonDisabled]}>›</Text>
+                      </TouchableOpacity>
                       <View style={styles.popupCardDots}>
                         {popupImageUrls.map((_, index) => (
                           <View
@@ -1170,6 +1197,32 @@ const styles = StyleSheet.create({
   },
   popupCardImageSliderContent: {
     flexDirection: 'row',
+  },
+  popupCardNavButton: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 11,
+  },
+  popupCardNavButtonLeft: {
+    left: 8,
+  },
+  popupCardNavButtonRight: {
+    right: 8,
+  },
+  popupCardNavButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  popupCardNavButtonDisabled: {
+    opacity: 0.35,
   },
   popupCardDots: {
     position: 'absolute',

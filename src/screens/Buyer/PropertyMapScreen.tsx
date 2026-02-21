@@ -174,6 +174,12 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleListingTypeChange = (type: ListingType) => {
     setListingType(type);
+    // Reset budget to "Any" when listing type changes - budget ranges use different units
+    // (lakhs for buy vs thousands/month for rent), so we must not carry over values
+    const propType = type === 'pg-hostel' ? pgHostelType.label : selectedPropertyType;
+    setBudget('');
+    setMinBudget(0);
+    setMaxBudget(getInitialMaxBudget(type, propType));
   };
 
   const handleBudgetChange = (min: number, max: number, label: string) => {
