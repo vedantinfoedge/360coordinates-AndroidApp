@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { SellerTabParamList } from '../../components/navigation/SellerTabNavigator';
 import { colors, spacing, typography } from '../../theme';
+import { formatters } from '../../utils/formatters';
 import { sellerService, DashboardStats } from '../../services/seller.service';
 import { ViewPlansContent } from '../../components/subscription/ViewPlansContent';
 
@@ -40,11 +41,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   const daysRemaining = subscription?.end_date
-    ? Math.ceil(
-        (new Date(subscription.end_date).getTime() - new Date().getTime()) /
-          (1000 * 60 * 60 * 24)
-      )
-    : 14;
+    ? formatters.daysRemaining(subscription.end_date)
+    : 90;
 
   const handlePayNow = (planId: string) => {
     // TODO: Implement payment gateway integration
@@ -75,7 +73,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <ViewPlansContent
       daysRemaining={daysRemaining}
-      trialTotalDays={21}
+      trialTotalDays={90}
       onRefresh={onRefresh}
       refreshing={refreshing}
       onPayNow={handlePayNow}

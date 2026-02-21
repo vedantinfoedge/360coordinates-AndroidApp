@@ -47,7 +47,7 @@ export interface ViewPlansContentProps {
 
 export const ViewPlansContent: React.FC<ViewPlansContentProps> = ({
   daysRemaining = 14,
-  trialTotalDays = 21,
+  trialTotalDays = 90,
   onRefresh,
   refreshing = false,
   onPayNow = () => {},
