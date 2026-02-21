@@ -13,7 +13,11 @@ import {
   Dimensions,
   Easing,
   InteractionManager,
+  StatusBar,
+  Modal,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -22,14 +26,48 @@ import { AgentTabParamList } from '../../components/navigation/AgentTabNavigator
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon, TabIconName } from '../../components/navigation/TabIcons';
 import { useAuth } from '../../context/AuthContext';
-import AgentHeader from '../../components/AgentHeader';
 import { sellerService, DashboardStats } from '../../services/seller.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
 import { getLeads, Lead } from '../../services/leadsService';
+import { chatService } from '../../services/chat.service';
+import { propertyService } from '../../services/property.service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+interface RecentChatItem {
+  id: string;
+  chatRoomId: string;
+  name: string;
+  lastMessage: string;
+  timestamp: string;
+  unreadCount: number;
+  propertyTitle?: string;
+  propertyId?: string;
+  buyerId?: string;
+}
+
+// Reference UI colors (360 Coordinates - same as Seller)
+const REF = {
+  navy: '#0B1F3A',
+  blue: '#1565C0',
+  blueLight: '#1E88E5',
+  grayBg: '#F2F5FA',
+  grayText: '#8A97A8',
+  textDark: '#0D1B2E',
+  purple: '#7C4DFF',
+  yellow: '#FFB300',
+  green: '#00C48C',
+  siBlue: '#E3F2FD',
+  siPurple: '#EDE7F6',
+  siYellow: '#FFF8E1',
+  siGreen: '#E8F5E9',
+  aiIndigo: '#E8EAF6',
+  aiTeal: '#E0F2F1',
+  badgeSale: '#E3F2FD',
+  badgeRent: '#FFF8E1',
+};
 
 type AgentDashboardScreenNavigationProp = CompositeNavigationProp<
   BottomTabScreenProps<AgentTabParamList, 'Home'>['navigation'],
@@ -68,20 +106,33 @@ interface RecentInquiry {
 
 type DashboardLead = Lead;
 
-// Direct Add Property / Add Project buttons for dashboard
-const AddActionButtons = React.memo(({
+// Add Property / Add Project gradient buttons (reference style)
+const AnimatedAddButtons = React.memo(({
   onAddProperty,
   onAddProject,
-}: { onAddProperty: () => void; onAddProject: () => void }) => (
-  <View style={styles.actionButtonsRow}>
-    <TouchableOpacity style={styles.addPropertyButton} onPress={onAddProperty} activeOpacity={0.9}>
-      <Text style={styles.addPropertyButtonText}>+ Add Property</Text>
-    </TouchableOpacity>
-    <TouchableOpacity style={styles.addPropertyButton} onPress={onAddProject} activeOpacity={0.9}>
-      <Text style={styles.addPropertyButtonText}>+ Add Project</Text>
-    </TouchableOpacity>
-  </View>
-));
+}: { onAddProperty: () => void; onAddProject: () => void }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const handlePressIn = () => Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true, friction: 3 }).start();
+  const handlePressOut = () => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 3 }).start();
+  return (
+    <Animated.View style={[styles.addButtonsRow, { transform: [{ scale: scaleAnim }] }]}>
+      <TouchableOpacity style={styles.addBtnWrap} onPress={onAddProperty} onPressIn={handlePressIn} onPressOut={handlePressOut} activeOpacity={0.9}>
+        {/* @ts-expect-error - LinearGradient children types */}
+        <LinearGradient colors={[REF.blueLight, REF.blue]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.addBtnGradient}>
+          <TabIcon name="home" color="#fff" size={16} />
+          <Text style={styles.addBtnText}>Add Property</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.addBtnWrap} onPress={onAddProject} onPressIn={handlePressIn} onPressOut={handlePressOut} activeOpacity={0.9}>
+        {/* @ts-expect-error - LinearGradient children types */}
+        <LinearGradient colors={[REF.blueLight, REF.blue]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.addBtnGradient}>
+          <TabIcon name="building" color="#fff" size={16} />
+          <Text style={styles.addBtnText}>Add Project</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
 
 // Animated Stat Card Component
 const AnimatedStatCard = React.memo(({
@@ -141,12 +192,13 @@ const AnimatedStatCard = React.memo(({
   };
 
   const getBadgeTextColor = () => {
-    if (!badgeColor) return '#059669';
-    if (badgeColor === '#D1FAE5') return '#059669';
+    if (!badgeColor) return REF.blue;
+    if (badgeColor === REF.siGreen) return '#059669';
     if (badgeColor === '#FEE2E2') return '#DC2626';
-    if (badgeColor === '#E3F6FF') return colors.primary;
-    if (badgeColor === '#F3F4F6') return '#6B7280';
-    return '#059669';
+    if (badgeColor === REF.siBlue || badgeColor === REF.badgeSale) return REF.blue;
+    if (badgeColor === REF.badgeRent) return '#F9A825';
+    if (badgeColor === '#F1F3F5') return REF.grayText;
+    return REF.blue;
   };
 
   const CardWrapper = onPress ? TouchableOpacity : View;
@@ -181,10 +233,10 @@ const AnimatedStatCard = React.memo(({
         {statusPills && (
           <View style={styles.statusPills}>
             <View style={styles.statusPill}>
-              <Text style={styles.statusPillText}>{statusPills.sale} Sale</Text>
+              <Text style={[styles.statusPillText, { color: REF.blue }]}>{statusPills.sale} Sale</Text>
             </View>
             <View style={[styles.statusPill, styles.statusPillRent]}>
-              <Text style={styles.statusPillText}>{statusPills.rent} Rent</Text>
+              <Text style={[styles.statusPillText, { color: '#F9A825' }]}>{statusPills.rent} Rent</Text>
             </View>
           </View>
         )}
@@ -200,12 +252,16 @@ const AnimatedQuickActionCard = React.memo(({
   description,
   onPress,
   delay = 0,
+  iconColor = REF.blue,
+  iconBgColor = REF.siBlue,
 }: {
   iconName: TabIconName;
   title: string;
   description: string;
   onPress: () => void;
   delay?: number;
+  iconColor?: string;
+  iconBgColor?: string;
 }) => {
   const cardAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -251,8 +307,8 @@ const AnimatedQuickActionCard = React.memo(({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.9}>
-        <View style={styles.quickActionIconContainer}>
-          <TabIcon name={iconName} color={colors.primary} size={20} />
+        <View style={[styles.quickActionIconContainer, { backgroundColor: iconBgColor }]}>
+          <TabIcon name={iconName} color={iconColor} size={20} />
         </View>
         <Text style={styles.quickActionTitle}>{title}</Text>
         <Text style={styles.quickActionDescription}>{description}</Text>
@@ -531,17 +587,20 @@ const AnimatedPropertyCard = React.memo(({
 });
 
 const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const [avatarMenuVisible, setAvatarMenuVisible] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [recentProperties, setRecentProperties] = useState<RecentProperty[]>([]);
   const [recentInquiries, setRecentInquiries] = useState<RecentInquiry[]>([]);
+  const [recentChats, setRecentChats] = useState<RecentChatItem[]>([]);
   const [recentLeads, setRecentLeads] = useState<DashboardLead[]>([]);
   const [leadsCount, setLeadsCount] = useState(0);
   const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Performance optimization
   const lastFetchTimeRef = useRef<number>(0);
@@ -554,7 +613,6 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const statsAnim = useRef(new Animated.Value(0)).current;
-  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!hasAnimatedRef.current) {
@@ -639,6 +697,45 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
         setLeadsCount(0);
         setNewLeadsCount(0);
         setRecentLeads([]);
+      }
+
+      // Load recent chats (same data as Chat screen)
+      try {
+        const chatResponse: any = await chatService.getConversations(user?.id as number);
+        const rooms = (chatResponse?.data || [])
+          .filter((r: any) => String(r.receiverId || '') === String(user?.id))
+          .slice(0, 5);
+        const chats: RecentChatItem[] = await Promise.all(
+          rooms.map(async (r: any) => {
+            let propertyTitle = r.propertyTitle || r.property_title || 'Property';
+            if (r.propertyId) {
+              try {
+                const pr: any = await propertyService.getPropertyDetails(r.propertyId);
+                if (pr?.success && pr?.data?.property?.title) {
+                  propertyTitle = pr.data.property.title;
+                }
+              } catch (_) {}
+            }
+            const name = r.buyerName || r.buyer_name || `Buyer ${r.buyerId || ''}`;
+            const updatedAt = r.updatedAt;
+            const ts = updatedAt instanceof Date ? updatedAt : (updatedAt?.toDate?.() || new Date());
+            const timestamp = formatters.timeAgo(ts.toISOString?.() || ts.toString?.() || '');
+            return {
+              id: r.chatRoomId || r.id,
+              chatRoomId: r.chatRoomId || r.id,
+              name,
+              lastMessage: r.lastMessage || 'No messages yet',
+              timestamp,
+              unreadCount: (r.readStatus || {})[String(user?.id)] === 'new' ? 1 : 0,
+              propertyTitle,
+              propertyId: r.propertyId,
+              buyerId: r.buyerId,
+            };
+          })
+        );
+        setRecentChats(chats);
+      } catch (_) {
+        setRecentChats([]);
       }
 
       const propertiesResponse: any = await sellerService.getProperties({
@@ -766,18 +863,15 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
     return () => task.cancel();
   }, [isAgentOrBuilder]);
 
+  const getInitials = (name: string): string => {
+    if (!name || typeof name !== 'string') return '';
+    return name.split(' ').map(n => (n && n[0]) || '').join('').toUpperCase().slice(0, 2);
+  };
+
   // Show access denied message if user is not an agent/builder (case-insensitive)
   if (user && !isAgentOrBuilder) {
     return (
       <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
-          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
-          onLogoutPress={async () => {
-            await logout();
-          }}
-        />
         <View style={styles.loadingContainer}>
           <View style={styles.errorIconWrap}>
             <TabIcon name="alert" color={colors.error} size={48} />
@@ -794,14 +888,6 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
   if (loading && !dashboardStats) {
     return (
       <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
-          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
-          onLogoutPress={async () => {
-            await logout();
-          }}
-        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading dashboard...</Text>
@@ -821,156 +907,196 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
     recent_inquiries: [],
   };
 
-  const daysRemaining = stats.subscription?.end_date
-    ? formatters.daysRemaining(stats.subscription.end_date)
-    : 0;
+  const firstName = user?.full_name ? String(user.full_name).split(' ')[0] ?? '' : '';
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good Morning';
+    if (h < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  })();
 
   return (
     <View style={styles.container}>
-      <AgentHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
-        onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
-        onLogoutPress={async () => {
-          await logout();
-        }}
-        subscriptionDays={daysRemaining}
-        scrollY={scrollY}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={REF.navy} />
+
+      <Modal visible={avatarMenuVisible} transparent animationType="fade" onRequestClose={() => setAvatarMenuVisible(false)}>
+        <TouchableOpacity style={styles.avatarMenuOverlay} activeOpacity={1} onPress={() => setAvatarMenuVisible(false)}>
+          <View style={styles.avatarMenu}>
+            <TouchableOpacity style={styles.avatarMenuItem} onPress={() => { setAvatarMenuVisible(false); navigation.navigate('Profile'); }} activeOpacity={0.7}>
+              <TabIcon name="profile" color={REF.blue} size={20} />
+              <Text style={styles.avatarMenuItemText}>Profile</Text>
+            </TouchableOpacity>
+            <View style={styles.avatarMenuDivider} />
+            <TouchableOpacity style={styles.avatarMenuItem} onPress={async () => { setAvatarMenuVisible(false); await logout(); }} activeOpacity={0.7}>
+              <TabIcon name="logout" color="#DC2626" size={20} />
+              <Text style={[styles.avatarMenuItemText, styles.avatarMenuLogoutText]}>Log out</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
-        scrollEventThrottle={16}>
-        <Animated.View
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }}>
-          {/* Agent Header Box */}
-          <View style={styles.agentHeaderContainer}>
-            <View style={styles.agentHeaderBox}>
-              <View style={styles.agentHeaderContent}>
-                <Text style={styles.agentGreeting}>
-                  Welcome{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''} ❤️
-                </Text>
-                <Text style={styles.agentSubtitle}>
-                  Manage your properties and track your leads
-                </Text>
-              </View>
-              <AddActionButtons
-                onAddProperty={() => (navigation.getParent() as any)?.navigate('AddProperty')}
-                onAddProject={() => (navigation.getParent() as any)?.navigate('AddProject')}
-              />
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 0 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {/* Navy welcome section - scrolls with content */}
+        <View style={[styles.navyHeader, { paddingTop: insets.top + 14, marginHorizontal: -16 }]}>
+          <View style={styles.welcomeCard}>
+            <View style={styles.welcomeLeft}>
+              <Text style={styles.welcomeGreeting}>{greeting.toUpperCase()}</Text>
+              <Text style={styles.welcomeName}>
+                Welcome, <Text style={styles.welcomeNameHighlight}>{firstName || 'Agent'}</Text>
+              </Text>
+              <Text style={styles.welcomeSub}>Manage your properties and track your leads</Text>
             </View>
+            <TouchableOpacity onPress={() => setAvatarMenuVisible(true)} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              {/* @ts-expect-error - LinearGradient children types */}
+              <LinearGradient colors={[REF.blueLight, REF.blue]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.welcomeAvatar}>
+                <Text style={styles.welcomeAvatarText}>{getInitials(user?.full_name || 'A')}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
-
-          {/* Statistics Cards (2x2 Grid) with Animations */}
-          <Animated.View
-            style={[
-              styles.statsGrid,
-              { opacity: statsAnim },
-            ]}>
-            <AnimatedStatCard
-              iconName="building"
-              number={dashboardStats?.active_properties || 0}
-              label="Active Properties"
-              iconBgColor="#E0F2FE"
-              iconColor="#0284C7"
-              onPress={() => navigation.navigate('Listings')}
-              delay={0}
+          <View style={styles.addButtonsRowWrap}>
+            <AnimatedAddButtons
+              onAddProperty={() => (navigation.getParent() as any)?.navigate('AddProperty')}
+              onAddProject={() => (navigation.getParent() as any)?.navigate('AddProject')}
             />
-            <AnimatedStatCard
-              iconName="eye"
-              number={formatters.number(dashboardStats?.total_views || 0)}
-              label="Total Views"
-              iconBgColor="#FEF3C7"
-              iconColor="#D97706"
-              delay={100}
-            />
-            <AnimatedStatCard
-              iconName="leads"
-              number={leadsCount}
-              label="Total Leads"
-              badge={newLeadsCount > 0 ? `+${newLeadsCount} New` : undefined}
-              badgeColor="#FEE2E2"
-              iconBgColor="#DCFCE7"
-              iconColor="#16A34A"
-              onPress={() => navigation.navigate('Leads')}
-              delay={200}
-            />
-            <AnimatedStatCard
-              iconName="inquiries"
-              number={dashboardStats?.total_inquiries || 0}
-              label="Total Inquiries"
-              iconBgColor="#F3E8FF"
-              iconColor="#7C3AED"
-              statusPills={{
-                sale: dashboardStats?.properties_by_status?.sale || 0,
-                rent: dashboardStats?.properties_by_status?.rent || 0,
-              }}
-              onPress={() => navigation.navigate('Chat', { screen: 'ChatList' })}
-              delay={300}
-            />
+          </View>
+        </View>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          <Text style={[styles.sectionLabel, styles.sectionLabelFirst]}>OVERVIEW</Text>
+          <Animated.View style={[styles.statsGrid, { opacity: statsAnim }]}>
+            <AnimatedStatCard iconName="building" number={dashboardStats?.active_properties || 0} label="Active Properties" iconBgColor={REF.siBlue} iconColor={REF.blue} badge={`${dashboardStats?.active_properties || 0} Active`} badgeColor={REF.siBlue} onPress={() => navigation.navigate('Listings')} delay={0} />
+            <AnimatedStatCard iconName="eye" number={formatters.formatNumber(dashboardStats?.total_views || 0)} label="Total Views" iconBgColor={REF.siPurple} iconColor={REF.purple} badge={stats.views_percentage_change > 0 ? `+${stats.views_percentage_change}%` : stats.views_percentage_change < 0 ? `${stats.views_percentage_change}%` : 'Active'} badgeColor={stats.views_percentage_change > 0 ? REF.siGreen : stats.views_percentage_change < 0 ? '#FEE2E2' : '#F1F3F5'} delay={100} />
+            <AnimatedStatCard iconName="leads" number={leadsCount} label="Total Leads" badge={newLeadsCount > 0 ? `+${newLeadsCount} New` : 'No New'} badgeColor={newLeadsCount > 0 ? '#FEE2E2' : '#F1F3F5'} iconBgColor={REF.siYellow} iconColor={REF.yellow} onPress={() => (navigation as any).navigate('Leads')} delay={200} />
+            <AnimatedStatCard iconName="inquiries" number={dashboardStats?.total_inquiries || 0} label="Total Inquiries" iconBgColor={REF.siGreen} iconColor={REF.green} statusPills={{ sale: dashboardStats?.properties_by_status?.sale || 0, rent: dashboardStats?.properties_by_status?.rent || 0 }} onPress={() => navigation.navigate('Chat', { screen: 'ChatList' })} delay={300} />
           </Animated.View>
 
-          {/* Quick Actions Grid (2x2) with Animations */}
+          <Text style={styles.sectionLabel}>QUICK ACTIONS</Text>
           <View style={styles.quickActionsGrid}>
-            <AnimatedQuickActionCard
-              iconName="plus"
-              title="Add New Property"
-              description="List a new property for sale or rent"
-              onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
-              delay={0}
-            />
-
-            <AnimatedQuickActionCard
-              iconName="list"
-              title="Manage Properties"
-              description="Edit, update or remove listings"
-              onPress={() => navigation.navigate('Listings')}
-              delay={100}
-            />
-
-            <AnimatedQuickActionCard
-              iconName="leads"
-              title="View Leads"
-              description="See buyers who viewed contact"
-              onPress={() => (navigation as any).navigate('Leads')}
-              delay={200}
-            />
-
-            <AnimatedQuickActionCard
-              iconName="inquiries"
-              title="View Inquiries"
-              description="Respond to buyer inquiries"
-              onPress={() => navigation.navigate('Chat', { screen: 'ChatList' })}
-              delay={300}
-            />
+            <AnimatedQuickActionCard iconName="plus" title="Add New Property" description="List a new property for sale or rent" iconColor={REF.blue} iconBgColor={REF.siBlue} onPress={() => (navigation.getParent() as any)?.navigate('AddProperty')} delay={0} />
+            <AnimatedQuickActionCard iconName="list" title="Manage Properties" description="Edit, update or remove listings" iconColor="#5C6BC0" iconBgColor={REF.aiIndigo} onPress={() => navigation.navigate('Listings')} delay={100} />
+            <AnimatedQuickActionCard iconName="leads" title="View Leads" description="See buyers who viewed contact" iconColor={REF.yellow} iconBgColor={REF.siYellow} onPress={() => (navigation as any).navigate('Leads')} delay={200} />
+            <AnimatedQuickActionCard iconName="inquiries" title="View Inquiries" description="Respond to buyer inquiries" iconColor="#009688" iconBgColor={REF.aiTeal} onPress={() => navigation.navigate('Chat', { screen: 'ChatList' })} delay={300} />
           </View>
 
-          {/* Recent Properties Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <View style={styles.sectionIconContainer}>
-                  <TabIcon name="home" color={colors.primary} size={20} />
+          {/* My Chats Section - same UI as Chat screen (reference) */}
+          <View style={styles.myChatsSection}>
+            <View style={styles.myChatsHeader}>
+              <Text style={styles.myChatsTitle}>
+                My <Text style={styles.myChatsTitleAccent}>Chats</Text>
+              </Text>
+              {recentChats.some(c => c.unreadCount > 0) && (
+                <View style={styles.myChatsUnreadBadge}>
+                  <Text style={styles.myChatsUnreadText}>
+                    {recentChats.filter(c => c.unreadCount > 0).length} Unread
+                  </Text>
                 </View>
-                <Text style={styles.sectionTitle}>Your Properties</Text>
+              )}
+            </View>
+            <View style={styles.myChatsStatsRow}>
+              <View style={[styles.myChatsStatPill, styles.myChatsStatPillActive]}>
+                <Text style={[styles.myChatsStatNum, styles.myChatsStatNumActive]}>{recentChats.length}</Text>
+                <Text style={[styles.myChatsStatLbl, styles.myChatsStatLblActive]}>Total</Text>
               </View>
-              <AnimatedSeeAllButton
-                onPress={() => navigation.navigate('Listings')}>
-                <Text style={styles.viewAllText}>View All</Text>
-                <Text style={styles.viewAllArrow}>›</Text>
-              </AnimatedSeeAllButton>
+              <View style={styles.myChatsStatPill}>
+                <Text style={[styles.myChatsStatNum, { color: '#FF5252' }]}>
+                  {recentChats.filter(c => c.unreadCount > 0).length}
+                </Text>
+                <Text style={styles.myChatsStatLbl}>Unread</Text>
+              </View>
+              <View style={styles.myChatsStatPill}>
+                <Text style={styles.myChatsStatNum}>
+                  {recentChats.filter(c => c.unreadCount === 0).length}
+                </Text>
+                <Text style={styles.myChatsStatLbl}>Read</Text>
+              </View>
+            </View>
+            <View style={styles.myChatsList}>
+              {recentChats.length > 0 ? (
+                recentChats.slice(0, 4).map((chat, idx) => (
+                  <TouchableOpacity
+                    key={chat.id}
+                    style={[
+                      styles.myChatsCard,
+                      chat.unreadCount > 0 && styles.myChatsCardUnread,
+                    ]}
+                    onPress={() =>
+                      navigation.navigate('Chat', {
+                        screen: 'ChatConversation',
+                        params: {
+                          conversationId: chat.chatRoomId,
+                          userId: chat.buyerId,
+                          userName: chat.name,
+                          propertyId: chat.propertyId,
+                          propertyTitle: chat.propertyTitle,
+                        },
+                      })
+                    }
+                    activeOpacity={0.8}>
+                    {chat.unreadCount > 0 && <View style={styles.myChatsUnreadBar} />}
+                    <View style={styles.myChatsAvatar}>
+                      <Text style={styles.myChatsAvatarText}>
+                        {(chat.name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                      </Text>
+                    </View>
+                    <View style={styles.myChatsBody}>
+                      <View style={styles.myChatsRow}>
+                        <Text style={[styles.myChatsName, chat.unreadCount > 0 && styles.myChatsNameUnread]} numberOfLines={1}>
+                          {chat.name}
+                        </Text>
+                        <Text style={styles.myChatsTime}>{chat.timestamp}</Text>
+                      </View>
+                      {chat.propertyTitle && (
+                        <View style={styles.myChatsPropertyTag}>
+                          <TabIcon name="home" color={REF.blue} size={9} />
+                          <Text style={styles.myChatsPropertyText} numberOfLines={1}>
+                            {chat.propertyTitle}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.myChatsBottom}>
+                        <Text
+                          style={[styles.myChatsPreview, chat.unreadCount > 0 && styles.myChatsPreviewUnread]}
+                          numberOfLines={1}>
+                          {chat.lastMessage}
+                        </Text>
+                        {chat.unreadCount > 0 && (
+                          <View style={styles.myChatsBadge}>
+                            <Text style={styles.myChatsBadgeText}>{chat.unreadCount}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.myChatsEmpty}>
+                  <TabIcon name="chats" color={REF.grayText} size={32} />
+                  <Text style={styles.myChatsEmptyText}>No chats yet</Text>
+                  <Text style={styles.myChatsEmptySub}>Start a conversation when buyers inquire</Text>
+                </View>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.myChatsViewAll}
+              onPress={() => navigation.navigate('Chat', { screen: 'ChatList' })}
+              activeOpacity={0.8}>
+              <Text style={styles.myChatsViewAllText}>View All Chats</Text>
+              <Text style={styles.myChatsViewAllArrow}>›</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.yourPropsHeader}>
+              <View style={styles.yourPropsTitle}>
+                <TabIcon name="home" size={18} color={REF.blue} />
+                <Text style={styles.yourPropsTitleText}>Your Properties</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('Listings')} style={styles.viewAllBtn} activeOpacity={0.7}>
+                <Text style={styles.viewAllBtnText}>View All ›</Text>
+              </TouchableOpacity>
             </View>
             {recentProperties.length > 0 ? (
               <FlatList
@@ -983,46 +1109,33 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
                 showsVerticalScrollIndicator={false}
               />
             ) : (
-              <View style={styles.emptyState}>
-                <View style={styles.emptyStateIconContainer}>
-                  <TabIcon name="home" color="#9CA3AF" size={48} />
+              <View style={styles.emptyProps}>
+                <View style={styles.emptyIll}>
+                  <TabIcon name="home" size={32} color={REF.blue} />
                 </View>
-                <Text style={styles.emptyStateTitle}>No Properties Listed</Text>
-                <Text style={styles.emptyStateText}>
-                  Start by adding your first property to get started
-                </Text>
-                <TouchableOpacity
-                  style={styles.emptyStateButton}
-                  onPress={() => navigation.getParent()?.navigate('AddProperty' as never)}
-                  activeOpacity={0.8}>
-                  <Text style={styles.emptyStateButtonText}>+ Add Property</Text>
+                <Text style={styles.emptyPropsTitle}>No Properties Listed</Text>
+                <Text style={styles.emptyPropsSub}>Start by adding your first property to get started</Text>
+                <TouchableOpacity style={styles.emptyAddBtn} onPress={() => (navigation.getParent() as any)?.navigate('AddProperty')} activeOpacity={0.8}>
+                  {/* @ts-expect-error - LinearGradient children types */}
+                  <LinearGradient colors={[REF.blueLight, REF.blue]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyAddBtnGradient}>
+                    <TabIcon name="plus" color="#fff" size={14} />
+                    <Text style={styles.emptyAddBtnText}>Add Property</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
-          {/* Recent Leads Section */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <View style={styles.sectionIconContainer}>
-                  <TabIcon name="clipboard" color={colors.primary} size={20} />
-                </View>
-                <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionTitle}>Recent Leads</Text>
-                  {newLeadsCount > 0 && (
-                    <View style={styles.sectionBadge}>
-                      <Text style={styles.sectionBadgeText}>
-                        {newLeadsCount} New
-                      </Text>
-                    </View>
-                  )}
-                </View>
+            <View style={styles.yourPropsHeader}>
+              <View style={styles.yourPropsTitle}>
+                <TabIcon name="clipboard" size={18} color={REF.blue} />
+                <Text style={styles.yourPropsTitleText}>Recent Leads</Text>
+                {newLeadsCount > 0 && <View style={styles.sectionBadge}><Text style={styles.sectionBadgeText}>{newLeadsCount} New</Text></View>}
               </View>
-              <AnimatedSeeAllButton onPress={() => (navigation as any).navigate('Leads')}>
-                <Text style={styles.viewAllText}>View All</Text>
-                <Text style={styles.viewAllArrow}>›</Text>
-              </AnimatedSeeAllButton>
+              <TouchableOpacity onPress={() => (navigation as any).navigate('Leads')} style={styles.viewAllBtn} activeOpacity={0.7}>
+                <Text style={styles.viewAllBtnText}>View All ›</Text>
+              </TouchableOpacity>
             </View>
 
             {recentLeads.length > 0 ? (
@@ -1063,7 +1176,7 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: REF.grayBg,
   },
   loadingContainer: {
     flex: 1,
@@ -1095,123 +1208,101 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: REF.grayBg,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingTop: spacing.xxl,
+    padding: 16,
+    paddingTop: 0,
     paddingBottom: spacing.xxl,
   },
-  agentHeaderContainer: {
-    marginBottom: spacing.xl,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 6,
+  navyHeader: {
+    backgroundColor: REF.navy,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 20,
   },
-  agentHeaderBox: {
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
-    paddingTop: spacing.xl + spacing.sm,
-    paddingBottom: spacing.xl + spacing.md,
-    minHeight: 180,
-    justifyContent: 'space-between',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  agentHeaderContent: {
-    marginBottom: spacing.lg,
-    zIndex: 1,
-  },
-  agentGreeting: {
-    fontSize: 26,
-    color: '#1D242B',
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-    lineHeight: 34,
-  },
-  agentSubtitle: {
-    ...typography.body,
-    color: '#6B7280',
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  actionButtonsRow: {
+  welcomeCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    padding: 18,
     flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  addPropertyButton: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: 10,
     alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
-    minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
-  addPropertyButtonText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: 14,
-  },
+  welcomeLeft: { flex: 1 },
+  welcomeGreeting: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 3 },
+  welcomeName: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.3, marginBottom: 4 },
+  welcomeNameHighlight: { color: '#60B4FF' },
+  welcomeSub: { color: 'rgba(255,255,255,0.45)', fontSize: 11.5, lineHeight: 16 },
+  welcomeAvatar: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: REF.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 4 },
+  welcomeAvatarText: { fontSize: 20, fontWeight: '800', color: '#fff' },
+  addButtonsRowWrap: { marginTop: 12 },
+  addButtonsRow: { flexDirection: 'row', gap: 10 },
+  addBtnWrap: { flex: 1, borderRadius: 14, overflow: 'hidden', shadowColor: REF.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 4 },
+  addBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 6 },
+  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: REF.grayText, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, paddingHorizontal: 4 },
+  sectionLabelFirst: { paddingTop: 16 },
+  yourPropsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingHorizontal: 4 },
+  yourPropsTitle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  yourPropsTitleText: { fontSize: 14, fontWeight: '800', color: REF.textDark },
+  viewAllBtn: { paddingVertical: 4 },
+  viewAllBtnText: { fontSize: 12, fontWeight: '600', color: REF.blueLight },
+  emptyProps: { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 2, borderColor: '#D0E4F7', borderStyle: 'dashed', padding: 28, alignItems: 'center', marginBottom: 20 },
+  emptyIll: { width: 64, height: 64, borderRadius: 20, backgroundColor: '#D0E8FB', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  emptyPropsTitle: { fontSize: 15, fontWeight: '800', color: REF.textDark, marginBottom: 5 },
+  emptyPropsSub: { fontSize: 12, color: REF.grayText, textAlign: 'center', lineHeight: 18, marginBottom: 16 },
+  emptyAddBtn: { borderRadius: 12, overflow: 'hidden', shadowColor: REF.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 4 },
+  emptyAddBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 11, paddingHorizontal: 24, gap: 6 },
+  emptyAddBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  avatarMenuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start', alignItems: 'flex-end', paddingTop: 60, paddingRight: 20 },
+  avatarMenu: { backgroundColor: colors.surface, borderRadius: 12, minWidth: 160, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, overflow: 'hidden' },
+  avatarMenuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
+  avatarMenuItemText: { fontSize: 15, fontWeight: '500', color: colors.text },
+  avatarMenuLogoutText: { color: '#DC2626' },
+  avatarMenuDivider: { height: 1, backgroundColor: '#F3F4F6', marginHorizontal: 12 },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: spacing.xl,
+    marginBottom: 16,
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
   statCard: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: 4,
+    borderRadius: 16,
+    padding: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 2,
-    minHeight: 180,
-    justifyContent: 'flex-start',
   },
   statCardIcon: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    backgroundColor: '#E3F6FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: 10,
   },
   statIcon: {
     fontSize: 22,
   },
   statNumber: {
-    fontSize: 32,
-    color: '#1D242B',
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-    lineHeight: 40,
+    fontSize: 26,
+    fontWeight: '800',
+    color: REF.textDark,
+    lineHeight: 28,
+    marginBottom: 3,
   },
   statLabel: {
-    ...typography.caption,
-    color: '#6B7280',
     fontSize: 12,
-    marginBottom: spacing.sm,
+    color: REF.grayText,
     fontWeight: '500',
+    marginBottom: 8,
   },
   activeBadge: {
     backgroundColor: '#D1FAE5',
@@ -1234,67 +1325,268 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   statusPill: {
-    backgroundColor: '#E3F6FF',
+    backgroundColor: REF.badgeSale,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: spacing.xs + 2,
     borderRadius: 20,
   },
   statusPillRent: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: REF.badgeRent,
   },
   statusPillText: {
-    ...typography.caption,
-    color: colors.primary,
     fontSize: 11,
     fontWeight: '600',
   },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: spacing.xl,
+    marginBottom: 16,
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
-  quickActionCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: 4,
+  // My Chats section - same UI as Chat screen (reference)
+  myChatsSection: {
+    backgroundColor: REF.navy,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: spacing.xl,
+    overflow: 'hidden',
+  },
+  myChatsHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-    minHeight: 130,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  quickActionIconContainer: {
+  myChatsTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  myChatsTitleAccent: {
+    color: '#60B4FF',
+  },
+  myChatsUnreadBadge: {
+    backgroundColor: '#FF5252',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  myChatsUnreadText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  myChatsStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  myChatsStatPill: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  myChatsStatPillActive: {
+    backgroundColor: REF.siBlue,
+    borderWidth: 1,
+    borderColor: REF.blue,
+  },
+  myChatsStatNum: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  myChatsStatLbl: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  myChatsStatNumActive: {
+    color: REF.blue,
+  },
+  myChatsStatLblActive: {
+    color: REF.blue,
+  },
+  myChatsList: {
+    marginBottom: 8,
+  },
+  myChatsCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+    gap: 12,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  myChatsCardUnread: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(21,101,192,0.3)',
+  },
+  myChatsUnreadBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: REF.blue,
+    borderTopLeftRadius: 3,
+    borderBottomLeftRadius: 3,
+  },
+  myChatsAvatar: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#E3F6FF',
+    backgroundColor: REF.blue,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm + 2,
+  },
+  myChatsAvatarText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  myChatsBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  myChatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  myChatsName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: REF.textDark,
+    flex: 1,
+  },
+  myChatsNameUnread: {
+    fontWeight: '800',
+  },
+  myChatsTime: {
+    fontSize: 10,
+    color: REF.grayText,
+  },
+  myChatsPropertyTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: REF.siBlue,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginBottom: 3,
+    alignSelf: 'flex-start',
+  },
+  myChatsPropertyText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: REF.blue,
+  },
+  myChatsBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  myChatsPreview: {
+    fontSize: 12,
+    color: REF.grayText,
+    flex: 1,
+  },
+  myChatsPreviewUnread: {
+    color: REF.textDark,
+    fontWeight: '700',
+  },
+  myChatsBadge: {
+    backgroundColor: REF.blue,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  myChatsBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  myChatsEmpty: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+  },
+  myChatsEmptyText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: REF.textDark,
+    marginTop: 8,
+  },
+  myChatsEmptySub: {
+    fontSize: 12,
+    color: REF.grayText,
+    marginTop: 4,
+  },
+  myChatsViewAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 4,
+  },
+  myChatsViewAllText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#60B4FF',
+  },
+  myChatsViewAllArrow: {
+    fontSize: 16,
+    color: '#60B4FF',
+    fontWeight: 'bold',
+  },
+  quickActionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  quickActionIconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   quickActionIcon: {
     fontSize: 20,
   },
   quickActionTitle: {
-    ...typography.body,
-    color: '#1D242B',
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '700',
+    color: REF.textDark,
+    marginBottom: 3,
   },
   quickActionDescription: {
-    ...typography.caption,
-    color: '#6B7280',
-    fontSize: 11,
-    textAlign: 'center',
-    lineHeight: 16,
+    fontSize: 10.5,
+    color: REF.grayText,
+    lineHeight: 15,
   },
   section: {
     marginBottom: spacing.xl + spacing.sm,

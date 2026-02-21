@@ -1,4 +1,5 @@
 import React, {useRef, useCallback, useState} from 'react';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   View,
   Text,
@@ -22,9 +23,8 @@ const FAB_SIZE = SCREEN_WIDTH <= 375 ? scale(48) : scale(52);
 const FAB_ELEVATION = -18;
 const FAB_COOLDOWN_MS = 800;
 
-const FOCUSED_COLOR = '#1976d2';
-const UNFOCUSED_COLOR = '#757575';
-const FAB_COLOR = '#1976d2';
+const FOCUSED_COLOR = '#1565C0';
+const UNFOCUSED_COLOR = '#8A97A8';
 const MIN_TOUCH = 44;
 
 const AGENT_TAB_CONFIG = [
@@ -79,20 +79,14 @@ export default function AgentCustomTabBar({state, descriptors, navigation}: Bott
               return (
                 <View key={route.key} style={styles.fabSlot}>
                   <Pressable
-                    style={[
-                      styles.fab,
-                      {
-                        width: FAB_SIZE,
-                        height: FAB_SIZE,
-                        borderRadius: FAB_SIZE / 2,
-                        marginTop: FAB_ELEVATION,
-                        backgroundColor: FAB_COLOR,
-                      },
-                    ]}
+                    style={[styles.fab, { width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2, marginTop: FAB_ELEVATION }]}
                     onPress={onFABPress}
                     accessibilityRole="button"
                     accessibilityLabel="Add Property or Project">
-                    <TabIcon name="plus" color={colors.surface} size={moderateScale(24)} />
+                    {/* @ts-expect-error - LinearGradient children types */}
+                    <LinearGradient colors={['#1E88E5', '#1565C0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fabGradient}>
+                      <TabIcon name="plus" color={colors.surface} size={moderateScale(20)} />
+                    </LinearGradient>
                   </Pressable>
                 </View>
               );
@@ -119,7 +113,8 @@ export default function AgentCustomTabBar({state, descriptors, navigation}: Bott
               accessibilityState={{selected: isFocused}}
               accessibilityLabel={config.label}>
               <View style={styles.tabIconWrap}>
-                <TabIcon name={config.icon} color={color} size={moderateScale(24)} />
+                <TabIcon name={config.icon} color={color} size={moderateScale(21)} />
+                {isFocused && <View style={styles.navDot} />}
               </View>
               <Text style={[styles.tabLabel, {color}]} numberOfLines={1}>
                 {config.label}
@@ -127,8 +122,8 @@ export default function AgentCustomTabBar({state, descriptors, navigation}: Bott
             </Pressable>
           );
         })}
+        </View>
       </View>
-    </View>
       
       {/* FAB Arc Menu Modal - options in arc above FAB */}
       <Modal
@@ -169,7 +164,7 @@ export default function AgentCustomTabBar({state, descriptors, navigation}: Bott
 const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: colors.surface,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: 'rgba(0,0,0,0.06)',
     borderTopWidth: 1,
     ...Platform.select({
       ios: {
@@ -200,11 +195,21 @@ const styles = StyleSheet.create({
   },
   tabIconWrap: {
     position: 'relative',
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  navDot: {
+    width: 4,
+    height: 4,
+    backgroundColor: FOCUSED_COLOR,
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: -6,
+    alignSelf: 'center',
   },
   tabLabel: {
     ...typography.small,
-    fontSize: moderateScale(11),
+    fontSize: moderateScale(10),
+    fontWeight: '600',
   },
   fabSlot: {
     flex: 1,
@@ -214,15 +219,24 @@ const styles = StyleSheet.create({
   fab: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: 999,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: {width: 0, height: 2},
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
+        shadowColor: '#1565C0',
+        shadowOffset: {width: 0, height: 4},
+        shadowOpacity: 0.4,
+        shadowRadius: 14,
       },
       android: {elevation: 8},
     }),
+  },
+  fabGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
   },
   menuOverlay: {
     flex: 1,
