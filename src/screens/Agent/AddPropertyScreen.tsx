@@ -671,7 +671,11 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
     }
 
     if (currentStep === 2) {
-      if (!location.trim()) nextErrors.location = 'Please enter location';
+      if (!latitude || !longitude) {
+        nextErrors.location = 'Please select property location on map';
+      } else if (!location.trim()) {
+        nextErrors.location = 'Please select property location on map';
+      }
       if (!state.trim()) nextErrors.state = 'Please enter state';
       if (fieldVisibility.showFacing && !facing) nextErrors.facing = 'Please select facing direction';
       if (fieldVisibility.showBalconies && balconies === null) nextErrors.balconies = 'Please select number of balconies';
@@ -1285,7 +1289,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.locationInputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter locality, area or landmark"
+                  placeholder="Select location on map below"
                   placeholderTextColor={colors.textSecondary}
                   value={location}
                   onChangeText={(text: string) => {
@@ -1310,10 +1314,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     setLocation(locationData.placeName || locationData.name);
                     setLocationSelected(true); // Mark location as selected
                     clearFieldError('location');
-                    if (locationData.coordinates) {
-                      setLatitude(locationData.coordinates[1]);
-                      setLongitude(locationData.coordinates[0]);
-                    }
+                    // Coordinates must come from map only - do NOT set from autosuggest
                     // Extract state from context if available
                     const extractedState = extractStateFromContext(locationData.context);
                     if (extractedState) {
@@ -1327,8 +1328,8 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
               {renderFieldError('location')}
               
               {/* Property Location on Map - Below Location Input */}
-              <View style={styles.mapContainer}>
-                <Text style={styles.mapLabel}>Property Location on Map (Optional)</Text>
+              <View style={styles.mapContainer} onLayout={captureFieldLayout('location')}>
+                <Text style={styles.mapLabel}>Property Location on Map <Text style={styles.required}>*</Text></Text>
                 <TouchableOpacity 
                   style={styles.mapButton}
                   onPress={() => setLocationPickerVisible(true)}>
@@ -1343,7 +1344,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                   </LinearGradient>
                 </TouchableOpacity>
                 <Text style={styles.mapButtonSubtext}>
-                  Select exact location on map for better visibility
+                  Select exact location on map (required) - address will be filled automatically
                 </Text>
                 {latitude && longitude && (
                   <Text style={styles.coordinateText}>
