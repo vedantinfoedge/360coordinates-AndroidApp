@@ -554,6 +554,11 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.registerLink}>Register now</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Footer - buyer-copyright-brand */}
+            <View style={styles.footer} testID="buyer-copyright-brand">
+              <Text style={styles.footerText}>Vedant Infoedge India LLP</Text>
+            </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -768,6 +773,18 @@ const styles = StyleSheet.create({
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    marginTop: spacing.md,
+  },
+  footer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    marginTop: spacing.lg,
+  },
+  footerText: {
+    fontSize: moderateScale(12),
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   registerText: {
     color: colors.textSecondary,

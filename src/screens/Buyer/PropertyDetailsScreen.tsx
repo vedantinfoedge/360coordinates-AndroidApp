@@ -315,7 +315,14 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
         console.log('==================');
         
         setProperty(propData);
-        setIsFavorite(propData.is_favorite || false);
+        // is_favorite: from API (buyer/properties/details.php adds it when logged-in buyer)
+        // Fallback to local cache if API doesn't return it (website flow: FavoritesManager.isFavorite)
+        let initialFavorite = propData.is_favorite;
+        if (typeof initialFavorite !== 'boolean' && isLoggedIn && user?.user_type === 'buyer') {
+          const {isFavorite: fromCache} = await import('../../services/favoritesManager');
+          initialFavorite = await fromCache(propData.id);
+        }
+        setIsFavorite(!!initialFavorite);
         setCurrentImageIndex(0); // Reset to first image
       } else {
         CustomAlert.alert('Error', 'Failed to load property details');
@@ -484,7 +491,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       );
       return;
     }
-    // Favorites require buyer role (matches website backend: buyer/favorites/toggle.php)
+    // Favorites require buyer role (matches website: buyer/favorites/toggle.php)
     if (user?.user_type && user.user_type !== 'buyer') {
       CustomAlert.alert(
         'Switch to Buyer',
@@ -496,9 +503,11 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       );
       return;
     }
+      // Use buyerService for consistency with other buyer screens
     try {
       setTogglingFavorite(true);
       const response = await buyerService.toggleFavorite(property.id) as any;
+        // Update property object
       
       if (response && response.success) {
         const newFavoriteStatus = response.data?.is_favorite ?? !isFavorite;
