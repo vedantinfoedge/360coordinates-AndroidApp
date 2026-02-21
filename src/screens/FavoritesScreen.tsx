@@ -18,7 +18,6 @@ import { TabIcon } from '../components/navigation/TabIcons';
 import { buyerService } from '../services/buyer.service';
 import { fixImageUrl } from '../utils/imageHelper';
 import { formatters } from '../utils/formatters';
-import BuyerHeader from '../components/BuyerHeader';
 import PropertyCard from '../components/PropertyCard';
 import { useAuth } from '../context/AuthContext';
 import CustomAlert from '../utils/alertHelper';
@@ -239,25 +238,6 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
   if (loading && properties.length === 0) {
     return (
       <View style={styles.container}>
-        <BuyerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={isLoggedIn ? logout : undefined}
-          onSignInPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
-              : undefined
-          }
-          onSignUpPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
-              : undefined
-          }
-          showLogout={isLoggedIn}
-          showProfile={isLoggedIn}
-          showSignIn={isGuest}
-          showSignUp={isGuest}
-        />
         <View style={[styles.centerContainer, { flex: 1 }]}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading favorites...</Text>
@@ -269,25 +249,6 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
   if (properties.length === 0 && !loading) {
     return (
       <View style={styles.container}>
-        <BuyerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={isLoggedIn ? logout : undefined}
-          onSignInPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
-              : undefined
-          }
-          onSignUpPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
-              : undefined
-          }
-          showLogout={isLoggedIn}
-          showProfile={isLoggedIn}
-          showSignIn={isGuest}
-          showSignUp={isGuest}
-        />
         <View style={[styles.centerContainer, { flex: 1 }]}>
           <View style={styles.emptyIconWrap}>
             <TabIcon name="heart-outline" color={colors.textSecondary} size={64} />
@@ -320,25 +281,6 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <BuyerHeader
-        onProfilePress={() => navigation.navigate('Profile')}
-        onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={isLoggedIn ? logout : undefined}
-        onSignInPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', { screen: 'Login' })
-            : undefined
-        }
-        onSignUpPress={
-          isGuest
-            ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
-            : undefined
-        }
-        showLogout={isLoggedIn}
-        showProfile={isLoggedIn}
-        showSignIn={isGuest}
-        showSignUp={isGuest}
-      />
       <FlatList
         data={properties}
         renderItem={renderProperty}
@@ -374,9 +316,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    paddingTop: spacing.xxl,
   },
   listContent: {
-    padding: spacing.md,
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
   },
   propertyCardStyle: {
     width: '100%',
