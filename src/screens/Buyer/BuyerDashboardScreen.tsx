@@ -448,6 +448,17 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       );
       return;
     }
+    if (user?.user_type && user.user_type !== 'buyer') {
+      CustomAlert.alert(
+        'Switch to Buyer',
+        'Favorites are available when viewing as a buyer.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch to Buyer', onPress: () => switchUserRole('buyer') },
+        ]
+      );
+      return;
+    }
     try {
       const response = await buyerService.toggleFavorite(propertyId) as any;
       if (response && response.success) {
@@ -479,7 +490,22 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
-      CustomAlert.alert('Error', error?.message || 'Failed to update favorite');
+      const { toggleInCache } = await import('../../services/favoritesManager');
+      const newState = await toggleInCache(propertyId);
+      const idNum = Number(propertyId);
+      const newFavoriteIds = new Set(favoriteIds);
+      if (newState) newFavoriteIds.add(idNum);
+      else newFavoriteIds.delete(idNum);
+      setFavoriteIds(newFavoriteIds);
+      const updateIsFavorite = (p: Property) =>
+        Number(p.id) === idNum ? { ...p, is_favorite: newState } : p;
+      setProperties(prev => prev.map(updateIsFavorite));
+      setUpcomingProjects(prev => prev.map(updateIsFavorite));
+      setBuyNewHomeProperties(prev => prev.map(updateIsFavorite));
+      CustomAlert.alert(
+        'Saved Locally',
+        'Could not sync with server. Saved locally and will sync when connection is restored.'
+      );
     }
   };
 

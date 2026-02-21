@@ -1,5 +1,11 @@
 import api from './api.service';
 import { API_ENDPOINTS } from '../config/api.config';
+import {
+  addToCache,
+  getCachedFavoriteIds,
+  removeFromCache,
+  setCachedFavoriteIds,
+} from './favoritesManager';
 
 export interface Property {
   id: number;
@@ -141,23 +147,73 @@ export const buyerService = {
     return response;
   },
 
-  // Get favorites list
+  // Get favorites list (matches website: GET /buyer/favorites/list.php)
   getFavorites: async (params?: {
     page?: number;
     limit?: number;
+    /** When true and page 1, replace cache. When false/undefined, merge (for pagination). */
+    replaceCache?: boolean;
   }): Promise<FavoritesResponse> => {
     const response = await api.get(API_ENDPOINTS.BUYER_FAVORITES_LIST, {
-      params,
+      params: { page: params?.page, limit: params?.limit },
     });
+    // Sync local cache with API result
+    if (response?.success && response?.data) {
+      const properties =
+        response.data.properties ?? (response.data as any).favorites ?? [];
+      const newIds = (Array.isArray(properties) ? properties : [])
+        .map((p: any) => Number(p?.id))
+        .filter((n: number) => !isNaN(n));
+      if (newIds.length > 0) {
+        const page = params?.page ?? 1;
+        const isFreshLoad = page === 1 && params?.replaceCache !== false;
+        if (isFreshLoad) {
+          await setCachedFavoriteIds(newIds);
+        } else {
+          const existing = await getCachedFavoriteIds();
+          await setCachedFavoriteIds([...new Set([...existing, ...newIds])]);
+        }
+      }
+    }
     return response;
   },
 
-  // Toggle favorite
+  // Toggle favorite (matches website: POST /buyer/favorites/toggle.php, body: { property_id })
   toggleFavorite: async (propertyId: number | string) => {
+    const id = Number(propertyId);
+    if (isNaN(id)) {
+      throw new Error('Invalid property ID');
+    }
     const response = await api.post(API_ENDPOINTS.BUYER_FAVORITES_TOGGLE, {
-      property_id: Number(propertyId),
+      property_id: id,
     });
-    return response;
+    // Normalize response - backend may return is_favorite as boolean, 1/0, or in data
+    const raw = response?.data?.is_favorite ?? response?.is_favorite;
+    const isFavorite =
+      raw === true || raw === 1 || raw === '1'
+        ? true
+        : raw === false || raw === 0 || raw === '0'
+          ? false
+          : undefined;
+    const normalized = {
+      ...response,
+      success: response?.success ?? false,
+      data: {
+        ...response?.data,
+        ...(typeof isFavorite === 'boolean'
+          ? { is_favorite: isFavorite }
+          : {}),
+      },
+    };
+    // Update local cache on success (website flow: on success → update localStorage)
+    if (normalized.success && typeof isFavorite === 'boolean') {
+      if (isFavorite) {
+        await addToCache(id);
+      } else {
+        await removeFromCache(id);
+      }
+    }
+    return normalized;
   },
 
   // Send inquiry (backend may require name, email, mobile; fetch from profile if not provided)

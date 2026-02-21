@@ -23,7 +23,6 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {TabIcon, TabIconName} from '../../components/navigation/TabIcons';
 import {verticalScale, moderateScale, scale} from '../../utils/responsive';
 import {propertyService} from '../../services/property.service';
-import {favoriteService} from '../../services/favorite.service';
 import CustomAlert from '../../utils/alertHelper';
 import {buyerService} from '../../services/buyer.service';
 import {createLead} from '../../services/leadsService';
@@ -75,7 +74,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const insets = useSafeAreaInsets();
   const headerHeight = insets.top + verticalScale(70);
   const scrollY = useRef(new Animated.Value(0)).current;
-  const {logout, user, isAuthenticated} = useAuth();
+  const {logout, user, isAuthenticated, switchUserRole} = useAuth();
   const [property, setProperty] = useState<any>(null);
   
   // Check if user is guest
@@ -485,15 +484,25 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       );
       return;
     }
+    // Favorites require buyer role (matches website backend: buyer/favorites/toggle.php)
+    if (user?.user_type && user.user_type !== 'buyer') {
+      CustomAlert.alert(
+        'Switch to Buyer',
+        'Favorites are available when viewing as a buyer. Switch to Buyer to add this property to your favorites.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch to Buyer', onPress: () => switchUserRole('buyer') },
+        ]
+      );
+      return;
+    }
     try {
       setTogglingFavorite(true);
-      // Use buyerService for consistency with other buyer screens
       const response = await buyerService.toggleFavorite(property.id) as any;
       
       if (response && response.success) {
         const newFavoriteStatus = response.data?.is_favorite ?? !isFavorite;
         setIsFavorite(newFavoriteStatus);
-        // Update property object
         setProperty({...property, is_favorite: newFavoriteStatus});
         if (newFavoriteStatus) {
           CustomAlert.alert('Added to favorites', 'View this and all favorites in Profile → My Favorites.');
@@ -503,7 +512,15 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
-      CustomAlert.alert('Error', error.message || 'Failed to update favorite');
+      // Fallback to local cache on API error (website flow: fallback to localStorage)
+      const { toggleInCache } = await import('../../services/favoritesManager');
+      const newState = await toggleInCache(property.id);
+      setIsFavorite(newState);
+      setProperty({...property, is_favorite: newState});
+      CustomAlert.alert(
+        'Saved Locally',
+        'Could not sync with server. Saved locally and will sync when connection is restored.'
+      );
     } finally {
       setTogglingFavorite(false);
     }

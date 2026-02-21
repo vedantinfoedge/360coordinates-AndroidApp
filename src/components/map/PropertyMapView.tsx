@@ -146,7 +146,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   searchParams,
   userLocation,
 }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, switchUserRole } = useAuth();
   const navigation = useNavigation<any>();
   const [properties, setProperties] = useState<Property[]>(initialProperties || []);
   const [loading, setLoading] = useState(!initialProperties);
@@ -639,6 +639,19 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       return;
     }
 
+    // Favorites require buyer role (matches website backend: buyer/favorites/toggle.php)
+    if (user?.user_type && user.user_type !== 'buyer') {
+      CustomAlert.alert(
+        'Switch to Buyer',
+        'Favorites are available when viewing as a buyer. Switch to Buyer to add this property to your favorites.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch to Buyer', onPress: () => switchUserRole('buyer') },
+        ]
+      );
+      return;
+    }
+
     try {
       // Use buyerService.toggleFavorite which returns new state
       console.log('==== [PropertyMapView] TOGGLE FAVORITE START ====');
@@ -680,7 +693,14 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
       console.error('[PropertyMapView] Toggle favorite error:', error);
       console.error('[PropertyMapView] Error details:', JSON.stringify(error, null, 2));
       console.log('==== [PropertyMapView] TOGGLE FAVORITE END (ERROR) ====\n');
-      CustomAlert.alert('Error', error.message || 'Failed to update favorite');
+      // Fallback to local cache on API error (website flow: fallback to localStorage)
+      const { toggleInCache } = await import('../../services/favoritesManager');
+      const newState = await toggleInCache(selectedProperty.id);
+      setIsFavorite(newState);
+      CustomAlert.alert(
+        'Saved Locally',
+        'Could not sync with server. Saved locally and will sync when connection is restored.'
+      );
     }
   };
 

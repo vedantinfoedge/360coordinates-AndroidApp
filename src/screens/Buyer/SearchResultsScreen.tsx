@@ -87,7 +87,7 @@ interface Property {
 
 const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const { logout, user, isAuthenticated } = useAuth();
+  const { logout, user, isAuthenticated, switchUserRole } = useAuth();
   const routeParams = route?.params || {};
 
   // Check if user is guest
@@ -957,29 +957,55 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
       );
       return;
     }
+    if (user?.user_type && user.user_type !== 'buyer') {
+      CustomAlert.alert(
+        'Switch to Buyer',
+        'Favorites are available when viewing as a buyer.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch to Buyer', onPress: () => switchUserRole('buyer') },
+        ]
+      );
+      return;
+    }
     try {
       const { buyerService } = await import('../../services/buyer.service');
       const response = await buyerService.toggleFavorite(propertyId) as any;
       if (response && response.success) {
-        // Update property in list
+        const newVal = response.data?.is_favorite;
         setProperties(prev =>
           prev.map(p =>
             String(p.id) === String(propertyId)
-              ? { ...p, is_favorite: response.data?.is_favorite ?? !p.is_favorite }
+              ? { ...p, is_favorite: typeof newVal === 'boolean' ? newVal : !p.is_favorite }
               : p,
           ),
         );
         setFilteredProperties(prev =>
           prev.map(p =>
             String(p.id) === String(propertyId)
-              ? { ...p, is_favorite: response.data?.is_favorite ?? !p.is_favorite }
+              ? { ...p, is_favorite: typeof newVal === 'boolean' ? newVal : !p.is_favorite }
               : p,
           ),
         );
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
-      CustomAlert.alert('Error', error?.message || 'Failed to update favorite. Please try again.');
+      const { toggleInCache } = await import('../../services/favoritesManager');
+      const newState = await toggleInCache(propertyId);
+      setProperties(prev =>
+        prev.map(p =>
+          String(p.id) === String(propertyId) ? { ...p, is_favorite: newState } : p,
+        ),
+      );
+      setFilteredProperties(prev =>
+        prev.map(p =>
+          String(p.id) === String(propertyId) ? { ...p, is_favorite: newState } : p,
+        ),
+      );
+      CustomAlert.alert(
+        'Saved Locally',
+        'Could not sync with server. Saved locally and will sync when connection is restored.'
+      );
     }
   };
 

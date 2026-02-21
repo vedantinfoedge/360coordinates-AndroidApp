@@ -67,7 +67,11 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       // Use buyer service endpoint (matches the toggle endpoint)
-      const response = await buyerService.getFavorites({ page: pageNum, limit: 20 });
+      const response = await buyerService.getFavorites({
+        page: pageNum,
+        limit: 20,
+        replaceCache: pageNum === 1 && !append,
+      });
 
       console.log('[FavoritesScreen] Response - Success:', response?.success);
       console.log('[FavoritesScreen] Response - Message:', response?.message);
