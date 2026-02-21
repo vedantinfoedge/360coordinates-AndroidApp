@@ -79,7 +79,7 @@ const TOP_CITIES: TopCity[] = [
 type ListingType = 'sale' | 'rent' | 'pg';
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, switchUserRole } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Check if user is guest
@@ -95,6 +95,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [searchLocation, setSearchLocation] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -214,6 +215,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       if (showLoading) {
         setLoading(true);
       }
+      const collectedFavoriteIds: number[] = [];
 
       // PG tab: same as website - two API calls then merge
       if (listingType === 'pg') {
@@ -241,6 +243,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           return isNotProject && (!p.seller || validUserType);
         });
         setProperties(validProperties);
+        collectedFavoriteIds.push(...(validProperties as any[]).filter((p: any) => p.is_favorite).map((p: any) => Number(p.id)));
       } else {
         const listParams: any = { limit: 10 };
         if (listingType === 'sale') listParams.status = 'sale';
@@ -255,6 +258,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             return isNotProject && (!p.seller || validUserType);
           });
           setProperties(validProperties as Property[]);
+          collectedFavoriteIds.push(...(validProperties as any[]).filter((p: any) => p.is_favorite).map((p: any) => Number(p.id)));
         }
       }
 
@@ -266,25 +270,26 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       if (projectsResponse.success && projectsResponse.data?.properties) {
         const projectsList = projectsResponse.data.properties as Property[];
-        // Explore Projects: Show projects from AGENTS and SELLERS (Builders)
         setUpcomingProjects(projectsList.filter(p => p.project_type === 'upcoming'));
+        collectedFavoriteIds.push(...(projectsList as any[]).filter((p: any) => p.is_favorite).map((p: any) => Number(p.id)));
       } else {
         setUpcomingProjects([]);
       }
 
       if (propertiesResponse.success && propertiesResponse.data?.properties) {
         const allList = propertiesResponse.data.properties as Property[];
-        setBuyNewHomeProperties(
-          allList
-            .filter(
-              p =>
-                p.status === 'sale' &&
-                p.project_type !== 'upcoming' &&
-                (p.property_type || '').toLowerCase().includes('apartment'),
-            )
-            .slice(0, 15),
-        );
+        const buyNewList = allList
+          .filter(
+            p =>
+              p.status === 'sale' &&
+              p.project_type !== 'upcoming' &&
+              (p.property_type || '').toLowerCase().includes('apartment'),
+          )
+          .slice(0, 15);
+        setBuyNewHomeProperties(buyNewList);
+        collectedFavoriteIds.push(...(buyNewList as any[]).filter((p: any) => p.is_favorite).map((p: any) => Number(p.id)));
       }
+      setFavoriteIds(new Set(collectedFavoriteIds.filter(id => !isNaN(id))));
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
       if (showLoading) {
@@ -378,6 +383,57 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const handleToggleFavorite = async (propertyId: number) => {
+    if (!isLoggedIn) {
+      CustomAlert.alert(
+        'Login Required',
+        'Please login to add properties to your favorites.',
+        [
+          { text: 'Login', onPress: () => (navigation as any).navigate('Auth', { screen: 'Login' }) },
+          { text: 'Cancel', style: 'cancel' },
+        ],
+      );
+      return;
+    }
+    if (user?.user_type && user.user_type !== 'buyer') {
+      CustomAlert.alert(
+        'Switch to Buyer',
+        'Favorites are available when viewing as a buyer. Switch to Buyer to add this property to your favorites.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch to Buyer', onPress: () => switchUserRole('buyer') },
+        ],
+      );
+      return;
+    }
+    try {
+      const response = await buyerService.toggleFavorite(propertyId) as any;
+      if (response && response.success) {
+        const isFavorite = response.data?.is_favorite ?? response.data?.favorite ?? !favoriteIds.has(propertyId);
+        const newFavoriteIds = new Set(favoriteIds);
+        if (isFavorite) {
+          newFavoriteIds.add(propertyId);
+        } else {
+          newFavoriteIds.delete(propertyId);
+        }
+        setFavoriteIds(newFavoriteIds);
+        const updateProperty = (p: Property) =>
+          p.id === propertyId ? { ...p, is_favorite: isFavorite } : p;
+        setProperties(prev => prev.map(updateProperty));
+        setUpcomingProjects(prev => prev.map(updateProperty));
+        setBuyNewHomeProperties(prev => prev.map(updateProperty));
+        if (isFavorite) {
+          CustomAlert.alert('Added to favorites', 'View this and all favorites in Profile → My Favorites.');
+        }
+      } else {
+        CustomAlert.alert('Error', response?.message || 'Failed to update favorite');
+      }
+    } catch (error: any) {
+      console.error('Error toggling favorite:', error);
+      CustomAlert.alert('Error', error?.message || 'Failed to update favorite');
+    }
+  };
+
   const renderPropertyCard = ({ item, index }: { item: Property; index: number }) => {
     const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
     const images = item.images?.length
@@ -397,8 +453,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           price={formatters.price(item.price, item.status === 'rent')}
           type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
           onPress={() => handlePropertyPress(item)}
+          onFavoritePress={() => handleToggleFavorite(Number(item.id))}
           onSharePress={() => handleShareProperty(item)}
-          isFavorite={false}
+          isFavorite={favoriteIds.has(Number(item.id))}
           property={item}
         />
       </Animated.View>
@@ -673,8 +730,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         price={formatters.price(item.price, item.status === 'rent')}
                         type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
                         onPress={() => handlePropertyPress(item)}
+                        onFavoritePress={() => handleToggleFavorite(Number(item.id))}
                         onSharePress={() => handleShareProperty(item)}
-                        isFavorite={false}
+                        isFavorite={favoriteIds.has(Number(item.id))}
                         property={item}
                         style={styles.carouselPropertyCard}
                       />
@@ -770,8 +828,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         price={formatters.price(item.price, item.status === 'rent')}
                         type={item.status === 'rent' ? 'rent' : item.status === 'pg' ? 'pg-hostel' : 'buy'}
                         onPress={() => handlePropertyPress(item)}
+                        onFavoritePress={() => handleToggleFavorite(Number(item.id))}
                         onSharePress={() => handleShareProperty(item)}
-                        isFavorite={false}
+                        isFavorite={favoriteIds.has(Number(item.id))}
                         property={item}
                         style={styles.carouselPropertyCard}
                       />
@@ -835,8 +894,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         price={formatters.price(item.price, false)}
                         type="buy"
                         onPress={() => handlePropertyPress(item)}
+                        onFavoritePress={() => handleToggleFavorite(Number(item.id))}
                         onSharePress={() => handleShareProperty(item)}
-                        isFavorite={false}
+                        isFavorite={favoriteIds.has(Number(item.id))}
                         property={item}
                         style={styles.carouselPropertyCard}
                       />

@@ -43,6 +43,7 @@ interface Property {
   images?: string[];
   property_type?: string;
   is_favorite?: boolean;
+  project_type?: string;
 }
 
 const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
@@ -94,6 +95,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
           images: ((prop.images || []) as string[]).map((url: string) => fixImageUrl(url)).filter((url: string | null): url is string => Boolean(url)),
           property_type: prop.property_type,
           is_favorite: true, // All items in favorites are favorited
+          project_type: prop.project_type,
         }));
 
         console.log('[FavoritesScreen] Formatted properties count:', formattedProperties.length);
@@ -219,12 +221,13 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
         price={formatters.price(Number(item.price), propertyType === 'rent')}
         type={propertyType}
         isFavorite={true}
-        onPress={() =>
-          navigation.navigate(
-            (item as any).project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
-            { propertyId: String(item.id) },
-          )
-        }
+        onPress={() => {
+          const targetScreen = item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails';
+          const params = { propertyId: String(item.id) };
+          // FavoritesScreen can be in ProfileStackNavigator or MainTabNavigator. PropertyDetails/UpcomingProjectDetails
+          // live in the Search tab - navigate there so View Details works from either context.
+          (navigation as any).navigate('Search', { screen: targetScreen, params });
+        }}
         onFavoritePress={() => handleToggleFavorite(item.id)}
         onSharePress={() => handleShareProperty(item)}
         property={item}
