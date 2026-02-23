@@ -155,10 +155,10 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     if (digits.length >= 10) setCounterpartyPhone(raw);
   }, [paramCounterpartyPhone]);
 
-  // Fetch counterparty phone when not provided: buyer → seller/agent phone; agent/seller → buyer phone
+  // Fetch counterparty contact info (phone when not provided, email, member-since)
   useEffect(() => {
-    if (paramCounterpartyPhone?.trim()) return;
     let cancelled = false;
+    const phoneAlreadyProvided = !!paramCounterpartyPhone?.trim();
     const currentUserType = (user?.user_type || '').toLowerCase();
     const isBuyer = currentUserType === 'buyer';
 
@@ -211,7 +211,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
             (data?.owner as any)?.created_at ||
             null;
           if (!cancelled) {
-            setCounterpartyPhone(phone ? String(phone).trim() || null : null);
+            if (!phoneAlreadyProvided) setCounterpartyPhone(phone ? String(phone).trim() || null : null);
             setCounterpartyEmail(email ? String(email).trim() || null : null);
             setCounterpartyMemberSince(formatMemberSince(memberSinceRaw));
           }
@@ -229,11 +229,11 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
             payload?.created_date ||
             null;
           if (!cancelled) {
-            setCounterpartyPhone(phone ? String(phone).trim() || null : null);
+            if (!phoneAlreadyProvided) setCounterpartyPhone(phone ? String(phone).trim() || null : null);
             setCounterpartyEmail(email ? String(email).trim() || null : null);
             setCounterpartyMemberSince(formatMemberSince(memberSinceRaw));
           }
-        } else if (!cancelled && !paramCounterpartyPhone) {
+        } else if (!cancelled && !phoneAlreadyProvided) {
           setCounterpartyPhone(null);
           setCounterpartyEmail(null);
           setCounterpartyMemberSince(null);

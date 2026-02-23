@@ -320,10 +320,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
+    alignItems: 'center',
   },
   propertyCardStyle: {
     width: '100%',
-    marginRight: 0,
+    marginHorizontal: 0,
   },
   propertySeparator: {
     height: spacing.md,
