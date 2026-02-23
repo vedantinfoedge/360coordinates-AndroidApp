@@ -1658,7 +1658,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
   const memberSinceText = (() => {
     const raw = selectedBuyer?.created_at;
     if (!raw) return '—';
-    const d = new Date(raw);
+    const d = new Date(String(raw).trim().replace(' ', 'T'));
     if (Number.isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   })();

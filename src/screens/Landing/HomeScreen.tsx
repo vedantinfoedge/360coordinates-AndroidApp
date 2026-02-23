@@ -88,7 +88,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [listingType, setListingType] = useState<ListingType>('sale');
   const [properties, setProperties] = useState<Property[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<Property[]>([]);
-  const [buyNewHomeProperties, setBuyNewHomeProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -262,11 +261,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         }
       }
 
-      // Fetch extra data for Upcoming Projects and Buy New Home sections
-      const [projectsResponse, propertiesResponse] = await Promise.all([
-        buyerService.getProperties({ limit: 50, project_type: 'upcoming' }),
-        buyerService.getProperties({ limit: 100 })
-      ]);
+      // Fetch Upcoming Projects
+      const projectsResponse = await buyerService.getProperties({ limit: 50, project_type: 'upcoming' });
 
       if (projectsResponse.success && projectsResponse.data?.properties) {
         const projectsList = projectsResponse.data.properties as Property[];
@@ -274,20 +270,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         collectedFavoriteIds.push(...(projectsList as any[]).filter((p: any) => p.is_favorite).map((p: any) => Number(p.id)));
       } else {
         setUpcomingProjects([]);
-      }
-
-      if (propertiesResponse.success && propertiesResponse.data?.properties) {
-        const allList = propertiesResponse.data.properties as Property[];
-        const buyNewList = allList
-          .filter(
-            p =>
-              p.status === 'sale' &&
-              p.project_type !== 'upcoming' &&
-              (p.property_type || '').toLowerCase().includes('apartment'),
-          )
-          .slice(0, 15);
-        setBuyNewHomeProperties(buyNewList);
-        collectedFavoriteIds.push(...(buyNewList as any[]).filter((p: any) => p.is_favorite).map((p: any) => Number(p.id)));
       }
       setFavoriteIds(new Set(collectedFavoriteIds.filter(id => !isNaN(id))));
     } catch (error: any) {
@@ -421,7 +403,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           p.id === propertyId ? { ...p, is_favorite: isFavorite } : p;
         setProperties(prev => prev.map(updateProperty));
         setUpcomingProjects(prev => prev.map(updateProperty));
-        setBuyNewHomeProperties(prev => prev.map(updateProperty));
         if (isFavorite) {
           CustomAlert.alert('Added to favorites', 'View this and all favorites in Profile → My Favorites.');
         }
@@ -846,70 +827,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
 
-
-          {/* Buy New Home Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Buy New Home</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Flats & apartments for sale
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  navigation.navigate('Search' as any, {
-                    screen: 'SearchResults',
-                    params: {
-                      query: '',
-                      location: '',
-                      listingType: 'buy',
-                      status: 'sale',
-                      propertyType: 'Apartment',
-                    },
-                  } as any);
-                }}>
-                <View style={styles.seeAllPill}>
-                  <Text style={styles.seeAllText}>See All</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-            {buyNewHomeProperties.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.propertiesList}>
-                {buyNewHomeProperties.map((item: Property) => {
-                  const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
-                  const images = item.images?.length
-                    ? (item.images.map((url: string) => fixImageUrl(url)).filter(Boolean) as string[])
-                    : undefined;
-                  return (
-                    <View key={item.id} style={styles.carouselCard}>
-                      <PropertyCard
-                        image={imageUrl || undefined}
-                        images={images}
-                        name={item.title}
-                        location={item.location}
-                        price={formatters.price(item.price, false)}
-                        type="buy"
-                        onPress={() => handlePropertyPress(item)}
-                        onFavoritePress={() => handleToggleFavorite(Number(item.id))}
-                        onSharePress={() => handleShareProperty(item)}
-                        isFavorite={favoriteIds.has(Number(item.id))}
-                        property={item}
-                        style={styles.carouselPropertyCard}
-                      />
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No properties for sale at the moment</Text>
-              </View>
-            )}
-          </View>
 
           {/* Top Cities Section */}
           <View style={styles.section}>

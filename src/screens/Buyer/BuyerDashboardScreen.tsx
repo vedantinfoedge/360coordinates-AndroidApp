@@ -16,7 +16,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CompositeNavigationProp } from '@react-navigation/native';
+import { CompositeNavigationProp, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -129,7 +129,6 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [listingType, setListingType] = useState<ListingType>('sale');
   const [properties, setProperties] = useState<Property[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<Property[]>([]);
-  const [buyNewHomeProperties, setBuyNewHomeProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
@@ -138,6 +137,8 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scrollViewRef = useRef<any>(null);
+  useScrollToTop(scrollViewRef);
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerHeight = insets.top + verticalScale(70);
 
@@ -330,34 +331,15 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         setFavoriteIds(new Set(favorites));
       }
 
-      // Fetch extra data for Upcoming Projects and Buy New Home sections (all statuses, larger set)
-      // Use parallel requests to get specific data for each section
-      const [projectsResponse, propertiesResponse] = await Promise.all([
-        buyerService.getProperties({ limit: 50, project_type: 'upcoming' }),
-        buyerService.getProperties({ limit: 100 })
-      ]);
+      // Fetch Upcoming Projects
+      const projectsResponse = await buyerService.getProperties({ limit: 50, project_type: 'upcoming' });
 
       if (projectsResponse.success && projectsResponse.data?.properties) {
         const projectsList = projectsResponse.data.properties as Property[];
-        // Explore Projects: Show projects from AGENTS and SELLERS (Builders)
-        // Since we fetched with project_type='upcoming', we just use the result
         const upcoming = projectsList.filter(p => p.project_type === 'upcoming');
         setUpcomingProjects(upcoming);
       } else {
         setUpcomingProjects([]);
-      }
-
-      if (propertiesResponse.success && propertiesResponse.data?.properties) {
-        const allList = propertiesResponse.data.properties as Property[];
-        const forSale = allList
-          .filter(
-            p =>
-              p.status === 'sale' &&
-              p.project_type !== 'upcoming' && // Ensure not duplicates of projects
-              (p.property_type || '').toLowerCase().includes('apartment'),
-          )
-          .slice(0, 15);
-        setBuyNewHomeProperties(forSale);
       }
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
@@ -474,12 +456,11 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         }
         setFavoriteIds(newFavoriteIds);
 
-        // Update property in all lists (properties, upcomingProjects, buyNewHomeProperties)
+        // Update property in all lists
         const updateIsFavorite = (p: Property) =>
           Number(p.id) === idNum ? { ...p, is_favorite: isFavorite } : p;
         setProperties(prev => prev.map(updateIsFavorite));
         setUpcomingProjects(prev => prev.map(updateIsFavorite));
-        setBuyNewHomeProperties(prev => prev.map(updateIsFavorite));
 
         if (isFavorite) {
           CustomAlert.alert('Added to Favorites', 'View in Profile → My Favorites');
@@ -501,7 +482,6 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         Number(p.id) === idNum ? { ...p, is_favorite: newState } : p;
       setProperties(prev => prev.map(updateIsFavorite));
       setUpcomingProjects(prev => prev.map(updateIsFavorite));
-      setBuyNewHomeProperties(prev => prev.map(updateIsFavorite));
       CustomAlert.alert(
         'Saved Locally',
         'Could not sync with server. Saved locally and will sync when connection is restored.'
@@ -609,6 +589,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Animated.ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, {
           paddingTop: 0,
@@ -975,80 +956,6 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
 
-
-        {/* Buy New Home — Flats & Apartments for Sale */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Buy New Home</Text>
-              <Text style={styles.sectionSubtitle}>
-                Flats & apartments for sale
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => {
-                (navigation as any).navigate('Search', {
-                  screen: 'SearchResults',
-                  params: {
-                    query: '',
-                    location: '',
-                    listingType: 'buy',
-                    status: 'sale',
-                    propertyType: 'Apartment',
-                  },
-                });
-              }}>
-              <View style={styles.seeAllPill}>
-                <Text style={styles.seeAllText}>See All</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-          {buyNewHomeProperties.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.carouselList}>
-              {buyNewHomeProperties.map((item: Property) => {
-                const imageUrl = fixImageUrl(item.cover_image || item.images?.[0]);
-                const images: string[] | undefined = item.images?.length
-                  ? item.images
-                    .map((url: string) => fixImageUrl(url))
-                    .filter((url): url is string => Boolean(url))
-                  : undefined;
-                return (
-                  <View key={item.id} style={styles.carouselCard}>
-                    <PropertyCard
-                      image={imageUrl || undefined}
-                      images={images}
-                      name={item.title}
-                      location={item.location}
-                      price={formatters.price(item.price, false)}
-                      type="buy"
-                      onPress={() =>
-                        navigation.navigate(
-                          item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails',
-                          { propertyId: String(item.id) },
-                        )
-                      }
-                      onFavoritePress={() => handleToggleFavorite(Number(item.id))}
-                      onSharePress={() => handleShareProperty(item)}
-                      isFavorite={favoriteIds.has(Number(item.id)) || item.is_favorite || false}
-                      property={{
-                        ...item,
-                        project_status: item.project_status || item.upcoming_project_data?.project_status
-                      }}
-                      style={styles.carouselPropertyCard}
-                    />
-                  </View>
-                );
-              })}
-            </ScrollView>
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No properties for sale at the moment</Text>
-            </View>
-          )}
-        </View>
 
         {/* Top Cities Section */}
         <View style={styles.section}>
