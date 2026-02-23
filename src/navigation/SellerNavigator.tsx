@@ -7,11 +7,13 @@ import SellerTabNavigator from '../components/navigation/SellerTabNavigator';
 import LoadingScreen from '../components/common/LoadingScreen';
 import SellerPropertyDetailsScreen from '../screens/Seller/SellerPropertyDetailsScreen';
 import AddPropertyScreen from '../screens/Seller/AddPropertyScreen';
+import PropertyMapScreen from '../screens/Buyer/PropertyMapScreen';
 
 export type SellerStackParamList = {
   SellerTabs: undefined;
   PropertyDetails: { propertyId: string };
   AddProperty: { propertyId?: string; isLimitedEdit?: boolean; createdAt?: string } | undefined;
+  PropertyMap: { listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'; propertyId?: string | number; hideControls?: boolean } | undefined;
 };
 
 const Stack = createNativeStackNavigator<SellerStackParamList>();
@@ -58,6 +60,7 @@ const SellerNavigator = () => {
         <Stack.Screen name="SellerTabs" component={SellerTabNavigator} />
         <Stack.Screen name="PropertyDetails" component={SellerPropertyDetailsScreen} />
         <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
+        <Stack.Screen name="PropertyMap" component={PropertyMapScreen} />
       </Stack.Navigator>
     );
   } catch (err: any) {

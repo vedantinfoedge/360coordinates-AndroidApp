@@ -26,7 +26,6 @@ import { validateAndProcessPropertyImages, PropertyImage } from '../../utils/ima
 import SellerHeader from '../../components/SellerHeader';
 import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
-import { Linking } from 'react-native';
 import { capitalize, capitalizeAmenity } from '../../utils/formatters';
 import LoadingScreen from '../../components/common/LoadingScreen';
 
@@ -353,6 +352,20 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
             <Text style={styles.location}>{property.location || property.city || 'Location not available'}</Text>
           </View>
+          <TouchableOpacity
+            style={styles.mapButton}
+            activeOpacity={0.85}
+            onPress={() => {
+              const listingType = property.status === 'rent' ? 'rent' : 'buy';
+              (navigation as any).navigate('PropertyMap', {
+                propertyId: property.id,
+                listingType,
+                hideControls: true,
+              });
+            }}>
+            <TabIcon name="location" color="#E53935" size={18} />
+            <Text style={styles.mapButtonText}>View on Map</Text>
+          </TouchableOpacity>
 
           {/* Key Specs Row */}
           <View style={styles.specsRow}>
@@ -678,7 +691,7 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   locationIconWrap: {
     marginRight: spacing.xs,
@@ -687,6 +700,24 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     flex: 1,
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
+  },
+  mapButtonText: {
+    ...typography.body,
+    color: '#E53935',
+    fontWeight: '600',
   },
   specsRow: {
     flexDirection: 'row',
