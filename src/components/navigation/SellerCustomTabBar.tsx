@@ -14,6 +14,7 @@ import {colors, typography} from '../../theme';
 import {moderateScale, scale} from '../../utils/responsive';
 import CustomAlert from '../../utils/alertHelper';
 import {useAuth} from '../../context/AuthContext';
+import {useUnreadChatCount} from '../../hooks/useUnreadChatCount';
 import {TabIcon} from './TabIcons';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
@@ -38,6 +39,7 @@ const SELLER_TAB_CONFIG = [
 export default function SellerCustomTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const {switchUserRole} = useAuth();
+  const unreadCount = useUnreadChatCount();
   const fabCooldownRef = useRef(false);
   const barHeight = TAB_BAR_HEIGHT + insets.bottom;
 
@@ -116,6 +118,11 @@ export default function SellerCustomTabBar({state, descriptors, navigation}: Bot
               accessibilityLabel={config.label}>
               <View style={styles.tabIconWrap}>
                 <TabIcon name={config.icon} color={color} size={moderateScale(21)} />
+                {config.name === 'Chat' && unreadCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                  </View>
+                )}
                 {isFocused && <View style={styles.navDot} />}
               </View>
               <Text style={[styles.tabLabel, {color}]} numberOfLines={1}>
@@ -173,6 +180,25 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -6,
     alignSelf: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    backgroundColor: '#FF385C',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   tabLabel: {
     ...typography.small,
