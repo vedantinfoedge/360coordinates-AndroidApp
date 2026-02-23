@@ -32,8 +32,8 @@ interface AuthContextType {
     phoneVerificationMethod?: string,
     phoneVerifiedFlag?: boolean,
   ) => Promise<any>;
-  verifyOTP: (userId: number, otp: string) => Promise<void>;
-  resendOTP: (userId: number) => Promise<void>;
+  verifyOTP: (userId: number, otp: string, phone?: string) => Promise<void>;
+  resendOTP: (userId: number, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   // Legacy API (kept for backward compatibility). Internally delegates to switchUserRole.
   switchRole: (targetRole: 'buyer' | 'seller') => Promise<void>;

@@ -165,15 +165,14 @@ const OTPVerificationScreen: React.FC = () => {
       // If email is provided, try MSG91 email OTP verification first
       if (params.email) {
         try {
-          const emailVerifyResponse = await otpService.verifyEmail(params.email, otp);
-          if (emailVerifyResponse.success) {
-            // Email OTP verified via MSG91, now verify with backend
-            await verifyOTP(userId, otp, params.phone);
-            
-            // Success - navigation handled by AppNavigator
+          const emailVerifyResponse = await otpService.verifyEmail(params.email, otp) as { success?: boolean; message?: string };
+          if (emailVerifyResponse?.success) {
+            // Success - navigation handled by flow type
             if (params.type === 'forgotPassword') {
               navigation.navigate('ResetPassword', {otp} as never);
-            } else {
+            } else if (userId) {
+              // Email OTP verified via MSG91, now verify with backend (login flow)
+              await verifyOTP(userId, otp, params.phone);
               CustomAlert.alert(
                 'Success',
                 'Email OTP verified successfully! You are now logged in.',
@@ -181,12 +180,13 @@ const OTPVerificationScreen: React.FC = () => {
                   {
                     text: 'OK',
                     onPress: () => {
-                      // Navigate based on selected role
                       handleSuccessNavigation();
                     },
                   },
                 ],
               );
+            } else {
+              throw new Error('User ID required for login flow');
             }
             return;
           }
@@ -224,8 +224,8 @@ const OTPVerificationScreen: React.FC = () => {
             const restVerifyResponse = await otpService.msg91VerifyViaBackend(
               phoneNumber,
               otp,
-              reqId,
-            );
+              reqId ?? undefined,
+            ) as { success?: boolean; message?: string; data?: any };
 
             console.log('[OTP Verification] MSG91 REST verify response:', {
               success: restVerifyResponse?.success,
@@ -233,7 +233,7 @@ const OTPVerificationScreen: React.FC = () => {
               data: restVerifyResponse?.data,
             });
 
-            if (restVerifyResponse && restVerifyResponse.success) {
+            if (restVerifyResponse?.success) {
               // Treat phone as fully verified via MSG91; no local OTP/token needed
               navigation.navigate('Register', {
                 phoneVerified: true,
@@ -262,7 +262,7 @@ const OTPVerificationScreen: React.FC = () => {
             }
 
             throw new Error(
-              restVerifyResponse?.message || 'Invalid or expired OTP. Please try again.',
+              (restVerifyResponse as { message?: string })?.message || 'Invalid or expired OTP. Please try again.',
             );
           }
 
@@ -539,20 +539,21 @@ const OTPVerificationScreen: React.FC = () => {
             // Extract token from verification response (if available)
             // The verifySMS function now returns token directly if SDK verification succeeds
             // For backend API, we may need to use reqId or a special marker
-            let verificationToken = smsVerifyResponse.token ||
-                                   smsVerifyResponse.data?.token || 
-                                   smsVerifyResponse.data?.verificationToken ||
-                                   smsVerifyResponse.data?.phoneVerificationToken;
+            const smsRes = smsVerifyResponse as { token?: string; data?: any; method?: string; reqId?: string };
+            let verificationToken = smsRes.token ||
+                                   smsRes.data?.token ||
+                                   smsRes.data?.verificationToken ||
+                                   smsRes.data?.phoneVerificationToken;
             
             // If no token from response, use reqId as fallback (for backend API verification)
             if (!verificationToken) {
-              if (smsVerifyResponse.method === 'backend' && params.reqId) {
+              if (smsRes.method === 'backend' && params.reqId) {
                 // Backend API verification - use reqId as token
                 verificationToken = params.reqId;
                 console.log('[OTP Verification] Using reqId as token for backend verification:', params.reqId.substring(0, 15) + '...');
-              } else if (smsVerifyResponse.reqId) {
-                verificationToken = smsVerifyResponse.reqId;
-                console.log('[OTP Verification] Using response reqId as token:', smsVerifyResponse.reqId.substring(0, 15) + '...');
+              } else if (smsRes.reqId) {
+                verificationToken = smsRes.reqId;
+                console.log('[OTP Verification] Using response reqId as token:', smsRes.reqId.substring(0, 15) + '...');
               } else if (params.reqId) {
                 verificationToken = params.reqId;
                 console.log('[OTP Verification] Using original reqId as token fallback:', params.reqId.substring(0, 15) + '...');
@@ -871,7 +872,7 @@ const OTPVerificationScreen: React.FC = () => {
       
       // Default: Use backend resend (fallback) - only if userId available
       if (userId && !isRegistrationFlow) {
-        await resendOTP(userId, params.phone);
+        await resendOTP(userId, params.phone ?? undefined);
       }
       // For registration flow, resend already handled by MSG91 above
       setTimer(60);
