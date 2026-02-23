@@ -576,19 +576,21 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
   return (
     <View style={styles.container}>
-      <PropertyDetailsHeader
-        onProfilePress={() => (navigation as any).navigate('AgentTabs')}
-        onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={user ? logout : undefined}
-        onSignInPress={isGuest ? () => (navigation as any).navigate('Auth', { screen: 'Login', params: { returnTo: 'UpcomingProjectDetails', propertyId: route.params.propertyId } }) : undefined}
-        onSignUpPress={isGuest ? () => (navigation as any).navigate('Auth', { screen: 'Register' }) : undefined}
-        showLogout={isLoggedIn}
-        showProfile={isLoggedIn}
-        showSignIn={isGuest}
-        showSignUp={isGuest}
-      />
+      {isLoggedIn && (
+        <PropertyDetailsHeader
+          onProfilePress={() => (navigation as any).navigate('AgentTabs')}
+          onSupportPress={() => navigation.navigate('Support')}
+          onLogoutPress={user ? logout : undefined}
+          onSignInPress={undefined}
+          onSignUpPress={undefined}
+          showLogout={true}
+          showProfile={true}
+          showSignIn={false}
+          showSignUp={false}
+        />
+      )}
 
-      <View style={styles.contentSheet}>
+      <View style={[styles.contentSheet, !isLoggedIn && { marginTop: 0, paddingTop: insets.top }]}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, isBuyer && { paddingBottom: 160 }]}>
           {/* Image carousel */}
           <View style={styles.imageCarouselContainer}>
