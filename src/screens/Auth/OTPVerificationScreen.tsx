@@ -152,10 +152,10 @@ const OTPVerificationScreen: React.FC = () => {
 
     const userId = params.userId || params.user_id;
     const isRegistrationFlow = params.type === 'register' || !params.type;
+    const isForgotPasswordFlow = params.type === 'forgotPassword';
     
-    // For registration flow, userId is optional (will be created during registration)
-    // For login/forgot password flows, userId is required
-    if (!userId && !isRegistrationFlow) {
+    // userId required only for login flow (registration and forgot-password use MSG91, no userId needed)
+    if (!userId && !isRegistrationFlow && !isForgotPasswordFlow) {
       CustomAlert.alert('Error', 'User ID not found. Please try again.');
       return;
     }
@@ -756,10 +756,10 @@ const OTPVerificationScreen: React.FC = () => {
   const handleResendOTP = async () => {
     const userId = params.userId || params.user_id;
     const isRegistrationFlow = params.type === 'register' || !params.type;
+    const isForgotPasswordFlow = params.type === 'forgotPassword';
     
-    // For registration flow, userId is optional (resend doesn't need userId)
-    // For login/forgot password flows, userId is required
-    if (!userId && !isRegistrationFlow) {
+    // userId required only for login flow (registration and forgot-password use MSG91, no userId needed)
+    if (!userId && !isRegistrationFlow && !isForgotPasswordFlow) {
       CustomAlert.alert('Error', 'User ID not found. Please try again.');
       setIsLoading(false);
       return;
