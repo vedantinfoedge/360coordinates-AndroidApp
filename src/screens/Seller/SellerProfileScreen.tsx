@@ -453,97 +453,100 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
       <Animated.ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: 30 }}
+        contentContainerStyle={{ paddingTop: spacing.md }}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}>
-        {/* Profile Card Section */}
-        <View style={styles.topSection}>
-          <View style={styles.avatarContainer}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {getInitials(formData.full_name || 'User')}
-                </Text>
-              </View>
-            )}
-            <TouchableOpacity
-              style={styles.editPhotoButton}
-              onPress={handleImagePicker}
-              disabled={saving}>
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.surface} />
-              ) : (
-                <TabIcon name="camera" color={colors.surface} size={24} />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.name}>{formData.full_name || 'User'}</Text>
-          <Text style={styles.email}>{formData.email}</Text>
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{getRoleLabel(user?.user_type)}</Text>
-          </View>
-          {(user as any)?.email_verified && (
-            <View style={styles.verifiedBadge}>
-              <TabIcon name="check" color={colors.success} size={14} />
-              <Text style={styles.verifiedText}> Verified</Text>
+        {/* Profile Section - Same UI as Buyer */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileGradient}>
+            <View style={styles.avatarContainer}>
+              <TouchableOpacity
+                style={styles.avatarWrapper}
+                onPress={handleImagePicker}
+                disabled={saving}
+                activeOpacity={0.8}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>
+                      {getInitials(formData.full_name || 'User')}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.cameraIconContainer}>
+                  {saving ? (
+                    <ActivityIndicator size="small" color={colors.text} />
+                  ) : (
+                    <TabIcon name="camera" color={colors.text} size={24} />
+                  )}
+                </View>
+              </TouchableOpacity>
             </View>
-          )}
-          <View style={styles.statsRow}>
+            <Text style={styles.userName}>{formData.full_name || 'User'}</Text>
+            <Text style={styles.userEmail}>{formData.email}</Text>
+            <View style={styles.creditsBadge}>
+              <TabIcon name="building" color={colors.textSecondary} size={16} />
+              <Text style={styles.creditsBadgeText}>
+                Properties: {stats.listedProperties} · Inquiries: {stats.inquiries}
+              </Text>
+            </View>
             <TouchableOpacity
-              style={styles.statItem}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('AllListings' as never)}>
-              <Text style={styles.statValue}>{stats.listedProperties}</Text>
-              <Text style={styles.statLabel}>Properties</Text>
+              style={styles.uploadButton}
+              onPress={handleImagePicker}
+              disabled={saving}
+              activeOpacity={0.8}>
+              <TabIcon name="camera" color={colors.textSecondary} size={18} />
+              <Text style={styles.uploadButtonText}>
+                {profileImage ? 'Change Photo' : 'Upload Photo'}
+              </Text>
             </TouchableOpacity>
-            <View style={styles.statDivider} />
             <TouchableOpacity
-              style={styles.statItem}
-              activeOpacity={0.7}
-              onPress={() => (navigation as any).navigate('Chat', { screen: 'ChatList' })}>
-              <Text style={styles.statValue}>{stats.inquiries}</Text>
-              <Text style={styles.statLabel}>Inquiries</Text>
+              style={styles.editButton}
+              onPress={handleEdit}
+              activeOpacity={0.8}>
+              <TabIcon name="edit" color="#FFC107" size={18} />
+              <Text style={styles.editButtonText}>Edit Profile</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.memberSince}>Member since {memberSince}</Text>
         </View>
 
-        {/* Personal Information Form */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
-            {!isEditing ? (
-              <TouchableOpacity onPress={handleEdit}>
-                <Text style={styles.editButtonText}>Edit</Text>
+        {/* Cancel/Save when editing */}
+        {isEditing && (
+          <View style={styles.actionButtons}>
+            <View style={styles.editActions}>
+              <TouchableOpacity onPress={handleCancel} style={styles.cancelButton} activeOpacity={0.8}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-            ) : (
-              <View style={styles.editActions}>
-                <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleSave} style={styles.saveButton} disabled={saving}>
-                  {saving ? (
-                    <ActivityIndicator size="small" color={colors.surface} />
-                  ) : (
+              <TouchableOpacity
+                onPress={handleSave}
+                style={styles.saveButton}
+                disabled={saving}
+                activeOpacity={0.8}>
+                {saving ? (
+                  <ActivityIndicator size="small" color={colors.surface} />
+                ) : (
+                  <View style={styles.saveButtonContent}>
+                    <TabIcon name="check" color={colors.surface} size={18} />
                     <Text style={styles.saveButtonText}>Save</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
+        )}
 
+        {/* Personal Information Form */}
+        <View style={styles.formSection}>
           <View style={styles.form}>
             <View style={styles.row}>
               <View style={[styles.inputContainer, styles.halfWidth]}>
                 <View style={styles.labelContainer}>
                   <TabIcon name="profile" color={colors.primary} size={18} />
-                  <Text style={styles.label}>First Name *</Text>
+                  <Text style={styles.label}>FIRST NAME *</Text>
                 </View>
                 <TextInput
                   style={[
@@ -567,7 +570,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
               <View style={[styles.inputContainer, styles.halfWidth]}>
                 <View style={styles.labelContainer}>
                   <TabIcon name="profile" color={colors.primary} size={18} />
-                  <Text style={styles.label}>Last Name *</Text>
+                  <Text style={styles.label}>LAST NAME *</Text>
                 </View>
                 <TextInput
                   style={[
@@ -592,7 +595,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <View style={styles.labelContainer}>
                 <TabIcon name="mail" color={colors.primary} size={18} />
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>EMAIL</Text>
               </View>
               <TextInput
                 style={[styles.input, styles.inputDisabled]}
@@ -609,7 +612,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <View style={styles.labelContainer}>
                 <TabIcon name="phone" color={colors.primary} size={18} />
-                <Text style={styles.label}>Phone Number</Text>
+                <Text style={styles.label}>PHONE NUMBER</Text>
               </View>
               <TextInput
                 style={[styles.input, styles.inputDisabled]}
@@ -626,7 +629,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <View style={styles.labelContainer}>
                 <TabIcon name="phone" color={colors.primary} size={18} />
-                <Text style={styles.label}>WhatsApp Number</Text>
+                <Text style={styles.label}>WHATSAPP NUMBER</Text>
               </View>
               <TextInput
                 style={[
@@ -652,7 +655,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <View style={styles.labelContainer}>
                 <TabIcon name="phone" color={colors.primary} size={18} />
-                <Text style={styles.label}>Alternate Mobile</Text>
+                <Text style={styles.label}>ALTERNATE MOBILE</Text>
               </View>
               <TextInput
                 style={[
@@ -678,7 +681,7 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <View style={styles.labelContainer}>
                 <TabIcon name="location" color={colors.primary} size={18} />
-                <Text style={styles.label}>Address</Text>
+                <Text style={styles.label}>ADDRESS</Text>
               </View>
               <TextInput
                 style={[
@@ -707,68 +710,70 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Menu Items Section */}
-        <View style={styles.menuSection}>
+        {/* Menu Items Section - Same style as Buyer */}
+        <View style={styles.optionsSection}>
           <TouchableOpacity
-            style={styles.menuItem}
+            style={styles.optionItem}
             onPress={() => navigation.navigate('AllListings')}
             activeOpacity={0.7}>
-            <View style={[styles.menuIconContainer, { backgroundColor: '#E0F2FE' }]}>
-              <TabIcon name="building" color="#0284C7" size={20} />
+            <View style={styles.optionLeft}>
+              <View style={styles.optionIconContainer}>
+                <TabIcon name="building" color={colors.primary} size={20} />
+              </View>
+              <Text style={styles.optionText}>My Properties</Text>
             </View>
-            <Text style={styles.menuText}>My Properties</Text>
             <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
+          <View style={styles.divider} />
           <TouchableOpacity
-            style={styles.menuItem}
+            style={styles.optionItem}
             onPress={() => navigation.navigate('Leads')}
             activeOpacity={0.7}>
-            <View style={[styles.menuIconContainer, { backgroundColor: '#E0F2FE' }]}>
-              <TabIcon name="leads" color="#0284C7" size={20} />
+            <View style={styles.optionLeft}>
+              <View style={styles.optionIconContainer}>
+                <TabIcon name="leads" color={colors.primary} size={20} />
+              </View>
+              <Text style={styles.optionText}>Leads</Text>
             </View>
-            <Text style={styles.menuText}>Leads</Text>
             <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
+          <View style={styles.divider} />
           <TouchableOpacity
-            style={styles.menuItem}
+            style={styles.optionItem}
             onPress={() => navigation.navigate('Support')}
             activeOpacity={0.7}>
-            <View style={[styles.menuIconContainer, { backgroundColor: '#DCFCE7' }]}>
-              <TabIcon name="support" color="#16A34A" size={20} />
+            <View style={styles.optionLeft}>
+              <View style={styles.optionIconContainer}>
+                <TabIcon name="support" color={colors.primary} size={20} />
+              </View>
+              <Text style={styles.optionText}>Support</Text>
             </View>
-            <Text style={styles.menuText}>Support</Text>
             <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
+          <View style={styles.divider} />
           <TouchableOpacity
-            style={styles.menuItem}
+            style={styles.optionItem}
             onPress={() => navigation.navigate('Subscription')}
             activeOpacity={0.7}>
-            <View style={[styles.menuIconContainer, { backgroundColor: '#FEF3C7' }]}>
-              <TabIcon name="subscription" color="#D97706" size={20} />
+            <View style={styles.optionLeft}>
+              <View style={styles.optionIconContainer}>
+                <TabIcon name="subscription" color={colors.primary} size={20} />
+              </View>
+              <Text style={styles.optionText}>Subscription</Text>
             </View>
-            <Text style={styles.menuText}>Subscription</Text>
             <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
+          <View style={styles.divider} />
           <TouchableOpacity
-            style={styles.menuItem}
+            style={styles.optionItem}
             onPress={handleLogout}
             activeOpacity={0.7}>
-            <View style={[styles.menuIconContainer, { backgroundColor: '#FEE2E2' }]}>
-              <TabIcon name="logout" color="#DC2626" size={20} />
+            <View style={styles.optionLeft}>
+              <View style={[styles.optionIconContainer, styles.logoutIconContainer]}>
+                <TabIcon name="logout" color="#DC2626" size={20} />
+              </View>
+              <Text style={[styles.optionText, styles.logoutText]}>Logout</Text>
             </View>
-            <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
             <TabIcon name="chevron-right" color={colors.textSecondary} size={20} />
           </TouchableOpacity>
         </View>
@@ -840,203 +845,215 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  topSection: {
+  profileSection: {
     backgroundColor: colors.surface,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    overflow: 'hidden',
+  },
+  profileGradient: {
     alignItems: 'center',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: spacing.xl + spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 3,
+    borderBottomColor: colors.primary + '30',
   },
   avatarContainer: {
-    position: 'relative',
     marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: spacing.sm,
   },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#E3F6FF', // Light blue
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.primary,
+    borderWidth: 4,
+    borderColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 3,
-    borderColor: colors.primary,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.border,
+    borderWidth: 4,
+    borderColor: colors.surface,
   },
   avatarText: {
-    fontSize: 32,
-    color: colors.primary,
+    ...typography.h2,
+    color: colors.surface,
+    fontSize: 36,
     fontWeight: '700',
   },
-  editPhotoButton: {
+  cameraIconContainer: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.primary,
+    bottom: 0,
+    right: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.surface,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  userName: {
+    fontSize: 26,
+    color: colors.secondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    fontWeight: '700',
+    lineHeight: 32,
+  },
+  userEmail: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 15,
+    marginTop: spacing.xs,
+  },
+  creditsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.round,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
-  editPhotoText: {
-    fontSize: 14,
-  },
-  name: {
-    fontSize: 22,
-    color: '#1D242B', // Dark Charcoal
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  email: {
-    ...typography.body,
-    color: '#6B7280',
-    marginBottom: spacing.sm,
-    fontSize: 14,
-  },
-  roleBadge: {
-    backgroundColor: '#E3F6FF', // Light blue
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: 20,
-    marginBottom: spacing.sm,
-  },
-  roleText: {
+  creditsBadgeText: {
     ...typography.caption,
-    color: colors.primary,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D1FAE5', // Light green tint
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 20,
-    marginBottom: spacing.sm,
-    gap: spacing.xs,
-  },
-  verifiedText: {
-    ...typography.caption,
-    color: '#059669', // Green text
-    fontSize: 11,
+    color: colors.text,
+    fontSize: 14,
     fontWeight: '600',
   },
-  statsRow: {
+  uploadButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
-    backgroundColor: '#FAFAFA',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
-    borderRadius: 14,
-    gap: spacing.lg,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    color: '#1D242B', // Dark Charcoal
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  statLabel: {
-    ...typography.caption,
-    color: '#6B7280',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  statDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: '#E5E7EB',
-  },
-  memberSince: {
-    ...typography.caption,
-    color: '#9CA3AF',
-    fontSize: 12,
-  },
-  section: {
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.surface,
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    borderRadius: 16,
-    marginHorizontal: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    color: '#1D242B', // Dark Charcoal
-    fontWeight: '700',
-    marginBottom: spacing.md,
-  },
-  editButtonText: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  editActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  cancelButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-  },
-  cancelButtonText: {
-    ...typography.body,
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  saveButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.primary,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+    alignSelf: 'stretch',
+  },
+  uploadButtonText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    alignSelf: 'stretch',
+  },
+  editButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  actionButtons: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  formSection: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  cancelButtonText: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  saveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   saveButtonText: {
     ...typography.body,
     color: colors.surface,
-    fontWeight: '600',
-    fontSize: 14,
+    fontWeight: '700',
+    fontSize: 16,
   },
   form: {
     marginTop: spacing.sm,
@@ -1059,9 +1076,11 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.caption,
-    color: '#374151',
-    fontWeight: '600',
-    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   lockedLabelRow: {
     flexDirection: 'row',
@@ -1106,55 +1125,55 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     paddingTop: spacing.md,
   },
-  menuSection: {
+  optionsSection: {
     backgroundColor: colors.surface,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xxl,
-    borderRadius: 16,
-    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
-  menuItem: {
+  optionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.surface,
+  },
+  optionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md + 2,
-    paddingHorizontal: spacing.lg,
-    minHeight: 54,
+    flex: 1,
+    gap: spacing.md,
   },
-  menuIconContainer: {
+  optionIconContainer: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 18,
+    backgroundColor: colors.primary + '15',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
   },
-  menuText: {
+  optionText: {
     ...typography.body,
-    color: '#374151',
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  logoutText: {
-    color: '#EF4444',
+    color: colors.text,
+    fontSize: 16,
     fontWeight: '600',
   },
-  menuArrow: {
-    ...typography.body,
-    color: '#9CA3AF',
-    fontSize: 18,
-    fontWeight: '500',
+  logoutText: {
+    color: colors.error,
   },
-  menuDivider: {
+  divider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
-    marginLeft: spacing.xxl + spacing.sm,
+    backgroundColor: colors.border,
+    marginLeft: spacing.lg,
+  },
+  logoutIconContainer: {
+    backgroundColor: colors.error + '15',
   },
   imagePickerModalOverlay: {
     flex: 1,
