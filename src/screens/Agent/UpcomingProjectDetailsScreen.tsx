@@ -979,9 +979,9 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
         </ScrollView>
 
-        {isBuyer && (
+        {(isBuyer || isGuest) && (
           <>
-            {!interactionLoading && (
+            {!interactionLoading && !isGuest && (
               <View style={styles.creditsRow}>
                 <View style={styles.creditsDot} />
                 <Text style={[styles.creditsText, interactionState.remaining <= 0 && styles.creditsTextError]}>
@@ -991,15 +991,15 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
             )}
             <View style={[styles.buyerActionButtons, { paddingBottom: insets.bottom + 8 }]}>
             <TouchableOpacity
-              style={[styles.contactButton, (processingContact || interactionLoading) && styles.contactButtonDisabled]}
+              style={[styles.contactButton, (processingContact || interactionLoading) && !isGuest && styles.contactButtonDisabled]}
               onPress={handleViewContact}
-              disabled={processingContact || interactionLoading}>
+              disabled={!isGuest && (processingContact || interactionLoading)}>
               <Text style={styles.contactButtonText}>{showContactModal ? 'Hide Contact' : 'Show Contacts'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.chatButton, (processingChat || interactionLoading) && styles.contactButtonDisabled]}
+              style={[styles.chatButton, (processingChat || interactionLoading) && !isGuest && styles.contactButtonDisabled]}
               onPress={handleChatWithBuilder}
-              disabled={processingChat || interactionLoading}>
+              disabled={!isGuest && (processingChat || interactionLoading)}>
               <>
                 <TabIcon name="chats" color={colors.surface} size={18} />
                 <Text style={styles.chatButtonText}>Chat with Builder</Text>
@@ -1009,7 +1009,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         </>
         )}
 
-      {!isBuyer && (
+      {!isBuyer && !isGuest && (
         <View style={[styles.actionButtons, { paddingBottom: insets.bottom }]}>
           <TouchableOpacity
             style={styles.editButton}
