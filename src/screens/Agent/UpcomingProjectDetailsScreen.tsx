@@ -1009,7 +1009,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         </>
         )}
 
-      {!isBuyer && (
+      {isLoggedIn && !isBuyer && (
         <View style={[styles.actionButtons, { paddingBottom: insets.bottom }]}>
           <TouchableOpacity
             style={styles.editButton}
