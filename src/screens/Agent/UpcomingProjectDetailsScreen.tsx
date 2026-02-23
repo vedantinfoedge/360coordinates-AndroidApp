@@ -899,6 +899,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               (navigation as any).navigate('PropertyMap', {
                 propertyId: property.id,
                 listingType: 'buy',
+                hideControls: true,
               });
             }}>
             <TabIcon name="location" color="#E53935" size={18} />

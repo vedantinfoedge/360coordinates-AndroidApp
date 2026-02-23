@@ -207,6 +207,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     (navigation as any).navigate('PropertyMap', {
       propertyId: property?.id,
       listingType,
+      hideControls: true,
     });
   };
 

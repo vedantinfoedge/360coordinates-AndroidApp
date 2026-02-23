@@ -20,7 +20,7 @@ export type AgentStackParamList = {
   AddProperty: undefined;
   AddProject: undefined;
   EditProperty: {propertyId: string | number};
-  PropertyMap: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'; propertyId?: string | number} | undefined;
+  PropertyMap: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'; propertyId?: string | number; hideControls?: boolean} | undefined;
   Support: undefined;
 };
 
