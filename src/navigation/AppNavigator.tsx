@@ -9,8 +9,6 @@ import SellerNavigator from './SellerNavigator';
 import AgentNavigator from './AgentNavigator';
 import AdminNavigator from './AdminNavigator';
 import SplashScreen from '../screens/Auth/SplashScreen';
-import InitialScreen from '../screens/Landing/InitialScreen';
-import SellSelectionScreen from '../screens/Landing/SellSelectionScreen';
 import MainTabNavigator from '../components/navigation/MainTabNavigator';
 import TermsConditionsScreen from '../screens/Landing/TermsConditionsScreen';
 import PrivacyPolicyScreen from '../screens/Landing/PrivacyPolicyScreen';
@@ -18,8 +16,6 @@ import {colors} from '../theme';
 
 export type RootStackParamList = {
   Splash: undefined;
-  Initial: undefined;
-  SellSelection: undefined;
   MainTabs: undefined;
   Auth: undefined;
   Buyer: undefined;
@@ -37,7 +33,7 @@ const AppNavigator = () => {
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
       // Handle navigation when auth state changes
-      // New workflow: Always start with Initial screen, then navigate based on user actions
+      // Navigate based on auth state and user role
       useEffect(() => {
         if (!isLoading && navigationRef.current) {
           // For authenticated users, check for dashboard preference or navigate based on user type
@@ -47,7 +43,7 @@ const AppNavigator = () => {
             )
               .toString()
               .toLowerCase();
-            // First check for immediate targetDashboard (from InitialScreen role selection)
+            // First check for immediate targetDashboard
             // Then check for persistent dashboard preference (stored until logout)
             Promise.all([
               AsyncStorage.getItem('@target_dashboard'),
@@ -190,7 +186,7 @@ const AppNavigator = () => {
       // Determine initial route
       let initialRoute: keyof RootStackParamList = 'Splash';
       if (!isLoading) {
-        // Guest users go directly to Buyer screen (no Initial screen)
+        // Guest users go directly to Buyer screen
         initialRoute = 'Buyer';
       }
 
@@ -200,8 +196,6 @@ const AppNavigator = () => {
         screenOptions={{headerShown: false}}
         initialRouteName={initialRoute}>
         <RootStack.Screen name="Splash" component={SplashScreen} />
-        <RootStack.Screen name="Initial" component={InitialScreen} />
-        <RootStack.Screen name="SellSelection" component={SellSelectionScreen} />
         <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
         <RootStack.Screen name="Auth" component={AuthNavigator} />
         <RootStack.Screen name="Buyer" component={BuyerNavigator} />
