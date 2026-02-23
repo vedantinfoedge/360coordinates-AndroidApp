@@ -226,6 +226,7 @@ export const propertyService = {
         seller_phone: property.seller_phone || owner.phone,
         seller_id: property.seller_id || owner.id || owner.user_id,
         seller_verified: property.seller_verified || owner.verified,
+        seller_created_at: property.seller_created_at || owner.created_at || owner.member_since || owner.joined_at,
         owner: owner,
       });
       

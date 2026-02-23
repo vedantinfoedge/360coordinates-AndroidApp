@@ -183,33 +183,39 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     const fetchContact = async () => {
       try {
         if (isBuyer && resolvedPropertyId) {
-          // Use propertyService to get normalized response (merges owner/seller from data)
           const res = await propertyService.getPropertyDetails(resolvedPropertyId);
           const data = (res as any)?.data;
           const property = data?.property ?? data;
-          const owner = property?.owner ?? property?.seller ?? data?.owner ?? data?.seller;
+          const seller = property?.seller ?? data?.seller;
+          const owner = property?.owner ?? data?.owner;
           const phone =
             property?.seller_phone ||
-            property?.owner?.phone ||
-            property?.seller?.phone ||
+            owner?.phone ||
+            seller?.phone ||
             null;
           const email =
             property?.seller_email ||
-            property?.owner?.email ||
-            property?.seller?.email ||
+            owner?.email ||
+            seller?.email ||
             null;
-          // Backend details.php: SELECT u.created_at as seller_created_at → may be nested or flat
           const memberSinceRaw =
-            property?.seller?.created_at ||
+            seller?.created_at ||
             property?.seller_created_at ||
-            (data?.seller as any)?.created_at ||
-            (data?.seller_created_at as string) ||
+            data?.seller_created_at ||
             owner?.created_at ||
             owner?.member_since ||
-            owner?.joined_at ||
-            property?.owner?.created_at ||
-            (data?.owner as any)?.created_at ||
+            seller?.member_since ||
+            data?.owner?.created_at ||
             null;
+          console.log('[ChatConversation] Buyer→Seller member-since lookup:', {
+            sellerCreatedAt: seller?.created_at,
+            propertySCA: property?.seller_created_at,
+            dataSCA: data?.seller_created_at,
+            ownerCreatedAt: owner?.created_at,
+            memberSinceRaw,
+            ownerKeys: owner ? Object.keys(owner) : [],
+            sellerKeys: seller ? Object.keys(seller) : [],
+          });
           if (!cancelled) {
             if (!phoneAlreadyProvided) setCounterpartyPhone(phone ? String(phone).trim() || null : null);
             setCounterpartyEmail(email ? String(email).trim() || null : null);
@@ -217,6 +223,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
           }
         } else if (!isBuyer && userId) {
           const res: any = await sellerService.getBuyer(userId);
+          console.log('[ChatConversation] Seller→Buyer getBuyer raw response:', JSON.stringify(res?.data ?? res, null, 2));
           const payload = res?.data?.buyer ?? res?.data?.user ?? res?.data ?? res?.buyer ?? res ?? null;
           const phone =
             payload?.phone || payload?.mobile || payload?.buyer_phone || null;
@@ -228,17 +235,27 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
             payload?.joined_at ||
             payload?.created_date ||
             null;
+          console.log('[ChatConversation] Seller→Buyer member-since lookup:', {
+            memberSinceRaw,
+            payloadKeys: payload ? Object.keys(payload) : [],
+          });
           if (!cancelled) {
             if (!phoneAlreadyProvided) setCounterpartyPhone(phone ? String(phone).trim() || null : null);
             setCounterpartyEmail(email ? String(email).trim() || null : null);
             setCounterpartyMemberSince(formatMemberSince(memberSinceRaw));
           }
-        } else if (!cancelled && !phoneAlreadyProvided) {
-          setCounterpartyPhone(null);
-          setCounterpartyEmail(null);
-          setCounterpartyMemberSince(null);
+        } else {
+          console.log('[ChatConversation] fetchContact: no branch matched', {
+            isBuyer, resolvedPropertyId, userId, phoneAlreadyProvided,
+          });
+          if (!cancelled && !phoneAlreadyProvided) {
+            setCounterpartyPhone(null);
+            setCounterpartyEmail(null);
+            setCounterpartyMemberSince(null);
+          }
         }
-      } catch (_) {
+      } catch (err: any) {
+        console.warn('[ChatConversation] fetchContact error:', err?.message ?? err);
         if (!cancelled) {
           setCounterpartyPhone(null);
           setCounterpartyEmail(null);
