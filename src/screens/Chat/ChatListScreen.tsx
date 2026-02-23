@@ -14,6 +14,7 @@ import {
   Pressable,
   Image,
   Linking,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
@@ -304,19 +305,18 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    // Pre-load buyer info for sellers/agents, then load chat rooms
+    // Set up real-time listener and load chat rooms immediately
+    // Run loadBuyerInfoFromInquiries in parallel (don't block) for sellers/agents
     const initializeChatList = async () => {
       console.log('[ChatList] Initializing chat list for user type:', user.user_type);
 
-      if (user.user_type === 'seller' || user.user_type === 'agent') {
-        await loadBuyerInfoFromInquiries();
-      }
-
-      // Set up real-time listener for chat rooms
       const unsubscribe = setupChatRoomsListener();
       unsubscribeRef.current = unsubscribe;
 
-      // Load chat rooms after buyer info is loaded
+      // Load chat rooms immediately; buyer info in parallel (seller/agent)
+      if (user.user_type === 'seller' || user.user_type === 'agent') {
+        loadBuyerInfoFromInquiries(); // Fire and forget - populates buyerCache for processChatRooms
+      }
       loadChatRooms();
     };
 
@@ -366,15 +366,12 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
 
       previousUserTypeRef.current = currentUserType;
 
-      // Reload buyer info for sellers/agents only
+      // Reload buyer info and chat rooms in parallel for sellers/agents
       if (user.user_type === 'seller' || user.user_type === 'agent') {
-        loadBuyerInfoFromInquiries();
+        loadBuyerInfoFromInquiries(); // Runs in parallel
       } else if (user.user_type === 'buyer') {
-        // For buyers, clear buyer cache (not needed)
         setBuyerCache({});
       }
-
-      // Reload chat rooms when screen comes into focus
       loadChatRooms();
 
       // Re-setup listener if it was cleaned up
@@ -524,7 +521,12 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
       console.log('[ChatList] Loading chat rooms for user type:', currentUserType, {
         userId: user.id,
       });
-      const response: any = await chatService.getConversations(user.id);
+      // Defer Firestore read until after tab transition for smoother UX
+      const response: any = await new Promise<any>((resolve, reject) => {
+        InteractionManager.runAfterInteractions(() => {
+          chatService.getConversations(user.id).then(resolve).catch(reject);
+        });
+      });
 
       console.log('[ChatList] Chat service response:', {
         success: response?.success,
@@ -644,6 +646,40 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
           receiverId: r.receiverId,
           participants: r.participants,
         })));
+      }
+    }
+
+    // Phase 1: Show minimal list immediately (no API calls) for fast perceived load
+    const roomsWithProperty = filteredRooms.filter(r => r.propertyId);
+    const minimalItems = buildMinimalChatListFromRooms(roomsWithProperty, userIdStr, currentUserType);
+    const minimalDeduped = deduplicateAndSortChats(minimalItems, isBuyer);
+    setChatList(minimalDeduped);
+    setLoading(false);
+    setRefreshing(false);
+
+    // Phase 2: Enrich with property and participant data in background
+    // Pre-fetch inquiries once for seller/agent (avoid N calls per room)
+    let inquiriesBuyerMap: Record<string, { name: string; profile_image?: string }> = {};
+    if (isSellerOrAgent) {
+      try {
+        const inquiriesResponse: any = await sellerService.getInquiries({ page: 1, limit: 100 });
+        if (inquiriesResponse?.success) {
+          const inquiries = inquiriesResponse.data?.inquiries || inquiriesResponse.data || [];
+          inquiries.forEach((inq: any) => {
+            const bid = String(inq.buyer_id || inq.buyerId || '');
+            if (!bid || inquiriesBuyerMap[bid]) return;
+            const buyerName = inq.buyer?.name || inq.buyer?.full_name || inq.buyer_name || inq.name ||
+              (inq.buyer?.first_name && inq.buyer?.last_name ? `${inq.buyer.first_name} ${inq.buyer.last_name}` : null) || 'Buyer';
+            if (buyerName !== 'Buyer' && !buyerName.startsWith('Buyer ')) {
+              inquiriesBuyerMap[bid] = {
+                name: buyerName,
+                profile_image: fixImageUrl(inq.buyer?.profile_image || inq.buyer_profile_image) || undefined,
+              };
+            }
+          });
+        }
+      } catch {
+        // Ignore - will use room data or fallback
       }
     }
 
@@ -783,122 +819,12 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
               cacheMatch: Object.keys(buyerCache).includes(buyerIdStr),
             });
 
-            // Step 3: If still not found, try to fetch buyer info from inquiries
-            if (!buyerInfo && buyerId) {
-              console.log('[ChatList] Fetching buyer info for buyerId:', buyerId, 'propertyId:', propertyId);
-              // Try to fetch buyer info from inquiries
-              try {
-                const inquiriesResponse: any = await sellerService.getInquiries({
-                  page: 1,
-                  limit: 100,
-                });
-
-                console.log('[ChatList] Inquiries response:', {
-                  success: inquiriesResponse?.success,
-                  hasData: !!inquiriesResponse?.data,
-                  dataType: Array.isArray(inquiriesResponse?.data) ? 'array' : typeof inquiriesResponse?.data,
-                  inquiriesCount: Array.isArray(inquiriesResponse?.data?.inquiries) ? inquiriesResponse.data.inquiries.length :
-                    Array.isArray(inquiriesResponse?.data) ? inquiriesResponse.data.length : 0,
-                });
-
-                if (inquiriesResponse?.success) {
-                  const inquiries = inquiriesResponse.data?.inquiries || inquiriesResponse.data || [];
-
-                  // Log all buyer IDs in inquiries for debugging
-                  const allInquiryBuyerIds = inquiries.map((inq: any) => String(inq.buyer_id || inq.buyerId || '')).filter(Boolean);
-                  console.log('[ChatList] All buyer IDs in inquiries:', allInquiryBuyerIds);
-                  console.log('[ChatList] Looking for buyerId:', String(buyerId), 'in inquiries');
-
-                  // First try to find inquiry for this specific property and buyer
-                  let inquiry = inquiries.find((inq: any) => {
-                    const inqPropertyId = String(inq.property_id || inq.propertyId || '');
-                    const inqBuyerId = String(inq.buyer_id || inq.buyerId || '');
-                    const matches = inqPropertyId === String(propertyId) && inqBuyerId === String(buyerId);
-                    if (matches) {
-                      console.log('[ChatList] Found matching inquiry:', { inqPropertyId, inqBuyerId, propertyId, buyerId });
-                    }
-                    return matches;
-                  });
-
-                  console.log('[ChatList] Found inquiry for property+buyer:', !!inquiry);
-
-                  // If not found, try to find any inquiry for this buyer (buyer might have inquired about multiple properties)
-                  if (!inquiry) {
-                    inquiry = inquiries.find((inq: any) => {
-                      const inqBuyerId = String(inq.buyer_id || inq.buyerId || '');
-                      return inqBuyerId === String(buyerId);
-                    });
-                    console.log('[ChatList] Found inquiry for buyer (any property):', !!inquiry);
-                  }
-
-                  if (inquiry) {
-                    console.log('[ChatList] Inquiry data structure:', {
-                      hasBuyer: !!inquiry.buyer,
-                      buyerKeys: inquiry.buyer ? Object.keys(inquiry.buyer) : [],
-                      buyer_name: inquiry.buyer_name,
-                      name: inquiry.name,
-                      allKeys: Object.keys(inquiry),
-                    });
-
-                    // Extract buyer name from multiple possible locations
-                    const buyerName = inquiry.buyer?.name ||
-                      inquiry.buyer?.full_name ||
-                      inquiry.buyer_name ||
-                      inquiry.name ||
-                      inquiry.buyer?.first_name ||
-                      (inquiry.buyer?.first_name && inquiry.buyer?.last_name
-                        ? `${inquiry.buyer.first_name} ${inquiry.buyer.last_name}`
-                        : null) ||
-                      'Buyer';
-
-                    const buyerProfileImage = inquiry.buyer?.profile_image ||
-                      inquiry.buyer_profile_image ||
-                      inquiry.buyer?.profileImage ||
-                      undefined;
-
-                    console.log('[ChatList] Extracted buyer info:', {
-                      name: buyerName,
-                      hasImage: !!buyerProfileImage,
-                    });
-
-                    const fixedImageUrl = buyerProfileImage ? fixImageUrl(buyerProfileImage) : null;
-                    buyerInfo = {
-                      name: buyerName,
-                      profile_image: fixedImageUrl || undefined,
-                    };
-
-                    // Cache buyer info
-                    if (buyerId) {
-                      const buyerIdStr = String(buyerId);
-                      setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
-                      console.log('[ChatList] Cached buyer info for buyerId:', buyerIdStr);
-
-                      // Also update Firebase chat room document with buyer name for future reference
-                      try {
-                        const db = firestore();
-                        if (db) {
-                          await db.collection('chats').doc(room.chatRoomId).update({
-                            buyerName: buyerInfo.name,
-                            ...(buyerInfo.profile_image && { buyerProfileImage: buyerInfo.profile_image }),
-                          });
-                          console.log('[ChatList] ✅ Updated Firebase chat room with buyer name:', buyerInfo.name);
-                        }
-                      } catch (updateError) {
-                        console.warn('[ChatList] Could not update Firebase chat room with buyer name:', updateError);
-                      }
-                    }
-                  } else {
-                    console.warn('[ChatList] No inquiry found for buyerId:', buyerId, 'propertyId:', propertyId);
-                    console.warn('[ChatList] This buyer may have chatted directly without making an inquiry');
-                    console.warn('[ChatList] Will try to find buyer name from Firebase chat room document or messages');
-                  }
-                } else {
-                  console.warn('[ChatList] Inquiries response not successful:', inquiriesResponse);
-                }
-              } catch (error) {
-                console.error('[ChatList] Error fetching buyer info from inquiries:', error);
-              }
-            } else if (buyerInfo) {
+            // Step 3: Check pre-fetched inquiries map (single API call for all rooms)
+            if (!buyerInfo && buyerId && inquiriesBuyerMap[buyerIdStr]) {
+              buyerInfo = inquiriesBuyerMap[buyerIdStr];
+              setBuyerCache(prev => ({ ...prev, [buyerIdStr]: buyerInfo }));
+            }
+            if (buyerInfo) {
               console.log('[ChatList] Using cached buyer info for buyerId:', buyerId);
             }
 
@@ -1201,6 +1127,58 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
     });
 
     setChatList(uniqueChats);
+  };
+
+  const deduplicateAndSortChats = (chats: ChatListItem[], isBuyerView: boolean): ChatListItem[] => {
+    const uniqueByUserAndProperty = new Map<string, ChatListItem>();
+    chats.forEach(chat => {
+      const key = isBuyerView
+        ? `${chat.receiverId || 'unknown'}_${chat.propertyId || chat.chatRoomId}`
+        : `${chat.buyerId || 'unknown'}_${chat.propertyId || chat.chatRoomId}`;
+      const existing = uniqueByUserAndProperty.get(key);
+      if (!existing || (chat.timestampMs || 0) > (existing.timestampMs || 0)) {
+        uniqueByUserAndProperty.set(key, chat);
+      }
+    });
+    const result = Array.from(uniqueByUserAndProperty.values());
+    result.sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+    return result;
+  };
+
+  // Build minimal list from room data only - no API/Firestore calls - for fast initial render
+  const buildMinimalChatListFromRooms = (
+    filteredRooms: ChatRoom[],
+    uid: string,
+    userType: string
+  ): ChatListItem[] => {
+    const isBuyer = userType === 'buyer';
+    return filteredRooms.map(room => {
+      const timestampMs = room.updatedAt instanceof Date
+        ? room.updatedAt.getTime()
+        : (room.updatedAt?.toDate?.()?.getTime() || Date.now());
+      const name = isBuyer
+        ? (room.receiverName || 'Property Owner')
+        : (room.buyerName || room.buyer_name || `Buyer ${room.buyerId || ''}`);
+      const readStatus = room.readStatus || {};
+      const unreadCount = (readStatus[uid] === 'new' || readStatus[uid] === undefined) ? 1 : 0;
+      return {
+        id: room.chatRoomId,
+        chatRoomId: room.chatRoomId,
+        name,
+        lastMessage: room.lastMessage || 'No messages yet',
+        timestamp: formatTimestamp(room.updatedAt),
+        timestampMs,
+        unreadCount,
+        propertyId: room.propertyId,
+        propertyTitle: room.propertyTitle || 'Property',
+        receiverId: isBuyer ? (room.receiverId || '') : uid,
+        receiverRole: (room.receiverRole as 'seller' | 'agent') || (userType === 'agent' ? 'agent' : 'seller'),
+        buyerId: room.buyerId,
+        image: undefined,
+        location: '',
+        price: '',
+      };
+    });
   };
 
   const formatTimestamp = (date: Date | any): string => {
@@ -2475,9 +2453,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   profileActionBtnPrimary: {
-    backgroundColor: 'transparent',
     borderWidth: 0,
-    // Linear gradient simulated - use primary blue
     backgroundColor: '#1565C0',
     shadowColor: '#1565C0',
     shadowOffset: { width: 0, height: 3 },
