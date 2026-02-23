@@ -86,6 +86,7 @@ const BuyerTabNavigator = () => {
               minHeight: TAB_BAR_HEIGHT,
             },
           }}
+          backBehavior="history"
           tabBar={props => <BuyerCustomTabBar {...props} />}>
       <Tab.Screen
         name="Home"

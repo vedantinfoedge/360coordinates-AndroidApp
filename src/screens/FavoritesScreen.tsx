@@ -223,9 +223,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
         onPress={() => {
           const targetScreen = item.project_type === 'upcoming' ? 'UpcomingProjectDetails' : 'PropertyDetails';
           const params = { propertyId: String(item.id) };
-          // FavoritesScreen can be in ProfileStackNavigator or MainTabNavigator. PropertyDetails/UpcomingProjectDetails
-          // live in the Search tab - navigate there so View Details works from either context.
-          (navigation as any).navigate('Search', { screen: targetScreen, params });
+          (navigation as any).navigate(targetScreen, params);
         }}
         onFavoritePress={() => handleToggleFavorite(item.id)}
         onSharePress={() => handleShareProperty(item)}

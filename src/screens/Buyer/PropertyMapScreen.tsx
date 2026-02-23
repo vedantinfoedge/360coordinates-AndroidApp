@@ -224,36 +224,27 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   const handleGoBackToList = () => {
+    const currentParams = {
+      listingType,
+      location: location || undefined,
+      propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
+      budget: budget || undefined,
+      bedrooms: bedrooms || undefined,
+      area: area || undefined,
+    };
     try {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      } else {
-        const params = {
-          listingType,
-          location,
-          propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
-          budget: budget || undefined,
-          bedrooms: bedrooms || undefined,
-          area: area || undefined,
-        };
+      (navigation as any).navigate('SearchResults', currentParams);
+    } catch {
+      try {
         const tabNav = navigation.getParent?.()?.getParent?.();
         if (tabNav) {
-          (tabNav as any).navigate('Search', { screen: 'SearchResults', params });
-        } else {
-          (navigation as any).navigate('Search', { screen: 'SearchResults', params });
+          (tabNav as any).navigate('Search', { screen: 'SearchResults', params: currentParams });
+        } else if (navigation.canGoBack()) {
+          navigation.goBack();
         }
-      }
-    } catch (error: any) {
-      console.error('Error navigating back to list:', error);
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      } else {
-        const tabNav = navigation.getParent?.()?.getParent?.();
-        if (tabNav) {
-          (tabNav as any).navigate('Search', {
-            screen: 'SearchResults',
-            params: { listingType, location },
-          });
+      } catch {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
         }
       }
     }

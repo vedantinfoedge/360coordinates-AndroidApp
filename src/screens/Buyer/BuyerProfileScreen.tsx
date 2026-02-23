@@ -11,6 +11,7 @@ import {
   Platform,
   Animated,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -102,6 +103,8 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     alternateMobile: '',
   });
 
+  const [saving, setSaving] = useState(false);
+
   const [originalData, setOriginalData] = useState({
     name: userData.full_name || '',
     phone: userData.phone || '',
@@ -127,8 +130,9 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
     try {
-      // Only save name and address (email and phone are locked)
       const {buyerService} = require('../../services/buyer.service');
       const updateResponse = await buyerService.updateProfile({
         full_name: formData.name,
@@ -145,6 +149,8 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     } catch (error: any) {
       console.error('Error updating profile:', error);
       CustomAlert.alert('Error', error?.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -373,12 +379,19 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.saveButton}
+                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
                 onPress={handleSave}
+                disabled={saving}
                 activeOpacity={0.8}>
                 <View style={styles.saveButtonContent}>
-                  <TabIcon name="check" color={colors.surface} size={18} />
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  {saving ? (
+                    <ActivityIndicator size="small" color={colors.surface} />
+                  ) : (
+                    <>
+                      <TabIcon name="check" color={colors.surface} size={18} />
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    </>
+                  )}
                 </View>
               </TouchableOpacity>
             </View>
@@ -810,6 +823,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  saveButtonDisabled: {
+    opacity: 0.7,
   },
   saveButtonText: {
     ...typography.body,

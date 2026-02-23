@@ -1419,7 +1419,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               console.error('Error navigating to map:', error);
             }
           }}>
-          <TabIcon name="location" color={colors.error} size={20} />
+          <TabIcon name="location" color={colors.success} size={20} />
           <Text style={styles.floatingMapButtonText}>View on Map</Text>
         </TouchableOpacity>
       )}

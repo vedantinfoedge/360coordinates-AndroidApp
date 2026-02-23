@@ -7,7 +7,7 @@ import HomeScreen from '../../screens/Landing/HomeScreen';
 import SearchNavigator from '../../navigation/SearchNavigator';
 import ChatNavigator from '../../navigation/ChatNavigator';
 import BuyerProfileScreen from '../../screens/Buyer/BuyerProfileScreen';
-import FavoritesScreen from '../../screens/FavoritesScreen';
+import FavoritesNavigator from '../../navigation/FavoritesNavigator';
 import SupportScreen from '../../screens/Buyer/SupportScreen';
 import RecentlyViewedScreen from '../../screens/Buyer/RecentlyViewedScreen';
 import AddTabScreen from '../../screens/Buyer/AddTabScreen';
@@ -60,6 +60,7 @@ const MainTabNavigator = () => {
               minHeight: TAB_BAR_HEIGHT,
             },
           }}
+          backBehavior="history"
           tabBar={props => <BuyerCustomTabBar {...props} />}>
           <Tab.Screen
             name="Home"
@@ -88,7 +89,7 @@ const MainTabNavigator = () => {
           />
           <Tab.Screen
             name="Favorites"
-            component={FavoritesScreen}
+            component={FavoritesNavigator}
             options={{title: 'Favorites', tabBarButton: () => null}}
           />
           <Tab.Screen
