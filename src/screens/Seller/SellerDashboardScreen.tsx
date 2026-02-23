@@ -547,7 +547,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         }, 0);
 
         const totalInquiries = properties.reduce((sum: number, prop: any) => {
-          return sum + (prop.inquiry_count || prop.inquiries || prop.inquiry_count || 0);
+          return sum + (prop.inquiry_count || prop.inquiries || 0);
         }, 0);
 
         const propertiesByStatus = {
@@ -555,15 +555,16 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           rent: properties.filter((prop: any) => prop.status === 'rent').length,
         };
 
-        // Use API stats if available, otherwise use calculated stats from properties
+        // Use API stats when available (they cover ALL properties, not just the fetched page).
+        // Only fall back to locally calculated values when the API stats call failed.
         const finalStats: DashboardStats = apiStats ? {
           ...apiStats,
-          // Override with calculated values for accuracy
-          total_properties: totalProperties,
-          active_properties: activeProperties,
-          total_views: totalViews,
-          total_inquiries: totalInquiries,
-          properties_by_status: propertiesByStatus,
+          // Only override with local values if API didn't provide them
+          total_properties: apiStats.total_properties ?? totalProperties,
+          active_properties: apiStats.active_properties ?? activeProperties,
+          total_views: apiStats.total_views ?? totalViews,
+          total_inquiries: apiStats.total_inquiries ?? totalInquiries,
+          properties_by_status: apiStats.properties_by_status ?? propertiesByStatus,
         } : {
           total_properties: totalProperties,
           active_properties: activeProperties,
