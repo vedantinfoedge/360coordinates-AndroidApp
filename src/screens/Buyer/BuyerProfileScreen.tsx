@@ -39,7 +39,7 @@ const TOTAL_INTERACTION_LIMIT = 5;
 const INTERACTION_STORAGE_KEY = 'interaction_remaining';
 
 const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
-  const {user, logout, isAuthenticated} = useAuth();
+  const {user, logout, isAuthenticated, setUser} = useAuth();
   const insets = useSafeAreaInsets();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(30)).current;
@@ -100,7 +100,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     phone: userData.phone || '',
     email: userData.email || '',
     address: userData.address || '',
-    alternateMobile: '',
+    alternateMobile: (user as any)?.alternate_mobile || '',
   });
 
   const [saving, setSaving] = useState(false);
@@ -110,6 +110,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     phone: userData.phone || '',
     email: userData.email || '',
     address: userData.address || '',
+    alternateMobile: (user as any)?.alternate_mobile || '',
   });
 
   // Update profile image when user changes
@@ -137,9 +138,17 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
       const updateResponse = await buyerService.updateProfile({
         full_name: formData.name,
         address: formData.address,
+        alternate_mobile: formData.alternateMobile,
       });
 
       if (updateResponse && updateResponse.success) {
+        if (user) {
+          setUser({
+            ...user,
+            full_name: formData.name,
+            address: formData.address,
+          });
+        }
         CustomAlert.alert('Success', 'Profile updated successfully');
         setOriginalData({...formData});
         setIsEditing(false);
