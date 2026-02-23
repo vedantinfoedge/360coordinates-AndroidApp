@@ -269,7 +269,10 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             routes: [{name: 'Agent'}],
           });
         } else {
-          (parentNav as any)?.navigate('MainTabs', {screen: 'Profile'});
+          (parentNav as any)?.reset({
+            index: 0,
+            routes: [{name: 'MainTabs'}],
+          });
         }
       } else if (returnTo === 'Chats') {
         if (userTypeToUse === 'seller') {

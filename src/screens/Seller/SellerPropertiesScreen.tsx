@@ -25,6 +25,7 @@ import { TabIcon } from '../../components/navigation/TabIcons';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService, DashboardStats } from '../../services/seller.service';
 import { fixImageUrl } from '../../utils/imageHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { formatters, capitalize } from '../../utils/formatters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -892,6 +893,10 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('Support' as never);
   };
 
+  if (loading) {
+    return <LoadingScreen message="Loading properties..." />;
+  }
+
   return (
     <View style={styles.container}>
       {/* Navy header — matches reference */}
@@ -1046,12 +1051,7 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading properties...</Text>
-        </View>
-      ) : properties.length === 0 ? (
+      {properties.length === 0 ? (
         <ScrollView
           style={styles.scrollContent}
           contentContainerStyle={styles.scrollContentInner}

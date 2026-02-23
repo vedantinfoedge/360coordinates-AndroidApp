@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SearchStackParamList } from '../../navigation/SearchNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import PropertyCard from '../../components/PropertyCard';
 import { useAuth } from '../../context/AuthContext';
@@ -1068,6 +1069,10 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const renderSeparator = () => <View style={styles.propertySeparator} />;
 
+  if (loading) {
+    return <LoadingScreen message="Loading properties..." />;
+  }
+
   return (
     <View style={styles.container}>
       {/* Dark top bar - search + filter chips (reference) */}
@@ -1371,12 +1376,6 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
         </ScrollView>
 
         {/* Properties List */}
-        {loading ? (
-        <View style={[styles.loadingContainer, { paddingTop: searchBarHeight }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading properties...</Text>
-        </View>
-      ) : (
         <FlatList
           data={sortedProperties}
           renderItem={renderProperty}
@@ -1396,7 +1395,6 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           }
         />
-        )}
       </View>
 
       {/* Floating View on Map - above bottom tab menu */}

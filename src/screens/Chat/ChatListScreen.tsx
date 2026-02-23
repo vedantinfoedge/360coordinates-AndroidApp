@@ -34,6 +34,7 @@ import { buyerService } from '../../services/buyer.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { capitalize } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import firestore from '@react-native-firebase/firestore';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
@@ -1353,11 +1354,13 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
           undefined;
         const profile_image_raw =
           owner?.profile_image ? fixImageUrl(owner.profile_image) ?? undefined : undefined;
+        const seller = property?.seller ?? data?.seller;
         const created_at =
-          owner?.created_at ||
+          seller?.created_at ||
           property?.seller_created_at ||
-          owner?.member_since ||
           data?.seller_created_at ||
+          owner?.created_at ||
+          owner?.member_since ||
           data?.owner?.created_at ||
           undefined;
 
@@ -1576,43 +1579,8 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  const isAgentOrSellerLoading = (user?.user_type || '').toLowerCase() === 'seller' || (user?.user_type || '').toLowerCase() === 'agent';
   if (loading && chatList.length === 0) {
-    return (
-      <View style={styles.container}>
-        {!isAgentOrSellerLoading && (
-          <BuyerHeader
-            onProfilePress={() => navigation.navigate('Profile')}
-            onSupportPress={() => navigation.navigate('Support')}
-            onLogoutPress={isLoggedIn ? logout : undefined}
-            onSignInPress={
-              isGuest
-                ? () =>
-                  (navigation as any).navigate('Auth', {
-                    screen: 'Login',
-                    params: { returnTo: 'Chats' },
-                  })
-                : undefined
-            }
-            onSignUpPress={
-              isGuest
-                ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
-                : undefined
-            }
-            showLogout={isLoggedIn}
-            showProfile={isLoggedIn}
-            showSignIn={isGuest}
-            showSignUp={isGuest}
-            scrollY={scrollY}
-            headerHeight={headerHeight}
-          />
-        )}
-        <View style={[styles.loadingContainer, { paddingTop: isAgentOrSellerLoading ? insets.top + spacing.md * 2 : insets.top + 60 + spacing.md * 2 }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading chats...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen message="Loading chats..." />;
   }
 
   const userType = (user?.user_type || '').toLowerCase();
@@ -1665,9 +1633,9 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
   const selectedBuyer = selectedBuyerId ? buyerDetailsCache[selectedBuyerId] : undefined;
   const selectedOwner = selectedOwnerPropertyId ? ownerDetailsCache[selectedOwnerPropertyId] : undefined;
   const memberSinceText = (() => {
-    const raw = cardMode === 'owner' ? selectedOwner?.created_at : selectedBuyer?.created_at;
+    const raw = cardMode === 'buyer' ? selectedBuyer?.created_at : selectedOwner?.created_at;
     if (!raw) return '—';
-    const d = new Date(raw);
+    const d = new Date(String(raw).trim().replace(' ', 'T'));
     if (Number.isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   })();

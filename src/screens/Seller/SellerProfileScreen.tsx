@@ -25,6 +25,7 @@ import SellerHeader from '../../components/SellerHeader';
 import Button from '../../components/common/Button';
 import { sellerService } from '../../services/seller.service';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { userService } from '../../services/user.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { validation } from '../../utils/validation';
@@ -423,21 +424,12 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
     ? formatters.timeAgo((user as any).created_at)
     : 'Recently';
 
-  if (loading && !user) {
-    return (
-      <View style={styles.container}>
-        <SellerHeader
-          onProfilePress={() => { }}
-          onSupportPress={() => navigation.navigate('Support')}
-          onSubscriptionPress={() => navigation.navigate('Subscription')}
-          onLogoutPress={handleLogout}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
-      </View>
-    );
+  if (loading) {
+    return <LoadingScreen message="Loading profile..." />;
+  }
+
+  if (!user) {
+    return <LoadingScreen message="Loading profile..." />;
   }
 
   return (

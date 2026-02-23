@@ -32,6 +32,7 @@ import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters } from '../../utils/formatters';
 import { DEBUG_SELLER_CRASH, SELLER_DASHBOARD_SAFE_MODE } from '../../config/debugCrash';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -909,12 +910,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
 
   // Defensive: do not render seller content until user is present (avoids crash on role-switch race)
   if (!user) {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+    return <LoadingScreen message="Loading..." />;
   }
 
   // Show access denied message if user is an agent
@@ -935,14 +931,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   if (loading && !dashboardStats) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen message="Loading dashboard..." />;
   }
 
   const stats: DashboardStats = dashboardStats ?? {

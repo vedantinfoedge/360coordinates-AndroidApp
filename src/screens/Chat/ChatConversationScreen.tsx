@@ -174,9 +174,11 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
 
     const formatMemberSince = (raw: string | number | undefined | null): string | null => {
       if (raw == null || String(raw).trim() === '') return null;
-      const d = new Date(String(raw));
+      // MySQL returns "2024-05-10 14:30:00" (space separator) which Hermes
+      // doesn't parse — normalise to ISO 8601 "T" separator first.
+      const iso = String(raw).trim().replace(' ', 'T');
+      const d = new Date(iso);
       if (Number.isNaN(d.getTime())) return null;
-      // Match website format: "March 2024"
       return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
     };
 
