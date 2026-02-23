@@ -101,6 +101,7 @@ type OwnerDetails = {
   email?: string;
   phone?: string;
   profile_image?: string;
+  created_at?: string;
 };
 
 const ChatListScreen: React.FC<Props> = ({ navigation }) => {
@@ -1352,6 +1353,13 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
           undefined;
         const profile_image_raw =
           owner?.profile_image ? fixImageUrl(owner.profile_image) ?? undefined : undefined;
+        const created_at =
+          owner?.created_at ||
+          property?.seller_created_at ||
+          owner?.member_since ||
+          data?.seller_created_at ||
+          data?.owner?.created_at ||
+          undefined;
 
         const normalized: OwnerDetails = {
           id: propertyIdStr,
@@ -1359,6 +1367,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
           email: email ? String(email) : undefined,
           phone: phone ? String(phone) : undefined,
           profile_image: profile_image_raw,
+          created_at: created_at ? String(created_at) : undefined,
         };
 
         setOwnerDetailsCache(prev => ({ ...prev, [propertyIdStr]: normalized }));
@@ -1656,11 +1665,11 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
   const selectedBuyer = selectedBuyerId ? buyerDetailsCache[selectedBuyerId] : undefined;
   const selectedOwner = selectedOwnerPropertyId ? ownerDetailsCache[selectedOwnerPropertyId] : undefined;
   const memberSinceText = (() => {
-    const raw = selectedBuyer?.created_at;
+    const raw = cardMode === 'owner' ? selectedOwner?.created_at : selectedBuyer?.created_at;
     if (!raw) return '—';
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   })();
   const cardTitle =
     cardMode === 'owner'
@@ -1924,7 +1933,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
                   {cardPerson.name || (cardMode === 'buyer' ? 'Buyer' : 'Property Owner')}
                 </Text>
                 <Text style={styles.contactInfoSince}>
-                  📅 Member since {cardMode === 'buyer' ? memberSinceText : '—'}
+                  📅 Member since {memberSinceText}
                 </Text>
                 <View style={styles.profileActions}>
                   <TouchableOpacity
