@@ -176,7 +176,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       activeOpacity={1}
       style={style}>
       <Animated.View
-        style={[styles.card, style, { transform: [{ scale: scaleAnim }] }]}>
+        style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
         {/* Property Image - carousel when multiple images */}
         <View style={styles.imageContainer} onLayout={onImageContainerLayout}>
           {hasMultipleImages && slideWidth > 0 ? (
@@ -347,80 +347,79 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
         {/* Property Info */}
         <View style={styles.infoContainer}>
-          <Text style={styles.name} numberOfLines={1}>
-            {capitalize(name)}
-          </Text>
-          <View style={styles.locationRow}>
-            <TabIcon name="location" color={colors.error} size={14} />
-            <Text style={styles.location} numberOfLines={1}>
-              {location}
+          <View style={styles.infoTop}>
+            <Text style={styles.name} numberOfLines={1}>
+              {capitalize(name)}
             </Text>
-          </View>
-          {/* Feature tags - property type, status, area */}
-          {(() => {
-            const tags: string[] = [];
-            if (property?.propertyType) {
-              const typeMap: Record<string, string> = {
-                apartment: 'Apartment', villa: 'Villa', 'farm-house': 'Farm House',
-                bungalow: 'Bungalow', 'independent-house': 'Independent House',
-                'studio-apartment': 'Studio Apartment', penthouse: 'Penthouse',
-                'plot-land': 'Plot / Land', residential: 'Residential', land: 'Land',
-                commercial: 'Commercial', 'pg-hostel': 'PG / Hostel',
+            <View style={styles.locationRow}>
+              <TabIcon name="location" color={colors.error} size={14} />
+              <Text style={styles.location} numberOfLines={1}>
+                {location}
+              </Text>
+            </View>
+            {(() => {
+              const tags: string[] = [];
+              if (property?.propertyType) {
+                const typeMap: Record<string, string> = {
+                  apartment: 'Apartment', villa: 'Villa', 'farm-house': 'Farm House',
+                  bungalow: 'Bungalow', 'independent-house': 'Independent House',
+                  'studio-apartment': 'Studio Apartment', penthouse: 'Penthouse',
+                  'plot-land': 'Plot / Land', residential: 'Residential', land: 'Land',
+                  commercial: 'Commercial', 'pg-hostel': 'PG / Hostel',
+                };
+                const pt = String(property.propertyType).toLowerCase().replace(/\s+/g, '-');
+                tags.push(typeMap[pt] || pt.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+              }
+              const avail = (property?.availabilityStatus || property?.property_status || '').toString().toLowerCase();
+              if (avail && (avail.includes('available') || avail.includes('ready') || avail.includes('completed'))) {
+                tags.push('Ready to Move');
+              }
+              if (property?.area) {
+                const a = String(property.area).trim();
+                if (a && !tags.includes(a)) tags.push(a);
+              }
+              if (tags.length === 0) return null;
+              const getTagStyle = (t: string) => {
+                const lower = t.toLowerCase();
+                if (lower.includes('ready') || lower.includes('available') || lower.includes('move')) return [styles.featureTag, styles.featureTagGreen];
+                if (lower.includes('under') || lower.includes('construction')) return [styles.featureTag, styles.featureTagAmber];
+                return styles.featureTag;
               };
-              const pt = String(property.propertyType).toLowerCase().replace(/\s+/g, '-');
-              tags.push(typeMap[pt] || pt.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
-            }
-            const avail = (property?.availabilityStatus || property?.property_status || '').toString().toLowerCase();
-            if (avail && (avail.includes('available') || avail.includes('ready') || avail.includes('completed'))) {
-              tags.push('Ready to Move');
-            }
-            if (property?.area) {
-              const a = String(property.area).trim();
-              if (a && !tags.includes(a)) tags.push(a);
-            }
-            if (tags.length === 0) return null;
-            const getTagStyle = (t: string) => {
-              const lower = t.toLowerCase();
-              if (lower.includes('ready') || lower.includes('available') || lower.includes('move')) return [styles.featureTag, styles.featureTagGreen];
-              if (lower.includes('under') || lower.includes('construction')) return [styles.featureTag, styles.featureTagAmber];
-              return styles.featureTag;
-            };
-            const getTagTextStyle = (t: string) => {
-              const lower = t.toLowerCase();
-              if (lower.includes('ready') || lower.includes('available') || lower.includes('move')) return [styles.featureTagText, styles.featureTagGreenText];
-              if (lower.includes('under') || lower.includes('construction')) return [styles.featureTagText, styles.featureTagAmberText];
-              return styles.featureTagText;
-            };
-            return (
-              <View style={styles.featureTagsRow}>
-                {tags.slice(0, 3).map((tag, i) => (
-                  <View key={i} style={getTagStyle(tag)}>
-                    <Text style={getTagTextStyle(tag)}>{tag}</Text>
-                  </View>
-                ))}
-              </View>
-            );
-          })()}
-          {/* Price row + Full-width View Details button */}
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>{price}</Text>
+              const getTagTextStyle = (t: string) => {
+                const lower = t.toLowerCase();
+                if (lower.includes('ready') || lower.includes('available') || lower.includes('move')) return [styles.featureTagText, styles.featureTagGreenText];
+                if (lower.includes('under') || lower.includes('construction')) return [styles.featureTagText, styles.featureTagAmberText];
+                return styles.featureTagText;
+              };
+              return (
+                <View style={styles.featureTagsRow}>
+                  {tags.slice(0, 3).map((tag, i) => (
+                    <View key={i} style={getTagStyle(tag)}>
+                      <Text style={getTagTextStyle(tag)}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
           </View>
-          <TouchableOpacity
-            style={styles.viewDetailsButton}
-            onPress={(e: { stopPropagation: () => void }) => {
-              e.stopPropagation();
-              if (onPress) onPress();
-            }}
-            activeOpacity={0.8}>
-            <Text style={styles.viewDetailsText}>View Details</Text>
-          </TouchableOpacity>
+          <View style={styles.infoBottom}>
+            <Text style={styles.price}>{price}</Text>
+            <TouchableOpacity
+              style={styles.viewDetailsButton}
+              onPress={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                if (onPress) onPress();
+              }}
+              activeOpacity={0.8}>
+              <Text style={styles.viewDetailsText}>View Details</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Animated.View>
     </TouchableOpacity>
   );
 };
 
-// Reference card styling - 20px radius, 340px height, 60/40 image/body
 const CARD_RADIUS = 20;
 const CARD_SHADOW = {
   shadowColor: '#0077C0',
@@ -433,22 +432,20 @@ const CARD_SHADOW = {
   borderColor: colors.borderRef,
 };
 
-const CARD_HEIGHT = 320;
+const IMAGE_HEIGHT = verticalScale(170);
 
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    maxWidth: scale(340),
-    height: CARD_HEIGHT,
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     ...CARD_SHADOW,
-    marginHorizontal: 20,
-    marginBottom: 14,
+    marginHorizontal: scale(16),
+    marginBottom: verticalScale(14),
   },
   imageContainer: {
     position: 'relative',
-    flex: 0.52,
+    height: IMAGE_HEIGHT,
     overflow: 'hidden',
     backgroundColor: colors.surfaceSecondary,
   },
@@ -616,66 +613,75 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   infoContainer: {
-    flex: 0.48,
-    paddingHorizontal: 14,
-    paddingTop: 11,
-    paddingBottom: 18,
+    paddingHorizontal: scale(14),
+    paddingTop: verticalScale(10),
+    paddingBottom: verticalScale(12),
     justifyContent: 'space-between',
   },
+  infoTop: {
+    marginBottom: verticalScale(6),
+  },
+  infoBottom: {
+    gap: verticalScale(6),
+  },
   name: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     fontFamily: typography.fontExtraBold,
     color: colors.text,
-    lineHeight: 17,
+    lineHeight: moderateScale(17),
     marginBottom: 2,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: scale(4),
-    marginBottom: scale(8),
+    marginBottom: verticalScale(6),
   },
   location: {
     flex: 1,
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(12),
     fontWeight: '400',
     color: colors.textSecondary,
-    lineHeight: moderateScale(20),
+    lineHeight: moderateScale(16),
   },
   featureTagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scale(8),
-    marginBottom: scale(10),
+    gap: scale(6),
   },
   featureTag: {
-    paddingHorizontal: scale(10),
-    paddingVertical: scale(4),
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(3),
     borderRadius: borderRadius.round,
     backgroundColor: colors.primaryXlight,
   },
   featureTagText: {
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(11),
     fontWeight: '500',
     color: colors.primary,
   },
-  priceRow: {
-    marginTop: 8,
-    marginBottom: 10,
+  featureTagGreen: {
+    backgroundColor: colors.successLight,
+  },
+  featureTagGreenText: {
+    color: '#16A34A',
+  },
+  featureTagAmber: {
+    backgroundColor: colors.warningLight,
+  },
+  featureTagAmberText: {
+    color: '#D97706',
   },
   price: {
-    fontSize: 17,
+    fontSize: moderateScale(16),
     fontFamily: typography.fontExtraBold,
     color: colors.primary,
   },
   viewDetailsButton: {
     width: '100%',
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 9,
-    paddingHorizontal: 0,
-    paddingBottom: 10,
-    marginBottom: 6,
+    borderRadius: scale(12),
+    paddingVertical: verticalScale(9),
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.primary,
@@ -685,7 +691,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   viewDetailsText: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     fontFamily: typography.fontBold,
     color: '#FFFFFF',
   },
