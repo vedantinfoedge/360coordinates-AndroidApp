@@ -278,7 +278,7 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
 
   // Show loading while fetching profile for authenticated user
   if (isAuthenticated && profileLoading) {
-    return <LoadingScreen message="Loading profile..." />;
+    return <LoadingScreen variant="profile" />;
   }
 
   // Show login prompt if user is not authenticated

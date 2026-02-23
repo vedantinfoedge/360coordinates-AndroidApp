@@ -18,6 +18,7 @@ import {propertyService} from '../../services/property.service';
 import {sellerService} from '../../services/seller.service';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type EditPropertyScreenNavigationProp = NativeStackNavigationProp<
   AgentStackParamList,
@@ -146,20 +147,7 @@ const EditPropertyScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
-          onLogoutPress={logout}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading property...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen variant="addProperty" />;
   }
 
   if (!property) {

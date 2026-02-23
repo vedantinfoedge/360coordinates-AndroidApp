@@ -910,7 +910,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
 
   // Defensive: do not render seller content until user is present (avoids crash on role-switch race)
   if (!user) {
-    return <LoadingScreen message="Loading..." />;
+    return <LoadingScreen variant="dashboard" />;
   }
 
   // Show access denied message if user is an agent
@@ -931,7 +931,7 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   if (loading && !dashboardStats) {
-    return <LoadingScreen message="Loading dashboard..." />;
+    return <LoadingScreen variant="dashboard" />;
   }
 
   const stats: DashboardStats = dashboardStats ?? {

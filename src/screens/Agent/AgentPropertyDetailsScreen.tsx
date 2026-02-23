@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Share,
   Platform,
-  Linking,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -25,6 +24,7 @@ import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import {verticalScale, moderateScale, scale} from '../../utils/responsive';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
@@ -165,20 +165,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   if (loading || !property) {
-    return (
-      <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => (navigation as any).navigate('AgentTabs', {screen: 'Profile'})}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
-          onLogoutPress={logout}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading property details...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen variant="property" />;
   }
 
   // Get property images - already converted to objects in loadPropertyDetails
@@ -215,20 +202,13 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     property.available_for_bachelors === 1 ||
     property.available_for_bachelors === '1';
 
-  const handleOpenMap = async () => {
-    const lat = property?.latitude;
-    const lng = property?.longitude;
-    if (!lat || !lng) {
-      CustomAlert.alert('Location unavailable', 'This property does not have map coordinates.');
-      return;
-    }
-
-    const url = `https://www.google.com/maps?q=${encodeURIComponent(String(lat))},${encodeURIComponent(String(lng))}`;
-    try {
-      await Linking.openURL(url);
-    } catch (e) {
-      CustomAlert.alert('Error', 'Unable to open maps.');
-    }
+  const handleOpenMap = () => {
+    const listingType = normalizedStatus === 'rent' ? 'rent' : normalizedStatus === 'pg-hostel' ? 'pg-hostel' : 'buy';
+    (navigation as any).navigate('PropertyMap', {
+      propertyId: property?.id,
+      listingType,
+      hideControls: true,
+    });
   };
 
   return (

@@ -25,6 +25,7 @@ import {inquiryService} from '../../services/inquiry.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type AgentInquiriesScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AgentStackParamList>,
@@ -418,20 +419,7 @@ const AgentInquiriesScreen: React.FC<Props> = ({navigation}) => {
   );
 
   if (loading && inquiries.length === 0) {
-    return (
-      <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => navigation.navigate('AgentTabs' as never, {screen: 'Profile'} as never)}
-          onSupportPress={() => navigation.navigate('Support')}
-          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
-          onLogoutPress={logout}
-        />
-        <View style={[styles.centerContainer, {flex: 1}]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading inquiries...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen variant="inquiries" />;
   }
 
   return (

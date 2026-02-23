@@ -1580,7 +1580,7 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   if (loading && chatList.length === 0) {
-    return <LoadingScreen message="Loading chats..." />;
+    return <LoadingScreen variant="chats" />;
   }
 
   const userType = (user?.user_type || '').toLowerCase();

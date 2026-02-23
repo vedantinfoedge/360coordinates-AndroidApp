@@ -51,10 +51,188 @@ const LOADING_MESSAGES = [
   'Preparing your 360° experience…',
 ];
 
+export type LoadingScreenVariant =
+  | 'chats'
+  | 'conversation'
+  | 'property'
+  | 'listings'
+  | 'profile'
+  | 'dashboard'
+  | 'favorites'
+  | 'leads'
+  | 'inquiries'
+  | 'subscription'
+  | 'recentlyViewed'
+  | 'search'
+  | 'addProperty'
+  | 'map'
+  | 'generic';
+
+const VARIANT_CONFIG: Record<
+  LoadingScreenVariant,
+  { defaultMessage: string; messages: string[] }
+> = {
+  chats: {
+    defaultMessage: 'Loading your chats…',
+    messages: ['Collecting your conversations…', 'Loading your chats…', 'Fetching chat rooms…', 'Gathering messages…'],
+  },
+  conversation: {
+    defaultMessage: 'Loading conversation…',
+    messages: ['Loading messages…', 'Fetching conversation…', 'Loading chat…', 'Syncing messages…'],
+  },
+  property: {
+    defaultMessage: 'Loading property details…',
+    messages: ['Fetching property info…', 'Loading photos & details…', 'Loading property…', 'Gathering property data…'],
+  },
+  listings: {
+    defaultMessage: 'Loading your listings…',
+    messages: ['Loading properties…', 'Fetching your listings…', 'Loading my properties…', 'Gathering listings…'],
+  },
+  profile: {
+    defaultMessage: 'Loading your profile…',
+    messages: ['Fetching your details…', 'Loading profile…', 'Loading your info…', 'Gathering profile data…'],
+  },
+  dashboard: {
+    defaultMessage: 'Loading your dashboard…',
+    messages: ['Loading stats & insights…', 'Fetching dashboard…', 'Loading your overview…', 'Gathering analytics…'],
+  },
+  favorites: {
+    defaultMessage: 'Loading your favorites…',
+    messages: ['Fetching saved properties…', 'Loading favorites…', 'Gathering saved listings…', 'Loading your saves…'],
+  },
+  leads: {
+    defaultMessage: 'Loading leads…',
+    messages: ['Fetching buyer interests…', 'Loading leads…', 'Gathering lead data…', 'Loading inquiries…'],
+  },
+  inquiries: {
+    defaultMessage: 'Loading inquiries…',
+    messages: ['Fetching inquiries…', 'Loading buyer interests…', 'Gathering inquiries…', 'Loading leads…'],
+  },
+  subscription: {
+    defaultMessage: 'Loading subscription…',
+    messages: ['Fetching your plan…', 'Loading subscription…', 'Gathering plan details…', 'Loading your plan…'],
+  },
+  recentlyViewed: {
+    defaultMessage: 'Loading recently viewed…',
+    messages: ['Fetching your history…', 'Loading recently viewed…', 'Gathering browse history…', 'Loading history…'],
+  },
+  search: {
+    defaultMessage: 'Searching properties…',
+    messages: ['Searching properties…', 'Loading search results…', 'Fetching properties…', 'Finding matches…'],
+  },
+  addProperty: {
+    defaultMessage: 'Loading property form…',
+    messages: ['Loading form…', 'Fetching property to edit…', 'Preparing form…', 'Loading property…'],
+  },
+  map: {
+    defaultMessage: 'Loading map…',
+    messages: ['Loading map…', 'Loading properties on map…', 'Fetching locations…', 'Preparing map…'],
+  },
+  generic: {
+    defaultMessage: 'Loading…',
+    messages: LOADING_MESSAGES,
+  },
+};
+
+// Variant-specific flying cards: chat bubbles, property cards, profile, etc.
+type VariantCardBase = { type: string };
+type ChatCard = VariantCardBase & { type: 'chat'; sender: string; text: string; isYou?: boolean };
+type PropertyCardData = VariantCardBase & { type: 'property'; emoji: string; title: string; price: string; loc: string };
+type ProfileCardData = VariantCardBase & { type: 'profile'; name: string; emoji: string };
+type StatCardData = VariantCardBase & { type: 'stat'; label: string; value: string };
+type FavoriteCardData = VariantCardBase & { type: 'favorite'; title: string; emoji: string };
+type LeadCardData = VariantCardBase & { type: 'lead'; name: string; prop: string };
+type CardData = ChatCard | PropertyCardData | ProfileCardData | StatCardData | FavoriteCardData | LeadCardData | { type: 'buyer'; bg: string; tag: string; emoji: string; title: string; loc: string; price: string; priceColor: string } | { type: 'seller'; name: string; role: string; emoji: string; badge: string; badgeBg: string; prop: string; propPrice: string } | { type: 'agent'; name: string; role: string; emoji: string; badge: string; badgeBg: string; stats: string[] } | { type: 'builder'; emoji: string; project: string; dev: string; price: string; units: string };
+
+const VARIANT_CARDS: Record<LoadingScreenVariant, CardData[]> = {
+  chats: [
+    { type: 'chat', sender: 'Priya', text: 'Hi, is this available?', isYou: false },
+    { type: 'chat', sender: 'You', text: 'Yes, when can you visit?', isYou: true },
+    { type: 'chat', sender: 'Rahul', text: 'Interested in 3BHK', isYou: false },
+    { type: 'chat', sender: 'You', text: 'Tomorrow 3 PM works', isYou: true },
+    { type: 'chat', sender: 'Amit', text: 'What\'s the best price?', isYou: false },
+  ],
+  conversation: [
+    { type: 'chat', sender: 'Agent', text: 'Property is available', isYou: false },
+    { type: 'chat', sender: 'You', text: 'Can I schedule a visit?', isYou: true },
+    { type: 'chat', sender: 'Agent', text: 'Sure, tomorrow 10 AM', isYou: false },
+  ],
+  property: [
+    { type: 'property', emoji: '🏢', title: '3BHK Apartment', price: '₹2.0 Cr', loc: 'Baner, Pune' },
+    { type: 'property', emoji: '🏠', title: '2BHK Flat', price: '₹85 L', loc: 'Kothrud' },
+    { type: 'property', emoji: '🏗️', title: 'Villa', price: '₹4.5 Cr', loc: 'Hinjewadi' },
+  ],
+  listings: [
+    { type: 'buyer', bg: '#E3F2FD', tag: 'BUY', emoji: '🏢', title: '3BHK Apartment', loc: 'Baner, Pune', price: '₹2.0 Cr', priceColor: '#1565C0' },
+    { type: 'buyer', bg: '#E8F5E9', tag: 'RENT', emoji: '🏠', title: '1BHK Flat', loc: 'Kothrud', price: '₹14K/mo', priceColor: '#2E7D32' },
+    { type: 'seller', name: 'Your Listing', role: 'Seller', emoji: '👩', badge: 'Active', badgeBg: '#FFF3E0', prop: '2BHK – Nashik', propPrice: '₹85 L' },
+    { type: 'property', emoji: '🌾', title: 'Plot 1500 sqft', price: '₹42 L', loc: 'Lonavala' },
+    { type: 'buyer', bg: '#FFF8E1', tag: 'BUY', emoji: '🏘️', title: 'PG for Girls', loc: 'Hinjawadi', price: '₹7K/mo', priceColor: '#E65100' },
+  ],
+  profile: [
+    { type: 'profile', name: 'John Doe', emoji: '👤' },
+    { type: 'profile', name: 'Priya Desai', emoji: '👩' },
+    { type: 'profile', name: 'Rahul Mehta', emoji: '👨' },
+  ],
+  dashboard: [
+    { type: 'stat', label: 'Listings', value: '48' },
+    { type: 'stat', label: 'Inquiries', value: '120+' },
+    { type: 'stat', label: 'Views', value: '1.2K' },
+    { type: 'stat', label: 'Deals', value: '85' },
+  ],
+  favorites: [
+    { type: 'favorite', title: '3BHK – Saved', emoji: '❤️' },
+    { type: 'favorite', title: 'Villa – In favorites', emoji: '🏠' },
+    { type: 'property', emoji: '🏢', title: '2BHK Flat', price: '₹1.2 Cr', loc: 'Baner' },
+  ],
+  leads: [
+    { type: 'lead', name: 'Amit', prop: 'Interested in 3BHK' },
+    { type: 'lead', name: 'Priya', prop: 'Enquired today' },
+    { type: 'lead', name: 'Rahul', prop: 'Wants to visit' },
+  ],
+  inquiries: [
+    { type: 'lead', name: 'Amit', prop: '3BHK Apartment' },
+    { type: 'lead', name: 'Sneha', prop: 'Villa – Baner' },
+    { type: 'lead', name: 'Rahul', prop: '2BHK Flat' },
+  ],
+  subscription: [
+    { type: 'stat', label: 'Plan', value: 'Pro' },
+    { type: 'stat', label: 'Listings', value: '50' },
+    { type: 'stat', label: 'Features', value: 'All' },
+  ],
+  recentlyViewed: [
+    { type: 'property', emoji: '🏢', title: '3BHK', price: '₹2 Cr', loc: 'Recently viewed' },
+    { type: 'property', emoji: '🏠', title: '1BHK', price: '₹14K', loc: 'Recently viewed' },
+    { type: 'property', emoji: '🌾', title: 'Plot', price: '₹42 L', loc: 'Recently viewed' },
+  ],
+  search: [
+    { type: 'buyer', bg: '#E3F2FD', tag: 'BUY', emoji: '🏢', title: '3BHK Apartment', loc: 'Baner', price: '₹2.0 Cr', priceColor: '#1565C0' },
+    { type: 'buyer', bg: '#E8F5E9', tag: 'RENT', emoji: '🏠', title: '1BHK Flat', loc: 'Pune', price: '₹14K/mo', priceColor: '#2E7D32' },
+    { type: 'property', emoji: '🏗️', title: 'Villa', price: '₹4 Cr', loc: 'Hinjewadi' },
+  ],
+  addProperty: [
+    { type: 'property', emoji: '📝', title: 'Property form', price: 'Loading…', loc: 'Details' },
+    { type: 'stat', label: 'Photos', value: '…' },
+    { type: 'stat', label: 'Location', value: '…' },
+  ],
+  map: [
+    { type: 'property', emoji: '📍', title: 'Map pins', price: 'Loading…', loc: 'Properties' },
+  ],
+  generic: [
+    { type: 'buyer', bg: '#E3F2FD', tag: 'BUY', emoji: '🏢', title: '3BHK Apartment', loc: 'Baner, Pune', price: '₹2.0 Cr', priceColor: '#1565C0' },
+    { type: 'seller', name: 'Priya Desai', role: 'Seller / Owner', emoji: '👩', badge: 'Posted', badgeBg: '#FFF3E0', prop: '2BHK – Nashik', propPrice: '₹85 L' },
+    { type: 'agent', name: 'Rahul Mehta', role: 'Certified Agent', emoji: '🤝', badge: 'RERA Certified', badgeBg: '#EDE7F6', stats: ['48', '4.8★', '120+'] },
+    { type: 'builder', emoji: '🏗️', project: 'Skyline Residency', dev: 'by Vedant Builders', price: '₹45L–₹1.2Cr', units: '12 units' },
+    { type: 'buyer', bg: '#E8F5E9', tag: 'RENT', emoji: '🏠', title: '1BHK Flat', loc: 'Kothrud, Pune', price: '₹14K/mo', priceColor: '#2E7D32' },
+  ] as CardData[],
+};
+
 type LoadingScreenProps = {
   message?: string;
   /** If provided, overrides cycling messages */
   customMessage?: string;
+  /** Screen variant for contextual visuals and messages */
+  variant?: LoadingScreenVariant;
 };
 
 const GridPattern: React.FC = () => (
@@ -78,9 +256,12 @@ const FLYING_CARDS = [
   { type: 'buyer', bg: '#E8F5E9', tag: 'RENT', emoji: '🏠', title: '1BHK Flat', loc: 'Kothrud, Pune', price: '₹14K/mo', priceColor: '#2E7D32' },
 ];
 
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, customMessage }) => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, customMessage, variant = 'generic' }) => {
   const [msgIndex, setMsgIndex] = useState(0);
   const [slotIndex, setSlotIndex] = useState(0);
+
+  const variantConfig = VARIANT_CONFIG[variant];
+  const variantCards = VARIANT_CARDS[variant];
 
   const glowOpacity = useRef(new Animated.Value(0.8)).current;
   const progressWidth = useRef(new Animated.Value(0)).current;
@@ -132,13 +313,14 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, customMessage })
   // Cycling loading messages (only when no custom/message prop)
   useEffect(() => {
     if (customMessage ?? message) return;
+    const msgs = variantConfig.messages;
     const id = setInterval(() => {
       Animated.timing(msgOpacity, {
         toValue: 0,
         duration: 150,
         useNativeDriver: true,
       }).start(() => {
-        setMsgIndex(i => (i + 1) % LOADING_MESSAGES.length);
+        setMsgIndex(i => (i + 1) % msgs.length);
         Animated.timing(msgOpacity, {
           toValue: 1,
           duration: 150,
@@ -147,7 +329,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, customMessage })
       });
     }, 2400);
     return () => clearInterval(id);
-  }, [customMessage, msgOpacity]);
+  }, [customMessage, message, msgOpacity, variantConfig.messages]);
 
   // Slot cycle: buyer → seller → agent → builder
   useEffect(() => {
@@ -227,10 +409,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, customMessage })
         });
       }, delay);
     };
-    [0, 1, 2, 3, 4].forEach((i, d) => runCard(i, d * 700));
-  }, [cardAnims]);
+    const cardCount = Math.min(variantCards.length, 5);
+    for (let i = 0; i < cardCount; i++) runCard(i, i * 700);
+  }, [cardAnims, variant]);
 
-  const displayMessage = customMessage ?? message ?? LOADING_MESSAGES[msgIndex];
+  const displayMessage = customMessage ?? message ?? variantConfig.messages[msgIndex % variantConfig.messages.length] ?? variantConfig.defaultMessage;
 
   const getSlotStyle = (i: number) => {
     if (slotIndex !== i) return styles.phSlot;
@@ -241,7 +424,9 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, customMessage })
   };
 
   const renderFlyingCard = (idx: number) => {
-    const card = FLYING_CARDS[idx];
+    const cards = variantCards;
+    if (idx >= cards.length) return null;
+    const card = cards[idx];
     const c = cardAnims[idx];
     const tx = c.translateX.interpolate({
       inputRange: [0, 1],
@@ -252,6 +437,135 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, customMessage })
       outputRange: [-verticalScale(90), 0],
     });
 
+    if (card.type === 'chat') {
+      const chatCard = card as ChatCard;
+      return (
+        <Animated.View
+          key={idx}
+          style={[
+            styles.fc,
+            styles.chatCard,
+            chatCard.isYou ? styles.chatCardYou : styles.chatCardThem,
+            {
+              opacity: c.opacity,
+              transform: [{ translateX: tx }, { translateY: ty }, { scale: c.scale }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={styles.chatSender}>{chatCard.sender}</Text>
+          <Text style={styles.chatText} numberOfLines={2}>{chatCard.text}</Text>
+        </Animated.View>
+      );
+    }
+    if (card.type === 'property') {
+      const pCard = card as PropertyCardData;
+      return (
+        <Animated.View
+          key={idx}
+          style={[
+            styles.fc,
+            styles.buyerCard,
+            {
+              opacity: c.opacity,
+              transform: [{ translateX: tx }, { translateY: ty }, { scale: c.scale }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <View style={[styles.bcImg, { backgroundColor: '#E3F2FD' }]}>
+            <Text style={styles.bcEmoji}>{pCard.emoji}</Text>
+          </View>
+          <View style={styles.bcBody}>
+            <Text style={styles.bcTitle}>{pCard.title}</Text>
+            <Text style={styles.bcLoc}>📍 {pCard.loc}</Text>
+            <Text style={[styles.bcPrice, { color: '#1565C0' }]}>{pCard.price}</Text>
+          </View>
+        </Animated.View>
+      );
+    }
+    if (card.type === 'profile') {
+      const profCard = card as ProfileCardData;
+      return (
+        <Animated.View
+          key={idx}
+          style={[
+            styles.fc,
+            styles.profileCard,
+            {
+              opacity: c.opacity,
+              transform: [{ translateX: tx }, { translateY: ty }, { scale: c.scale }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <View style={styles.profileCardAvatar}>
+            <Text style={styles.profileCardEmoji}>{profCard.emoji}</Text>
+          </View>
+          <Text style={styles.profileCardName}>{profCard.name}</Text>
+        </Animated.View>
+      );
+    }
+    if (card.type === 'stat') {
+      const statCard = card as StatCardData;
+      return (
+        <Animated.View
+          key={idx}
+          style={[
+            styles.fc,
+            styles.statCard,
+            {
+              opacity: c.opacity,
+              transform: [{ translateX: tx }, { translateY: ty }, { scale: c.scale }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={styles.statCardValue}>{statCard.value}</Text>
+          <Text style={styles.statCardLabel}>{statCard.label}</Text>
+        </Animated.View>
+      );
+    }
+    if (card.type === 'favorite') {
+      const favCard = card as FavoriteCardData;
+      return (
+        <Animated.View
+          key={idx}
+          style={[
+            styles.fc,
+            styles.favoriteCard,
+            {
+              opacity: c.opacity,
+              transform: [{ translateX: tx }, { translateY: ty }, { scale: c.scale }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={styles.favoriteCardEmoji}>{favCard.emoji}</Text>
+          <Text style={styles.favoriteCardTitle}>{favCard.title}</Text>
+        </Animated.View>
+      );
+    }
+    if (card.type === 'lead') {
+      const leadCard = card as LeadCardData;
+      return (
+        <Animated.View
+          key={idx}
+          style={[
+            styles.fc,
+            styles.leadCard,
+            {
+              opacity: c.opacity,
+              transform: [{ translateX: tx }, { translateY: ty }, { scale: c.scale }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={styles.leadCardName}>{leadCard.name}</Text>
+          <Text style={styles.leadCardProp}>{leadCard.prop}</Text>
+        </Animated.View>
+      );
+    }
     if (card.type === 'buyer') {
       return (
         <Animated.View
@@ -388,17 +702,18 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, customMessage })
 
   return (
     <View style={styles.outer}>
-      <LinearGradient
-        colors={[COLORS.bgGradStart, COLORS.bgGradMid, COLORS.bgGradEnd]}
-        style={StyleSheet.absoluteFill}
-        locations={[0, 0.55, 1]}
-      />
+      <View style={StyleSheet.absoluteFill}>
+        <LinearGradient
+          colors={[COLORS.bgGradStart, COLORS.bgGradMid, COLORS.bgGradEnd]}
+          locations={[0, 0.55, 1]}
+        />
+      </View>
       <GridPattern />
       <Animated.View style={[styles.bgGlow, { opacity: glowOpacity }]} />
 
       {/* Stage */}
       <View style={styles.stage}>
-        {[0, 1, 2, 3, 4].map(renderFlyingCard)}
+        {variantCards.slice(0, 5).map((_, idx) => renderFlyingCard(idx))}
 
         {/* Illustrated Phone */}
         <View style={styles.iPhone}>
@@ -587,6 +902,57 @@ const styles = StyleSheet.create({
   bcTitle: { fontSize: 10, fontWeight: '800', color: '#0D1B2E' },
   bcLoc: { fontSize: 8, color: '#8A97A8' },
   bcPrice: { fontSize: 11, fontWeight: '800' },
+  chatCard: {
+    width: scale(90),
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 8,
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 }, default: {} }),
+  },
+  chatCardYou: { alignSelf: 'flex-end', backgroundColor: '#E3F2FD' },
+  chatCardThem: { alignSelf: 'flex-start', backgroundColor: '#F5F5F5' },
+  chatSender: { fontSize: 9, fontWeight: '800', color: '#1565C0', marginBottom: 2 },
+  chatText: { fontSize: 10, color: '#0D1B2E', lineHeight: 14 },
+  profileCard: {
+    width: scale(75),
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 }, default: {} }),
+  },
+  profileCardAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#E3F2FD', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  profileCardEmoji: { fontSize: 18 },
+  profileCardName: { fontSize: 10, fontWeight: '800', color: '#0D1B2E' },
+  statCard: {
+    width: scale(70),
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'center',
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 }, default: {} }),
+  },
+  statCardValue: { fontSize: 16, fontWeight: '800', color: '#1565C0' },
+  statCardLabel: { fontSize: 8, color: '#8A97A8', marginTop: 2 },
+  favoriteCard: {
+    width: scale(85),
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'center',
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 }, default: {} }),
+  },
+  favoriteCardEmoji: { fontSize: 24, marginBottom: 4 },
+  favoriteCardTitle: { fontSize: 10, fontWeight: '800', color: '#0D1B2E', textAlign: 'center' },
+  leadCard: {
+    width: scale(85),
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 8,
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 }, default: {} }),
+  },
+  leadCardName: { fontSize: 11, fontWeight: '800', color: '#0D1B2E' },
+  leadCardProp: { fontSize: 9, color: '#8A97A8', marginTop: 2 },
   sellerCard: {
     width: scale(86),
     backgroundColor: 'white',

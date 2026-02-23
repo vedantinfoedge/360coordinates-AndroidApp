@@ -39,6 +39,7 @@ type Props = {
       budget?: string;
       bedrooms?: string;
       area?: string;
+      hideControls?: boolean;
     };
   };
 };
@@ -211,6 +212,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
   );
 
   const propertyId = params.propertyId;
+  const hideControls = params.hideControls === true;
 
   const handlePropertyPress = (property: any) => {
     try {
@@ -257,20 +259,22 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
         showListToggle={false}
         listingType={listingTypeForMap}
         selectedPropertyId={propertyId ? String(propertyId) : undefined}
-        fullscreenSearchBar={fullscreenSearchBar}
+        fullscreenSearchBar={hideControls ? undefined : fullscreenSearchBar}
         searchParams={searchParams}
         userLocation={userLocation}
       />
 
-      <View style={styles.floatingListButtonWrapper} pointerEvents="box-none">
-        <TouchableOpacity
-          style={styles.floatingListButton}
-          activeOpacity={0.8}
-          onPress={handleGoBackToList}>
-          <TabIcon name="list" color={colors.text} size={20} />
-          <Text style={styles.floatingListButtonText}>Go back to list</Text>
-        </TouchableOpacity>
-      </View>
+      {!hideControls && (
+        <View style={styles.floatingListButtonWrapper} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.floatingListButton}
+            activeOpacity={0.8}
+            onPress={handleGoBackToList}>
+            <TabIcon name="list" color={colors.text} size={20} />
+            <Text style={styles.floatingListButtonText}>Go back to list</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };

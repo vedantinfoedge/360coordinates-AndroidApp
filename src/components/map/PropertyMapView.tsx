@@ -21,6 +21,7 @@ import { buyerService } from '../../services/buyer.service';
 import { Share } from 'react-native';
 import { MAP_CONFIG } from '../../config/mapbox.config';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../common/LoadingScreen';
 import { PG_HOSTEL_PROPERTY_TYPE, buildPGHostelFetchParams } from '../../utils/propertySearchParams';
 import { geocodeLocation } from '../../utils/geocoding';
 import { useAuth } from '../../context/AuthContext';
@@ -763,12 +764,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   // When fullscreenSearchBar is provided, keep it visible during loading so users
   // can continue interacting with the search bar (fixes CompactSearchBar "not working after search")
   if (loading && !fullscreenSearchBar) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading properties...</Text>
-      </View>
-    );
+    return <LoadingScreen variant="map" />;
   }
 
   // Show error if Mapbox is not available

@@ -425,11 +425,11 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
     : 'Recently';
 
   if (loading) {
-    return <LoadingScreen message="Loading profile..." />;
+    return <LoadingScreen variant="profile" />;
   }
 
   if (!user) {
-    return <LoadingScreen message="Loading profile..." />;
+    return <LoadingScreen variant="profile" />;
   }
 
   return (

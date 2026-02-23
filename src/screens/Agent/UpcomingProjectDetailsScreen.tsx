@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  ActivityIndicator,
   Share,
   Platform,
   Linking,
@@ -19,6 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { AgentStackParamList } from '../../navigation/AgentNavigator';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { verticalScale } from '../../utils/responsive';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import { propertyService } from '../../services/property.service';
 import { validateAndProcessPropertyImages, PropertyImage } from '../../utils/imageHelper';
@@ -26,8 +26,8 @@ import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import { formatters, capitalize, capitalizeAmenity } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { AMENITIES_LIST } from '../../utils/propertyTypeConfig';
-import PropertyDetailsHeader from '../../components/PropertyDetailsHeader';
 import { buyerService } from '../../services/buyer.service';
 import { createLead } from '../../services/leadsService';
 import {
@@ -224,7 +224,7 @@ const buildFormattedProject = (prop: any, propertyImages: PropertyImage[]): any 
 
 const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const isBuyer = (user?.user_type || '').toLowerCase() === 'buyer';
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -523,14 +523,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
   };
 
   if (loading || !property) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading project details...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen variant="property" message="Loading project details…" />;
   }
 
   const propertyImages: PropertyImage[] = property.images && Array.isArray(property.images) && property.images.length > 0
@@ -583,20 +576,8 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
   return (
     <View style={styles.container}>
-      <PropertyDetailsHeader
-        onProfilePress={() => (navigation as any).navigate('AgentTabs')}
-        onSupportPress={() => navigation.navigate('Support')}
-        onLogoutPress={user ? logout : undefined}
-        onSignInPress={isGuest ? () => (navigation as any).navigate('Auth', { screen: 'Login', params: { returnTo: 'UpcomingProjectDetails', propertyId: route.params.propertyId } }) : undefined}
-        onSignUpPress={isGuest ? () => (navigation as any).navigate('Auth', { screen: 'Register' }) : undefined}
-        showLogout={isLoggedIn}
-        showProfile={isLoggedIn}
-        showSignIn={isGuest}
-        showSignUp={isGuest}
-      />
-
       <View style={styles.contentSheet}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, isBuyer && { paddingBottom: 160 }]}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Image carousel */}
           <View style={styles.imageCarouselContainer}>
           {/* Back button - top left */}
@@ -627,6 +608,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                 scrollEventThrottle={16}
                 style={styles.imageCarousel}
                 contentContainerStyle={{ ...styles.imageCarouselContent, width: IMAGE_CAROUSEL_WIDTH * propertyImages.length }}
+                decelerationRate="fast"
                 snapToInterval={IMAGE_CAROUSEL_WIDTH}
                 snapToAlignment="center">
                 {propertyImages.map((image: PropertyImage, index: number) => (
@@ -681,7 +663,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
           )}
         </View>
 
-        {/* Header: Title, badge, location, price */}
+        {/* Header: Title, badge, location, price - same as PropertyDetailsScreen */}
         <View style={styles.headerSection}>
           <View style={styles.titleRow}>
             <Text style={styles.title}>{(property.title || 'Project').toUpperCase()}</Text>
@@ -693,82 +675,66 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
             <TabIcon name="location" color="#E53935" size={16} />
             <Text style={styles.location}>{property.location || property.city || property.fullAddress || property.address || 'Location not specified'}</Text>
           </View>
-          <Text style={styles.priceLabel}>Price Range</Text>
-          <Text style={styles.price}>{priceRangeText}</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{priceRangeText}</Text>
+            <Text style={styles.priceOnwards}>onwards</Text>
+          </View>
           {pricePerSqft && <Text style={styles.priceSub}>{pricePerSqft}</Text>}
           {bookingAmount && <Text style={styles.bookingLabel}>Booking amount: {bookingAmount}</Text>}
         </View>
 
-        {/* Quick info: Configuration (BHK), Status Upcoming, area, towers, units, floors, carpet area */}
+        {/* Quick info - same card structure as PropertyDetailsScreen */}
         <View style={styles.quickInfo}>
           {bhkTypeText ? (
             <View style={styles.infoCard}>
-              <View style={styles.infoIconWrap}>
+              <View style={styles.infoIconContainer}>
                 <TabIcon name="home" color={colors.primary} size={20} />
               </View>
-              <Text style={styles.infoText}>{bhkTypeText}</Text>
+              <Text style={styles.infoLabel}>Config</Text>
+              <Text style={styles.infoValue}>{bhkTypeText}</Text>
             </View>
           ) : null}
           <View style={styles.infoCard}>
-            <View style={styles.infoIconWrap}>
+            <View style={styles.infoIconContainer}>
               <TabIcon name="clipboard" color={colors.primary} size={20} />
             </View>
-            <Text style={styles.infoText}>Upcoming</Text>
+            <Text style={styles.infoLabel}>Status</Text>
+            <Text style={styles.infoValue}>Upcoming</Text>
           </View>
-          {(property.property_type || property.project_type) && (
+          {(property.property_type || property.project_type) ? (
             <View style={styles.infoCard}>
-              <View style={styles.infoIconWrap}>
+              <View style={styles.infoIconContainer}>
                 <TabIcon name="building" color={colors.primary} size={20} />
               </View>
-              <Text style={styles.infoText}>{capitalize(String(property.property_type || property.project_type))}</Text>
+              <Text style={styles.infoLabel}>Type</Text>
+              <Text style={styles.infoValue}>{capitalize(String(property.property_type || property.project_type))}</Text>
             </View>
-          )}
-          {property.project_status && (
-            <View style={styles.infoCard}>
-              <View style={styles.infoIconWrap}>
-                <TabIcon name="clipboard" color={colors.primary} size={20} />
-              </View>
-              <Text style={styles.infoText}>{String(property.project_status)}</Text>
-            </View>
-          )}
+          ) : null}
           {hasValidArea && (
             <View style={styles.infoCard}>
-              <View style={styles.infoIconWrap}>
-                <TabIcon name="square" color={colors.primary} size={20} />
+              <View style={styles.infoIconContainer}>
+                <TabIcon name="square" color={colors.textSecondary} size={20} />
               </View>
-              <Text style={styles.infoText}>{property.area} sq ft</Text>
+              <Text style={styles.infoLabel}>Area</Text>
+              <Text style={styles.infoValue}>{property.area} sq ft</Text>
             </View>
           )}
           {property.number_of_towers != null && property.number_of_towers !== '' && (
             <View style={styles.infoCard}>
-              <View style={styles.infoIconWrap}>
+              <View style={styles.infoIconContainer}>
                 <TabIcon name="building" color={colors.primary} size={20} />
               </View>
-              <Text style={styles.infoText}>{property.number_of_towers} Tower{Number(property.number_of_towers) !== 1 ? 's' : ''}</Text>
+              <Text style={styles.infoLabel}>Towers</Text>
+              <Text style={styles.infoValue}>{property.number_of_towers}</Text>
             </View>
           )}
           {property.total_units != null && property.total_units !== '' && (
             <View style={styles.infoCard}>
-              <View style={styles.infoIconWrap}>
+              <View style={styles.infoIconContainer}>
                 <TabIcon name="home" color={colors.primary} size={20} />
               </View>
-              <Text style={styles.infoText}>{property.total_units} Units</Text>
-            </View>
-          )}
-          {property.floors_count != null && property.floors_count !== '' && (
-            <View style={styles.infoCard}>
-              <View style={styles.infoIconWrap}>
-                <TabIcon name="layers" color={colors.primary} size={20} />
-              </View>
-              <Text style={styles.infoText}>{property.floors_count} Floors</Text>
-            </View>
-          )}
-          {hasValidCarpetArea && (
-            <View style={styles.infoCard}>
-              <View style={styles.infoIconWrap}>
-                <TabIcon name="square" color={colors.primary} size={20} />
-              </View>
-              <Text style={styles.infoText}>{carpetDisplay}</Text>
+              <Text style={styles.infoLabel}>Units</Text>
+              <Text style={styles.infoValue}>{property.total_units}</Text>
             </View>
           )}
         </View>
@@ -780,7 +746,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>Configurations</Text>
             </View>
-            <View style={styles.sectionDivider} />
             <View style={styles.chipRow}>
               {configurations.map((c, i) => (
                 <View key={i} style={styles.chip}>
@@ -793,22 +758,20 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
         {/* Description */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleBar} />
-            <Text style={styles.sectionTitle}>About this Project</Text>
-          </View>
-          <View style={styles.sectionDivider} />
-          <Text style={styles.description}>{property.description || 'No description available'}</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>About this Project</Text>
+            </View>
+            <Text style={styles.description}>{property.description || 'No description available'}</Text>
         </View>
 
         {/* Project details grid: only show fields that have data from API */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleBar} />
-            <Text style={styles.sectionTitle}>Project Details</Text>
-          </View>
-          <View style={styles.sectionDivider} />
-          <View style={styles.detailsGrid}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Project Details</Text>
+            </View>
+            <View style={styles.detailsGrid}>
             {renderDetail('Builder / Developer', property.builder)}
             {renderDetail('Project Type', property.property_type || property.project_type)}
             {renderDetail('Project Status', property.project_status)}
@@ -835,14 +798,14 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
             {renderDetail('Land Ownership', property.land_ownership_type)}
             {renderDetail('Bank Approved', property.bank_approved)}
             {approvedBanks.length > 0 && (
-              <View style={styles.detailItemFull}>
+              <View style={[styles.detailItem, styles.detailItemFull]}>
                 <Text style={styles.detailLabel}>Approved Banks</Text>
                 <Text style={styles.detailValue}>{approvedBanks.join(', ')}</Text>
               </View>
             )}
             {property.other_bank_names && renderDetail('Other Banks', property.other_bank_names)}
             {property.mapLink ? (
-              <View style={styles.detailItemFull}>
+              <View style={[styles.detailItem, styles.detailItemFull]}>
                 <Text style={styles.detailLabel}>Map Link</Text>
                 <TouchableOpacity onPress={() => {
                   const url = String(property.mapLink).startsWith('http') ? property.mapLink : `https://${property.mapLink}`;
@@ -862,7 +825,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>Amenities</Text>
             </View>
-            <View style={styles.sectionDivider} />
             <View style={styles.amenitiesGrid}>
               {amenities.map((a: string, i: number) => {
                 const id = String(a).trim().toLowerCase().replace(/\s+/g, '_');
@@ -883,12 +845,11 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
 
         {/* Location / Address - same as property details: address + View on Map button */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleBar} />
-            <Text style={styles.sectionTitle}>Location</Text>
-          </View>
-          <View style={styles.sectionDivider} />
-          <Text style={styles.address}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Location</Text>
+            </View>
+            <Text style={styles.address}>
             {[property.location, hasValidArea ? property.area : null, property.city, property.state].filter(Boolean).join(', ') || property.address || property.fullAddress || 'Address not available'}
           </Text>
           {property.additional_address && <Text style={styles.addressSub}>{property.additional_address}</Text>}
@@ -906,6 +867,8 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               (navigation as any).navigate('PropertyMap', {
                 propertyId: property.id,
                 listingType: 'buy',
+                location: property.location || property.city || '',
+                city: property.city || property.location || '',
               });
             }}>
             <TabIcon name="location" color="#E53935" size={18} />
@@ -920,7 +883,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>Contact & Sales</Text>
             </View>
-            <View style={styles.sectionDivider} />
             <View style={styles.detailsGrid}>
               {renderDetail('Sales Person Name', property.sales_name)}
               {renderDetail('Phone', property.sales_number)}
@@ -940,7 +902,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>Project Highlights</Text>
             </View>
-            <View style={styles.sectionDivider} />
             <Text style={styles.description}>{property.project_highlights}</Text>
           </View>
         )}
@@ -952,7 +913,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>Unique Selling Points</Text>
             </View>
-            <View style={styles.sectionDivider} />
             <Text style={styles.description}>{property.usp}</Text>
           </View>
         )}
@@ -964,7 +924,6 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>Project Brochure</Text>
             </View>
-            <View style={styles.sectionDivider} />
             <TouchableOpacity
               style={styles.brochureButton}
               onPress={() => {
@@ -980,37 +939,39 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
         </ScrollView>
 
         {(isBuyer || isGuest) && (
-          <>
-            {!interactionLoading && !isGuest && (
+          <View style={[styles.bottomCta, { paddingBottom: insets.bottom + 8 }]}>
+            {user && user.user_type === 'buyer' && !interactionLoading && !isGuest && (
               <View style={styles.creditsRow}>
-                <View style={styles.creditsDot} />
-                <Text style={[styles.creditsText, interactionState.remaining <= 0 && styles.creditsTextError]}>
-                  Credits Left: {interactionState.remaining}/{interactionState.max}
-                </Text>
+                <View style={styles.creditsBadge}>
+                  <View style={styles.creditsDot} />
+                  <Text style={[styles.creditsText, interactionState.remaining <= 0 && styles.creditsTextError]}>
+                    Credits Left: {interactionState.remaining} / {interactionState.max}
+                  </Text>
+                </View>
               </View>
             )}
-            <View style={[styles.buyerActionButtons, { paddingBottom: insets.bottom + 8 }]}>
-            <TouchableOpacity
-              style={[styles.contactButton, (processingContact || interactionLoading) && !isGuest && styles.contactButtonDisabled]}
-              onPress={handleViewContact}
-              disabled={!isGuest && (processingContact || interactionLoading)}>
-              <Text style={styles.contactButtonText}>{showContactModal ? 'Hide Contact' : 'Show Contacts'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chatButton, (processingChat || interactionLoading) && !isGuest && styles.contactButtonDisabled]}
-              onPress={handleChatWithBuilder}
-              disabled={!isGuest && (processingChat || interactionLoading)}>
-              <>
-                <TabIcon name="chats" color={colors.surface} size={18} />
-                <Text style={styles.chatButtonText}>Chat with Builder</Text>
-              </>
-            </TouchableOpacity>
+            <View style={styles.ctaRow}>
+              <TouchableOpacity
+                style={[styles.contactButton, (processingContact || interactionLoading) && !isGuest && styles.contactButtonDisabled]}
+                onPress={handleViewContact}
+                disabled={!isGuest && (processingContact || interactionLoading)}>
+                <Text style={styles.contactButtonText}>{showContactModal ? 'Hide Contact' : 'View Contact'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chatButton, (processingChat || interactionLoading) && !isGuest && styles.contactButtonDisabled]}
+                onPress={handleChatWithBuilder}
+                disabled={!isGuest && (processingChat || interactionLoading)}>
+                <View style={styles.chatButtonContent}>
+                  <TabIcon name="inquiries" color={colors.surface} size={18} />
+                  <Text style={styles.chatButtonText}>Chat with Builder</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
-        </>
         )}
 
       {!isBuyer && !isGuest && (
-        <View style={[styles.actionButtons, { paddingBottom: insets.bottom }]}>
+        <View style={[styles.actionButtons, { paddingBottom: insets.bottom + 8 }]}>
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => navigation.navigate('EditProperty', { propertyId: property.id })}>
@@ -1126,10 +1087,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                   setShowContactModal(false);
                   setTimeout(() => handleChatWithBuilder(), 300);
                 }}>
-                <>
-                  <TabIcon name="chats" color={colors.surface} size={18} />
+                <View style={styles.modalChatButtonContent}>
+                  <TabIcon name="inquiries" color={colors.surface} size={18} />
                   <Text style={styles.modalChatButtonText}>Start Chat</Text>
-                </>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -1146,104 +1107,298 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
   );
 };
 
-const REFERENCE_BG = '#0D1B2A';
+const REFERENCE_BG = '#1D242B';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: REFERENCE_BG },
   contentSheet: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderTopLeftRadius: borderRadius.xxl,
     borderTopRightRadius: borderRadius.xxl,
     overflow: 'hidden',
-    marginTop: -borderRadius.xxl,
   },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
-  loadingText: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
-  imageCarouselContainer: { height: 300, position: 'relative', marginHorizontal: spacing.md, marginTop: spacing.lg, borderRadius: borderRadius.xl, overflow: 'hidden', backgroundColor: '#D4E4D4' },
-  imageBackButton: { position: 'absolute', top: spacing.md, left: spacing.md, zIndex: 10 },
-  imageBackButtonInner: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.95)', justifyContent: 'center', alignItems: 'center', ...Platform.select({ android: { elevation: 4 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 } }) },
-  imageActionButtons: { position: 'absolute', top: spacing.md, right: spacing.md, flexDirection: 'row', gap: spacing.sm, zIndex: 10 },
+  scrollContent: { paddingBottom: verticalScale(120) },
+  imageCarouselContainer: {
+    height: verticalScale(380),
+    position: 'relative',
+    overflow: 'hidden',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    backgroundColor: '#c8dfe8',
+    borderRadius: borderRadius.xl,
+  },
+  imageBackButton: { position: 'absolute', top: 14, left: 14, zIndex: 10 },
+  imageBackButtonInner: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({ android: { elevation: 4 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 10 } }),
+  },
+  imageActionButtons: { position: 'absolute', top: 14, right: 14, flexDirection: 'row', gap: 8, zIndex: 10 },
   imageActionBtn: { zIndex: 11 },
-  imageActionBtnInner: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.95)', justifyContent: 'center', alignItems: 'center', ...Platform.select({ android: { elevation: 4 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 } }) },
-  imageCarousel: { height: 300, borderRadius: borderRadius.lg },
+  imageActionBtnInner: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({ android: { elevation: 4 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 10 } }),
+  },
+  imageCarousel: { height: verticalScale(340), borderRadius: borderRadius.xl },
   imageCarouselContent: { alignItems: 'center' },
-  imageContainer: { width: IMAGE_CAROUSEL_WIDTH, height: 300, overflow: 'hidden' },
-  image: { width: '100%', height: '100%' },
+  imageContainer: { width: IMAGE_CAROUSEL_WIDTH, height: verticalScale(340), borderRadius: borderRadius.xl, overflow: 'hidden' },
+  image: { width: '100%', height: '100%', borderRadius: borderRadius.xl },
   imagePlaceholder: { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' },
   imagePlaceholderIconWrap: { marginBottom: spacing.xs },
   imagePlaceholderSubtext: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
-  imageIndicators: { position: 'absolute', bottom: spacing.md, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: spacing.xs, zIndex: 3 },
-  indicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
-  indicatorActive: { backgroundColor: colors.surface, width: 24 },
-  shareIcon: { fontSize: 18 },
-  headerSection: { backgroundColor: colors.surface, padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.border },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm, flexWrap: 'wrap' },
-  title: { fontSize: 24, fontWeight: '700', color: colors.text, flex: 1, lineHeight: 32 },
+  imageIndicators: {
+    position: 'absolute',
+    bottom: spacing.md,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    zIndex: 3,
+    paddingVertical: spacing.xs,
+  },
+  indicator: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.5)' },
+  indicatorActive: { backgroundColor: colors.surface, width: 18, borderRadius: 3 },
+  headerSection: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 8,
+    borderBottomColor: colors.background,
+  },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: 10, flexWrap: 'wrap' },
+  title: { fontSize: 20, fontWeight: '800', color: colors.text, flex: 1, lineHeight: 25, letterSpacing: -0.3 },
   upcomingBadge: { backgroundColor: colors.accent, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.md },
-  upcomingBadgeText: { ...typography.caption, color: colors.surface, fontWeight: '600', fontSize: 11 },
-  locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, gap: spacing.xs },
-  locationIconWrap: {},
-  location: { fontSize: 16, color: colors.textSecondary, flex: 1 },
-  priceLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs, textTransform: 'uppercase', fontWeight: '600' },
-  price: { fontSize: 28, fontWeight: '700', color: colors.primary, marginTop: spacing.xs },
+  upcomingBadgeText: { ...typography.caption, color: colors.text, fontWeight: '600', fontSize: 11 },
+  locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, gap: spacing.xs },
+  location: { fontSize: 13, color: colors.sub, flex: 1 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs, marginTop: spacing.xs },
+  priceOnwards: { fontSize: 13, color: colors.sub, fontWeight: '500' },
+  price: { fontSize: 26, fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
   priceSub: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
   bookingLabel: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
   linkText: { color: colors.primary, textDecorationLine: 'underline', fontWeight: '600' },
-  brochureButton: { backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, alignSelf: 'flex-start' },
+  brochureButton: { backgroundColor: colors.background, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.borderRef, alignSelf: 'flex-start' },
   brochureButtonText: { ...typography.body, color: colors.primary, fontWeight: '600' },
-  mapButton: { backgroundColor: colors.surface, borderRadius: borderRadius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 2, borderColor: colors.primary, marginTop: spacing.sm },
-  mapButtonText: { ...typography.body, color: colors.primary, fontWeight: '700', fontSize: 16 },
-  quickInfo: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.surface, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.sm },
-  infoCard: { flex: 1, minWidth: '30%', alignItems: 'center', backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
-  infoIconWrap: { marginBottom: spacing.xs },
-  infoText: { ...typography.caption, color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  section: { backgroundColor: colors.surface, padding: spacing.xl, marginTop: 0, paddingTop: spacing.xl },
+  mapButton: {
+    backgroundColor: colors.primaryXlight,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: colors.borderRef,
+  },
+  mapButtonText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  quickInfo: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: colors.surface,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 10,
+    borderBottomWidth: 8,
+    borderBottomColor: colors.background,
+  },
+  infoCard: {
+    flex: 1,
+    minWidth: '30%',
+    alignItems: 'center',
+    backgroundColor: colors.primaryXlight,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderRef,
+    justifyContent: 'center',
+    gap: 6,
+  },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: colors.primaryXlight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoLabel: { fontSize: 10, fontWeight: '600', color: colors.sub, textAlign: 'center' },
+  infoValue: { fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center' },
+  section: { backgroundColor: colors.surface, padding: 20, borderBottomWidth: 8, borderBottomColor: colors.background },
   sectionHeader: { flexDirection: 'row', alignItems: 'center' },
-  sectionTitleBar: { width: 4, height: 20, borderRadius: 2, backgroundColor: colors.primary, marginRight: spacing.sm },
-  sectionDivider: { height: 1, backgroundColor: 'rgba(29, 36, 43, 0.1)', marginTop: spacing.sm, marginBottom: spacing.lg },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { backgroundColor: colors.surfaceSecondary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.round },
+  sectionTitleBar: { width: 4, height: 18, borderRadius: 2, backgroundColor: colors.primary, marginRight: 8 },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.text,
+    paddingBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primaryLight,
+    marginBottom: 16,
+    flex: 1,
+  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  chip: { backgroundColor: colors.background, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.round, borderWidth: 1, borderColor: colors.borderRef },
   chipText: { ...typography.caption, color: colors.text, fontWeight: '600', fontSize: 13 },
-  description: { ...typography.body, color: colors.textSecondary, lineHeight: 24, fontSize: 15 },
-  detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  detailItem: { width: '47%', padding: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
-  detailItemFull: { width: '100%', padding: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, marginTop: spacing.xs },
-  detailLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs, fontSize: 12, fontWeight: '500', textTransform: 'uppercase' },
-  detailValue: { ...typography.body, color: colors.text, fontWeight: '600', fontSize: 14 },
-  amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  amenityItem: { flexDirection: 'row', alignItems: 'center', width: '47%', backgroundColor: colors.surfaceSecondary, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
+  description: { fontSize: 13, color: colors.sub, lineHeight: 22 },
+  detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  detailItem: {
+    width: '47%',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderRef,
+  },
+  detailItemFull: { width: '100%' },
+  detailLabel: { fontSize: 10, fontWeight: '700', color: colors.sub, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
+  detailValue: { fontSize: 14, fontWeight: '800', color: colors.text, lineHeight: 20 },
+  amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  amenityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '47%',
+    backgroundColor: colors.background,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderRef,
+    gap: 10,
+  },
   amenityIcon: { fontSize: 16, color: colors.primary, fontWeight: 'bold' },
-  amenityText: { ...typography.body, color: colors.text, fontSize: 14, fontWeight: '500' },
-  address: { ...typography.body, color: colors.textSecondary, lineHeight: 24, marginBottom: spacing.xs },
-  mapPlaceholder: { height: 140, backgroundColor: colors.accentLighter, borderRadius: borderRadius.lg, marginTop: spacing.sm, marginBottom: spacing.md, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0, 119, 192, 0.15)' },
-  mapPlaceholderText: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
+  amenityText: { fontSize: 12, fontWeight: '700', color: colors.text, flex: 1, lineHeight: 16 },
+  address: { fontSize: 13, color: colors.sub, marginBottom: 14, lineHeight: 22 },
+  mapPlaceholder: {
+    height: 120,
+    backgroundColor: '#b8d5ea',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  mapPlaceholderText: { fontSize: 11, color: colors.sub, fontWeight: '600', marginTop: 4 },
   addressSub: { ...typography.body, color: colors.textSecondary, lineHeight: 22, fontSize: 14, marginTop: spacing.xs },
   coordinates: { ...typography.caption, color: colors.textSecondary, fontSize: 12, fontStyle: 'italic', marginTop: spacing.xs },
-  actionButtons: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, flexDirection: 'row', gap: spacing.md },
-  editButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, minHeight: 52 },
-  editButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
-  buyerActionButtons: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, ...Platform.select({ android: { elevation: 8 }, ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4 } }) },
-  contactButton: { flex: 1, backgroundColor: colors.surface, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.primary },
-  contactButtonText: { ...typography.body, color: colors.primary, fontWeight: '700', fontSize: 16 },
-  chatButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg },
-  chatButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
-  contactButtonDisabled: { opacity: 0.5 },
-  creditsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.sm },
-  creditsDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
-  creditsText: { ...typography.caption, fontSize: 14, color: colors.primary, fontWeight: '600' },
-  creditsTextError: { color: colors.error || '#c62828' },
+  actionButtons: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderRef,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 13,
+    minHeight: 48,
+  },
+  editButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 14 },
+  bottomCta: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderRef,
+    ...Platform.select({
+      android: { elevation: 8 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+    }),
+  },
+  ctaRow: { flexDirection: 'row', gap: 10 },
+  contactButton: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
+    minHeight: 48,
+  },
+  contactButtonText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  chatButton: {
+    flex: 1.4,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    ...Platform.select({
+      android: { elevation: 6 },
+      ios: { shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 14 },
+    }),
+  },
+  chatButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chatButtonText: { fontSize: 14, fontWeight: '700', color: colors.surface },
+  contactButtonDisabled: { opacity: 0.5, backgroundColor: colors.border },
+  creditsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 },
+  creditsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: colors.borderRef,
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
+    ...Platform.select({
+      android: { elevation: 2 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+    }),
+  },
+  creditsDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  creditsText: { fontSize: 12, fontWeight: '700', color: colors.text },
+  creditsTextError: { color: colors.error },
   limitText: { ...typography.caption, fontSize: 14, color: colors.text, fontWeight: '600' },
   limitTextError: { color: colors.error || '#c62828' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl, borderTopRightRadius: borderRadius.xl, padding: spacing.lg, maxHeight: '70%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
-  modalTitle: { fontSize: 24, fontWeight: '700', color: colors.text },
+  modalTitle: { fontSize: 24, fontWeight: '700', color: colors.secondary },
   modalClose: { fontSize: 28, color: colors.textSecondary, fontWeight: '300' },
-  modalLimitInfo: { marginBottom: spacing.md },
+  modalLimitInfo: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   contactDetailsScroll: { maxHeight: 320 },
   contactDetails: { gap: spacing.sm, marginBottom: spacing.lg },
   contactItem: { paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -1252,7 +1407,19 @@ const styles = StyleSheet.create({
   contactLink: { color: colors.primary, textDecorationLine: 'underline' },
   contactSubItem: { paddingTop: spacing.xs },
   contactSubValue: { ...typography.body, color: colors.textSecondary, fontSize: 14 },
-  modalChatButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingVertical: spacing.lg, minHeight: 52 },
+  modalChatButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    ...Platform.select({
+      android: { elevation: 4 },
+      ios: { shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+    }),
+  },
+  modalChatButtonContent: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   modalChatButtonText: { ...typography.body, color: colors.surface, fontWeight: '700', fontSize: 16 },
 });
 

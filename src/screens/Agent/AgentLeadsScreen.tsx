@@ -17,6 +17,7 @@ import {TabIcon} from '../../components/navigation/TabIcons';
 import {getLeads, Lead} from '../../services/leadsService';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type AgentLeadsScreenNavigationProp = BottomTabNavigationProp<AgentTabParamList, 'Leads'>;
 
@@ -129,10 +130,7 @@ const AgentLeadsScreen: React.FC<Props> = ({navigation}) => {
   return (
     <View style={styles.container}>
       {loading && leads.length === 0 ? (
-        <View style={[styles.center, {paddingTop: contentTopPadding}]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading leads...</Text>
-        </View>
+        <LoadingScreen variant="leads" />
       ) : error && leads.length === 0 ? (
         <View style={[styles.center, {paddingTop: contentTopPadding}]}>
           <View style={styles.errorIconWrap}>

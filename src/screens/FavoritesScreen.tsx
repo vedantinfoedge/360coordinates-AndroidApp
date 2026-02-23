@@ -21,6 +21,7 @@ import { formatters } from '../utils/formatters';
 import PropertyCard from '../components/PropertyCard';
 import { useAuth } from '../context/AuthContext';
 import CustomAlert from '../utils/alertHelper';
+import LoadingScreen from '../components/common/LoadingScreen';
 
 type FavoritesScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<BuyerStackParamList, 'Favorites'>,
@@ -234,14 +235,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (loading && properties.length === 0) {
-    return (
-      <View style={styles.container}>
-        <View style={[styles.centerContainer, { flex: 1 }]}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>Loading favorites...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen variant="favorites" />;
   }
 
   if (properties.length === 0 && !loading) {

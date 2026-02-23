@@ -30,6 +30,7 @@ const AMENITY_GAP = spacing.xs;
 const AMENITY_COLS = 4;
 const AMENITY_ITEM_WIDTH = (SCREEN_WIDTH - 2 * spacing.xl - (AMENITY_COLS - 1) * AMENITY_GAP) / AMENITY_COLS;
 import Dropdown from '../../components/common/Dropdown';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { propertyService } from '../../services/property.service';
 import { sellerService } from '../../services/seller.service';
 import {
@@ -2054,27 +2055,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
 
   // Show loading while loading property data
   if (loadingProperty) {
-    return (
-      <Modal
-        visible={true}
-        animationType="fade"
-        transparent={true}
-        presentationStyle="overFullScreen"
-        statusBarTranslucent={true}
-        onRequestClose={handleClose}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            {/* @ts-expect-error SafeAreaView accepts style at runtime (types incomplete) */}
-            <SafeAreaView style={styles.safeArea}>
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>Loading property details...</Text>
-              </View>
-            </SafeAreaView>
-          </View>
-        </View>
-      </Modal>
-    );
+    return <LoadingScreen variant="addProperty" />;
   }
 
   return (

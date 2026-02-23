@@ -21,6 +21,7 @@ import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import {buyerService} from '../../services/buyer.service';
 import {
   getViewedProperties,
@@ -267,6 +268,10 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
     );
   }
 
+  if (loading) {
+    return <LoadingScreen variant="recentlyViewed" />;
+  }
+
   return (
     <View style={styles.container}>
       {/* Custom Header */}
@@ -320,12 +325,7 @@ const RecentlyViewedScreen: React.FC<Props> = ({navigation}) => {
           </Text>
         </View>
 
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading...</Text>
-          </View>
-        ) : viewedProperties.length === 0 ? (
+        {viewedProperties.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconContainer}>
               <Text style={styles.emptyIcon}>📭</Text>

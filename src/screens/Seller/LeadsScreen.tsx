@@ -22,6 +22,7 @@ import SellerHeader from '../../components/SellerHeader';
 import { getLeads, Lead } from '../../services/leadsService';
 import { formatters } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type LeadsScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<SellerTabParamList, 'Leads'>,
@@ -151,10 +152,7 @@ const LeadsScreen: React.FC<Props> = ({ navigation }) => {
       /> */}
 
       {loading && leads.length === 0 ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading leads...</Text>
-        </View>
+        <LoadingScreen variant="leads" />
       ) : error && leads.length === 0 ? (
         <View style={styles.center}>
           <View style={styles.errorIconWrap}>

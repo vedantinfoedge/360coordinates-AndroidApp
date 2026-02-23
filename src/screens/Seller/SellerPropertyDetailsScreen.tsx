@@ -28,6 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import { Linking } from 'react-native';
 import { capitalize, capitalizeAmenity } from '../../utils/formatters';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 // Import WebView with error handling
 let WebView: any = null;
@@ -210,12 +211,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   if (loading || !property) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading property details...</Text>
-      </View>
-    );
+    return <LoadingScreen variant="property" />;
   }
 
   const amenities = property.amenities || [];

@@ -9,6 +9,7 @@ import AddProjectScreen from '../screens/Agent/AddProjectScreen';
 import EditPropertyScreen from '../screens/Agent/EditPropertyScreen';
 import AgentSupportScreen from '../screens/Agent/AgentSupportScreen';
 import SubscriptionScreen from '../screens/Agent/SubscriptionScreen';
+import PropertyMapScreen from '../screens/Buyer/PropertyMapScreen';
 
 export type AgentStackParamList = {
   AgentTabs: undefined;
@@ -19,6 +20,7 @@ export type AgentStackParamList = {
   AddProperty: undefined;
   AddProject: undefined;
   EditProperty: {propertyId: string | number};
+  PropertyMap: {listingType?: 'all' | 'buy' | 'rent' | 'pg-hostel'; propertyId?: string | number; hideControls?: boolean} | undefined;
   Support: undefined;
 };
 
@@ -37,6 +39,7 @@ const AgentNavigator = () => {
       <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
       <Stack.Screen name="AddProject" component={AddProjectScreen} />
       <Stack.Screen name="EditProperty" component={EditPropertyScreen} />
+      <Stack.Screen name="PropertyMap" component={PropertyMapScreen} />
       <Stack.Screen name="Support" component={AgentSupportScreen} />
     </Stack.Navigator>
   );

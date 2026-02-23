@@ -339,7 +339,7 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
   })();
 
   if (loading) {
-    return <LoadingScreen message="Loading profile..." />;
+    return <LoadingScreen variant="profile" />;
   }
 
   return (

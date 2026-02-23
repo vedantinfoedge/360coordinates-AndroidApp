@@ -29,6 +29,7 @@ import {buyerService} from '../../services/buyer.service';
 import {sellerService} from '../../services/seller.service';
 import {propertyService} from '../../services/property.service';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import {generateChatRoomId, markChatAsRead} from '../../services/firebase.service';
 
 type ChatConversationScreenNavigationProp = CompositeNavigationProp<
@@ -694,6 +695,10 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     }
   }, [userName, user?.user_type]);
 
+  if (loading && messages.length === 0) {
+    return <LoadingScreen variant="conversation" />;
+  }
+
   return (
     <View style={[styles.container, {paddingBottom: insets.bottom}]}>
       {/* Custom Header: extends to top (no white space), back, avatar, name, call, more */}
@@ -764,13 +769,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         style={styles.messagesContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
-        {loading && messages.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading messages...</Text>
-          </View>
-        ) : (
-          <FlatList
+        <FlatList
             ref={flatListRef as any}
             data={messages}
             renderItem={renderMessage}
@@ -795,7 +794,6 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
               </View>
             }
           />
-        )}
 
         {/* Quick replies when conversation is new (same UI for buyer/seller/agent) */}
         {!loading && messages.length === 0 && (
