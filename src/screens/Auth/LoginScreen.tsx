@@ -11,15 +11,23 @@ import {
   Platform,
   Animated,
   Easing,
+  Dimensions,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import LinearGradientLib from 'react-native-linear-gradient';
+
+const LinearGradient = LinearGradientLib as React.ComponentType<any>;
 import CustomAlert from '../../utils/alertHelper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AuthStackParamList} from '../../navigation/AuthNavigator';
-import {colors, spacing} from '../../theme';
+import {fonts, spacing} from '../../theme';
 import {scale, verticalScale, moderateScale} from '../../utils/responsive';
 import {useAuth, UserRole} from '../../context/AuthContext';
+import {authColors, authFonts} from './authDesignTheme';
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 // Storage keys for Remember Me feature
 const REMEMBERED_EMAIL_KEY = '@remembered_email';
@@ -37,6 +45,7 @@ type Props = {
 
 const LoginScreen: React.FC<Props> = ({navigation}) => {
   const {login} = useAuth();
+  const insets = useSafeAreaInsets();
   const route = useRoute();
   const params = (route.params as any) || {};
   const returnTo = params.returnTo;
@@ -334,9 +343,9 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const roles = [
-    {value: 'buyer' as UserRole, label: 'Buyer/Tenant', icon: '👤'},
-    {value: 'seller' as UserRole, label: 'Seller/Owner', icon: '🏠'},
-    {value: 'agent' as UserRole, label: 'Agent/Builder', icon: '🏢'},
+    {value: 'buyer' as UserRole, label: 'Buyer / Tenant', icon: '🏠'},
+    {value: 'seller' as UserRole, label: 'Seller / Owner', icon: '🏢'},
+    {value: 'agent' as UserRole, label: 'Agent / Builder', icon: '🤝'},
   ];
 
   const getRoleLabel = (role: UserRole) => {
@@ -349,7 +358,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
 
   const completedFields = [email, password].filter(Boolean).length;
 
-  // Animate progress bar when fields change
+  // Animate progress bar when fields change (0-2 fields -> 0-100%)
   useEffect(() => {
     Animated.timing(progressWidth, {
       toValue: (completedFields / 2) * 100,
@@ -358,6 +367,12 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
       useNativeDriver: false,
     }).start();
   }, [completedFields]);
+
+  const trackWidth = SCREEN_WIDTH - 56;
+  const progressBarWidth = progressWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, trackWidth],
+  });
 
   // Button press animation
   const handlePressIn = () => {
@@ -377,18 +392,42 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Fixed Header with 360 logo animation */}
-      <View style={styles.fixedHeader}>
+    <View style={[styles.container, {paddingTop: insets.top}]}>
+      {/* Background */}
+      <LinearGradient
+        colors={[...authColors.backgroundGradient]}
+        style={StyleSheet.absoluteFill}
+        start={{x: 0.5, y: 0}}
+        end={{x: 0.5, y: 1}}
+      />
+      {/* Orbs */}
+      <View style={styles.orbContainer} pointerEvents="none">
+        <View style={[styles.orb, styles.orb1]} />
+        <View style={[styles.orb, styles.orb2]} />
+        <View style={[styles.orb, styles.orb3]} />
+      </View>
+      {/* Grid overlay */}
+      <View style={styles.gridOverlay} pointerEvents="none" />
+
+      {/* Status bar area */}
+      <View style={styles.statusBar}>
+        <Text style={styles.statusTime}>
+          {new Date().toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', hour12: false}).replace(' ', '')}
+        </Text>
+        <View style={styles.statusIcons} />
+      </View>
+
+      {/* Logo area - KEEP current circular animation */}
+      <View style={styles.logoArea}>
         <Animated.View style={{
           transform: [
             {scale: logoScale},
-            {rotate: spin}, // 360-degree rotation
+            {rotate: spin},
           ],
           opacity: logoOpacity,
         }}>
           <Animated.View style={{
-            shadowColor: colors.primary,
+            shadowColor: authColors.blue2,
             shadowOffset: {width: 0, height: 0},
             shadowOpacity: logoGlow.interpolate({
               inputRange: [0, 1],
@@ -399,7 +438,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
               outputRange: [8, 20],
             }),
             elevation: 8,
-            borderRadius: 40,
+            borderRadius: 36,
           }}>
             <Image
               source={require('../../assets/App-icon.png')}
@@ -408,22 +447,22 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             />
           </Animated.View>
         </Animated.View>
-        <Animated.Text style={[styles.appName, {opacity: headerOpacity, transform: [{translateY: headerOpacity.interpolate({
-          inputRange: [0, 1],
-          outputRange: [15, 0],
-        })}]}]}>
-          360Coordinates
-        </Animated.Text>
-        <Animated.View style={[styles.progressBarContainer, {opacity: headerOpacity}]}>
-          <View style={styles.progressBar}>
-            <Animated.View style={[styles.progressFill, {width: progressWidth.interpolate({
-              inputRange: [0, 100],
-              outputRange: ['0%', '100%'],
-            })}]} />
-          </View>
-          <Text style={styles.progressText}>{completedFields}/2 fields completed</Text>
-        </Animated.View>
+        <Animated.Text style={[styles.appName, {opacity: headerOpacity}]}>360Coordinates</Animated.Text>
       </View>
+
+      {/* Heading */}
+      <Animated.View style={[styles.headingArea, {opacity: headerOpacity}]}>
+        <Text style={styles.h1}>Welcome{'\n'}<Text style={styles.h1Emphasis}>Back.</Text></Text>
+        <Text style={styles.h2}>Sign in to explore your dream property</Text>
+      </Animated.View>
+
+      {/* Progress bar */}
+      <Animated.View style={[styles.progWrap, {opacity: headerOpacity}]}>
+        <View style={styles.progTrack}>
+          <Animated.View style={[styles.progFill, {width: progressBarWidth}]} />
+        </View>
+        <Text style={styles.progLabel}>{completedFields}/2 fields completed</Text>
+      </Animated.View>
 
       {/* Scrollable Form */}
       <KeyboardAvoidingView
@@ -431,133 +470,140 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[styles.contentContainer, {paddingBottom: insets.bottom + 20}]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
-          
           <Animated.View style={[styles.card, {
             opacity: cardOpacity,
             transform: [{translateY: cardTranslateY}],
           }]}>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to continue</Text>
+            <View style={styles.cardScroll}>
+              <Text style={styles.sectionLabel}>SIGN IN AS</Text>
+              <View style={styles.roleRow}>
+                {roles.map((role, index) => (
+                  <Animated.View
+                    key={role.value}
+                    style={{
+                      flex: 1,
+                      opacity: roleButtonAnims[index],
+                    }}>
+                    <TouchableOpacity
+                      style={[
+                        styles.roleBtn,
+                        selectedRole === role.value && styles.roleBtnActive,
+                      ]}
+                      onPress={() => setSelectedRole(role.value)}
+                      activeOpacity={0.8}>
+                      {selectedRole === role.value && (
+                        <LinearGradient
+                          colors={[...authColors.ctaGradient]}
+                          style={[StyleSheet.absoluteFill, styles.roleBtnGradient]}
+                          start={{x: 0, y: 0}}
+                          end={{x: 1, y: 1}}
+                        />
+                      )}
+                      <Text style={styles.roleIcon}>{role.icon}</Text>
+                      <Text style={[
+                        styles.roleName,
+                        selectedRole === role.value && styles.roleNameActive,
+                      ]}>
+                        {role.label}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
 
-            {/* Role Selection with staggered animation */}
-            <View style={styles.roleContainer}>
-              {roles.map((role, index) => (
-                <Animated.View
-                  key={role.value}
-                  style={{
-                    flex: 1,
-                    opacity: roleButtonAnims[index],
-                    transform: [{
-                      scale: roleButtonAnims[index].interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.8, 1],
-                      }),
-                    }],
-                  }}>
+              <View style={styles.divider} />
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLbl}>EMAIL ADDRESS</Text>
+                <View style={styles.inpWrap}>
+                  <TextInput
+                    style={styles.inp}
+                    placeholder="your@email.com"
+                    placeholderTextColor={authColors.textPlaceholder}
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLbl}>PASSWORD</Text>
+                <View style={styles.inpWrap}>
+                  <TextInput
+                    style={styles.inp}
+                    placeholder="Enter your password"
+                    placeholderTextColor={authColors.textPlaceholder}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
                   <TouchableOpacity
-                    style={[
-                      styles.roleButton,
-                      selectedRole === role.value && styles.roleButtonSelected,
-                    ]}
-                    onPress={() => setSelectedRole(role.value)}
-                    activeOpacity={0.7}>
-                    <Text style={styles.roleIcon}>{role.icon}</Text>
-                    <Text style={[
-                      styles.roleButtonText,
-                      selectedRole === role.value && styles.roleButtonTextSelected,
-                    ]}>
-                      {role.label}
-                    </Text>
+                    style={styles.eyeBtn}
+                    onPress={() => setShowPassword(!showPassword)}>
+                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
                   </TouchableOpacity>
-                </Animated.View>
-              ))}
-            </View>
+                </View>
+              </View>
 
-            {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email Address</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                placeholderTextColor={colors.textSecondary}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  placeholder="Enter your password"
-                  placeholderTextColor={colors.textSecondary}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+              <View style={styles.optsRow}>
                 <TouchableOpacity
-                  style={styles.eyeButton}
-                  onPress={() => setShowPassword(!showPassword)}>
-                  <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                  style={styles.remRow}
+                  onPress={async () => {
+                    const newVal = !rememberMe;
+                    setRememberMe(newVal);
+                    if (!newVal) await clearSavedCredentials();
+                  }}>
+                  <View style={[styles.cb, rememberMe && styles.cbOn]}>
+                    {rememberMe && <Text style={styles.cbCheck}>✓</Text>}
+                  </View>
+                  <Text style={styles.remTxt}>Remember me</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+                  <Text style={styles.forgot}>Forgot Password?</Text>
                 </TouchableOpacity>
               </View>
-            </View>
 
-            {/* Remember Me & Forgot Password */}
-            <View style={styles.optionsRow}>
-              <TouchableOpacity
-                style={styles.checkboxContainer}
-                onPress={async () => {
-                  const newVal = !rememberMe;
-                  setRememberMe(newVal);
-                  if (!newVal) await clearSavedCredentials();
-                }}>
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-                <Text style={styles.checkboxLabel}>Remember me</Text>
-              </TouchableOpacity>
-              <TouchableOpacity>
-                <Text style={styles.forgotPassword}>Forgot Password?</Text>
-              </TouchableOpacity>
-            </View>
+              <Animated.View style={{transform: [{scale: buttonScale}]}}>
+                <TouchableOpacity
+                  style={[styles.ctaBtn, isLoading && styles.ctaBtnDisabled]}
+                  onPress={() => handleLogin()}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  disabled={isLoading}
+                  activeOpacity={0.9}>
+                  <LinearGradient
+                    colors={isLoading ? ['#5a6a7a', '#4a5a6a'] : [...authColors.ctaGradient]}
+                    style={StyleSheet.absoluteFill}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 1}}
+                  />
+                  <Text style={styles.ctaBtnText}>
+                    {isLoading ? 'Signing in...' : `Sign In as ${getRoleLabel(selectedRole)}`}
+                  </Text>
+                  <View style={styles.arr}>
+                    <Text style={styles.arrIcon}>→</Text>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
 
-            {/* Sign In Button with animation */}
-            <Animated.View style={{transform: [{scale: buttonScale}]}}>
-              <TouchableOpacity
-                style={[styles.signInButton, isLoading && styles.signInButtonDisabled]}
-                onPress={() => handleLogin()}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                disabled={isLoading}
-                activeOpacity={0.9}>
-                <Text style={styles.signInButtonText}>
-                  {isLoading ? 'Signing in...' : `Sign In as ${getRoleLabel(selectedRole)}`}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
+              <View style={styles.cardFoot}>
+                <Text style={styles.cardFootText}>Don't have an account? </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                  <Text style={styles.cardFootLink}>Register now</Text>
+                </TouchableOpacity>
+              </View>
 
-            {/* Register Link */}
-            <View style={styles.registerContainer}>
-              <Text style={styles.registerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                <Text style={styles.registerLink}>Register now</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Footer - buyer-copyright-brand */}
-            <View style={styles.footer} testID="buyer-copyright-brand">
-              <Text style={styles.footerText}>Vedant Infoedge India LLP</Text>
+              <View style={styles.company} testID="buyer-copyright-brand">
+                <Text style={styles.companyText}>Vedant Infoedge India LLP</Text>
+              </View>
             </View>
           </Animated.View>
         </ScrollView>
@@ -569,231 +615,342 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: authColors.background,
   },
-  fixedHeader: {
-    backgroundColor: '#FAFAFA',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 119, 192, 0.1)',
-  },
-  logoImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    marginBottom: spacing.xs,
-  },
-  appName: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.primary,
-    marginBottom: spacing.sm,
-  },
-  progressBarContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  progressBar: {
-    width: '100%',
-    height: 6,
-    backgroundColor: colors.border,
-    borderRadius: 3,
+  orbContainer: {
+    ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 3,
+  orb: {
+    position: 'absolute',
+    borderRadius: 9999,
+    opacity: 0.15,
   },
-  progressText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+  orb1: {
+    width: 230,
+    height: 230,
+    backgroundColor: authColors.orb1,
+    top: -70,
+    left: -70,
+  },
+  orb2: {
+    width: 190,
+    height: 190,
+    backgroundColor: authColors.orb2,
+    bottom: 140,
+    right: -60,
+  },
+  orb3: {
+    width: 130,
+    height: 130,
+    backgroundColor: authColors.orb3,
+    top: 230,
+    right: 0,
+  },
+  gridOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  statusBar: {
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  statusTime: {
+    color: authColors.textWhite,
+    fontSize: 15,
+    fontFamily: authFonts.button,
+  },
+  statusIcons: {
+    width: 50,
+    height: 14,
+  },
+  logoArea: {
+    alignItems: 'center',
+    paddingTop: 14,
+    paddingBottom: 0,
+    zIndex: 5,
+  },
+  logoImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(210,225,245,0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  appName: {
+    fontSize: 18,
+    fontFamily: authFonts.button,
+    color: authColors.blueAccent,
+    letterSpacing: -0.3,
+    marginTop: 8,
+  },
+  headingArea: {
+    paddingHorizontal: 28,
+    paddingTop: 14,
+    zIndex: 5,
+  },
+  h1: {
+    fontSize: 28,
+    fontFamily: authFonts.heading,
+    color: authColors.textWhite,
+    lineHeight: 34,
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  h1Emphasis: {
+    color: authColors.blueAccent,
+  },
+  h2: {
+    fontSize: 13,
+    fontFamily: authFonts.body,
+    color: authColors.muted,
+  },
+  progWrap: {
+    paddingHorizontal: 28,
+    marginTop: 10,
+    zIndex: 5,
+  },
+  progTrack: {
+    height: 3,
+    backgroundColor: authColors.progressTrack,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progFill: {
+    height: '100%',
+    backgroundColor: authColors.blue2,
+    borderRadius: 2,
+  },
+  progLabel: {
+    fontSize: 10.5,
+    color: authColors.footerMuted,
+    marginTop: 5,
+    textAlign: 'center',
   },
   formContainer: {
     flex: 1,
+    zIndex: 5,
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
-    padding: spacing.lg,
-    paddingBottom: verticalScale(40),
+    paddingHorizontal: 14,
+    paddingTop: 14,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: scale(20),
-    padding: spacing.lg,
+    marginHorizontal: 14,
+    backgroundColor: authColors.cardBg,
+    borderWidth: 1,
+    borderColor: authColors.cardBorder,
+    borderRadius: 26,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOffset: {width: 0, height: 16},
+    shadowOpacity: 0.5,
+    shadowRadius: 50,
+    elevation: 8,
   },
-  title: {
-    fontSize: moderateScale(24),
-    fontWeight: '700',
-    color: colors.secondary,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
+  cardScroll: {
+    padding: 20,
   },
-  subtitle: {
-    fontSize: moderateScale(14),
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
+  sectionLabel: {
+    fontSize: 10.5,
+    fontFamily: authFonts.sectionLabel,
+    color: authColors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 9,
   },
-  roleContainer: {
+  roleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-    gap: spacing.sm,
+    gap: 7,
+    marginBottom: 18,
   },
-  roleButton: {
+  roleBtn: {
     flex: 1,
-    borderRadius: scale(12),
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5,
+    borderColor: authColors.cardBorder,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  roleButtonSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.accent,
+  roleBtnActive: {
+    borderColor: authColors.blue2,
+    shadowColor: authColors.blue,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  roleBtnGradient: {
+    borderRadius: 12,
   },
   roleIcon: {
-    fontSize: moderateScale(20),
-    marginBottom: scale(4),
+    fontSize: 17,
+    zIndex: 1,
   },
-  roleButtonText: {
-    fontSize: moderateScale(10),
-    color: colors.text,
-    fontWeight: '600',
+  roleName: {
+    fontSize: 9.5,
+    fontFamily: authFonts.sectionLabel,
+    color: authColors.roleInactive,
     textAlign: 'center',
+    lineHeight: 13,
+    zIndex: 1,
   },
-  roleButtonTextSelected: {
-    color: colors.primary,
-    fontWeight: '700',
+  roleNameActive: {
+    color: authColors.textWhite,
   },
-  inputContainer: {
-    marginBottom: spacing.md,
+  divider: {
+    height: 1,
+    backgroundColor: authColors.divider,
+    marginBottom: 16,
   },
-  label: {
-    fontSize: moderateScale(14),
-    color: colors.text,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
+  field: {
+    marginBottom: 12,
   },
-  input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: scale(12),
-    padding: spacing.md,
-    fontSize: moderateScale(16),
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
+  fieldLbl: {
+    fontSize: 10.5,
+    fontFamily: authFonts.sectionLabel,
+    color: authColors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
-  passwordContainer: {
+  inpWrap: {
+    backgroundColor: authColors.inputBg,
+    borderWidth: 1.5,
+    borderColor: authColors.inputBorder,
+    borderRadius: 13,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: scale(12),
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingHorizontal: 13,
+    height: 48,
   },
-  passwordInput: {
+  inp: {
     flex: 1,
-    padding: spacing.md,
-    fontSize: moderateScale(16),
-    color: colors.text,
+    fontSize: 13.5,
+    fontFamily: authFonts.body,
+    color: authColors.textWhite,
+    padding: 0,
   },
-  eyeButton: {
-    padding: spacing.md,
+  eyeBtn: {
+    padding: 8,
   },
   eyeIcon: {
-    fontSize: moderateScale(18),
+    fontSize: 15,
+    opacity: 0.7,
   },
-  optionsRow: {
+  optsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: 18,
   },
-  checkboxContainer: {
+  remRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 7,
   },
-  checkbox: {
-    width: scale(20),
-    height: scale(20),
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: scale(4),
+  cb: {
+    width: 18,
+    height: 18,
+    backgroundColor: authColors.checkboxBg,
+    borderWidth: 1.5,
+    borderColor: authColors.checkboxBorder,
+    borderRadius: 6,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  cbOn: {
+    backgroundColor: authColors.blue,
+    borderColor: authColors.blue,
+  },
+  cbCheck: {
+    color: authColors.textWhite,
+    fontSize: 10,
+    fontFamily: authFonts.sectionLabel,
+  },
+  remTxt: {
+    fontSize: 12,
+    fontFamily: authFonts.body,
+    color: authColors.textMutedLight,
+  },
+  forgot: {
+    fontSize: 12,
+    fontFamily: authFonts.link,
+    color: authColors.blueAccent,
+  },
+  ctaBtn: {
+    height: 52,
+    borderRadius: 15,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.xs,
+    justifyContent: 'center',
+    marginBottom: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: authColors.blue,
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.42,
+    shadowRadius: 22,
+    elevation: 6,
   },
-  checkboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  ctaBtnDisabled: {
+    opacity: 0.7,
   },
-  checkmark: {
-    color: colors.surface,
-    fontSize: moderateScale(12),
-    fontWeight: 'bold',
+  ctaBtnText: {
+    fontSize: 14.5,
+    fontFamily: authFonts.button,
+    color: authColors.textWhite,
+    letterSpacing: -0.1,
+    zIndex: 1,
   },
-  checkboxLabel: {
-    fontSize: moderateScale(14),
-    color: colors.text,
-  },
-  forgotPassword: {
-    fontSize: moderateScale(14),
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  signInButton: {
-    backgroundColor: colors.primary,
-    borderRadius: scale(12),
-    paddingVertical: verticalScale(16),
+  arr: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    justifyContent: 'center',
+    marginLeft: 7,
+    zIndex: 1,
   },
-  signInButtonDisabled: {
-    backgroundColor: colors.textSecondary,
+  arrIcon: {
+    color: authColors.textWhite,
+    fontSize: 12,
   },
-  signInButtonText: {
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: moderateScale(16),
-  },
-  registerContainer: {
+  cardFoot: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: spacing.md,
+    flexWrap: 'wrap',
   },
-  footer: {
+  cardFootText: {
+    fontSize: 12.5,
+    fontFamily: authFonts.body,
+    color: authColors.footerMuted,
+  },
+  cardFootLink: {
+    fontSize: 12.5,
+    fontFamily: authFonts.link,
+    color: authColors.blueAccent,
+  },
+  company: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-    marginTop: spacing.lg,
+    marginTop: 10,
   },
-  footerText: {
-    fontSize: moderateScale(12),
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  registerText: {
-    color: colors.textSecondary,
-    fontSize: moderateScale(14),
-  },
-  registerLink: {
-    color: colors.primary,
-    fontSize: moderateScale(14),
-    fontWeight: '700',
+  companyText: {
+    fontSize: 10.5,
+    fontFamily: authFonts.body,
+    color: authColors.companyMuted,
   },
 });
 
