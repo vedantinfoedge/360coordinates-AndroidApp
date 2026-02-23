@@ -26,6 +26,7 @@ import {markChatAsRead} from '../../services/firebase.service';
 import {notificationService} from '../../services/notification.service';
 import firestore from '@react-native-firebase/firestore';
 import {FirebaseFirestoreTypes} from '@react-native-firebase/firestore';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type ChatScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<any>,
@@ -628,37 +629,7 @@ const ChatScreen: React.FC<Props> = ({navigation}) => {
   }
 
   if (loading && chatList.length === 0) {
-    return (
-      <View style={styles.container}>
-        <BuyerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={isLoggedIn ? logout : undefined}
-          onSignInPress={
-            isGuest
-              ? () =>
-                  (navigation as any).navigate('Auth', {
-                    screen: 'Login',
-                    params: {returnTo: 'Chats'},
-                  })
-              : undefined
-          }
-          onSignUpPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
-              : undefined
-          }
-          showLogout={isLoggedIn}
-          showProfile={isLoggedIn}
-          showSignIn={isGuest}
-          showSignUp={isGuest}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading chats...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen message="Loading chats..." />;
   }
 
   return (

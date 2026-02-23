@@ -26,6 +26,7 @@ import { sellerService } from '../../services/seller.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters, capitalize } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -572,14 +573,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={[styles.loadingContainer, { paddingTop: insets.top + spacing.lg }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading properties...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen message="Loading properties..." />;
   }
 
   return (
@@ -671,12 +665,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-      {loading ? (
-        <View style={[styles.loadingContainer, { paddingTop: insets.top + HEADER_HEIGHT }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading listings...</Text>
-        </View>
-      ) : allProperties.length === 0 ? (
+      {allProperties.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconWrap}>
             <TabIcon name="home" color="#9CA3AF" size={48} />

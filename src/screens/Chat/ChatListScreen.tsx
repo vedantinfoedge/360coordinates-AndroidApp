@@ -34,6 +34,7 @@ import { buyerService } from '../../services/buyer.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { capitalize } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import firestore from '@react-native-firebase/firestore';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
@@ -1576,43 +1577,8 @@ const ChatListScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  const isAgentOrSellerLoading = (user?.user_type || '').toLowerCase() === 'seller' || (user?.user_type || '').toLowerCase() === 'agent';
   if (loading && chatList.length === 0) {
-    return (
-      <View style={styles.container}>
-        {!isAgentOrSellerLoading && (
-          <BuyerHeader
-            onProfilePress={() => navigation.navigate('Profile')}
-            onSupportPress={() => navigation.navigate('Support')}
-            onLogoutPress={isLoggedIn ? logout : undefined}
-            onSignInPress={
-              isGuest
-                ? () =>
-                  (navigation as any).navigate('Auth', {
-                    screen: 'Login',
-                    params: { returnTo: 'Chats' },
-                  })
-                : undefined
-            }
-            onSignUpPress={
-              isGuest
-                ? () => (navigation as any).navigate('Auth', { screen: 'Register' })
-                : undefined
-            }
-            showLogout={isLoggedIn}
-            showProfile={isLoggedIn}
-            showSignIn={isGuest}
-            showSignUp={isGuest}
-            scrollY={scrollY}
-            headerHeight={headerHeight}
-          />
-        )}
-        <View style={[styles.loadingContainer, { paddingTop: isAgentOrSellerLoading ? insets.top + spacing.md * 2 : insets.top + 60 + spacing.md * 2 }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading chats...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen message="Loading chats..." />;
   }
 
   const userType = (user?.user_type || '').toLowerCase();

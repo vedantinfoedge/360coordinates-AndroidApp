@@ -28,6 +28,7 @@ import { sellerService } from '../../services/seller.service';
 import { fixImageUrl } from '../../utils/imageHelper';
 import { formatters } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<AgentTabParamList, 'Profile'>,
@@ -338,19 +339,7 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
   })();
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => { }}
-          onSupportPress={() => navigation.getParent()?.navigate('Support' as never)}
-          onSubscriptionPress={() => navigation.getParent()?.navigate('Subscription' as never)}
-          onLogoutPress={handleLogout}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </View>
-    );
+    return <LoadingScreen message="Loading profile..." />;
   }
 
   return (

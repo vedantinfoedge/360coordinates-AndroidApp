@@ -25,6 +25,7 @@ import {TabIcon} from '../../components/navigation/TabIcons';
 import {useAuth} from '../../context/AuthContext';
 import BuyerHeader from '../../components/BuyerHeader';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<BuyerStackParamList, 'Profile'>,
@@ -274,6 +275,11 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
       launchImageLibrary(options, callback);
     }
   };
+
+  // Show loading while fetching profile for authenticated user
+  if (isAuthenticated && profileLoading) {
+    return <LoadingScreen message="Loading profile..." />;
+  }
 
   // Show login prompt if user is not authenticated
   if (!isAuthenticated || !user) {
