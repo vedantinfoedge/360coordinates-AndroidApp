@@ -104,6 +104,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
   const [counterpartyEmail, setCounterpartyEmail] = useState<string | null>(null);
   const [counterpartyMemberSince, setCounterpartyMemberSince] = useState<string | null>(null);
   const [contactInfoVisible, setContactInfoVisible] = useState(false);
+  const [resolvedPropertyTitle, setResolvedPropertyTitle] = useState<string>(propertyTitle || '');
   const flatListRef = useRef<FlatListScrollRef | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inquirySentForPropertyRef = useRef<number | null>(null);
@@ -250,6 +251,46 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
       cancelled = true;
     };
   }, [user?.user_type, userId, propertyId, conversationId, paramCounterpartyPhone]);
+
+  // Resolve propertyId from params or conversationId for property bar navigation
+  const resolvedPropId = React.useMemo(() => {
+    if (propertyId) return String(propertyId);
+    if (conversationId) {
+      const parts = String(conversationId).split('_');
+      if (parts.length >= 3) {
+        const parsed = Number(parts[2]);
+        if (!Number.isNaN(parsed) && parsed > 0) return String(parsed);
+      }
+    }
+    return null;
+  }, [propertyId, conversationId]);
+
+  // Fetch property title if not provided via route params
+  useEffect(() => {
+    if (propertyTitle) {
+      setResolvedPropertyTitle(propertyTitle);
+      return;
+    }
+    if (!resolvedPropId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await propertyService.getPropertyDetails(Number(resolvedPropId));
+        const data = (res as any)?.data;
+        const property = data?.property ?? data;
+        const title =
+          property?.title || property?.property_name || property?.name || '';
+        if (!cancelled && title) setResolvedPropertyTitle(title);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [propertyTitle, resolvedPropId]);
+
+  const handlePropertyPress = () => {
+    if (resolvedPropId) {
+      (navigation as any).navigate('PropertyDetails', { propertyId: resolvedPropId });
+    }
+  };
 
   const handlePhonePress = () => {
     const raw = counterpartyPhone?.trim();
@@ -672,6 +713,22 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
         </TouchableOpacity>
       </View>
 
+      {/* Property bar – tappable strip showing property name */}
+      {resolvedPropertyTitle && resolvedPropId ? (
+        <TouchableOpacity
+          style={styles.propBar}
+          activeOpacity={0.7}
+          onPress={handlePropertyPress}>
+          <Text style={styles.propBarIcon}>🏠</Text>
+          <View style={styles.propBarText}>
+            <Text style={styles.propBarTitle} numberOfLines={1}>
+              {resolvedPropertyTitle}
+            </Text>
+          </View>
+          <Text style={styles.propBarChevron}>›</Text>
+        </TouchableOpacity>
+      ) : null}
+
       {/* Messages List */}
       <KeyboardAvoidingView
         style={styles.messagesContainer}
@@ -944,23 +1001,29 @@ const styles = StyleSheet.create({
   propBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 9,
     paddingHorizontal: 16,
     backgroundColor: colors.primaryXlight || '#e8f7ff',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border || colors.borderRef,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   propBarIcon: {
-    fontSize: 20,
+    fontSize: 16,
   },
   propBarText: {
     flex: 1,
   },
   propBarTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.primary,
+  },
+  propBarChevron: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.primary,
+    opacity: 0.6,
   },
   messagesContainer: {
     flex: 1,
