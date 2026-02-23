@@ -113,6 +113,43 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
     alternateMobile: (user as any)?.alternate_mobile || '',
   });
 
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  const loadProfile = async () => {
+    try {
+      setProfileLoading(true);
+      const {buyerService} = require('../../services/buyer.service');
+      const response: any = await buyerService.getProfile();
+      if (response && response.success && response.data) {
+        const profile = response.data.profile || response.data;
+        const profileData = {
+          name: profile.full_name || user?.full_name || '',
+          phone: profile.phone || user?.phone || '',
+          email: profile.email || user?.email || '',
+          address: profile.address || '',
+          alternateMobile: profile.alternate_mobile || '',
+        };
+        setFormData(profileData);
+        setOriginalData(profileData);
+        if (profile.profile_image) {
+          setProfileImage(profile.profile_image);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error loading buyer profile:', error);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadProfile();
+    } else {
+      setProfileLoading(false);
+    }
+  }, [isAuthenticated]);
+
   // Update profile image when user changes
   React.useEffect(() => {
     if (user?.profile_image) {
@@ -149,9 +186,10 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
             address: formData.address,
           });
         }
-        CustomAlert.alert('Success', 'Profile updated successfully');
         setOriginalData({...formData});
         setIsEditing(false);
+        CustomAlert.alert('Success', 'Profile updated successfully');
+        await loadProfile();
       } else {
         CustomAlert.alert('Error', updateResponse?.message || 'Failed to update profile');
       }

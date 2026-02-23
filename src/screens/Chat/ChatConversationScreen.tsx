@@ -288,7 +288,7 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handlePropertyPress = () => {
     if (resolvedPropId) {
-      (navigation as any).navigate('PropertyDetails', { propertyId: resolvedPropId });
+      navigation.navigate('PropertyDetails', { propertyId: resolvedPropId });
     }
   };
 

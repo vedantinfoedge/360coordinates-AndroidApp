@@ -2,6 +2,7 @@ import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import ChatListScreen from '../screens/Chat/ChatListScreen';
 import ChatConversationScreen from '../screens/Chat/ChatConversationScreen';
+import PropertyDetailsScreen from '../screens/Buyer/PropertyDetailsScreen';
 import {colors} from '../theme';
 
 export type ChatStackParamList = {
@@ -16,6 +17,7 @@ export type ChatStackParamList = {
     /** When opening as buyer, pass seller/agent phone to avoid access issues. */
     counterpartyPhone?: string;
   };
+  PropertyDetails: {propertyId: string};
 };
 
 const ChatStack = createNativeStackNavigator<ChatStackParamList>();
@@ -25,12 +27,16 @@ const ChatNavigator = () => {
     <ChatStack.Navigator
       initialRouteName="ChatList"
       screenOptions={{
-        headerShown: false, // We use custom headers in screens
+        headerShown: false,
       }}>
       <ChatStack.Screen name="ChatList" component={ChatListScreen} />
       <ChatStack.Screen
         name="ChatConversation"
         component={ChatConversationScreen}
+      />
+      <ChatStack.Screen
+        name="PropertyDetails"
+        component={PropertyDetailsScreen}
       />
     </ChatStack.Navigator>
   );

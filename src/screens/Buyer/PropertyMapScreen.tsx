@@ -262,12 +262,15 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
         userLocation={userLocation}
       />
 
-      <TouchableOpacity
-        style={styles.floatingListButton}
-        onPress={handleGoBackToList}>
-        <TabIcon name="list" color={colors.text} size={20} />
-        <Text style={styles.floatingListButtonText}>Go back to list</Text>
-      </TouchableOpacity>
+      <View style={styles.floatingListButtonWrapper} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.floatingListButton}
+          activeOpacity={0.8}
+          onPress={handleGoBackToList}>
+          <TabIcon name="list" color={colors.text} size={20} />
+          <Text style={styles.floatingListButtonText}>Go back to list</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -277,10 +280,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  floatingListButton: {
+  floatingListButtonWrapper: {
     position: 'absolute',
-    bottom: 30,
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    paddingBottom: 30,
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  floatingListButton: {
     minWidth: 180,
     flexDirection: 'row',
     alignItems: 'center',
@@ -296,7 +306,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 9999,
     gap: spacing.sm,
   },
   floatingListButtonIcon: {
