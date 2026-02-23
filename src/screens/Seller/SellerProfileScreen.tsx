@@ -495,15 +495,21 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           )}
           <View style={styles.statsRow}>
-            <View style={styles.statItem}>
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('AllListings' as never)}>
               <Text style={styles.statValue}>{stats.listedProperties}</Text>
               <Text style={styles.statLabel}>Properties</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statDivider} />
-            <View style={styles.statItem}>
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+              onPress={() => (navigation as any).navigate('Chat', { screen: 'ChatList' })}>
               <Text style={styles.statValue}>{stats.inquiries}</Text>
               <Text style={styles.statLabel}>Inquiries</Text>
-            </View>
+            </TouchableOpacity>
           </View>
           <Text style={styles.memberSince}>Member since {memberSince}</Text>
         </View>
