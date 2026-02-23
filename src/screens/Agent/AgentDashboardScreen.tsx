@@ -887,7 +887,7 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   if (loading && !dashboardStats) {
-    return <LoadingScreen message="Loading dashboard..." />;
+    return <LoadingScreen variant="dashboard" />;
   }
 
   const stats = dashboardStats || {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -8,6 +8,7 @@ import { colors, spacing, typography } from '../../theme';
 import { formatters } from '../../utils/formatters';
 import { sellerService, DashboardStats } from '../../services/seller.service';
 import { ViewPlansContent } from '../../components/subscription/ViewPlansContent';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type SubscriptionScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AgentStackParamList, 'Subscription'>,
@@ -67,12 +68,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (loading && !subscription) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading subscription...</Text>
-      </View>
-    );
+    return <LoadingScreen variant="subscription" />;
   }
 
   return (

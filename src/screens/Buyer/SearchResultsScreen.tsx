@@ -1070,7 +1070,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   const renderSeparator = () => <View style={styles.propertySeparator} />;
 
   if (loading) {
-    return <LoadingScreen message="Loading properties..." />;
+    return <LoadingScreen variant="search" />;
   }
 
   return (

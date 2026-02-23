@@ -40,6 +40,7 @@ import {
 import {capitalize, capitalizeAmenity} from '../../utils/formatters';
 import {geocodeLocation} from '../../utils/geocoding';
 import MapViewComponent from '../../components/map/MapView';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 // Import WebView with error handling
 let WebView: any = null;
@@ -861,12 +862,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   if (loading || !property) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={styles.loadingText}>Loading property details...</Text>
-      </View>
-    );
+    return <LoadingScreen variant="property" />;
   }
 
   // Get property images - already converted to objects in loadPropertyDetails (like website format)

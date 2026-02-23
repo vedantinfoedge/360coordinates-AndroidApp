@@ -24,6 +24,7 @@ import {propertyService} from '../../services/property.service';
 import {fixImageUrl} from '../../utils/imageHelper';
 import {formatters} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { buildPGHostelFetchParams } from '../../utils/propertySearchParams';
 
 type AllPropertiesScreenNavigationProp = CompositeNavigationProp<
@@ -239,33 +240,7 @@ const AllPropertiesScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   if (loading && properties.length === 0) {
-    return (
-      <View style={styles.container}>
-        <BuyerHeader
-          onProfilePress={() => navigation.navigate('Profile')}
-          onSupportPress={() => navigation.navigate('Support')}
-          onLogoutPress={isLoggedIn ? logout : undefined}
-          onSignInPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', {screen: 'Login'})
-              : undefined
-          }
-          onSignUpPress={
-            isGuest
-              ? () => (navigation as any).navigate('Auth', {screen: 'Register'})
-              : undefined
-          }
-          showLogout={isLoggedIn}
-          showProfile={isLoggedIn}
-          showSignIn={isGuest}
-          showSignUp={isGuest}
-        />
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading properties...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen variant="search" />;
   }
 
   return (

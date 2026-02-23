@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  ActivityIndicator,
   Share,
   Platform,
   Linking,
@@ -26,6 +25,7 @@ import { useAuth } from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import { formatters, capitalize, capitalizeAmenity } from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { AMENITIES_LIST } from '../../utils/propertyTypeConfig';
 import PropertyDetailsHeader from '../../components/PropertyDetailsHeader';
 import { buyerService } from '../../services/buyer.service';
@@ -523,14 +523,7 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
   };
 
   if (loading || !property) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading project details...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen variant="property" message="Loading project details…" />;
   }
 
   const propertyImages: PropertyImage[] = property.images && Array.isArray(property.images) && property.images.length > 0
@@ -1158,8 +1151,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: -borderRadius.xxl,
   },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
-  loadingText: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
   imageCarouselContainer: { height: 300, position: 'relative', marginHorizontal: spacing.md, marginTop: spacing.lg, borderRadius: borderRadius.xl, overflow: 'hidden', backgroundColor: '#D4E4D4' },

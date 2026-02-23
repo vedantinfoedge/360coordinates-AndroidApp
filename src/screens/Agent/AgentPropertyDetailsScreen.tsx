@@ -25,6 +25,7 @@ import {useAuth} from '../../context/AuthContext';
 import ImageGallery from '../../components/common/ImageGallery';
 import {formatters, capitalize, capitalizeAmenity} from '../../utils/formatters';
 import CustomAlert from '../../utils/alertHelper';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import {verticalScale, moderateScale, scale} from '../../utils/responsive';
 
 type PropertyDetailsScreenNavigationProp = NativeStackNavigationProp<
@@ -165,20 +166,7 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   if (loading || !property) {
-    return (
-      <View style={styles.container}>
-        <AgentHeader
-          onProfilePress={() => (navigation as any).navigate('AgentTabs', {screen: 'Profile'})}
-          onSupportPress={() => navigation.navigate('Support' as never)}
-          onSubscriptionPress={() => (navigation as any).navigate('Subscription')}
-          onLogoutPress={logout}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading property details...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen variant="property" />;
   }
 
   // Get property images - already converted to objects in loadPropertyDetails

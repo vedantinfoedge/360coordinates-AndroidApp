@@ -31,12 +31,12 @@ const SellerNavigator = () => {
   try {
     if (!user) {
       console.log('[DEBUG RoleSwitch] SellerNavigator render: no user, showing Loading');
-      return <LoadingScreen message="Loading..." />;
+      return <LoadingScreen variant="generic" />;
     }
 
     if (!isSeller) {
       console.log('[DEBUG RoleSwitch] SellerNavigator render: not seller, showing Switching...');
-      return <LoadingScreen message="Switching to Seller..." />;
+      return <LoadingScreen variant="dashboard" message="Switching to Seller..." />;
     }
 
     // DEBUG: If crash isolation is on, render only static placeholder (no API, no Chat/Firestore, no real screens)

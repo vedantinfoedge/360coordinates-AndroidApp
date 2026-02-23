@@ -573,7 +573,7 @@ const AgentPropertiesScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (loading) {
-    return <LoadingScreen message="Loading properties..." />;
+    return <LoadingScreen variant="listings" />;
   }
 
   return (

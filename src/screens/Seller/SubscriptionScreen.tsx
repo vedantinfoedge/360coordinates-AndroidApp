@@ -6,6 +6,7 @@ import { colors, spacing, typography } from '../../theme';
 import { formatters } from '../../utils/formatters';
 import { sellerService, DashboardStats } from '../../services/seller.service';
 import { ViewPlansContent } from '../../components/subscription/ViewPlansContent';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 type Props = BottomTabScreenProps<SellerTabParamList, 'Subscription'>;
 
@@ -62,12 +63,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (loading && !subscription) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading subscription...</Text>
-      </View>
-    );
+    return <LoadingScreen variant="subscription" />;
   }
 
   return (
