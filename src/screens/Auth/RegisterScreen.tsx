@@ -26,6 +26,7 @@ import {AuthStackParamList} from '../../navigation/AuthNavigator';
 import {colors, spacing} from '../../theme';
 import {useAuth, UserRole} from '../../context/AuthContext';
 import {authColors, authFonts} from './authDesignTheme';
+import {AuthFieldIcon} from './AuthFieldIcons';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 import MSG91WebWidget from '../../components/auth/MSG91WebWidget';
@@ -814,8 +815,12 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                 <View style={styles.divider} />
 
                 <View style={styles.field}>
-                  <Text style={styles.fieldLbl}>FULL NAME</Text>
+                  <View style={styles.fieldLblRow}>
+                    <AuthFieldIcon name="person" size={11} color={authColors.muted} />
+                    <Text style={styles.fieldLbl}>FULL NAME</Text>
+                  </View>
                   <View style={styles.inpWrap}>
+                    <AuthFieldIcon name="person" size={15} opacity={0.32} />
                     <TextInput
                       style={[styles.inp, {textTransform: 'uppercase'}]}
                       placeholder="Enter your full name"
@@ -829,8 +834,12 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                 </View>
 
                 <View style={styles.field}>
-                  <Text style={styles.fieldLbl}>EMAIL ADDRESS</Text>
+                  <View style={styles.fieldLblRow}>
+                    <AuthFieldIcon name="envelope" size={11} color={authColors.muted} />
+                    <Text style={styles.fieldLbl}>EMAIL ADDRESS</Text>
+                  </View>
                   <View style={styles.inpWrap}>
+                    <AuthFieldIcon name="envelope" size={15} opacity={0.32} />
                     <TextInput
                       style={styles.inp}
                       placeholder="Enter your email"
@@ -845,8 +854,11 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                 </View>
 
                 <View style={styles.field}>
-                  <View style={styles.fieldLblRow}>
-                    <Text style={styles.fieldLbl}>PHONE NUMBER</Text>
+                  <View style={styles.fieldLblRowPhone}>
+                    <View style={styles.fieldLblIconWrap}>
+                      <AuthFieldIcon name="phone" size={11} color={authColors.muted} />
+                      <Text style={styles.fieldLbl}>PHONE NUMBER</Text>
+                    </View>
                     {phoneVerified && <Text style={styles.verifiedBadge}>✓ Verified</Text>}
                   </View>
                   <View style={styles.phoneRow}>
@@ -854,6 +866,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                       <Text style={styles.phonePrefixText}>🇮🇳 +91</Text>
                     </View>
                     <View style={[styles.inpWrap, styles.phoneInpWrap]}>
+                      <AuthFieldIcon name="phone" size={15} opacity={0.32} />
                       <TextInput
                         style={styles.inp}
                         placeholder="10-digit number"
@@ -890,8 +903,12 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                 </View>
 
                 <View style={styles.field}>
-                  <Text style={styles.fieldLbl}>PASSWORD</Text>
+                  <View style={styles.fieldLblRow}>
+                    <AuthFieldIcon name="padlock" size={11} color={authColors.muted} />
+                    <Text style={styles.fieldLbl}>PASSWORD</Text>
+                  </View>
                   <View style={styles.inpWrap}>
+                    <AuthFieldIcon name="padlock" size={15} opacity={0.32} />
                     <TextInput
                       style={styles.inp}
                       placeholder="Min 6 characters"
@@ -903,14 +920,22 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                       autoCorrect={false}
                     />
                     <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
-                      <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                      <AuthFieldIcon
+                        name={showPassword ? 'eye-off' : 'eye'}
+                        size={15}
+                        opacity={0.35}
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 <View style={styles.field}>
-                  <Text style={styles.fieldLbl}>CONFIRM PASSWORD</Text>
+                  <View style={styles.fieldLblRow}>
+                    <AuthFieldIcon name="shield" size={11} color={authColors.muted} />
+                    <Text style={styles.fieldLbl}>CONFIRM PASSWORD</Text>
+                  </View>
                   <View style={styles.inpWrap}>
+                    <AuthFieldIcon name="shield" size={15} opacity={0.32} />
                     <TextInput
                       style={styles.inp}
                       placeholder="Confirm your password"
@@ -922,7 +947,11 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
                       autoCorrect={false}
                     />
                     <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                      <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                      <AuthFieldIcon
+                        name={showConfirmPassword ? 'eye-off' : 'eye'}
+                        size={15}
+                        opacity={0.35}
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1206,13 +1235,23 @@ const styles = StyleSheet.create({
     color: authColors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 6,
   },
   fieldLblRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 6,
+  },
+  fieldLblRowPhone: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
+  },
+  fieldLblIconWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   verifiedBadge: {
     fontSize: 10.5,
@@ -1228,6 +1267,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 13,
     height: 48,
+    gap: 9,
   },
   phoneInpWrap: {
     flex: 1,

@@ -26,6 +26,7 @@ import {fonts, spacing} from '../../theme';
 import {scale, verticalScale, moderateScale} from '../../utils/responsive';
 import {useAuth, UserRole} from '../../context/AuthContext';
 import {authColors, authFonts} from './authDesignTheme';
+import {AuthFieldIcon} from './AuthFieldIcons';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -517,8 +518,12 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
               <View style={styles.divider} />
 
               <View style={styles.field}>
-                <Text style={styles.fieldLbl}>EMAIL ADDRESS</Text>
+                <View style={styles.fieldLblRow}>
+                  <AuthFieldIcon name="envelope" size={11} color={authColors.muted} />
+                  <Text style={styles.fieldLbl}>EMAIL ADDRESS</Text>
+                </View>
                 <View style={styles.inpWrap}>
+                  <AuthFieldIcon name="envelope" size={15} opacity={0.32} />
                   <TextInput
                     style={styles.inp}
                     placeholder="your@email.com"
@@ -533,8 +538,12 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
               </View>
 
               <View style={styles.field}>
-                <Text style={styles.fieldLbl}>PASSWORD</Text>
+                <View style={styles.fieldLblRow}>
+                  <AuthFieldIcon name="padlock" size={11} color={authColors.muted} />
+                  <Text style={styles.fieldLbl}>PASSWORD</Text>
+                </View>
                 <View style={styles.inpWrap}>
+                  <AuthFieldIcon name="padlock" size={15} opacity={0.32} />
                   <TextInput
                     style={styles.inp}
                     placeholder="Enter your password"
@@ -548,7 +557,11 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
                   <TouchableOpacity
                     style={styles.eyeBtn}
                     onPress={() => setShowPassword(!showPassword)}>
-                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    <AuthFieldIcon
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={15}
+                      opacity={0.35}
+                    />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -817,13 +830,18 @@ const styles = StyleSheet.create({
   field: {
     marginBottom: 12,
   },
+  fieldLblRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 6,
+  },
   fieldLbl: {
     fontSize: 10.5,
     fontFamily: authFonts.sectionLabel,
     color: authColors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 6,
   },
   inpWrap: {
     backgroundColor: authColors.inputBg,
@@ -834,6 +852,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 13,
     height: 48,
+    gap: 9,
   },
   inp: {
     flex: 1,
