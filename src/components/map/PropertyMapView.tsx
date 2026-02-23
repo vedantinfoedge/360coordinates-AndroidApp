@@ -86,6 +86,8 @@ interface PropertyMapViewProps {
   searchParams?: MapSearchParams;
   /** Optional user location - when provided with no search location, fetches nearby properties */
   userLocation?: { latitude: number; longitude: number };
+  /** When true, only show the selected property on the map (no related/nearby properties) */
+  singlePropertyOnly?: boolean;
 }
 
 /** Normalized API response shape (service may return this or AxiosResponse) */
@@ -146,6 +148,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   fullscreenSearchBar,
   searchParams,
   userLocation,
+  singlePropertyOnly = false,
 }) => {
   const { isAuthenticated, user, switchUserRole } = useAuth();
   const navigation = useNavigation<any>();
@@ -321,8 +324,11 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           setSelectedPinScreenPosition(null); // Will be set by useEffect after map settles
           checkFavoriteStatus(String(currentProperty.id));
 
-          // Load related properties (same area, similar type) and pass current property
-          await loadRelatedProperties(lat, lng, currentProperty.status || currentProperty.property_status, formattedProperty);
+          if (singlePropertyOnly) {
+            setProperties([formattedProperty]);
+          } else {
+            await loadRelatedProperties(lat, lng, currentProperty.status || currentProperty.property_status, formattedProperty);
+          }
         }
       }
     } catch (error) {

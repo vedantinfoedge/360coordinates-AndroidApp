@@ -262,6 +262,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
         fullscreenSearchBar={hideControls ? undefined : fullscreenSearchBar}
         searchParams={searchParams}
         userLocation={userLocation}
+        singlePropertyOnly={hideControls}
       />
 
       {!hideControls && (
