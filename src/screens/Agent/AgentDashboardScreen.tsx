@@ -33,6 +33,7 @@ import CustomAlert from '../../utils/alertHelper';
 import { getLeads, Lead } from '../../services/leadsService';
 import { chatService } from '../../services/chat.service';
 import { propertyService } from '../../services/property.service';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -886,14 +887,7 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   if (loading && !dashboardStats) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen message="Loading dashboard..." />;
   }
 
   const stats = dashboardStats || {

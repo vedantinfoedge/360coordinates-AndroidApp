@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { DEBUG_SELLER_CRASH } from '../config/debugCrash';
 import SellerTabNavigator from '../components/navigation/SellerTabNavigator';
-import { colors } from '../theme';
+import LoadingScreen from '../components/common/LoadingScreen';
 import SellerPropertyDetailsScreen from '../screens/Seller/SellerPropertyDetailsScreen';
 import AddPropertyScreen from '../screens/Seller/AddPropertyScreen';
 
@@ -31,22 +31,12 @@ const SellerNavigator = () => {
   try {
     if (!user) {
       console.log('[DEBUG RoleSwitch] SellerNavigator render: no user, showing Loading');
-      return (
-        <View style={styles.gateContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.gateText}>Loading...</Text>
-        </View>
-      );
+      return <LoadingScreen message="Loading..." />;
     }
 
     if (!isSeller) {
       console.log('[DEBUG RoleSwitch] SellerNavigator render: not seller, showing Switching...');
-      return (
-        <View style={styles.gateContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.gateText}>Switching to Seller...</Text>
-        </View>
-      );
+      return <LoadingScreen message="Switching to Seller..." />;
     }
 
     // DEBUG: If crash isolation is on, render only static placeholder (no API, no Chat/Firestore, no real screens)
@@ -85,12 +75,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: '#FAFAFA',
   },
   gateText: {
     marginTop: 12,
     fontSize: 16,
-    color: colors.textSecondary,
+    color: '#5A6978',
   },
 });
 
