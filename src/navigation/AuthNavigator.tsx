@@ -14,7 +14,7 @@ export type AuthStackParamList = {
   Register: {role?: 'agent' | 'builder' | 'seller'} | undefined;
   ForgotPassword: undefined;
   OTPVerification: {userId?: number; user_id?: number; phone?: string; email?: string; type?: 'register' | 'forgotPassword'; reqId?: string; method?: 'msg91-sdk' | 'msg91-rest' | 'backend' | 'msg91-widget'};
-  ResetPassword: {otp: string};
+  ResetPassword: {otp: string; phone?: string};
 };
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();

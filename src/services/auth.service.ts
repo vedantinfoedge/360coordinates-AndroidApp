@@ -263,7 +263,7 @@ export const authService = {
     return response;
   },
 
-  // Reset Password
+  // Reset Password (email flow - uses reset_token from forgot-password)
   resetPassword: async (
     resetToken: string,
     otp: string,
@@ -271,6 +271,22 @@ export const authService = {
   ) => {
     const response = await api.post(API_ENDPOINTS.RESET_PASSWORD, {
       reset_token: resetToken,
+      otp,
+      new_password: newPassword,
+    });
+    return response;
+  },
+
+  // Reset Password by Phone (MSG91 OTP flow - uses phone as identifier)
+  resetPasswordByPhone: async (
+    phone: string,
+    otp: string,
+    newPassword: string,
+  ) => {
+    const digits = phone.replace(/\D/g, '');
+    const normalizedPhone = digits.length === 10 ? `91${digits}` : digits;
+    const response = await api.post(API_ENDPOINTS.RESET_PASSWORD, {
+      phone: normalizedPhone,
       otp,
       new_password: newPassword,
     });

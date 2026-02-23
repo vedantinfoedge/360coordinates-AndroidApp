@@ -10,9 +10,10 @@ import CustomAlert from '../../utils/alertHelper';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AuthStackParamList} from '../../navigation/AuthNavigator';
-import {colors, typography, spacing, borderRadius} from '../../theme';
+import {colors, typography, spacing} from '../../theme';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import {authService} from '../../services/auth.service';
 
 type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -21,17 +22,20 @@ type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<
 
 type RouteParams = {
   otp?: string;
+  phone?: string;
 };
 
 const ResetPasswordScreen: React.FC = () => {
   const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
   const route = useRoute();
   const params = route.params as RouteParams;
+  const {otp, phone} = params;
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
     newPassword?: string;
     confirmPassword?: string;
@@ -56,18 +60,40 @@ const ResetPasswordScreen: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (!validate()) {
       return;
     }
 
-    // TODO: Reset password with backend using OTP
-    CustomAlert.alert('Success', 'Password reset successfully', [
-      {
-        text: 'OK',
-        onPress: () => navigation.navigate('Login' as never),
-      },
-    ]);
+    if (!otp) {
+      CustomAlert.alert('Error', 'OTP is required. Please go back and verify your phone first.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (phone) {
+        await authService.resetPasswordByPhone(phone, otp, newPassword);
+      } else {
+        CustomAlert.alert('Error', 'Phone number is required for password reset. Please go through forgot password flow again.');
+        setIsLoading(false);
+        return;
+      }
+
+      CustomAlert.alert('Success', 'Password reset successfully', [
+        {
+          text: 'OK',
+          onPress: () => navigation.navigate('Login' as never),
+        },
+      ]);
+    } catch (error: any) {
+      CustomAlert.alert(
+        'Error',
+        error?.message || error?.response?.data?.message || 'Failed to reset password. Please try again.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -126,9 +152,10 @@ const ResetPasswordScreen: React.FC = () => {
         </View>
 
         <Button
-          title="Reset Password"
+          title={isLoading ? 'Resetting...' : 'Reset Password'}
           onPress={handleResetPassword}
           fullWidth
+          disabled={isLoading}
         />
       </View>
     </ScrollView>

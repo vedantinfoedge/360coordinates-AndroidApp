@@ -71,9 +71,9 @@ export const MSG91_CONFIG = {
   SMS_TEMPLATE_ID: '356c6c6c4141303836323334', // ⚠️ LIKELY WRONG - This looks like Widget ID, not Template ID!
   
   // Forgot Password SMS Widget ID
-  FORGOT_PASSWORD_WIDGET_ID: '356c686b6c57353338333631',
+  FORGOT_PASSWORD_WIDGET_ID: '366145646558303730333934',
   
-  // Forgot Password SMS Auth Token
+  // Forgot Password SMS Auth Token (tokenAuth)
   FORGOT_PASSWORD_AUTH_TOKEN: '481618TsNUr9hYEGR694e174cP1',
 };
 

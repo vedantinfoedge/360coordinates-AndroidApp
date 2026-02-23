@@ -472,33 +472,31 @@ const OTPVerificationScreen: React.FC = () => {
                   return;
                 }
                 
-                // For login/forgot password flows, verify with backend
+                // For forgot password: MSG91 verification is enough - no backend userId needed
+                if (params.type === 'forgotPassword') {
+                  console.log('[OTP Verification] Forgot password - OTP verified via MSG91, navigating to ResetPassword');
+                  navigation.navigate('ResetPassword', {otp, phone: params.phone} as never);
+                  return;
+                }
+                // For login flow, verify with backend
                 if (userId) {
                   console.log('[OTP Verification] Verifying with backend for authentication...');
                   await verifyOTP(userId, otp, params.phone);
-                  
-                  // Success - navigation handled by AppNavigator
-                  if (params.type === 'forgotPassword') {
-                    navigation.navigate('ResetPassword', {otp} as never);
-                  } else {
-                    CustomAlert.alert(
-                      'Success',
-                      'SMS OTP verified successfully! You are now logged in.',
-                      [
-                        {
-                          text: 'OK',
-                          onPress: () => {
-                            // Navigate based on selected role
-                            handleSuccessNavigation();
-                          },
+                  CustomAlert.alert(
+                    'Success',
+                    'SMS OTP verified successfully! You are now logged in.',
+                    [
+                      {
+                        text: 'OK',
+                        onPress: () => {
+                          handleSuccessNavigation();
                         },
-                      ],
-                    );
-                  }
+                      },
+                    ],
+                  );
                   return;
-                } else {
-                  throw new Error('User ID required for login/forgot password flow');
                 }
+                throw new Error('User ID required for login flow');
               } else {
                 // If MSG91 SDK returns failure response
                 const errorMsg = verifyResponse?.message || verifyResponse?.error || 'MSG91 SDK verification returned failure response';
@@ -615,33 +613,31 @@ const OTPVerificationScreen: React.FC = () => {
               return;
             }
             
-            // For login/forgot password flows, verify with backend
+            // For forgot password: MSG91 verification is enough - no backend userId needed
+            if (params.type === 'forgotPassword') {
+              console.log('[OTP Verification] Forgot password - OTP verified via MSG91/helper, navigating to ResetPassword');
+              navigation.navigate('ResetPassword', {otp, phone: params.phone} as never);
+              return;
+            }
+            // For login flow, verify with backend
             if (userId) {
               console.log('[OTP Verification] Verifying with backend for authentication...');
               await verifyOTP(userId, otp, params.phone);
-              
-              // Success - navigation handled by AppNavigator
-              if (params.type === 'forgotPassword') {
-                navigation.navigate('ResetPassword', {otp} as never);
-              } else {
-                CustomAlert.alert(
-                  'Success',
-                  'SMS OTP verified successfully! You are now logged in.',
-                  [
-                    {
-                      text: 'OK',
-                      onPress: () => {
-                        // Navigate based on selected role
-                        handleSuccessNavigation();
-                      },
+              CustomAlert.alert(
+                'Success',
+                'SMS OTP verified successfully! You are now logged in.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      handleSuccessNavigation();
                     },
-                  ],
-                );
-              }
+                  },
+                ],
+              );
               return;
-            } else {
-              throw new Error('User ID required for login/forgot password flow');
             }
+            throw new Error('User ID required for login flow');
           } else {
             console.error('[OTP Verification] MSG91 verification returned failure:', smsVerifyResponse.message);
             throw new Error(smsVerifyResponse.message || 'MSG91 verification failed');

@@ -31,7 +31,7 @@ interface MSG91WebWidgetProps {
   visible: boolean;
   onClose: () => void;
   identifier: string; // Email or phone number
-  widgetType: 'email' | 'sms';
+  widgetType: 'email' | 'sms' | 'forgotPassword';
   onSuccess: (data: any) => void;
   onFailure: (error: any) => void;
 }
@@ -50,7 +50,7 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const responseReceivedRef = useRef<boolean>(false);
   const nativeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isSMSWidget = widgetType === 'sms';
+  const isSMSWidget = widgetType === 'sms' || widgetType === 'forgotPassword';
   const [useAuthKey, setUseAuthKey] = useState(false); // allow toggling between Token ID and Auth Key for SMS
 
   // Memoize widget config to prevent recalculation on every render
@@ -58,14 +58,18 @@ const MSG91WebWidget: React.FC<MSG91WebWidgetProps> = ({
     const widgetId =
       widgetType === 'email'
         ? MSG91_CONFIG.EMAIL_WIDGET_ID
-        : MSG91_CONFIG.SMS_WIDGET_ID;
+        : widgetType === 'forgotPassword'
+          ? MSG91_CONFIG.FORGOT_PASSWORD_WIDGET_ID
+          : MSG91_CONFIG.SMS_WIDGET_ID;
     
     const authToken =
       widgetType === 'email'
         ? MSG91_CONFIG.EMAIL_AUTH_TOKEN
-        : MSG91_CONFIG.SMS_AUTH_TOKEN;
+        : widgetType === 'forgotPassword'
+          ? MSG91_CONFIG.FORGOT_PASSWORD_AUTH_TOKEN
+          : MSG91_CONFIG.SMS_AUTH_TOKEN;
     const resolvedAuthToken =
-      isSMSWidget && useAuthKey
+      isSMSWidget && useAuthKey && widgetType !== 'forgotPassword'
         ? MSG91_CONFIG.SMS_AUTH_KEY // alternative credential for SMS if needed
         : authToken;
     
