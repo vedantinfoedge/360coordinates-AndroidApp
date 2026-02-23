@@ -3,6 +3,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import ChatListScreen from '../screens/Chat/ChatListScreen';
 import ChatConversationScreen from '../screens/Chat/ChatConversationScreen';
 import PropertyDetailsScreen from '../screens/Buyer/PropertyDetailsScreen';
+import UpcomingProjectDetailsScreen from '../screens/Agent/UpcomingProjectDetailsScreen';
 import {colors} from '../theme';
 
 export type ChatStackParamList = {
@@ -18,6 +19,7 @@ export type ChatStackParamList = {
     counterpartyPhone?: string;
   };
   PropertyDetails: {propertyId: string};
+  UpcomingProjectDetails: {propertyId: string};
 };
 
 const ChatStack = createNativeStackNavigator<ChatStackParamList>();
@@ -37,6 +39,10 @@ const ChatNavigator = () => {
       <ChatStack.Screen
         name="PropertyDetails"
         component={PropertyDetailsScreen}
+      />
+      <ChatStack.Screen
+        name="UpcomingProjectDetails"
+        component={UpcomingProjectDetailsScreen}
       />
     </ChatStack.Navigator>
   );

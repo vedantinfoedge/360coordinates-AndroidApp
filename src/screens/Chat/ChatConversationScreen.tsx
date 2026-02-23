@@ -265,22 +265,30 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
     return null;
   }, [propertyId, conversationId]);
 
-  // Fetch property title if not provided via route params
+  const [isUpcomingProject, setIsUpcomingProject] = useState(false);
+
+  // Fetch property title and project_type if not provided via route params
   useEffect(() => {
+    if (!resolvedPropId) return;
     if (propertyTitle) {
       setResolvedPropertyTitle(propertyTitle);
-      return;
     }
-    if (!resolvedPropId) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await propertyService.getPropertyDetails(Number(resolvedPropId));
         const data = (res as any)?.data;
         const property = data?.property ?? data;
-        const title =
-          property?.title || property?.property_name || property?.name || '';
-        if (!cancelled && title) setResolvedPropertyTitle(title);
+        if (!cancelled) {
+          if (!propertyTitle) {
+            const title =
+              property?.title || property?.property_name || property?.name || '';
+            if (title) setResolvedPropertyTitle(title);
+          }
+          if (property?.project_type === 'upcoming') {
+            setIsUpcomingProject(true);
+          }
+        }
       } catch {}
     })();
     return () => { cancelled = true; };
@@ -288,7 +296,10 @@ const ChatConversationScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handlePropertyPress = () => {
     if (resolvedPropId) {
-      navigation.navigate('PropertyDetails', { propertyId: resolvedPropId });
+      navigation.navigate(
+        isUpcomingProject ? 'UpcomingProjectDetails' : 'PropertyDetails',
+        { propertyId: resolvedPropId },
+      );
     }
   };
 
