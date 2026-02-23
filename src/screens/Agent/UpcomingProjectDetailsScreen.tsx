@@ -246,6 +246,19 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
   }, [route.params.propertyId]);
 
   useEffect(() => {
+    const recordProjectView = async () => {
+      if (!user?.id || !route.params.propertyId) return;
+      try {
+        await buyerService.recordInteraction(route.params.propertyId, 'view');
+      } catch (_) {
+        // View tracking is non-critical
+      }
+    };
+    const timer = setTimeout(recordProjectView, 1000);
+    return () => clearTimeout(timer);
+  }, [route.params.propertyId, user?.id]);
+
+  useEffect(() => {
     if (isBuyer) initializeInteractionState();
   }, [isBuyer]);
 
