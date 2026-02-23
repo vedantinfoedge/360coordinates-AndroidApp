@@ -1095,19 +1095,16 @@ const SellerDashboardScreen: React.FC<Props> = ({ navigation }) => {
               delay={0}
             />
 
-            {/* Card 2: Views */}
+            {/* Card 2: View Inquiries */}
             <AnimatedStatCard
-              iconName="eye"
+              iconName="chats"
               iconColor={REF.purple}
               iconBgColor={REF.siPurple}
-              number={formatters.formatNumber(stats.total_views)}
-              label="Views"
-              badge={stats.views_percentage_change > 0
-                ? `+${stats.views_percentage_change}%`
-                : stats.views_percentage_change < 0
-                  ? `${stats.views_percentage_change}%`
-                  : 'Active'}
-              badgeColor={stats.views_percentage_change > 0 ? REF.siGreen : stats.views_percentage_change < 0 ? '#FEE2E2' : '#F1F3F5'}
+              number={stats.total_inquiries}
+              label="View Inquiries"
+              badge={stats.new_inquiries > 0 ? `${stats.new_inquiries} New` : 'No New'}
+              badgeColor={stats.new_inquiries > 0 ? '#FEE2E2' : '#F1F3F5'}
+              onPress={() => navigation.navigate('Chat', { screen: 'ChatList' })}
               delay={100}
             />
 

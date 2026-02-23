@@ -917,10 +917,13 @@ const SellerPropertiesScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.statNum}>{listedCount}</Text>
             <Text style={styles.statLabel}>Listed</Text>
           </View>
-          <View style={styles.statCard}>
+          <TouchableOpacity
+            style={styles.statCard}
+            activeOpacity={0.7}
+            onPress={() => (navigation as any).navigate('Chat', { screen: 'ChatList' })}>
             <Text style={styles.statNum}>{inquiriesCount}</Text>
             <Text style={styles.statLabel}>Inquiries</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
