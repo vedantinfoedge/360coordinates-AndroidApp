@@ -995,10 +995,13 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
                   <TabIcon name="close" color={colors.textSecondary} size={20} />
                 </TouchableOpacity>
               </View>
-              {!interactionLoading && (
+              {user && user.user_type === 'buyer' && !interactionLoading && (
                 <View style={styles.modalLimitInfo}>
                   <Text style={[styles.limitText, interactionState.remaining <= 0 && styles.limitTextError]}>
                     Credits Left: {interactionState.remaining} / {interactionState.max}
+                  </Text>
+                  <Text style={styles.modalCreditsResetText}>
+                    Credits will reset after 12 hours
                   </Text>
                 </View>
               )}
@@ -1387,6 +1390,7 @@ const styles = StyleSheet.create({
   creditsTextError: { color: colors.error },
   limitText: { ...typography.caption, fontSize: 14, color: colors.text, fontWeight: '600' },
   limitTextError: { color: colors.error || '#c62828' },
+  modalCreditsResetText: { ...typography.caption, fontSize: 11, color: colors.textSecondary, textAlign: 'center' as const, marginTop: spacing.xs },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl, borderTopRightRadius: borderRadius.xl, padding: spacing.lg, maxHeight: '70%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
