@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Share,
   Platform,
-  Linking,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -203,20 +202,12 @@ const AgentPropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     property.available_for_bachelors === 1 ||
     property.available_for_bachelors === '1';
 
-  const handleOpenMap = async () => {
-    const lat = property?.latitude;
-    const lng = property?.longitude;
-    if (!lat || !lng) {
-      CustomAlert.alert('Location unavailable', 'This property does not have map coordinates.');
-      return;
-    }
-
-    const url = `https://www.google.com/maps?q=${encodeURIComponent(String(lat))},${encodeURIComponent(String(lng))}`;
-    try {
-      await Linking.openURL(url);
-    } catch (e) {
-      CustomAlert.alert('Error', 'Unable to open maps.');
-    }
+  const handleOpenMap = () => {
+    const listingType = normalizedStatus === 'rent' ? 'rent' : normalizedStatus === 'pg-hostel' ? 'pg-hostel' : 'buy';
+    (navigation as any).navigate('PropertyMap', {
+      propertyId: property?.id,
+      listingType,
+    });
   };
 
   return (
