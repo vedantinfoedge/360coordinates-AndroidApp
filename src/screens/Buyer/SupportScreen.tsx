@@ -12,7 +12,6 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import functions from '@react-native-firebase/functions';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,6 +21,7 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon } from '../../components/navigation/TabIcons';
 import BuyerHeader from '../../components/BuyerHeader';
 import { useAuth } from '../../context/AuthContext';
+import { contactService } from '../../services/contact.service';
 
 type SupportScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<BuyerStackParamList>,
@@ -96,7 +96,7 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
-    subject: '',
+    phone: '',
     message: '',
   });
 
@@ -127,25 +127,24 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleSubmitContact = async () => {
-    if (!contactForm.name || !contactForm.email || !contactForm.message) {
-      Alert.alert('Error', 'Please fill in all required fields (Name, Email, Message).');
+    const validation = contactService.validate(contactForm);
+    if (!validation.valid) {
+      Alert.alert('Error', validation.error);
       return;
     }
 
     setLoading(true);
     try {
-      const result = await functions().httpsCallable('sendContactEmail')(contactForm);
-      const data = result.data as { success: boolean; message: string };
-
-      if (data.success) {
+      const result = await contactService.send(contactForm);
+      if (result?.success) {
         Alert.alert('Success', 'Your message has been sent successfully!');
-        setContactForm({ name: '', email: '', subject: '', message: '' });
+        setContactForm({ name: '', email: '', phone: '', message: '' });
       } else {
-        throw new Error(data.message || 'Failed to send message.');
+        throw new Error(result?.message || 'Failed to send message.');
       }
     } catch (error: any) {
       console.error('Contact Form Error:', error);
-      Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
+      Alert.alert('Error', error?.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -281,15 +280,16 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Subject</Text>
+              <Text style={styles.label}>Phone Number</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter subject"
+                placeholder="Enter your phone (min 10 digits)"
                 placeholderTextColor={colors.textSecondary}
-                value={contactForm.subject}
+                value={contactForm.phone}
                 onChangeText={(text: string) =>
-                  setContactForm({ ...contactForm, subject: text })
+                  setContactForm({ ...contactForm, phone: text })
                 }
+                keyboardType="phone-pad"
               />
             </View>
 

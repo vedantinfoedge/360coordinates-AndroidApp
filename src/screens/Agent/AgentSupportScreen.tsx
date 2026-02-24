@@ -9,6 +9,8 @@ import {
   Linking,
   Platform,
   Animated,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -19,6 +21,7 @@ import {colors, spacing, typography, borderRadius} from '../../theme';
 import {TabIcon} from '../../components/navigation/TabIcons';
 import AgentHeader from '../../components/AgentHeader';
 import {useAuth} from '../../context/AuthContext';
+import {contactService} from '../../services/contact.service';
 
 type SupportScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AgentStackParamList>,
@@ -84,10 +87,11 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
   const insets = useSafeAreaInsets();
   const {logout} = useAuth();
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
-    subject: '',
+    phone: '',
     message: '',
   });
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -118,18 +122,28 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  const handleSubmitContact = () => {
-    if (!contactForm.name || !contactForm.email || !contactForm.message) {
+  const handleSubmitContact = async () => {
+    const validation = contactService.validate(contactForm);
+    if (!validation.valid) {
+      Alert.alert('Error', validation.error);
       return;
     }
-    // In real app, send to backend
-    const email = 'info@360coordinates.com';
-    const subject = contactForm.subject || 'Contact Form Query';
-    const body = `Name: ${contactForm.name}\nEmail: ${contactForm.email}\n\nMessage:\n${contactForm.message}`;
-    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url).catch(err => console.error('Error opening email:', err));
-    // Reset form
-    setContactForm({name: '', email: '', subject: '', message: ''});
+
+    setLoading(true);
+    try {
+      const result = await contactService.send(contactForm);
+      if (result?.success) {
+        Alert.alert('Success', 'Your message has been sent successfully!');
+        setContactForm({name: '', email: '', phone: '', message: ''});
+      } else {
+        throw new Error(result?.message || 'Failed to send message.');
+      }
+    } catch (error: any) {
+      console.error('Contact Form Error:', error);
+      Alert.alert('Error', error?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -249,15 +263,16 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Subject</Text>
+              <Text style={styles.label}>Phone Number</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter subject"
+                placeholder="Enter your phone (min 10 digits)"
                 placeholderTextColor={colors.textSecondary}
-                value={contactForm.subject}
+                value={contactForm.phone}
                 onChangeText={text =>
-                  setContactForm({...contactForm, subject: text})
+                  setContactForm({...contactForm, phone: text})
                 }
+                keyboardType="phone-pad"
               />
             </View>
 
@@ -278,9 +293,14 @@ const AgentSupportScreen: React.FC<Props> = ({navigation}) => {
             </View>
 
             <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleSubmitContact}>
-              <Text style={styles.submitButtonText}>Send Message</Text>
+              style={[styles.submitButton, loading && {opacity: 0.7}]}
+              onPress={handleSubmitContact}
+              disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <Text style={styles.submitButtonText}>Send Message</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
