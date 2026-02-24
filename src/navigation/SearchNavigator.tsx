@@ -35,6 +35,8 @@ export type SearchStackParamList = {
         budget?: string;
         bedrooms?: string;
         area?: string;
+        searchMode?: 'projects' | 'properties';
+        project_type?: 'upcoming' | null;
       }
     | undefined;
   Favorites: undefined;

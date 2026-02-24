@@ -1411,6 +1411,8 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
                 budget: budget || undefined,
                 bedrooms: bedrooms || undefined,
                 area: area || undefined,
+                searchMode: searchMode,
+                project_type: projectTypeFilter || undefined,
               };
               navigation.navigate('PropertyMap', mapParams as never);
             } catch (error: any) {

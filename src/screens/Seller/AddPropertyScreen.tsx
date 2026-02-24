@@ -1951,6 +1951,9 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                       keyboardType="numeric"
                     />
                   </View>
+                  {formatPriceShort(depositAmount) && (
+                    <Text style={styles.priceSuggestionText}>≈ ₹{formatPriceShort(depositAmount)}</Text>
+                  )}
                   <Text style={styles.hintText}>
                     Typically 2-6 months of rent
                   </Text>
@@ -1989,6 +1992,9 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   keyboardType="numeric"
                 />
               </View>
+              {formatPriceShort(maintenance) && (
+                <Text style={styles.priceSuggestionText}>≈ ₹{formatPriceShort(maintenance)}</Text>
+              )}
             </View>
 
             <TouchableOpacity style={styles.summaryButton}>
@@ -2914,10 +2920,15 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   backButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     gap: spacing.xs,
   },
   backButtonIcon: {
@@ -2933,8 +2944,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cancelButton: {
+    flex: 1,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,

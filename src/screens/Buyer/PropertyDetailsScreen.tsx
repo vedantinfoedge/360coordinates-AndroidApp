@@ -1188,7 +1188,7 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           </Text>
           {(property.description?.length ?? 0) > DESCRIPTION_PREVIEW_LENGTH && (
             <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
-              <Text style={styles.readMore}>Read more {'>'}</Text>
+              <Text style={styles.readMore}>{descriptionExpanded ? 'Read less' : 'Read more >'}</Text>
             </TouchableOpacity>
           )}
         </View>

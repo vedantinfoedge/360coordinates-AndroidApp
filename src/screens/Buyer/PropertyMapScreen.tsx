@@ -40,6 +40,8 @@ type Props = {
       bedrooms?: string;
       area?: string;
       hideControls?: boolean;
+      searchMode?: 'projects' | 'properties';
+      project_type?: 'upcoming' | null;
     };
   };
 };
@@ -55,6 +57,8 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
   const initialBudget = params.budget || '';
   const initialBedrooms = params.bedrooms || '';
   const initialArea = params.area || '';
+  const searchMode = params.searchMode || 'properties';
+  const projectTypeFilter = params.project_type || null;
 
   const [searchText, setSearchText] = useState(initialLocation);
   const [location, setLocation] = useState(initialLocation);
@@ -158,6 +162,8 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
     bedrooms,
     area,
     searchCoordinates,
+    searchMode,
+    project_type: projectTypeFilter || undefined,
   };
 
   const handleSearch = (p: CompactSearchBarSearchParams) => {
@@ -189,7 +195,9 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
     setBudget(label);
   };
 
-  const fullscreenSearchBar = (
+  const isProjectMode = searchMode === 'projects';
+
+  const fullscreenSearchBar = isProjectMode ? undefined : (
     <FullscreenMapSearch
       searchText={searchText}
       location={location}
@@ -226,13 +234,15 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
   };
 
   const handleGoBackToList = () => {
-    const currentParams = {
+    const currentParams: any = {
       listingType,
       location: location || undefined,
       propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
       budget: budget || undefined,
       bedrooms: bedrooms || undefined,
       area: area || undefined,
+      searchMode,
+      project_type: projectTypeFilter || undefined,
     };
     try {
       (navigation as any).navigate('SearchResults', currentParams);
@@ -272,7 +282,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
             activeOpacity={0.8}
             onPress={handleGoBackToList}>
             <TabIcon name="list" color={colors.text} size={20} />
-            <Text style={styles.floatingListButtonText}>Go back to list</Text>
+            <Text style={styles.floatingListButtonText}>{isProjectMode ? 'Go back to projects' : 'Go back to list'}</Text>
           </TouchableOpacity>
         </View>
       )}

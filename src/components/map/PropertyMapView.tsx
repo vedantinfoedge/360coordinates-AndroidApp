@@ -47,6 +47,8 @@ export interface MapSearchParams {
   area?: string;
   /** [lng, lat] from autocomplete - used for immediate map centering without geocoding */
   searchCoordinates?: [number, number];
+  searchMode?: 'projects' | 'properties';
+  project_type?: 'upcoming' | null;
 }
 
 // Check if Mapbox is available
@@ -70,6 +72,7 @@ interface Property {
   cover_image?: string;
   images?: string[];
   property_type?: string;
+  project_type?: string;
 }
 
 interface PropertyMapViewProps {
@@ -198,7 +201,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   const effectiveListingType = searchParams?.listingType || listingType;
 
   const searchParamsKey = searchParams
-    ? `${searchParams.location}|${searchParams.city}|${searchParams.listingType}|${searchParams.propertyType}|${searchParams.minBudget}|${searchParams.maxBudget}|${searchParams.bedrooms}|${searchParams.area}|${userLocation ? `${userLocation.latitude},${userLocation.longitude}` : ''}`
+    ? `${searchParams.location}|${searchParams.city}|${searchParams.listingType}|${searchParams.propertyType}|${searchParams.minBudget}|${searchParams.maxBudget}|${searchParams.bedrooms}|${searchParams.area}|${searchParams.searchMode}|${searchParams.project_type}|${userLocation ? `${userLocation.latitude},${userLocation.longitude}` : ''}`
     : userLocation ? `loc:${userLocation.latitude},${userLocation.longitude}` : '';
 
   useEffect(() => {
@@ -567,7 +570,17 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
         const response = await propertyService.getProperties(params) as ApiResponseWithData<{ properties?: any[] }>;
 
         if (response.success && response.data?.properties) {
-          const formattedProperties = response.data.properties
+          let apiResults = response.data.properties;
+
+          const sm = searchParams?.searchMode;
+          const pt = searchParams?.project_type;
+          if (pt === 'upcoming') {
+            apiResults = apiResults.filter((p: any) => (p.project_type || '') === 'upcoming');
+          } else if (sm === 'properties') {
+            apiResults = apiResults.filter((p: any) => (p.project_type || '') !== 'upcoming');
+          }
+
+          const formattedProperties = apiResults
             .filter((prop: any) => prop.latitude && prop.longitude)
             .map((prop: any) => ({
               id: prop.id,
@@ -576,13 +589,14 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
               price: parseFloat(prop.price || '0'),
               status: prop.status || prop.property_status || 'sale',
               property_type: prop.property_type || prop.type || '',
+              project_type: prop.project_type || '',
               latitude: parseFloat(prop.latitude),
               longitude: parseFloat(prop.longitude),
               cover_image: prop.cover_image || prop.image,
               images: buildPropertyImages(prop),
             }));
           setProperties(formattedProperties);
-          log.property(`Loaded ${formattedProperties.length} properties for map (filter: ${lt})`);
+          log.property(`Loaded ${formattedProperties.length} properties for map (filter: ${lt}, mode: ${sm || 'all'})`);
         }
       }
     } catch (error) {

@@ -240,6 +240,10 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
   const [propertyUnlocked, setPropertyUnlocked] = useState(false);
   const [processingContact, setProcessingContact] = useState(false);
   const [processingChat, setProcessingChat] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [highlightsExpanded, setHighlightsExpanded] = useState(false);
+  const [uspExpanded, setUspExpanded] = useState(false);
+  const DESCRIPTION_PREVIEW_LENGTH = 180;
 
   useEffect(() => {
     loadProjectDetails();
@@ -762,7 +766,12 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>About this Project</Text>
             </View>
-            <Text style={styles.description}>{property.description || 'No description available'}</Text>
+            <Text style={styles.description} numberOfLines={descriptionExpanded ? undefined : 4}>{property.description || 'No description available'}</Text>
+            {(property.description?.length ?? 0) > DESCRIPTION_PREVIEW_LENGTH && (
+              <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
+                <Text style={styles.readMore}>{descriptionExpanded ? 'Read less' : 'Read more >'}</Text>
+              </TouchableOpacity>
+            )}
         </View>
 
         {/* Project details grid: only show fields that have data from API */}
@@ -902,7 +911,12 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>Project Highlights</Text>
             </View>
-            <Text style={styles.description}>{property.project_highlights}</Text>
+            <Text style={styles.description} numberOfLines={highlightsExpanded ? undefined : 4}>{property.project_highlights}</Text>
+            {(property.project_highlights?.length ?? 0) > DESCRIPTION_PREVIEW_LENGTH && (
+              <TouchableOpacity onPress={() => setHighlightsExpanded(!highlightsExpanded)}>
+                <Text style={styles.readMore}>{highlightsExpanded ? 'Read less' : 'Read more >'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -913,7 +927,12 @@ const UpcomingProjectDetailsScreen: React.FC<Props> = ({ navigation, route }) =>
               <View style={styles.sectionTitleBar} />
               <Text style={styles.sectionTitle}>Unique Selling Points</Text>
             </View>
-            <Text style={styles.description}>{property.usp}</Text>
+            <Text style={styles.description} numberOfLines={uspExpanded ? undefined : 4}>{property.usp}</Text>
+            {(property.usp?.length ?? 0) > DESCRIPTION_PREVIEW_LENGTH && (
+              <TouchableOpacity onPress={() => setUspExpanded(!uspExpanded)}>
+                <Text style={styles.readMore}>{uspExpanded ? 'Read less' : 'Read more >'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1258,6 +1277,7 @@ const styles = StyleSheet.create({
   chip: { backgroundColor: colors.background, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.round, borderWidth: 1, borderColor: colors.borderRef },
   chipText: { ...typography.caption, color: colors.text, fontWeight: '600', fontSize: 13 },
   description: { fontSize: 13, color: colors.sub, lineHeight: 22 },
+  readMore: { fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 8 },
   detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   detailItem: {
     width: '47%',
