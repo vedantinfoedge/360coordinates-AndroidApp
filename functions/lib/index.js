@@ -61,10 +61,40 @@ exports.onChatMessageCreated = functions.firestore
             return;
         }
         const tokensUrl = `${backendUrl}/api/device-token/tokens.php?user_id=${encodeURIComponent(recipientId)}`;
-        const res = await fetch(tokensUrl, {
+        const tokenRes = await fetch(tokensUrl, {
             headers: { "X-Internal-Secret": fcmSecret },
         });
-        const data = await res.json();
+        const bodyText = await tokenRes.text();
+        const bodySnippet = bodyText.replace(/\s+/g, " ").trim().slice(0, 200);
+        if (tokenRes.status < 200 || tokenRes.status >= 300) {
+            console.warn("[onChatMessageCreated] Tokens API non-2xx:", {
+                status: tokenRes.status,
+                url: tokensUrl,
+                bodySnippet,
+            });
+            return;
+        }
+        const trimmed = bodyText.trim();
+        if (trimmed.startsWith("<!") || trimmed.startsWith("<?")) {
+            console.warn("[onChatMessageCreated] Tokens API returned HTML:", {
+                status: tokenRes.status,
+                url: tokensUrl,
+                bodySnippet,
+            });
+            return;
+        }
+        let data;
+        try {
+            data = JSON.parse(bodyText);
+        }
+        catch (parseErr) {
+            console.warn("[onChatMessageCreated] Tokens API invalid JSON:", {
+                status: tokenRes.status,
+                url: tokensUrl,
+                bodySnippet,
+            });
+            return;
+        }
         const tokens = Array.isArray(data === null || data === void 0 ? void 0 : data.tokens) ? data.tokens : [];
         if (tokens.length === 0) {
             console.log("[onChatMessageCreated] No FCM tokens for recipient:", recipientId);
