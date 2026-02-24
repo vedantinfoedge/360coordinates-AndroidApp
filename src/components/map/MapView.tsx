@@ -1,4 +1,4 @@
-import React, {useEffect, useImperativeHandle, useRef, useState, forwardRef} from 'react';
+import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,10 +8,11 @@ import {
   PermissionsAndroid,
   Platform,
 } from 'react-native';
-import {MAP_CONFIG, initializeMapbox, MAPBOX_ACCESS_TOKEN} from '../../config/mapbox.config';
-import {colors, spacing, typography} from '../../theme';
-import {log} from '../../utils/debug';
+import { MAP_CONFIG, initializeMapbox, MAPBOX_ACCESS_TOKEN } from '../../config/mapbox.config';
+import { colors, spacing, typography } from '../../theme';
+import { log } from '../../utils/debug';
 import CustomAlert from '../../utils/alertHelper';
+import { TabIcon } from '../navigation/TabIcons';
 
 // Conditionally import Mapbox to prevent crashes if not linked
 let Mapbox: any = null;
@@ -25,7 +26,7 @@ try {
   Camera = mapboxModule.Camera;
   PointAnnotation = mapboxModule.PointAnnotation;
   isMapboxAvailable = true;
-  
+
   // Set access token if available
   if (MAPBOX_ACCESS_TOKEN && MAPBOX_ACCESS_TOKEN !== 'YOUR_MAPBOX_ACCESS_TOKEN_HERE') {
     Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
@@ -152,13 +153,13 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
 
   const getCurrentLocation = () => {
     const Geolocation = require('react-native-geolocation-service').default;
-    
+
     Geolocation.getCurrentPosition(
       (position: any) => {
-        const {latitude, longitude} = position.coords;
+        const { latitude, longitude } = position.coords;
         const coordinate: [number, number] = [longitude, latitude];
         setUserLocation(coordinate);
-        
+
         // Update camera to user location
         if (cameraRef.current) {
           cameraRef.current.setCamera({
@@ -167,8 +168,8 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
             animationDuration: 1000,
           });
         }
-        
-        log.location('Current location obtained', {latitude, longitude});
+
+        log.location('Current location obtained', { latitude, longitude });
       },
       (error: any) => {
         log.error('location', 'Error getting current location', error);
@@ -225,7 +226,7 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
           <Text style={styles.loadingText}>Loading map...</Text>
         </View>
       )}
-      
+
       <Mapbox.MapView
         ref={mapRef}
         style={styles.map}
@@ -253,7 +254,7 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
           <PointAnnotation
             id="user-location"
             coordinate={userLocation}
-            anchor={{x: 0.5, y: 0.5}}>
+            anchor={{ x: 0.5, y: 0.5 }}>
             <View style={styles.userLocationMarker}>
               <View style={styles.userLocationDot} />
             </View>
@@ -266,7 +267,7 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
           const markerColor = marker.color || '#0077C0';
           const isSelected = markerColor === '#F97316';
           const hasPrice = marker.price !== undefined && marker.price !== null;
-          
+
           // If marker has a price, show price tag
           if (hasPrice) {
             // Format price for marker - show exact price with proper formatting
@@ -285,18 +286,18 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
               }
               return price.toLocaleString('en-IN');
             };
-            
+
             const priceText = formatPrice(marker.price!);
-            
+
             return (
               <PointAnnotation
                 key={marker.id}
                 id={marker.id}
                 coordinate={marker.coordinate}
-                anchor={{x: 0.5, y: 0.5}}
+                anchor={{ x: 0.5, y: 0.5 }}
                 onSelected={() => handleMarkerPress(marker.id)}>
                 <View style={[styles.priceTagMarker, isSelected && styles.priceTagMarkerSelected]}>
-                  <View style={[styles.priceTag, {backgroundColor: markerColor}]}>
+                  <View style={[styles.priceTag, { backgroundColor: markerColor }]}>
                     <Text style={styles.priceTagText} numberOfLines={1} adjustsFontSizeToFit={true} minimumFontScale={0.8}>
                       ₹{priceText}
                     </Text>
@@ -305,20 +306,20 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
               </PointAnnotation>
             );
           }
-          
-          // If no price, show modern pin marker (for location picker, etc.)
+
+          // If no price, show teardrop pin marker with location icon (for location picker, etc.)
           return (
             <PointAnnotation
               key={marker.id}
               id={marker.id}
               coordinate={marker.coordinate}
-              anchor={{x: 0.5, y: 1}}
+              anchor={{ x: 0.5, y: 1 }}
               onSelected={() => handleMarkerPress(marker.id)}>
               <View style={styles.pinContainer}>
-                <View style={[styles.pinHead, {backgroundColor: markerColor}]}>
-                  <View style={styles.pinInnerCircle} />
+                <View style={[styles.pinHead, { backgroundColor: markerColor }]}>
+                  <TabIcon name="location" color="#FFFFFF" size={18} />
                 </View>
-                <View style={[styles.pinTail, {borderTopColor: markerColor}]} />
+                <View style={[styles.pinTail, { borderTopColor: markerColor }]} />
                 <View style={styles.pinShadow} />
               </View>
             </PointAnnotation>
@@ -399,7 +400,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 5,
@@ -428,47 +429,41 @@ const styles = StyleSheet.create({
   },
   pinContainer: {
     alignItems: 'center',
-    width: 40,
-    height: 52,
+    width: 44,
+    height: 58,
   },
   pinHead: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#0077C0',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 3},
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 10,
     zIndex: 2,
-  },
-  pinInnerCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
   },
   pinTail: {
     width: 0,
     height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 14,
+    borderLeftWidth: 11,
+    borderRightWidth: 11,
+    borderTopWidth: 16,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderTopColor: '#0077C0',
-    marginTop: -4,
+    marginTop: -5,
     zIndex: 1,
   },
   pinShadow: {
-    width: 14,
+    width: 16,
     height: 6,
-    borderRadius: 7,
+    borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.2)',
     marginTop: 2,
   },

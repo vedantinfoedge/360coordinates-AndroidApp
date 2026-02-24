@@ -1,4 +1,4 @@
-import React, {useState, useRef, useCallback} from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,13 +12,13 @@ import {
   FlatList,
 } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
-import MapViewComponent, {MapViewHandle} from './MapView';
-import {colors, spacing, typography, borderRadius} from '../../theme';
-import {reverseGeocode} from '../../utils/geocoding';
-import {MAPBOX_ACCESS_TOKEN} from '../../config/mapbox.config';
-import {log} from '../../utils/debug';
+import MapViewComponent, { MapViewHandle } from './MapView';
+import { colors, spacing, typography, borderRadius } from '../../theme';
+import { reverseGeocode } from '../../utils/geocoding';
+import { MAPBOX_ACCESS_TOKEN } from '../../config/mapbox.config';
+import { log } from '../../utils/debug';
 import CustomAlert from '../../utils/alertHelper';
-import {TabIcon} from '../navigation/TabIcons';
+import { TabIcon } from '../navigation/TabIcons';
 
 // Conditionally import Mapbox
 let Camera: any = null;
@@ -35,7 +35,7 @@ try {
 
 interface LocationPickerProps {
   visible: boolean;
-  initialLocation?: {latitude: number; longitude: number};
+  initialLocation?: { latitude: number; longitude: number };
   onLocationSelect: (location: {
     latitude: number;
     longitude: number;
@@ -120,12 +120,12 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   const handleMapPress = async (coordinate: [number, number]) => {
     setSelectedLocation(coordinate);
     setLoadingAddress(true);
-    
+
     try {
       // Reverse geocode to get address using Mapbox API
       const [longitude, latitude] = coordinate;
       const result = await reverseGeocode(latitude, longitude);
-      
+
       if (result && result.placeName) {
         setAddress(result.placeName);
         setLocationContext(result.context || []); // Store context
@@ -162,24 +162,24 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   const handleUseCurrentLocation = async () => {
     try {
       setLoadingAddress(true);
-      
+
       // Note: react-native-geolocation-service handles permissions automatically
       // For Android, ensure ACCESS_FINE_LOCATION permission is in AndroidManifest.xml
 
       // Get current location
       Geolocation.getCurrentPosition(
         position => {
-          const {latitude, longitude} = position.coords;
+          const { latitude, longitude } = position.coords;
           const coordinate: [number, number] = [longitude, latitude];
           setSelectedLocation(coordinate);
-          
+
           if (mapViewRef.current) {
             mapViewRef.current.flyTo(coordinate, 15);
           }
-          
+
           // Get address
           handleMapPress(coordinate);
-          log.location('Current location obtained', {latitude, longitude});
+          log.location('Current location obtained', { latitude, longitude });
         },
         error => {
           log.error('location', 'Error getting current location', error);
@@ -275,12 +275,12 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
             markers={
               selectedLocation
                 ? [
-                    {
-                      id: 'selected',
-                      coordinate: selectedLocation,
-                      color: colors.primary,
-                    },
-                  ]
+                  {
+                    id: 'selected',
+                    coordinate: selectedLocation,
+                    color: colors.primary,
+                  },
+                ]
                 : []
             }
           />
@@ -311,7 +311,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                     setSuggestions([]);
                     setShowSuggestions(false);
                   }}
-                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <TabIcon name="close" color={colors.textSecondary} size={16} />
                 </TouchableOpacity>
               )}
@@ -323,11 +323,11 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                   data={suggestions}
                   keyExtractor={item => item.id}
                   keyboardShouldPersistTaps="handled"
-                  renderItem={({item}) => (
+                  renderItem={({ item }) => (
                     <TouchableOpacity
                       style={styles.suggestionItem}
                       onPress={() => handleSuggestionSelect(item)}>
-                      <Text style={styles.suggestionIcon}>📍</Text>
+                      <TabIcon name="location" color={colors.primary} size={16} />
                       <Text style={styles.suggestionText} numberOfLines={2}>
                         {item.place_name}
                       </Text>
@@ -371,7 +371,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
           <TouchableOpacity
             style={styles.actionButton}
             onPress={handleUseCurrentLocation}>
-            <Text style={styles.actionButtonIcon}>📍</Text>
+            <TabIcon name="location" color={colors.surface} size={20} />
             <Text style={styles.actionButtonText}>Use Current Location</Text>
           </TouchableOpacity>
         </View>
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'ios' ? spacing.sm + 2 : spacing.xs,
     gap: spacing.sm,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 5,
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     maxHeight: 220,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 6,
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 5,
@@ -533,9 +533,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: borderRadius.md,
     gap: spacing.sm,
-  },
-  actionButtonIcon: {
-    fontSize: 20,
   },
   actionButtonText: {
     ...typography.body,
