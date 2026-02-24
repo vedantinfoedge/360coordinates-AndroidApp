@@ -665,9 +665,11 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         return true;
       }
       case 4: {
-        // Pricing & Amenities: starting price, at least one amenity
+        // Pricing & Amenities: starting price, dates, at least one amenity
         const nextErrors: Record<string, string> = {};
         if (!startingPrice.trim()) nextErrors.startingPrice = 'Starting price is required';
+        if (!launchDate) nextErrors.launchDate = 'Launch date is required';
+        if (!possessionDate) nextErrors.possessionDate = 'Expected possession date is required';
         if (selectedAmenities.length === 0) nextErrors.amenities = 'At least one amenity must be selected';
         if (Object.keys(nextErrors).length > 0) {
           setFieldErrors(nextErrors);
@@ -688,8 +690,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
           nextErrors.projectImages = 'Please wait for all images to be validated';
         } else if (rejectedImages.length > 0) {
           nextErrors.projectImages = `Please remove ${rejectedImages.length} rejected image(s)`;
-        } else if (projectImages.length < 2) {
-          nextErrors.projectImages = 'Please upload at least 2 images';
+        } else if (projectImages.length < 4) {
+          nextErrors.projectImages = 'Please upload at least 4 images';
         } else if (projectImages.length > 20) {
           nextErrors.projectImages = 'You can upload a maximum of 20 images';
         } else if (approvedImages.length === 0) {
@@ -759,8 +761,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         .map(img => img.imageUrl || img.base64)
         .filter((url): url is string => url !== undefined && url !== '');
 
-      if (approvedImages.length < 2) {
-        Alert.alert('Error', 'Please upload at least 2 approved images', [{ text: 'OK' }]);
+      if (approvedImages.length < 4) {
+        Alert.alert('Error', 'Please upload at least 4 approved images', [{ text: 'OK' }]);
         setIsSubmitting(false);
         return;
       }
@@ -808,8 +810,8 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         loadingDocks: loadingDocks || null,
         startingPrice: startingPrice.trim() || null,
         bookingAmount: bookingAmount.trim() || null,
-        expectedLaunchDate: launchDate || null,
-        expectedPossessionDate: possessionDate || null,
+        expectedLaunchDate: launchDate,
+        expectedPossessionDate: possessionDate,
         reraStatus: reraStatus || null,
         landOwnershipType: landOwnershipType || null,
         bankApproved: bankApproved || null,
@@ -1504,10 +1506,10 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Launch Date (Optional)</Text>
+              <Text style={styles.label}>Launch Date <Text style={styles.required}>*</Text></Text>
               <TouchableOpacity
                 style={styles.input}
-                onPress={() => setShowLaunchDatePicker(true)}>
+                onPress={() => { setShowLaunchDatePicker(true); clearFieldError('launchDate'); }}>
                 <Text style={launchDate ? styles.dateText : styles.datePlaceholder}>
                   {launchDate || 'Select date'}
                 </Text>
@@ -1524,18 +1526,22 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
                       const d = String(selectedDate.getDate()).padStart(2, '0');
                       setLaunchDate(`${y}-${m}-${d}`);
+                      clearFieldError('launchDate');
                     }
                   }}
                   onTouchCancel={() => setShowLaunchDatePicker(false)}
                 />
               )}
+              {!!fieldErrors.launchDate && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.launchDate}</Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Expected Possession Date (Optional)</Text>
+              <Text style={styles.label}>Expected Possession Date <Text style={styles.required}>*</Text></Text>
               <TouchableOpacity
                 style={styles.input}
-                onPress={() => setShowPossessionDatePicker(true)}>
+                onPress={() => { setShowPossessionDatePicker(true); clearFieldError('possessionDate'); }}>
                 <Text style={possessionDate ? styles.dateText : styles.datePlaceholder}>
                   {possessionDate || 'Select date'}
                 </Text>
@@ -1552,10 +1558,14 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
                       const d = String(selectedDate.getDate()).padStart(2, '0');
                       setPossessionDate(`${y}-${m}-${d}`);
+                      clearFieldError('possessionDate');
                     }
                   }}
                   onTouchCancel={() => setShowPossessionDatePicker(false)}
                 />
+              )}
+              {!!fieldErrors.possessionDate && (
+                <Text style={styles.fieldErrorText}>{fieldErrors.possessionDate}</Text>
               )}
             </View>
 
@@ -1628,11 +1638,11 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
               <Text style={styles.imageCountText}>
-                Images uploaded: {approvedImagesCount} / 20 (Minimum 2 required)
+                Images uploaded: {approvedImagesCount} / 20 (Minimum 4 required)
               </Text>
-              {approvedImagesCount < 2 && (
+              {approvedImagesCount < 4 && (
                 <Text style={styles.warningText}>
-                  ⚠️ Please upload at least 2 images to continue.
+                  ⚠️ Please upload at least 4 images to continue.
                 </Text>
               )}
               {!!fieldErrors.projectImages && (
