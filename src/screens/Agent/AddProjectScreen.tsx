@@ -11,6 +11,8 @@ import {
   Platform,
   PermissionsAndroid,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType } from 'react-native-image-picker';
@@ -208,8 +210,10 @@ const INDIAN_STATES_OPTIONS = INDIAN_STATES.map(s => ({ label: s, value: s }));
 const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
   const scrollViewRef = useRef<ScrollView>(null);
+  const fieldLayoutsRef = useRef<Record<string, number>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Step 1: Basic Project Information
   const [projectName, setProjectName] = useState('');
@@ -310,6 +314,16 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
     }
     return parseFloat(cleaned) || 0;
   };
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = (e: any) => setKeyboardHeight(e.endCoordinates.height);
+    const onHide = () => setKeyboardHeight(0);
+    const sub1 = Keyboard.addListener(showEvent, onShow);
+    const sub2 = Keyboard.addListener(hideEvent, onHide);
+    return () => { sub1.remove(); sub2.remove(); };
+  }, []);
 
   const clearFieldError = useCallback((field: string) => {
     setFieldErrors(prev => {
@@ -594,10 +608,17 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
     });
   };
 
-  // Scroll to first field with error
+  const handleFieldLayout = useCallback((fieldName: string, y: number) => {
+    fieldLayoutsRef.current[fieldName] = y;
+  }, []);
+
   const scrollToFirstError = useCallback((firstErrorField: string) => {
-    // Scroll to top so user sees error messages; ScrollView doesn't have findNodeHandle for field refs easily
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    const y = fieldLayoutsRef.current[firstErrorField];
+    if (y !== undefined) {
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true });
+    } else {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }
   }, []);
 
   // Validation functions (per AddUpcomingProjectPopup spec)
@@ -735,7 +756,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
     if (currentStep < totalSteps) {
+      fieldLayoutsRef.current = {};
       setCurrentStep(currentStep + 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     } else {
       handleSubmit();
     }
@@ -743,7 +766,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
 
   const handlePrevious = () => {
     if (currentStep > 1) {
+      fieldLayoutsRef.current = {};
       setCurrentStep(currentStep - 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     }
   };
 
@@ -970,12 +995,14 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Basic Project Information</Text>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.projectName && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('projectName', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Project Name <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, fieldErrors.projectName && styles.inputError]}
                 placeholder="e.g., Green Valley Residency"
                 placeholderTextColor={colors.textSecondary}
                 value={projectName}
@@ -1000,7 +1027,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.hintText}>Auto-filled from your account</Text>
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.projectType && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('projectType', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Project Type <Text style={styles.required}>*</Text>
               </Text>
@@ -1029,7 +1058,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.projectStatus && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('projectStatus', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Project Status <Text style={styles.required}>*</Text>
               </Text>
@@ -1058,12 +1089,14 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               />
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.description && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('description', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Project Description <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, fieldErrors.description && styles.inputError]}
                 placeholder="Provide a detailed overview (minimum 100 characters)"
                 placeholderTextColor={colors.textSecondary}
                 value={description}
@@ -1091,13 +1124,15 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Location</Text>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.location && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('location', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Location / Area <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.locationInputContainer}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, fieldErrors.location && styles.inputError]}
                   placeholder="Enter locality, area or landmark"
                   placeholderTextColor={colors.textSecondary}
                   value={locationQuery}
@@ -1199,7 +1234,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               onClose={() => setLocationPickerVisible(false)}
             />
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.state && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('state', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 State <Text style={styles.required}>*</Text>
               </Text>
@@ -1221,12 +1258,14 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.additionalAddress && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('additionalAddress', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Additional Address <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, fieldErrors.additionalAddress && styles.inputError]}
                 placeholder="Enter additional address details"
                 placeholderTextColor={colors.textSecondary}
                 value={additionalAddress}
@@ -1240,12 +1279,14 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.pincode && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('pincode', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Pincode <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, fieldErrors.pincode && styles.inputError]}
                 placeholder="6 digits"
                 placeholderTextColor={colors.textSecondary}
                 value={pincode}
@@ -1271,7 +1312,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Configuration</Text>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.configurations && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('configurations', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Configurations <Text style={styles.required}>*</Text>
               </Text>
@@ -1319,13 +1362,15 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               };
               const areaMeta = areaLabelByType[projectType] || { label: 'Carpet Area Range (sq.ft)', suffix: 'sq.ft', placeholder: 'e.g., 650 - 1200' };
               return (
-                <View style={styles.inputContainer}>
+                <View
+                  style={[styles.inputContainer, fieldErrors.carpetAreaRange && styles.inputContainerError]}
+                  onLayout={(e) => handleFieldLayout('carpetAreaRange', e.nativeEvent.layout.y)}>
                   <Text style={styles.label}>
                     {areaMeta.label} <Text style={styles.required}>*</Text>
                   </Text>
                   <View style={styles.areaInputContainer}>
                     <TextInput
-                      style={[styles.input, styles.areaInput]}
+                      style={[styles.input, styles.areaInput, fieldErrors.carpetAreaRange && styles.inputError]}
                       placeholder={areaMeta.placeholder}
                       placeholderTextColor={colors.textSecondary}
                       value={carpetAreaRange}
@@ -1457,14 +1502,16 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Pricing & Amenities</Text>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.startingPrice && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('startingPrice', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Starting Price <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.priceInputContainer}>
                 <Text style={styles.currencySymbol}>₹</Text>
                 <TextInput
-                  style={[styles.input, styles.priceInput]}
+                  style={[styles.input, styles.priceInput, fieldErrors.startingPrice && styles.inputError]}
                   placeholder="e.g., 4500000 or 45-60"
                   placeholderTextColor={colors.textSecondary}
                   value={startingPrice}
@@ -1505,10 +1552,12 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.launchDate && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('launchDate', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>Launch Date <Text style={styles.required}>*</Text></Text>
               <TouchableOpacity
-                style={styles.input}
+                style={[styles.input, fieldErrors.launchDate && styles.inputError]}
                 onPress={() => { setShowLaunchDatePicker(true); clearFieldError('launchDate'); }}>
                 <Text style={launchDate ? styles.dateText : styles.datePlaceholder}>
                   {launchDate || 'Select date'}
@@ -1537,10 +1586,12 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.possessionDate && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('possessionDate', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>Expected Possession Date <Text style={styles.required}>*</Text></Text>
               <TouchableOpacity
-                style={styles.input}
+                style={[styles.input, fieldErrors.possessionDate && styles.inputError]}
                 onPress={() => { setShowPossessionDatePicker(true); clearFieldError('possessionDate'); }}>
                 <Text style={possessionDate ? styles.dateText : styles.datePlaceholder}>
                   {possessionDate || 'Select date'}
@@ -1569,7 +1620,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.amenities && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('amenities', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Amenities <Text style={styles.required}>*</Text>
               </Text>
@@ -1614,7 +1667,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Media & Contact</Text>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.projectImages && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('projectImages', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Project Images <Text style={styles.required}>*</Text> (Concept images / 3D renders allowed)
               </Text>
@@ -1811,7 +1866,9 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[styles.inputContainer, fieldErrors.salesPersons && styles.inputContainerError]}
+              onLayout={(e) => handleFieldLayout('salesPersons', e.nativeEvent.layout.y)}>
               <Text style={styles.label}>
                 Sales Person(s) <Text style={styles.required}>*</Text> (At least 1, max 5)
               </Text>
@@ -2030,14 +2087,25 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               })}
             </ScrollView>
 
-            {/* Content */}
-            <ScrollView
-              ref={scrollViewRef}
-              style={styles.content}
-              contentContainerStyle={styles.contentContainer}
-              showsVerticalScrollIndicator={false}>
-              {renderStepContent()}
-            </ScrollView>
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}>
+              {/* Content */}
+              <ScrollView
+                ref={scrollViewRef}
+                style={styles.content}
+                contentContainerStyle={[
+                  styles.contentContainer,
+                  Platform.OS === 'android' && keyboardHeight > 0
+                    ? { paddingBottom: keyboardHeight }
+                    : null,
+                ]}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled">
+                {renderStepContent()}
+              </ScrollView>
+            </KeyboardAvoidingView>
 
             {/* Footer */}
             <View style={styles.footer}>
@@ -2201,6 +2269,13 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: spacing.lg,
   },
+  inputContainerError: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    backgroundColor: colors.error + '08',
+  },
   label: {
     ...typography.caption,
     color: colors.text,
@@ -2220,6 +2295,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  inputError: {
+    borderColor: colors.error,
+    borderWidth: 1.5,
   },
   disabledInput: {
     backgroundColor: colors.border + '40',
