@@ -22,6 +22,9 @@ DerivedData
 *.xcuserstate
 **/.xcode.env.local
 
+# Firebase functions env (contains secrets)
+functions/.env
+
 # Android/IntelliJ
 #
 build/

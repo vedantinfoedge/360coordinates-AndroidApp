@@ -3,12 +3,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.onChatMessageCreated = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+// Load .env from functions/ if present (BACKEND_URL, BACKEND_FCM_SECRET)
+try {
+    require("dotenv").config();
+}
+catch (_a) {
+    // dotenv optional; use GCP Runtime env vars if not installed
+}
 admin.initializeApp();
 // =============================================================================
 // Chat Push Notifications - Firestore trigger on new message
 // Fetches recipient's FCM tokens from PHP backend and sends push notification
+// Set env in GCP Console: Cloud Functions → onChatMessageCreated → Edit → Runtime env vars
+//   BACKEND_URL = https://360coordinates.com/backend
+//   BACKEND_FCM_SECRET = (same as FCM_INTERNAL_SECRET on PHP)
+// Or in .env in functions/ (do not commit .env): BACKEND_URL=... BACKEND_FCM_SECRET=...
 // =============================================================================
-const TOKENS_API_BASE = "https://360coordinates.com/backend/api";
+const getBackendConfig = () => ({
+    url: (process.env.BACKEND_URL || "").replace(/\/$/, ""),
+    fcmSecret: process.env.BACKEND_FCM_SECRET || "",
+});
 exports.onChatMessageCreated = functions.firestore
     .document("chats/{chatRoomId}/messages/{messageId}")
     .onCreate(async (snap, context) => {
@@ -40,9 +54,16 @@ exports.onChatMessageCreated = functions.firestore
             console.warn("[onChatMessageCreated] Could not determine recipient");
             return;
         }
-        // Fetch FCM tokens from PHP backend
-        const tokensUrl = `${TOKENS_API_BASE}/device-token/tokens.php?user_id=${encodeURIComponent(recipientId)}`;
-        const res = await fetch(tokensUrl);
+        // Fetch FCM tokens from PHP backend (BACKEND_URL, BACKEND_FCM_SECRET = X-Internal-Secret)
+        const { url: backendUrl, fcmSecret } = getBackendConfig();
+        if (!backendUrl || !fcmSecret) {
+            console.warn("[onChatMessageCreated] Missing BACKEND_URL or BACKEND_FCM_SECRET env.");
+            return;
+        }
+        const tokensUrl = `${backendUrl}/api/device-token/tokens.php?user_id=${encodeURIComponent(recipientId)}`;
+        const res = await fetch(tokensUrl, {
+            headers: { "X-Internal-Secret": fcmSecret },
+        });
         const data = await res.json();
         const tokens = Array.isArray(data === null || data === void 0 ? void 0 : data.tokens) ? data.tokens : [];
         if (tokens.length === 0) {
