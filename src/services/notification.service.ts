@@ -27,6 +27,7 @@ class NotificationService {
   private fcmToken: string | null = null;
   private chatListRefreshCallback: (() => void) | null = null;
   private showNotificationCallback: ShowNotificationCallback | null = null;
+  private tokenRefreshedCallback: ((token: string) => void | Promise<void>) | null = null;
 
   /**
    * Request notification permissions and get FCM token
@@ -47,10 +48,7 @@ class NotificationService {
         const token = await messaging().getToken();
         this.fcmToken = token;
         console.log('[Notifications] FCM Token:', token);
-        
-        // TODO: Send token to backend to associate with user
-        // await api.post('/users/fcm-token', { fcmToken: token });
-        
+
         return token;
       } else {
         console.log('[Notifications] Permission not granted');
@@ -93,6 +91,13 @@ class NotificationService {
   setShowNotificationCallback(callback: ShowNotificationCallback | null) {
     this.showNotificationCallback = callback;
     console.log('[Notifications] Custom notification callback registered');
+  }
+
+  /**
+   * Register a callback when FCM token is refreshed (for re-registering with backend)
+   */
+  setTokenRefreshedCallback(callback: ((token: string) => void | Promise<void>) | null) {
+    this.tokenRefreshedCallback = callback;
   }
 
   /**
@@ -164,11 +169,16 @@ class NotificationService {
     });
 
     // Token refresh handler
-    m.onTokenRefresh(token => {
+    m.onTokenRefresh(async token => {
       console.log('[Notifications] FCM Token refreshed:', token);
       this.fcmToken = token;
-      // TODO: Update token in backend
-      // await api.post('/users/fcm-token', { fcmToken: token });
+      if (this.tokenRefreshedCallback) {
+        try {
+          await this.tokenRefreshedCallback(token);
+        } catch (e) {
+          console.warn('[Notifications] Token refresh callback failed:', e);
+        }
+      }
     });
     } catch (e) {
       console.warn('[Notifications] Initialize failed:', e?.message || e);

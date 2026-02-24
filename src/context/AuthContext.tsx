@@ -1,6 +1,9 @@
-import React, {createContext, useState, useEffect, useContext} from 'react';
+import React, {createContext, useState, useEffect, useContext, useCallback} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Platform} from 'react-native';
 import {authService} from '../services/auth.service';
+import {notificationService} from '../services/notification.service';
+import {deviceTokenService} from '../services/deviceToken.service';
 
 export type UserRole = 'buyer' | 'seller' | 'agent' | 'builder' | 'admin';
 
@@ -52,6 +55,20 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const registerDeviceTokenAsync = useCallback(async () => {
+    try {
+      const token = await notificationService.getToken();
+      if (token) {
+        await deviceTokenService.register(
+          token,
+          Platform.OS as 'android' | 'ios',
+        );
+      }
+    } catch (e) {
+      console.warn('[AuthContext] Failed to register device token:', e);
+    }
+  }, []);
+
   // Helper to derive the canonical registered role for access control.
   const getRegisteredRole = (u: User): UserRole => {
     const raw =
@@ -74,6 +91,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
   useEffect(() => {
     loadUser();
   }, []);
+
+  // Register device token when user is logged in; handle token refresh
+  useEffect(() => {
+    if (user) {
+      registerDeviceTokenAsync();
+      notificationService.setTokenRefreshedCallback(registerDeviceTokenAsync);
+      return () => notificationService.setTokenRefreshedCallback(null);
+    }
+  }, [user, registerDeviceTokenAsync]);
 
   const loadUser = async () => {
     try {
@@ -444,11 +470,19 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
   };
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
-    // Clear dashboard preference on logout
-    await AsyncStorage.removeItem('@user_dashboard_preference');
-    await AsyncStorage.removeItem('@target_dashboard');
+    try {
+      const token = await notificationService.getToken();
+      if (token) {
+        await deviceTokenService.unregister(token);
+      }
+    } catch (e) {
+      console.warn('[AuthContext] Failed to unregister device token:', e);
+    } finally {
+      await authService.logout();
+      setUser(null);
+      await AsyncStorage.removeItem('@user_dashboard_preference');
+      await AsyncStorage.removeItem('@target_dashboard');
+    }
   };
 
   const switchUserRole = async (targetRole: 'buyer' | 'seller') => {
