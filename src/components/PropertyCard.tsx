@@ -440,7 +440,6 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     ...CARD_SHADOW,
-    marginHorizontal: scale(16),
     marginBottom: verticalScale(14),
   },
   imageContainer: {

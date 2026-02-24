@@ -306,16 +306,20 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
             );
           }
           
-          // If no price, show simple colored marker (for location picker, etc.)
+          // If no price, show modern pin marker (for location picker, etc.)
           return (
             <PointAnnotation
               key={marker.id}
               id={marker.id}
               coordinate={marker.coordinate}
-              anchor={{x: 0.5, y: 0.5}}
+              anchor={{x: 0.5, y: 1}}
               onSelected={() => handleMarkerPress(marker.id)}>
-              <View style={[styles.simpleMarker, {backgroundColor: markerColor}, isSelected && styles.simpleMarkerSelected]}>
-                <View style={styles.simpleMarkerDot} />
+              <View style={styles.pinContainer}>
+                <View style={[styles.pinHead, {backgroundColor: markerColor}]}>
+                  <View style={styles.pinInnerCircle} />
+                </View>
+                <View style={[styles.pinTail, {borderTopColor: markerColor}]} />
+                <View style={styles.pinShadow} />
               </View>
             </PointAnnotation>
           );
@@ -422,33 +426,51 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.surface,
   },
-  simpleMarker: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  pinContainer: {
+    alignItems: 'center',
+    width: 40,
+    height: 52,
+  },
+  pinHead: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#0077C0',
-    borderWidth: 3,
-    borderColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 8,
+    zIndex: 2,
   },
-  simpleMarkerSelected: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 4,
-    zIndex: 100,
+  pinInnerCircle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
   },
-  simpleMarkerDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.surface,
+  pinTail: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 14,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#0077C0',
+    marginTop: -4,
+    zIndex: 1,
+  },
+  pinShadow: {
+    width: 14,
+    height: 6,
+    borderRadius: 7,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    marginTop: 2,
   },
 });
 

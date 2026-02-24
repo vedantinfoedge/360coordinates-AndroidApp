@@ -287,27 +287,32 @@ const CompactSearchBar: React.FC<CompactSearchBarProps> = ({
               </Text>
               <Text style={[styles.dropdownChevron, compact && styles.dropdownChevronCompact]}>{openDropdown === 'listing' ? '▲' : '▼'}</Text>
             </TouchableOpacity>
+          </>
+        )}
 
-            <TouchableOpacity
-              style={[
-                styles.dropdownTrigger,
-                compact && styles.dropdownTriggerCompact,
-                listingType === 'pg-hostel' && styles.dropdownTriggerDisabled,
-              ]}
-              onPress={() =>
-                listingType !== 'pg-hostel' &&
-                setOpenDropdown(openDropdown === 'property' ? null : 'property')
-              }
-              disabled={listingType === 'pg-hostel'}>
-              <Text style={[styles.dropdownLabel, compact && styles.dropdownLabelCompact]}>Property</Text>
-              <Text
-                style={[styles.dropdownValue, compact && styles.dropdownValueCompact, listingType === 'pg-hostel' && styles.dropdownValueDisabled]}
-                numberOfLines={1}>
-                {selectedPropertyType === 'all' ? 'All' : selectedPropertyType}
-              </Text>
-              <Text style={[styles.dropdownChevron, compact && styles.dropdownChevronCompact]}>{openDropdown === 'property' ? '▲' : '▼'}</Text>
-            </TouchableOpacity>
+        {/* Property Type - shown in both modes */}
+        <TouchableOpacity
+          style={[
+            styles.dropdownTrigger,
+            compact && styles.dropdownTriggerCompact,
+            listingType === 'pg-hostel' && styles.dropdownTriggerDisabled,
+          ]}
+          onPress={() =>
+            listingType !== 'pg-hostel' &&
+            setOpenDropdown(openDropdown === 'property' ? null : 'property')
+          }
+          disabled={listingType === 'pg-hostel'}>
+          <Text style={[styles.dropdownLabel, compact && styles.dropdownLabelCompact]}>Property</Text>
+          <Text
+            style={[styles.dropdownValue, compact && styles.dropdownValueCompact, listingType === 'pg-hostel' && styles.dropdownValueDisabled]}
+            numberOfLines={1}>
+            {selectedPropertyType === 'all' ? 'All' : selectedPropertyType}
+          </Text>
+          <Text style={[styles.dropdownChevron, compact && styles.dropdownChevronCompact]}>{openDropdown === 'property' ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
 
+        {!isProjectMode && (
+          <>
             <TouchableOpacity
               style={[styles.dropdownTrigger, compact && styles.dropdownTriggerCompact]}
               onPress={() => setOpenDropdown(openDropdown === 'budget' ? null : 'budget')}>
