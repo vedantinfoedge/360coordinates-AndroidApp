@@ -53,7 +53,9 @@ export type TabIconName =
   | 'heart-outline'
   | 'leaf'
   | 'credits'
-  | 'help-circle';
+  | 'help-circle'
+  | 'compass'
+  | 'navigation';
 
 type Props = { name: TabIconName; color: string; size?: number };
 
@@ -377,6 +379,19 @@ export function TabIcon({ name, color, size = SIZE }: Props) {
           <Path d="M12 22a10 10 0 100-20 10 10 0 000 20z" />
           <Path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
           <Path d="M12 17h.01" />
+        </Svg>
+      );
+    case 'compass':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z" />
+          <Path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z" />
+        </Svg>
+      );
+    case 'navigation':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M12 2l7 19-7-4-7 4 7-19z" />
         </Svg>
       );
     default:

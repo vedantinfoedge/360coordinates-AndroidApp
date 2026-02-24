@@ -37,6 +37,8 @@ try {
 
 export interface MapViewHandle {
   getPointInView: (coordinate: [number, number]) => Promise<[number, number] | null>;
+  flyTo: (center: [number, number], zoom?: number) => void;
+  resetBearing: () => void;
 }
 
 interface MapViewProps {
@@ -84,6 +86,25 @@ const MapViewComponent = forwardRef<MapViewHandle, MapViewProps>(function MapVie
           return point ? [point[0], point[1]] : null;
         } catch {
           return null;
+        }
+      },
+      flyTo: (center: [number, number], zoom?: number) => {
+        if (cameraRef.current) {
+          cameraRef.current.setCamera({
+            centerCoordinate: center,
+            zoomLevel: zoom ?? 15,
+            animationDuration: 1000,
+            animationMode: 'flyTo',
+          });
+        }
+      },
+      resetBearing: () => {
+        if (cameraRef.current) {
+          cameraRef.current.setCamera({
+            heading: 0,
+            animationDuration: 500,
+            animationMode: 'easeTo',
+          });
         }
       },
     }),
