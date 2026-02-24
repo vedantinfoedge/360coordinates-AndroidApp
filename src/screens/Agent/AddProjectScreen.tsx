@@ -1162,7 +1162,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.mapButton}
                 onPress={() => setLocationPickerVisible(true)}>
-                <TabIcon name={latitude && longitude ? 'location' : 'map'} color={colors.surface} size={20} />
+                <Text style={styles.mapButtonIcon}>📍</Text>
                 <Text style={styles.mapButtonText}>
                   {latitude && longitude ? 'Change Location' : 'Add Location on Map'}
                 </Text>
@@ -2419,6 +2419,8 @@ const styles = StyleSheet.create({
   },
   mapButtonIcon: {
     fontSize: 18,
+    marginRight: spacing.xs,
+    color: colors.surface,
   },
   mapButtonText: {
     ...typography.body,

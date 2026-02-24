@@ -327,7 +327,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                     <TouchableOpacity
                       style={styles.suggestionItem}
                       onPress={() => handleSuggestionSelect(item)}>
-                      <TabIcon name="location" color={colors.primary} size={16} />
+                      <Text style={styles.suggestionIcon}>📍</Text>
                       <Text style={styles.suggestionText} numberOfLines={2}>
                         {item.place_name}
                       </Text>
@@ -371,7 +371,8 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
           <TouchableOpacity
             style={styles.actionButton}
             onPress={handleUseCurrentLocation}>
-            <Text style={styles.actionButtonText}>📍 Use Current Location</Text>
+            <Text style={styles.actionButtonIcon}>📍</Text>
+            <Text style={styles.actionButtonText}>Use Current Location</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -472,6 +473,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderLight,
   },
+  suggestionIcon: {
+    fontSize: 16,
+  },
   suggestionText: {
     flex: 1,
     ...typography.caption,
@@ -522,10 +526,16 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.primary,
     padding: spacing.md,
     borderRadius: borderRadius.md,
-    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  actionButtonIcon: {
+    fontSize: 20,
   },
   actionButtonText: {
     ...typography.body,

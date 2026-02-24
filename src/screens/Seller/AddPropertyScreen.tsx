@@ -1299,7 +1299,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.mapButtonGradient}>
-                    <TabIcon name={latitude && longitude ? 'check' : 'location'} color={colors.surface} size={18} />
+                    <Text style={styles.mapButtonIcon}>📍</Text>
                     <Text style={styles.mapButtonText}>
                       {latitude && longitude ? 'Location Added — Tap to Change' : 'Add Location on Map'}
                     </Text>
@@ -2541,6 +2541,7 @@ const styles = StyleSheet.create({
   mapButtonIcon: {
     fontSize: 18,
     marginRight: spacing.xs,
+    color: colors.surface,
   },
   mapButtonText: {
     ...typography.body,
