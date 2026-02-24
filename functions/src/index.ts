@@ -1,79 +1,86 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import * as nodemailer from "nodemailer";
-import * as cors from "cors";
 
 admin.initializeApp();
 
-const corsHandler = cors({ origin: true });
+// =============================================================================
+// Chat Push Notifications - Firestore trigger on new message
+// Fetches recipient's FCM tokens from PHP backend and sends push notification
+// =============================================================================
 
-// Configure the email transport using the default SMTP transport and a GMail account.
-// For Gmail, you may need to use an App Password if 2FA is enabled.
-// Configuration:
-// firebase functions:config:set gmail.email="your-email@gmail.com" gmail.password="your-app-password"
+const TOKENS_API_BASE = "https://360coordinates.com/backend/api";
 
-// Helper to get transporter
-const getTransporter = () => {
-    const gmailEmail = functions.config().gmail?.email;
-    const gmailPassword = functions.config().gmail?.password;
+export const onChatMessageCreated = functions.firestore
+    .document("chats/{chatRoomId}/messages/{messageId}")
+    .onCreate(async (snap, context) => {
+        try {
+            const message = snap.data();
+            const { chatRoomId } = context.params;
+            const senderId = String(message.senderId || "");
+            const senderRole = message.senderRole || "buyer";
+            const text = String(message.text || "").slice(0, 100);
 
-    if (!gmailEmail || !gmailPassword) {
-        console.error("Missing gmail config. Run: firebase functions:config:set gmail.email=\"...\" gmail.password=\"...\"");
-        return null;
-    }
+            if (!senderId || !chatRoomId) {
+                console.warn("[onChatMessageCreated] Missing senderId or chatRoomId");
+                return;
+            }
 
-    return nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: gmailEmail,
-            pass: gmailPassword,
-        },
+            // Get chat room to find recipient
+            const roomSnap = await admin.firestore()
+                .collection("chats")
+                .doc(chatRoomId)
+                .get();
+
+            const room = roomSnap.data();
+            if (!room) {
+                console.warn("[onChatMessageCreated] Chat room not found:", chatRoomId);
+                return;
+            }
+
+            const buyerId = String(room.buyerId || "");
+            const receiverId = String(room.receiverId || "");
+            const recipientId = senderId === buyerId ? receiverId : buyerId;
+            const buyerName = room.buyerName || "Someone";
+
+            if (!recipientId) {
+                console.warn("[onChatMessageCreated] Could not determine recipient");
+                return;
+            }
+
+            // Fetch FCM tokens from PHP backend
+            const tokensUrl = `${TOKENS_API_BASE}/device-token/tokens.php?user_id=${encodeURIComponent(recipientId)}`;
+            const res = await fetch(tokensUrl);
+            const data = await res.json() as { success?: boolean; tokens?: string[] };
+            const tokens = Array.isArray(data?.tokens) ? data.tokens : [];
+
+            if (tokens.length === 0) {
+                console.log("[onChatMessageCreated] No FCM tokens for recipient:", recipientId);
+                return;
+            }
+
+            // Build notification
+            const title = senderRole === "buyer" ? buyerName : "New reply";
+            const body = text || "You have a new message";
+
+            const payload = {
+                tokens,
+                notification: {
+                    title,
+                    body,
+                },
+                data: {
+                    type: "chat",
+                    chatRoomId: String(chatRoomId),
+                },
+                android: {
+                    priority: "high" as const,
+                },
+            };
+
+            const result = await admin.messaging().sendEachForMulticast(payload);
+            console.log("[onChatMessageCreated] FCM sent:", result.successCount, "success,",
+                result.failureCount, "failed, recipient:", recipientId);
+        } catch (error) {
+            console.error("[onChatMessageCreated] Error:", error);
+        }
     });
-};
-
-export const sendContactEmail = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
-    // 1. Validation
-    const { name, email, subject, message } = data;
-
-    if (!name || !email || !message) {
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            "The function must be called with arguments 'name', 'email', and 'message'."
-        );
-    }
-
-    // 2. Setup Transporter
-    const transporter = getTransporter();
-    if (!transporter) {
-        throw new functions.https.HttpsError(
-            "failed-precondition",
-            "Server email configuration is missing."
-        );
-    }
-
-    const mailOptions = {
-        from: `"${name}" <${email}>`,
-        to: "info@360coordinates.com",
-        subject: subject || `New Contact Form Submission from ${name}`,
-        text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
-        html: `
-            <h3>New Contact Form Submission</h3>
-            <p><strong>Name:</strong> ${name}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Subject:</strong> ${subject || 'N/A'}</p>
-            <p><strong>Message:</strong></p>
-            <p>${message.replace(/\n/g, '<br>')}</p>
-        `,
-    };
-
-    try {
-        await transporter.sendMail(mailOptions);
-        return { success: true, message: "Email sent successfully!" };
-    } catch (error) {
-        console.error("Error sending email:", error);
-        throw new functions.https.HttpsError(
-            "internal",
-            "Unable to send email. Please try again later."
-        );
-    }
-});

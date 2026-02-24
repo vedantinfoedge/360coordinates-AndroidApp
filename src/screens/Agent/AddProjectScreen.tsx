@@ -20,6 +20,7 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { TabIcon, TabIconName } from '../../components/navigation/TabIcons';
 import Dropdown from '../../components/common/Dropdown';
 import { propertyService } from '../../services/property.service';
+import { sellerService } from '../../services/seller.service';
 import { uploadPropertyImageWithModeration, moderateFirebaseUrlForProperty } from '../../services/imageUpload.service';
 import { USE_FIREBASE_STORAGE } from '../../config/firebaseStorage.config';
 import { isFirebaseStorageAvailable } from '../../services/firebaseStorageProperty.service';
@@ -894,7 +895,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
 
         // ── Step 3: Update property with watermarked image URLs ──
         console.log('[Agent AddProject] Step 3: Updating property with watermarked URLs…');
-        await propertyService.updateProperty(propertyId, {
+        await sellerService.updateProperty(propertyId, {
           images: watermarkedUrls,
           cover_image: watermarkedUrls[0] || null,
         });
