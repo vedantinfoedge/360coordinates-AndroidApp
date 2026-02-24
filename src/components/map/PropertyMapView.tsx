@@ -49,6 +49,8 @@ export interface MapSearchParams {
   searchCoordinates?: [number, number];
   searchMode?: 'projects' | 'properties';
   project_type?: 'upcoming' | null;
+  project_status?: string;
+  possession_date?: string;
 }
 
 // Check if Mapbox is available
@@ -201,7 +203,7 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   const effectiveListingType = searchParams?.listingType || listingType;
 
   const searchParamsKey = searchParams
-    ? `${searchParams.location}|${searchParams.city}|${searchParams.listingType}|${searchParams.propertyType}|${searchParams.minBudget}|${searchParams.maxBudget}|${searchParams.bedrooms}|${searchParams.area}|${searchParams.searchMode}|${searchParams.project_type}|${userLocation ? `${userLocation.latitude},${userLocation.longitude}` : ''}`
+    ? `${searchParams.location}|${searchParams.city}|${searchParams.listingType}|${searchParams.propertyType}|${searchParams.minBudget}|${searchParams.maxBudget}|${searchParams.bedrooms}|${searchParams.area}|${searchParams.searchMode}|${searchParams.project_type}|${searchParams.project_status}|${searchParams.possession_date}|${userLocation ? `${userLocation.latitude},${userLocation.longitude}` : ''}`
     : userLocation ? `loc:${userLocation.latitude},${userLocation.longitude}` : '';
 
   useEffect(() => {
@@ -565,6 +567,13 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           // Pass project_type to API so backend returns project results
           if (searchParams.project_type === 'upcoming') {
             params.project_type = 'upcoming';
+          }
+
+          if (searchParams.project_status) {
+            params.project_status = searchParams.project_status;
+          }
+          if (searchParams.possession_date) {
+            params.possession_date = searchParams.possession_date;
           }
         } else {
           // Legacy: listing type only (without searchParams from compact bar)

@@ -77,6 +77,8 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
   const [bedrooms, setBedrooms] = useState(initialBedrooms);
   const [area, setArea] = useState(initialArea);
   const [userLocation, setUserLocation] = useState<{latitude: number; longitude: number} | undefined>(undefined);
+  const [projectStatusFilter, setProjectStatusFilter] = useState('');
+  const [possessionDateFilter, setPossessionDateFilter] = useState('');
 
   // Fetch current location when opened without a location (e.g. from "Search on Map" button)
   useEffect(() => {
@@ -164,6 +166,8 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
     searchCoordinates,
     searchMode,
     project_type: projectTypeFilter || undefined,
+    project_status: projectStatusFilter || undefined,
+    possession_date: possessionDateFilter || undefined,
   };
 
   const handleSearch = (p: CompactSearchBarSearchParams) => {
@@ -177,6 +181,8 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
     setBedrooms(p.bedrooms);
     setArea(p.area);
     setSearchCoordinates(p.coordinates);
+    if (p.projectStatus !== undefined) setProjectStatusFilter(p.projectStatus);
+    if (p.possessionDate !== undefined) setPossessionDateFilter(p.possessionDate);
   };
 
   const handleListingTypeChange = (type: ListingType) => {
@@ -216,6 +222,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
       onBedroomsChange={setBedrooms}
       onAreaChange={setArea}
       onSearch={handleSearch}
+      searchMode={searchMode}
     />
   );
 

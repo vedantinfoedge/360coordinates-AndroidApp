@@ -1973,11 +1973,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingTop: spacing.sm,
     paddingBottom: 120,
+    alignItems: 'center',
   },
   propertyCardStyle: {
-    width: '100%',
+    width: Dimensions.get('window').width - 40,
     maxWidth: 340,
-    marginHorizontal: 20,
     alignSelf: 'center',
   },
   propertySeparator: {

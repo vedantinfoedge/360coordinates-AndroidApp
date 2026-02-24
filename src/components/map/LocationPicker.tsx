@@ -108,6 +108,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     if (mapViewRef.current) {
       mapViewRef.current.flyTo(coordinate, 15);
     }
+    handleMapPress(coordinate);
   }, []);
 
   const handleResetBearing = useCallback(() => {
