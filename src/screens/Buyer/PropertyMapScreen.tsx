@@ -197,7 +197,7 @@ const PropertyMapScreen: React.FC<Props> = ({navigation, route}) => {
 
   const isProjectMode = searchMode === 'projects';
 
-  const fullscreenSearchBar = isProjectMode ? undefined : (
+  const fullscreenSearchBar = (
     <FullscreenMapSearch
       searchText={searchText}
       location={location}

@@ -1262,21 +1262,20 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                     }
                   }}
                   onFocus={() => {
-                    // Allow autosuggest when user focuses on the input
-                    // Only if they haven't selected a location or are editing
                     if (locationSelected && location.length >= 2) {
                       setLocationSelected(false);
                     }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setLocationSelected(true), 200);
                   }}
                 />
                 <LocationAutoSuggest
                   query={location}
                   onSelect={(locationData) => {
                     setLocation(locationData.placeName || locationData.name);
-                    setLocationSelected(true); // Mark location as selected
+                    setLocationSelected(true);
                     clearFieldError('location');
-                    // Coordinates must come from map only - do NOT set from autosuggest
-                    // Extract state from context if available
                     const extractedState = extractStateFromContext(locationData.context);
                     if (extractedState) {
                       stateAutoFilledFromLocation.current = true;
@@ -1296,16 +1295,20 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   onPress={() => setLocationPickerVisible(true)}>
                   {/* @ts-expect-error - LinearGradient works but TypeScript types are incorrect */}
                   <LinearGradient
-                    colors={['#0077C0', '#005A94']}
+                    colors={latitude && longitude ? ['#28a745', '#1e7e34'] : ['#0077C0', '#005A94']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.mapButtonGradient}>
-                    <TabIcon name="location" color={colors.surface} size={18} />
-                    <Text style={styles.mapButtonText}>Add Location on Map</Text>
+                    <TabIcon name={latitude && longitude ? 'check' : 'location'} color={colors.surface} size={18} />
+                    <Text style={styles.mapButtonText}>
+                      {latitude && longitude ? 'Location Added — Tap to Change' : 'Add Location on Map'}
+                    </Text>
                   </LinearGradient>
                 </TouchableOpacity>
                 <Text style={styles.mapButtonSubtext}>
-                  Select exact location on map (required) - address will be filled automatically
+                  {latitude && longitude
+                    ? `${location || 'Location pinned on map'}`
+                    : 'Select exact location on map (required) - address will be filled automatically'}
                 </Text>
                 {latitude && longitude && (
                   <Text style={styles.coordinateText}>
@@ -2185,7 +2188,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                         <TabIcon name="check" color={colors.surface} size={20} />
                       )}
                       <Text style={styles.publishButtonText}>
-                        {isSubmitting ? 'Submitting...' : 'Publish Listing'}
+                        {isSubmitting ? 'Submitting...' : 'Publish'}
                       </Text>
                     </LinearGradient>
                   ) : (

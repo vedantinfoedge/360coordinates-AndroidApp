@@ -561,6 +561,11 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           }
           if (searchParams.bedrooms) params.bedrooms = searchParams.bedrooms;
           if (searchParams.area) params.area = searchParams.area;
+
+          // Pass project_type to API so backend returns project results
+          if (searchParams.project_type === 'upcoming') {
+            params.project_type = 'upcoming';
+          }
         } else {
           // Legacy: listing type only (without searchParams from compact bar)
           if (lt === 'buy') params.status = 'sale';
@@ -576,6 +581,8 @@ const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           const pt = searchParams?.project_type;
           if (pt === 'upcoming') {
             apiResults = apiResults.filter((p: any) => (p.project_type || '') === 'upcoming');
+          } else if (sm === 'projects') {
+            apiResults = apiResults.filter((p: any) => (p.project_type || '') !== '');
           } else if (sm === 'properties') {
             apiResults = apiResults.filter((p: any) => (p.project_type || '') !== 'upcoming');
           }
