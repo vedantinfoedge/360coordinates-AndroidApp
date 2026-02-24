@@ -20,11 +20,14 @@ try {
   // ignore if ErrorUtils not available
 }
 
-// Firebase background message handler disabled to prevent startup crash.
-// Re-enable after verifying Firebase config (google-services.json package_name matches applicationId).
-// try {
-//   const messaging = require('@react-native-firebase/messaging').default;
-//   messaging().setBackgroundMessageHandler(async remoteMessage => {});
-// } catch (e) { console.warn('[Notifications] Firebase Messaging:', e?.message); }
+// Firebase background message handler - required for receiving push when app is in background/quit
+try {
+  const messaging = require('@react-native-firebase/messaging').default;
+  messaging().setBackgroundMessageHandler(async remoteMessage => {
+    console.log('[Notifications] Background message received:', remoteMessage?.messageId);
+  });
+} catch (e) {
+  console.warn('[Notifications] Firebase Messaging background handler:', e?.message || e);
+}
 
 AppRegistry.registerComponent(appName, () => App);
