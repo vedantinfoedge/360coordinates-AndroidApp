@@ -31,6 +31,7 @@ import { formatters } from '../../utils/formatters';
 import { Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import CustomAlert from '../../utils/alertHelper';
+import DocumentPicker from 'react-native-document-picker';
 
 type AddProjectScreenNavigationProp = NativeStackNavigationProp<
   AgentStackParamList,
@@ -174,7 +175,7 @@ const AMENITIES = [
   { id: 'water_supply', label: '24x7 Water' },
   { id: 'gas_pipeline', label: 'Gas Pipeline' },
   { id: 'wifi', label: 'WiFi' },
-  { id: 'ac', label: 'AC' },
+  { id: 'ac', label: 'Air Conditioning' },
   { id: 'electricity', label: 'Electricity' },
 ];
 
@@ -188,6 +189,20 @@ const BANKS = [
   { id: 'bob', label: 'Bank of Baroda (BoB)' },
   { id: 'other', label: 'Other' },
 ];
+
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh',
+  'Dadra and Nagar Haveli and Daman and Diu', 'Delhi',
+  'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
+
+const INDIAN_STATES_OPTIONS = INDIAN_STATES.map(s => ({ label: s, value: s }));
 
 const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
@@ -222,7 +237,6 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const [carpetAreaRange, setCarpetAreaRange] = useState('');
   const [numberOfTowers, setNumberOfTowers] = useState('');
   const [totalUnits, setTotalUnits] = useState('');
-  const [floorsCount, setFloorsCount] = useState('');
   const [unitsPerFloor, setUnitsPerFloor] = useState('');
   const [numberOfVillas, setNumberOfVillas] = useState('');
   const [numberOfPlots, setNumberOfPlots] = useState('');
@@ -242,12 +256,11 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   // Step 5: Amenities
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
 
-  // Step 6: Legal & Approval
+  // Legal & Approval (sent in payload, no UI yet - for future expansion)
   const [reraStatus, setReraStatus] = useState('');
   const [landOwnershipType, setLandOwnershipType] = useState('');
   const [bankApproved, setBankApproved] = useState('');
   const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
-  const [otherBankNames, setOtherBankNames] = useState('');
 
   // Step 7: Media Uploads
   const [coverImage, setCoverImage] = useState<{ uri: string; base64?: string } | null>(null);
@@ -262,17 +275,17 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const [brochure, setBrochure] = useState<{ uri: string; name: string } | null>(null);
   const [masterPlan, setMasterPlan] = useState<{ uri: string; base64?: string } | null>(null);
 
-  // Step 5: Contact & Sales (at least one sales person)
-  const [salesPersons, setSalesPersons] = useState<Array<{ name: string; number: string; email: string }>>([
-    { name: '', number: '', email: '' },
+  // Step 5: Contact & Sales (at least one sales person, max 5)
+  const [salesPersons, setSalesPersons] = useState<Array<{
+    name: string;
+    number: string;
+    email: string;
+    landlineNumber: string;
+    whatsappNumber: string;
+    alternativeNumber: string;
+  }>>([
+    { name: '', number: '', email: '', landlineNumber: '', whatsappNumber: '', alternativeNumber: '' },
   ]);
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [alternativeNumber, setAlternativeNumber] = useState('');
-
-  // Step 9: Marketing Highlights
-  const [projectHighlights, setProjectHighlights] = useState('');
-  const [usp, setUsp] = useState('');
 
   const totalSteps = 5;
   const steps: Array<{ id: number; name: string; iconName: TabIconName }> = [
@@ -288,7 +301,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
     // Remove all non-numeric characters except decimal point
     const cleaned = value.replace(/[^0-9.-]/g, '');
     // Handle Lakhs/Crore format (e.g., "45 Lakhs" -> 4500000)
-    if (value.toLowerCase().includes('lakh') || value.toLowerCase().includes('l')) {
+    if (value.toLowerCase().includes('lakh') || value.toLowerCase().includes('lac')) {
       const num = parseFloat(cleaned) || 0;
       return num * 100000;
     }
@@ -753,71 +766,55 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      // Format price
       const formattedStartingPrice = formatPriceInput(startingPrice);
-      const formattedPricePerSqft = pricePerSqft ? formatPriceInput(pricePerSqft) : null;
-      const formattedBookingAmount = bookingAmount ? formatPriceInput(bookingAmount) : null;
       const parsedArea = parseFloat(area.replace(/[^0-9.]/g, ''));
 
       // ── Build property payload WITHOUT images ──
-      // Backend expects property_type in guide format (e.g. 'Apartment', 'Villa / Banglow'), not IDs
       const propertyTypeForBackend = PROJECT_TYPES.find(t => t.id === projectType)?.label || projectType;
+
+      // Map configuration IDs to their display labels for the backend
+      const configLabels = selectedConfigurations
+        .map(id => CONFIGURATIONS.find(c => c.id === id)?.label)
+        .filter((label): label is string => !!label);
+
+      // Build salesPersons array with all 6 fields per person
+      const salesPersonsPayload = salesPersons
+        .filter(sp => sp.name.trim() && sp.number.trim() && sp.email.trim())
+        .map(sp => ({
+          name: sp.name.trim(),
+          number: sp.number.trim(),
+          email: sp.email.trim(),
+          landlineNumber: sp.landlineNumber?.trim() || '',
+          whatsappNumber: sp.whatsappNumber?.trim() || '',
+          alternativeNumber: sp.alternativeNumber?.trim() || '',
+        }));
+
       const rawUpcomingData: Record<string, any> = {
-        project_status: projectStatus,
-        rera_number: reraNumber.trim() || null,
-        city: city || null,
+        builderName: user?.full_name || '',
+        projectStatus: projectStatus,
+        reraNumber: reraNumber.trim() || null,
+        configurations: configLabels,
+        carpetAreaRange: carpetAreaRange.trim() || null,
+        numberOfTowers: numberOfTowers || null,
+        totalUnits: totalUnits || null,
+        unitsPerFloor: unitsPerFloor || null,
+        numberOfVillas: numberOfVillas || null,
+        numberOfPlots: numberOfPlots || null,
+        numberOfFloorsOrTowers: numberOfFloorsOrTowers || null,
+        bedCapacity: bedCapacity || null,
+        loadingDocks: loadingDocks || null,
+        startingPrice: startingPrice.trim() || null,
+        pricePerSqft: pricePerSqft.trim() || null,
+        bookingAmount: bookingAmount.trim() || null,
+        expectedLaunchDate: launchDate || null,
+        expectedPossessionDate: possessionDate || null,
+        reraStatus: reraStatus || null,
+        landOwnershipType: landOwnershipType || null,
+        bankApproved: bankApproved || null,
+        approvedBanks: selectedBanks.length > 0 ? selectedBanks.map(id => BANKS.find(b => b.id === id)?.label || id) : null,
+        salesPersons: salesPersonsPayload.length > 0 ? salesPersonsPayload : null,
         pincode: pincode.trim() || null,
-        configurations: selectedConfigurations.join(','),
-        carpet_area_range: carpetAreaRange.trim() || null,
-        number_of_towers: numberOfTowers ? parseInt(numberOfTowers, 10) : null,
-        total_units: totalUnits ? parseInt(totalUnits, 10) : null,
-        floors_count: floorsCount ? parseInt(floorsCount, 10) : null,
-        units_per_floor: unitsPerFloor ? parseInt(unitsPerFloor, 10) : null,
-        number_of_villas: numberOfVillas ? parseInt(numberOfVillas, 10) : null,
-        number_of_plots: numberOfPlots ? parseInt(numberOfPlots, 10) : null,
-        number_of_floors_or_towers: numberOfFloorsOrTowers ? parseInt(numberOfFloorsOrTowers, 10) : null,
-        bed_capacity: bedCapacity ? parseInt(bedCapacity, 10) : null,
-        loading_docks: loadingDocks ? parseInt(loadingDocks, 10) : null,
-        price_per_sqft: formattedPricePerSqft,
-        booking_amount: formattedBookingAmount,
-        launch_date: launchDate || null,
-        possession_date: possessionDate || null,
-        rera_status: reraStatus || null,
-        land_ownership_type: landOwnershipType || null,
-        bank_approved: bankApproved || null,
-        approved_banks: selectedBanks.length > 0 ? selectedBanks.join(',') : null,
-        other_bank_names: otherBankNames.trim() || null,
-        sales_name: (() => {
-          const valid = salesPersons.find(sp =>
-            /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
-            sp.number.replace(/\D/g, '').length === 10 &&
-            sp.email.includes('@')
-          );
-          return valid?.name.trim() || salesPersons[0]?.name.trim() || '';
-        })(),
-        sales_number: (() => {
-          const valid = salesPersons.find(sp =>
-            /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
-            sp.number.replace(/\D/g, '').length === 10 &&
-            sp.email.includes('@')
-          );
-          return valid?.number.trim() || salesPersons[0]?.number.trim() || '';
-        })(),
-        email_id: (() => {
-          const valid = salesPersons.find(sp =>
-            /^[a-zA-Z\s]+$/.test(sp.name.trim()) &&
-            sp.number.replace(/\D/g, '').length === 10 &&
-            sp.email.includes('@')
-          );
-          return valid?.email.trim() || salesPersons[0]?.email.trim() || '';
-        })(),
-        mobile_number: mobileNumber.trim() || null,
-        whatsapp_number: whatsappNumber.trim() || null,
-        alternative_number: alternativeNumber.trim() || null,
-        project_highlights: projectHighlights.trim() || null,
-        usp: usp.trim() || null,
-        master_plan: masterPlan?.base64 || null,
-        cover_image: coverImage?.base64 || null,
+        mapLink: latitude && longitude ? `https://maps.google.com/?q=${latitude},${longitude}` : null,
       };
       const upcoming_project_data = Object.fromEntries(
         Object.entries(rawUpcomingData).filter(([, v]) => v !== null && v !== undefined && v !== '')
@@ -989,7 +986,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Agent / Developer Name</Text>
+              <Text style={styles.label}>Builder / Developer Name</Text>
               <TextInput
                 style={[styles.input, styles.disabledInput]}
                 value={user?.full_name || ''}
@@ -1202,30 +1199,19 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.label}>
                 State <Text style={styles.required}>*</Text>
               </Text>
-              <View style={styles.stateInputContainer}>
-                <TextInput
-                  style={[styles.input, stateAutoFilled && styles.autoFilledInput]}
-                  placeholder="Enter state"
-                  placeholderTextColor={colors.textSecondary}
-                  value={state}
-                  onChangeText={(text: string) => {
-                    setState(text);
-                    setStateAutoFilled(false);
-                    clearFieldError('state');
-                  }}
-                  editable={!stateAutoFilled}
-                />
-                {stateAutoFilled && (
-                  <View style={styles.autoFilledBadge}>
-                    <Text style={styles.autoFilledBadgeText}>(Auto-filled from location)</Text>
-                    <TouchableOpacity
-                      style={styles.editButton}
-                      onPress={() => setStateAutoFilled(false)}>
-                      <Text style={styles.editButtonText}>Edit</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
+              <Dropdown
+                placeholder="Select state"
+                options={INDIAN_STATES_OPTIONS}
+                value={state}
+                onSelect={(value) => {
+                  setState(value);
+                  setStateAutoFilled(false);
+                  clearFieldError('state');
+                }}
+              />
+              {stateAutoFilled && (
+                <Text style={styles.hintText}>Auto-filled from location</Text>
+              )}
               {!!fieldErrors.state && (
                 <Text style={styles.fieldErrorText}>{fieldErrors.state}</Text>
               )}
@@ -1806,21 +1792,22 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.uploadButton}
                 onPress={async () => {
-                  const hasPermission = await requestCameraPermission();
-                  if (!hasPermission) return;
-
-                  launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
-                    if (response.assets && response.assets[0]) {
-                      const asset = response.assets[0];
+                  try {
+                    const res = await DocumentPicker.pickSingle({ type: DocumentPicker.types.pdf });
+                    if (res?.uri) {
                       setBrochure({
-                        uri: asset.uri || '',
-                        name: asset.fileName || 'brochure.pdf',
+                        uri: res.uri,
+                        name: res.name || 'brochure.pdf',
                       });
                     }
-                  });
+                  } catch (err: any) {
+                    if (!DocumentPicker.isCancel(err)) {
+                      Alert.alert('Error', 'Failed to pick PDF file');
+                    }
+                  }
                 }}>
                 <View style={styles.uploadButtonIconWrap}><TabIcon name="file" color={colors.primary} size={20} /></View>
-                <Text style={styles.uploadButtonText}>Upload Brochure</Text>
+                <Text style={styles.uploadButtonText}>Upload Brochure (PDF)</Text>
               </TouchableOpacity>
               {brochure && (
                 <View style={styles.fileItem}>
@@ -1882,7 +1869,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                Sales Person(s) <Text style={styles.required}>*</Text> (At least one required)
+                Sales Person(s) <Text style={styles.required}>*</Text> (At least 1, max 5)
               </Text>
               {!!fieldErrors.salesPersons && (
                 <Text style={styles.fieldErrorText}>{fieldErrors.salesPersons}</Text>
@@ -1890,29 +1877,31 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               {salesPersons.length === 0 ? (
                 <TouchableOpacity
                   style={styles.addSalesPersonButton}
-                  onPress={() => setSalesPersons([{ name: '', number: '', email: '' }])}>
+                  onPress={() => setSalesPersons([{ name: '', number: '', email: '', landlineNumber: '', whatsappNumber: '', alternativeNumber: '' }])}>
                   <Text style={styles.addSalesPersonText}>+ Add sales person</Text>
                 </TouchableOpacity>
               ) : null}
               {salesPersons.map((sp, index) => (
                 <View key={index} style={styles.salesPersonCard}>
                   <View style={styles.salesPersonRow}>
-                    <Text style={styles.salesPersonLabel}>Name</Text>
+                    <Text style={styles.salesPersonLabel}>Person {index + 1}</Text>
                     <TouchableOpacity
                       onPress={() => setSalesPersons(prev => prev.filter((_, i) => i !== index))}
                       style={styles.removeSalesPersonBtn}>
                       <Text style={styles.removeSalesPersonText}>Remove</Text>
                     </TouchableOpacity>
                   </View>
+                  <Text style={styles.salesPersonLabel}>Name <Text style={styles.required}>*</Text></Text>
                   <TextInput
                     style={styles.input}
                     placeholder="Letters and spaces only"
                     placeholderTextColor={colors.textSecondary}
                     value={sp.name}
                     onChangeText={(text: string) => {
+                      const cleaned = text.replace(/[^a-zA-Z\s]/g, '');
                       setSalesPersons(prev => {
                         const next = [...prev];
-                        next[index] = { ...next[index], name: text };
+                        next[index] = { ...next[index], name: cleaned };
                         return next;
                       });
                       clearFieldError(`salesPerson_name_${index}`);
@@ -1921,7 +1910,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                   {!!fieldErrors[`salesPerson_name_${index}`] && (
                     <Text style={styles.fieldErrorText}>{fieldErrors[`salesPerson_name_${index}`]}</Text>
                   )}
-                  <Text style={styles.salesPersonLabel}>Number (10 digits)</Text>
+                  <Text style={styles.salesPersonLabel}>Contact Number <Text style={styles.required}>*</Text></Text>
                   <TextInput
                     style={styles.input}
                     placeholder="10-digit phone number"
@@ -1942,7 +1931,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                   {!!fieldErrors[`salesPerson_number_${index}`] && (
                     <Text style={styles.fieldErrorText}>{fieldErrors[`salesPerson_number_${index}`]}</Text>
                   )}
-                  <Text style={styles.salesPersonLabel}>Email</Text>
+                  <Text style={styles.salesPersonLabel}>Email ID <Text style={styles.required}>*</Text></Text>
                   <TextInput
                     style={styles.input}
                     placeholder="email@example.com"
@@ -1962,45 +1951,66 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                   {!!fieldErrors[`salesPerson_email_${index}`] && (
                     <Text style={styles.fieldErrorText}>{fieldErrors[`salesPerson_email_${index}`]}</Text>
                   )}
+                  <Text style={styles.salesPersonLabel}>Landline Number (Optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., 020-12345678"
+                    placeholderTextColor={colors.textSecondary}
+                    value={sp.landlineNumber}
+                    onChangeText={(text: string) => {
+                      const cleaned = text.replace(/[^0-9\s\-]/g, '').slice(0, 15);
+                      setSalesPersons(prev => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], landlineNumber: cleaned };
+                        return next;
+                      });
+                    }}
+                    keyboardType="phone-pad"
+                    maxLength={15}
+                  />
+                  <Text style={styles.salesPersonLabel}>WhatsApp Number (Optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="10-digit number"
+                    placeholderTextColor={colors.textSecondary}
+                    value={sp.whatsappNumber}
+                    onChangeText={(text: string) => {
+                      const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                      setSalesPersons(prev => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], whatsappNumber: cleaned };
+                        return next;
+                      });
+                    }}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                  <Text style={styles.salesPersonLabel}>Alternative Number (Optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="10-digit number"
+                    placeholderTextColor={colors.textSecondary}
+                    value={sp.alternativeNumber}
+                    onChangeText={(text: string) => {
+                      const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                      setSalesPersons(prev => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], alternativeNumber: cleaned };
+                        return next;
+                      });
+                    }}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
                 </View>
               ))}
-              <TouchableOpacity
-                style={styles.addSalesPersonButton}
-                onPress={() => setSalesPersons(prev => [...prev, { name: '', number: '', email: '' }])}>
-                <Text style={styles.addSalesPersonText}>+ Add another sales person</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Mobile Number (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="10-digit number"
-                placeholderTextColor={colors.textSecondary}
-                value={mobileNumber}
-                onChangeText={(text: string) => {
-                  const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
-                  setMobileNumber(cleaned);
-                }}
-                keyboardType="numeric"
-                maxLength={10}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>WhatsApp Number (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="10-digit number"
-                placeholderTextColor={colors.textSecondary}
-                value={whatsappNumber}
-                onChangeText={(text: string) => {
-                  const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
-                  setWhatsappNumber(cleaned);
-                }}
-                keyboardType="numeric"
-                maxLength={10}
-              />
+              {salesPersons.length < 5 && (
+                <TouchableOpacity
+                  style={styles.addSalesPersonButton}
+                  onPress={() => setSalesPersons(prev => [...prev, { name: '', number: '', email: '', landlineNumber: '', whatsappNumber: '', alternativeNumber: '' }])}>
+                  <Text style={styles.addSalesPersonText}>+ Add another sales person ({salesPersons.length}/5)</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         );
