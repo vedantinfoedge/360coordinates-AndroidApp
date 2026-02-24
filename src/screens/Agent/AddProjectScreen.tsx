@@ -767,7 +767,11 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       const formattedStartingPrice = formatPriceInput(startingPrice);
-      const parsedArea = parseFloat(area.replace(/[^0-9.]/g, ''));
+
+      // For upcoming projects, derive numeric area from carpetAreaRange (e.g. "500-1000 sq.ft." → 500)
+      // The `area` state is a text location/neighborhood name, not a number.
+      const areaMatch = carpetAreaRange.match(/(\d+(\.\d+)?)/);
+      const numericArea = areaMatch ? parseFloat(areaMatch[1]) : 0;
 
       // ── Build property payload WITHOUT images ──
       const propertyTypeForBackend = PROJECT_TYPES.find(t => t.id === projectType)?.label || projectType;
@@ -826,7 +830,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         project_type: 'upcoming',
         description: description.trim(),
         location: location.trim(),
-        area: isNaN(parsedArea) ? null : parsedArea,
+        area: numericArea,
         state: state.trim(),
         additional_address: additionalAddress.trim() || null,
         latitude: latitude || null,

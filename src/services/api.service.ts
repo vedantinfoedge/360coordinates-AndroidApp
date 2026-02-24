@@ -175,7 +175,7 @@ api.interceptors.response.use(
           if (errorData.length < 200 && !errorData.includes('<!DOCTYPE')) {
             errorMessage = errorData;
           } else {
-            errorMessage = 'Validation failed. Please check your email, password, and selected role.';
+            errorMessage = 'Validation failed. Please check your input and try again.';
           }
         }
       } else if (errorData?.message) {
@@ -183,7 +183,7 @@ api.interceptors.response.use(
       } else if (errorData?.error) {
         errorMessage = errorData.error;
       } else {
-        errorMessage = 'Validation failed. Please check your email, password, and selected role.';
+        errorMessage = 'Validation failed. Please check your input and try again.';
       }
     } else if (statusCode === 404) {
       errorMessage = 'Service not found. Please try again later.';
