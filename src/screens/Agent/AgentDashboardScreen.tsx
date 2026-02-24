@@ -607,7 +607,6 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const lastFetchTimeRef = useRef<number>(0);
   const isFetchingRef = useRef<boolean>(false);
   const hasAnimatedRef = useRef<boolean>(false);
-  const welcomeShownRef = useRef<boolean>(false);
   const CACHE_DURATION = 30000;
 
   // Animation values
@@ -854,37 +853,10 @@ const AgentDashboardScreen: React.FC<Props> = ({ navigation }) => {
     loadDashboardData(false, true);
   };
 
-  // Show welcome popup once when agent/builder opens the dashboard (replaces previous "Access Denied" popup for agents)
-  useEffect(() => {
-    if (!isAgentOrBuilder || welcomeShownRef.current) return;
-    welcomeShownRef.current = true;
-    const task = InteractionManager.runAfterInteractions(() => {
-      CustomAlert.alert('Welcome, Dear Agent/Builder', 'You have access to the Agent dashboard.');
-    });
-    return () => task.cancel();
-  }, [isAgentOrBuilder]);
-
   const getInitials = (name: string): string => {
     if (!name || typeof name !== 'string') return '';
     return name.split(' ').map(n => (n && n[0]) || '').join('').toUpperCase().slice(0, 2);
   };
-
-  // Show access denied message if user is not an agent/builder (case-insensitive)
-  if (user && !isAgentOrBuilder) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <View style={styles.errorIconWrap}>
-            <TabIcon name="alert" color={colors.error} size={48} />
-          </View>
-          <Text style={styles.errorTitle}>Access Denied</Text>
-          <Text style={styles.errorText}>
-            You are registered as {user.user_type === 'buyer' ? 'Buyer/Tenant' : user.user_type === 'seller' ? 'Seller/Owner' : 'User'}. You cannot access this dashboard.
-          </Text>
-        </View>
-      </View>
-    );
-  }
 
   if (loading && !dashboardStats) {
     return <LoadingScreen variant="dashboard" />;

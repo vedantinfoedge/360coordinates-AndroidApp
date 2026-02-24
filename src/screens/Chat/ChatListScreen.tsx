@@ -2454,7 +2454,7 @@ const styles = StyleSheet.create({
   },
   profileActionBtnPrimary: {
     borderWidth: 0,
-    backgroundColor: '#1565C0',
+     backgroundColor: '#1565C0',
     shadowColor: '#1565C0',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.4,
