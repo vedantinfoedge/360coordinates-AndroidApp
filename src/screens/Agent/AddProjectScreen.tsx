@@ -247,7 +247,6 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
 
   // Step 4: Pricing & Timeline
   const [startingPrice, setStartingPrice] = useState('');
-  const [pricePerSqft, setPricePerSqft] = useState('');
   const [bookingAmount, setBookingAmount] = useState('');
   const [launchDate, setLaunchDate] = useState('');
   const [possessionDate, setPossessionDate] = useState('');
@@ -264,7 +263,6 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
 
   // Step 7: Media Uploads
-  const [coverImage, setCoverImage] = useState<{ uri: string; base64?: string } | null>(null);
   const [projectImages, setProjectImages] = useState<Array<{
     uri: string;
     base64?: string;
@@ -809,7 +807,6 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         bedCapacity: bedCapacity || null,
         loadingDocks: loadingDocks || null,
         startingPrice: startingPrice.trim() || null,
-        pricePerSqft: pricePerSqft.trim() || null,
         bookingAmount: bookingAmount.trim() || null,
         expectedLaunchDate: launchDate || null,
         expectedPossessionDate: possessionDate || null,
@@ -1487,26 +1484,6 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Price per Sq.ft (Optional)</Text>
-              <View style={styles.priceInputContainer}>
-                <Text style={styles.currencySymbol}>₹</Text>
-                <TextInput
-                  style={[styles.input, styles.priceInput]}
-                  placeholder="e.g., 5000 or 5000-6000"
-                  placeholderTextColor={colors.textSecondary}
-                  value={pricePerSqft}
-                  onChangeText={setPricePerSqft}
-                  keyboardType="numeric"
-                />
-              </View>
-              {pricePerSqft && (
-                <Text style={styles.priceDisplay}>
-                  Price: {formatters.price(formatPriceInput(pricePerSqft))}/sq.ft
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
               <Text style={styles.label}>Booking Amount Price (Optional)</Text>
               <View style={styles.priceInputContainer}>
                 <Text style={styles.currencySymbol}>₹</Text>
@@ -1626,54 +1603,6 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Media & Contact</Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Project Cover Image (Optional)</Text>
-              <View style={styles.coverImageRow}>
-                <TouchableOpacity
-                  style={styles.coverImageUpload}
-                  onPress={async () => {
-                    const hasPermission = await requestCameraPermission();
-                    if (!hasPermission) return;
-                    launchImageLibrary({ mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true }, (response) => {
-                      if (response.assets && response.assets[0]) {
-                        const asset = response.assets[0];
-                        setCoverImage({
-                          uri: asset.uri || '',
-                          base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
-                        });
-                      }
-                    });
-                  }}>
-                  {coverImage ? (
-                    <Image source={{ uri: coverImage.uri }} style={styles.coverImagePreview} />
-                  ) : (
-                    <View style={styles.coverImagePlaceholder}>
-                      <Text style={styles.imagePlaceholderText}>🖼️</Text>
-                      <Text style={styles.imagePlaceholderLabel}>Upload</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.coverImageCamera}
-                  onPress={async () => {
-                    const ok = await requestCameraPermissionForCapture();
-                    if (!ok) return;
-                    launchCamera({ mediaType: 'photo' as MediaType, quality: 0.8 as const, includeBase64: true }, (response) => {
-                      if (response.assets && response.assets[0]) {
-                        const asset = response.assets[0];
-                        setCoverImage({
-                          uri: asset.uri || '',
-                          base64: asset.base64 ? `data:image/${asset.type || 'jpeg'};base64,${asset.base64}` : undefined,
-                        });
-                      }
-                    });
-                  }}>
-                  <TabIcon name="camera" color={colors.primary} size={36} />
-                  <Text style={styles.coverImageCameraLabel}>Take photo</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
@@ -2598,54 +2527,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     alignItems: 'center',
-  },
-  coverImageRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'stretch',
-  },
-  coverImageUpload: {
-    flex: 1,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 120,
-  },
-  coverImagePreview: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
-  coverImagePlaceholder: {
-    flex: 1,
-    minHeight: 120,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-  },
-  coverImageCamera: {
-    flex: 1,
-    minHeight: 120,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  coverImageCameraIcon: {
-    fontSize: 32,
-    marginBottom: spacing.xs,
-  },
-  coverImageCameraLabel: {
-    ...typography.body,
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
   },
   projectImagesButtonRow: {
     flexDirection: 'row',
