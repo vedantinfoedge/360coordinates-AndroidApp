@@ -1191,9 +1191,22 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               <Text style={styles.readMore}>{descriptionExpanded ? 'Read less' : 'Read more >'}</Text>
             </TouchableOpacity>
           )}
+          {property.pdf_url ? (
+            <TouchableOpacity
+              style={styles.pdfLinkRow}
+              onPress={() => Linking.openURL(property.pdf_url).catch(() => {})}
+              activeOpacity={0.8}>
+              <TabIcon name="file-text" color={colors.primary} size={20} />
+              <Text style={styles.pdfLinkText}>View Brochure (PDF)</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        {/* Property Details */}
+        {/* Property Details
+         * From seller/agent: property_type, status, furnishing, facing, age, total_floors, floor, carpet_area,
+         * balconies, price_negotiable, maintenance_charges, deposit_amount (rent), state, additional_address;
+         * agent only: pdf_url, video_url. Buyer sees all above; State here; Additional address in Location; PDF in About section.
+         */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleBar} />
@@ -1240,6 +1253,58 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>TOTAL FLOORS</Text>
                 <Text style={styles.detailValue}>{property.total_floors}</Text>
+              </View>
+            )}
+            {(property.floor != null && property.floor !== '' && String(property.floor) !== '0') && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>FLOOR NUMBER</Text>
+                <Text style={styles.detailValue}>{property.floor}</Text>
+              </View>
+            )}
+            {property.state && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>STATE</Text>
+                <Text style={styles.detailValue}>{property.state}</Text>
+              </View>
+            )}
+            {property.furnishing && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>FURNISHING</Text>
+                <Text style={styles.detailValue}>{property.furnishing}</Text>
+              </View>
+            )}
+            {(property.balconies != null && property.balconies !== '' && String(property.balconies) !== '0') && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>BALCONY</Text>
+                <Text style={styles.detailValue}>{property.balconies}</Text>
+              </View>
+            )}
+            {property.price_negotiable != null && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>PRICE NEGOTIABLE</Text>
+                <Text style={styles.detailValue}>{property.price_negotiable ? 'Yes' : 'No'}</Text>
+              </View>
+            )}
+            {(property.maintenance_charges != null && property.maintenance_charges !== '' && Number(property.maintenance_charges) > 0) && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>MAINTENANCE</Text>
+                <Text style={styles.detailValue}>
+                  ₹{parseFloat(String(property.maintenance_charges)).toLocaleString('en-IN')}/month
+                </Text>
+              </View>
+            )}
+            {(property.carpet_area != null && property.carpet_area !== '' && Number(property.carpet_area) > 0) && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>CARPET AREA</Text>
+                <Text style={styles.detailValue}>{property.carpet_area} sq ft</Text>
+              </View>
+            )}
+            {isRentListing && property.deposit_amount != null && property.deposit_amount !== '' && Number(property.deposit_amount) > 0 && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>DEPOSIT</Text>
+                <Text style={styles.detailValue}>
+                  ₹{parseFloat(String(property.deposit_amount)).toLocaleString('en-IN')}
+                </Text>
               </View>
             )}
             {isRentListing && hasBachelorsFlag ? (
@@ -1307,6 +1372,11 @@ const PropertyDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           <Text style={styles.address}>
             {property.address || property.fullAddress || property.location || 'Address not available'}
           </Text>
+          {property.additional_address ? (
+            <Text style={[styles.address, styles.additionalAddress]}>
+              {property.additional_address}
+            </Text>
+          ) : null}
           <TouchableOpacity
             style={styles.mapContainer}
             onPress={() => {
@@ -2046,6 +2116,29 @@ const styles = StyleSheet.create({
     color: colors.sub,
     marginBottom: 14,
     lineHeight: 22,
+  },
+  additionalAddress: {
+    marginTop: -8,
+    marginBottom: 14,
+    fontStyle: 'italic',
+  },
+  pdfLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderRef,
+    alignSelf: 'flex-start',
+  },
+  pdfLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
+    marginLeft: 8,
   },
   mapContainer: {
     height: 120,
