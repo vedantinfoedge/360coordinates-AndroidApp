@@ -25,7 +25,7 @@ export interface BudgetSet {
   /** Max value for this set (e.g. 500 = 5Cr for sale residential, 200 = 2L for rent residential). */
   maxSlider: number;
   options: BudgetOption[];
-  /** On "Rent page", first option (0K-5K or 0-10K) is excluded from dropdown. */
+  /** When true, first option is excluded from dropdown on Rent page (e.g. legacy behavior). Currently unused so 0-5K shows. */
   rentPageExcludeFirst?: boolean;
 }
 
@@ -66,7 +66,8 @@ const COMMERCIAL_SALE_OPTIONS: BudgetOption[] = [
 
 // --- Commercial rent (₹/month). In thousands.
 const COMMERCIAL_RENT_OPTIONS: BudgetOption[] = [
-  { label: '0-10K', min: 0, max: 10 },
+  { label: '0-5K', min: 0, max: 5 },
+  { label: '5K-10K', min: 5, max: 10 },
   { label: '10K-25K', min: 10, max: 25 },
   { label: '25K-50K', min: 25, max: 50 },
   { label: '50K-1L', min: 50, max: 100 },
@@ -81,7 +82,7 @@ export const BUDGET_SETS: Record<BudgetSetType, BudgetSet> = {
     unit: 'thousands',
     maxSlider: 200,
     options: RENT_RESIDENTIAL_OPTIONS,
-    rentPageExcludeFirst: true, // Rent page: no "0K-5K"
+    rentPageExcludeFirst: false, // Show 0-5K range on Rent page (buyer dashboard & search results)
   },
   sale_residential: {
     type: 'sale_residential',
@@ -100,7 +101,7 @@ export const BUDGET_SETS: Record<BudgetSetType, BudgetSet> = {
     unit: 'thousands',
     maxSlider: 500,
     options: COMMERCIAL_RENT_OPTIONS,
-    rentPageExcludeFirst: true, // Rent page: no "0-10K"
+    rentPageExcludeFirst: false, // Show 0-5K range on Rent page (buyer dashboard & search results)
   },
 };
 
