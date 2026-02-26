@@ -401,7 +401,10 @@ const PropertyDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </Text>
         </View>
 
-        {/* Details Grid */}
+        {/* Details (seller view of same listing).
+         * Collected in AddPropertyScreen: property_type, status (sale/rent), furnishing, possession_status.
+         * Buyer sees on Property Details: Facing, Type, Property Type, Possession, Land Area, Property Age, Total Floors, Available for Bachelors (rent).
+         */}
         <View style={styles.section}>
           <View style={styles.sectionTitleContainer}>
             <TabIcon name="building" color={colors.primary} size={20} />
