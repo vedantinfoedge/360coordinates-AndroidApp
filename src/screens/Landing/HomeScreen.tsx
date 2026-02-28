@@ -472,7 +472,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, {
             paddingTop: 0,
-            paddingBottom: Math.max(spacing.xxl * 3, insets.bottom + 110), // Tab bar clearance so View Details button stays fully visible
+            paddingBottom: Math.max(verticalScale(spacing.xl), insets.bottom + 72), // Tab bar clearance so View Details stays visible
           }]}
           showsVerticalScrollIndicator={false}
           onScroll={(event: { nativeEvent: { contentOffset: { y: number } } }) => {
@@ -484,7 +484,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }>
           {/* Dark Header Section - matches reference UI */}
-          <View style={[styles.darkHeaderSection, { paddingTop: insets.top + spacing.md }]}>
+          <View style={[styles.darkHeaderSection, { paddingTop: insets.top + spacing.sm }]}>
             <View style={styles.greetingRow}>
               <View style={styles.greetingLeft}>
                 <View style={styles.timeGreetingRow}>
@@ -870,7 +870,7 @@ const styles = StyleSheet.create({
   darkHeaderSection: {
     backgroundColor: DARK,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
     borderBottomLeftRadius: borderRadius.xl,
     borderBottomRightRadius: borderRadius.xl,
   },
@@ -878,8 +878,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.md,
-    paddingTop: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingTop: spacing.md,
   },
   greetingLeft: { flex: 1 },
   timeGreetingRow: {
@@ -1065,7 +1065,10 @@ const styles = StyleSheet.create({
   lightContentArea: {
     flex: 1,
     backgroundColor: '#FAFAFA',
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  section: {
+    marginBottom: spacing.md,
   },
   // Welcome Section - Modern, spacious design (legacy, kept for structure)
   welcomeSection: {
@@ -1171,7 +1174,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
     fontSize: 17,
@@ -1199,11 +1202,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semiBold,
     color: colors.primary,
   },
-  // Properties List - Extra paddingBottom so View Details button clears tab bar
+  // Properties List - padding so View Details button clears tab bar
   propertiesList: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl + verticalScale(24),
+    paddingBottom: spacing.lg + verticalScale(8),
   },
   carouselCard: {
     width: scale(280),

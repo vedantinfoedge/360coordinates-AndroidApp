@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     ...CARD_SHADOW,
-    marginBottom: verticalScale(14),
+    marginBottom: verticalScale(8),
   },
   imageContainer: {
     position: 'relative',
@@ -613,15 +613,15 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     paddingHorizontal: scale(14),
-    paddingTop: verticalScale(10),
-    paddingBottom: verticalScale(12),
+    paddingTop: verticalScale(6),
+    paddingBottom: verticalScale(8),
     justifyContent: 'space-between',
   },
   infoTop: {
-    marginBottom: verticalScale(6),
+    marginBottom: verticalScale(4),
   },
   infoBottom: {
-    gap: verticalScale(6),
+    gap: verticalScale(4),
   },
   name: {
     fontSize: moderateScale(13),
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: colors.primary,
     borderRadius: scale(12),
-    paddingVertical: verticalScale(9),
+    paddingVertical: verticalScale(7),
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.primary,

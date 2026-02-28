@@ -593,7 +593,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, {
           paddingTop: 0,
-          paddingBottom: Math.max(verticalScale(spacing.xxl * 3), insets.bottom + 110), // Tab bar clearance so View Details stays fully visible
+          paddingBottom: Math.max(verticalScale(spacing.xl), insets.bottom + 72), // Tab bar clearance so View Details stays visible
         }]}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
@@ -605,7 +605,7 @@ const BuyerDashboardScreen: React.FC<Props> = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }>
         {/* Dark Header Section */}
-        <View style={[styles.darkHeaderSection, { paddingTop: insets.top + spacing.md }]}>
+        <View style={[styles.darkHeaderSection, { paddingTop: insets.top + spacing.sm }]}>
           {/* Greeting row: time + avatar */}
           <View style={styles.greetingRow}>
             <View style={styles.greetingLeft}>
@@ -990,14 +990,14 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingTop: 0,
-    paddingBottom: verticalScale(spacing.xxl * 3),
+    paddingBottom: verticalScale(spacing.xl),
     backgroundColor: '#FAFAFA',
   },
   // Dark header section (theme from reference image)
   darkHeaderSection: {
     backgroundColor: DARK,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
     borderBottomLeftRadius: borderRadius.xl,
     borderBottomRightRadius: borderRadius.xl,
   },
@@ -1005,8 +1005,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.md,
-    paddingTop: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingTop: spacing.md,
   },
   greetingLeft: {
     flex: 1,
@@ -1228,16 +1228,18 @@ const styles = StyleSheet.create({
   lightContentArea: {
     flex: 1,
     backgroundColor: '#FAFAFA',
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingHorizontal: 0,
   },
-  
+  section: {
+    marginBottom: spacing.md,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
     fontSize: 17,
@@ -1277,7 +1279,7 @@ const styles = StyleSheet.create({
   carouselList: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl + verticalScale(24), // Extra space so View Details button isn't clipped
+    paddingBottom: spacing.lg + verticalScale(8),
   },
   carouselCard: {
     width: scale(300),
@@ -1294,7 +1296,7 @@ const styles = StyleSheet.create({
     width: scale(100),
     alignItems: 'center',
     marginRight: spacing.lg,
-    paddingTop: spacing.xxl,
+    paddingTop: spacing.sm,
     paddingHorizontal: spacing.md,
   },
   cityImageContainer: {
