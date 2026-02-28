@@ -1231,10 +1231,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingHorizontal: 0,
   },
-  section: {
-    marginTop: verticalScale(28),
-    marginBottom: spacing.lg,
-  },
+  
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

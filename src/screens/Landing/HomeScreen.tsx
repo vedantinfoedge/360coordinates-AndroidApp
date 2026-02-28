@@ -1165,10 +1165,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   // Section Styling - More breathing room
-  section: {
-    marginTop: spacing.xl + scale(8),
-    marginBottom: spacing.md,
-  },
+
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
