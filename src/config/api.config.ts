@@ -1,86 +1,108 @@
 /**
- * API configuration — all paths use 360coordinates.com
+ * API configuration — 360coordinates.com backend API
+ * Base URL points to /backend/api (JSON API). Site root used for images/uploads.
  */
 
-const API_BASE_URL = 'https://360coordinates.com';
+const API_BASE_URL = 'https://360coordinates.com/backend/api';
 
 export const API_CONFIG = {
   API_BASE_URL,
-  BASE_URL: API_BASE_URL,
-  UPLOAD_BASE_URL: API_BASE_URL,
+  BASE_URL: 'https://360coordinates.com',
+  UPLOAD_BASE_URL: 'https://360coordinates.com',
   TIMEOUT: 30000,
 };
 
 export const API_ENDPOINTS = {
-  DEVICE_TOKEN_REGISTER: '/device-token/register',
-  DEVICE_TOKEN_UNREGISTER: '/device-token/unregister',
-  PROPERTY_SEARCH: '/property/search',
-  PROPERTIES_LIST: '/properties',
-  PROPERTY_DETAILS: '/property/details',
-  PROPERTY_UPDATE: '/property/update',
-  PROPERTY_DELETE: '/property/delete',
-  MY_PROPERTIES: '/my-properties',
-  UPLOAD_IMAGES: '/upload/images',
-  SELLER_PROPERTIES_ADD: '/seller/properties/add',
-  FAVORITES_LIST: '/favorites',
-  FAVORITE_ADD: '/favorite/add',
-  FAVORITE_REMOVE: '/favorite/remove',
-  FAVORITE_CHECK: '/favorite/check',
-  UPLOAD_PROFILE_IMAGE: '/upload/profile-image',
-  INQUIRY_SEND: '/inquiry/send',
-  SELLER_INQUIRIES_LIST: '/seller/inquiries',
-  INQUIRY_INBOX: '/inquiry/inbox',
-  INQUIRY_SENT: '/inquiry/sent',
-  INQUIRY_MARK_READ: '/inquiry/mark-read',
-  INQUIRY_REPLY: '/inquiry/reply',
-  MODERATE_AND_UPLOAD: '/moderate-and-upload',
-  CHAT_CREATE_ROOM: '/chat/room',
-  CHAT_INIT_CONVERSATION: '/chat/init',
-  CHAT_MESSAGES: '/chat/messages',
-  CHAT_SEND_MESSAGE: '/chat/send',
-  BUYER_PROFILE_GET: '/buyer/profile',
-  SELLER_PROFILE_GET: '/seller/profile',
-  UPDATE_PROFILE: '/profile/update',
-  UPLOAD_PICTURE: '/upload/picture',
-  CHANGE_PASSWORD: '/change-password',
-  OTP_SEND_SMS: '/otp/send-sms',
-  OTP_VERIFY_MSG91_TOKEN: '/otp/verify-msg91',
-  OTP_VERIFY_SMS: '/otp/verify-sms',
-  OTP_SEND_EMAIL: '/otp/send-email',
-  OTP_VERIFY_EMAIL: '/otp/verify-email',
-  MSG91_OTP_SEND: '/otp/msg91/send',
-  MSG91_OTP_VERIFY: '/otp/msg91/verify',
-  SELLER_DASHBOARD_STATS: '/seller/dashboard/stats',
-  SELLER_PROPERTIES_LIST: '/seller/properties',
-  SELLER_BUYERS_GET: '/seller/buyers',
-  SELLER_PROFILE_UPDATE: '/seller/profile/update',
-  SELLER_INQUIRY_UPDATE_STATUS: '/seller/inquiry/status',
-  SELLER_PROPERTIES_DELETE: '/seller/properties/delete',
-  SELLER_PROPERTIES_UPDATE: '/seller/properties/update',
-  BUYER_PROPERTIES_LIST: '/buyer/properties',
-  BUYER_PROPERTY_DETAILS: '/buyer/property/details',
-  BUYER_FAVORITES_LIST: '/buyer/favorites',
-  BUYER_FAVORITES_TOGGLE: '/buyer/favorites/toggle',
-  BUYER_INQUIRY_SEND: '/buyer/inquiry/send',
-  BUYER_PROFILE_UPDATE: '/buyer/profile/update',
-  BUYER_INTERACTION_RECORD: '/buyer/interaction/record',
-  BUYER_INTERACTION_CHECK: '/buyer/interaction/check',
-  BUYER_HISTORY_ADD: '/buyer/history/add',
-  BUYER_HISTORY_LIST: '/buyer/history',
-  REGISTER: '/register',
-  LOGIN: '/login',
-  VERIFY_OTP: '/verify-otp',
-  RESEND_OTP: '/resend-otp',
-  FORGOT_PASSWORD: '/forgot-password',
-  RESET_PASSWORD: '/reset-password',
-  REFRESH_TOKEN: '/refresh-token',
-  DELETE_ACCOUNT: '/account/delete',
-  SWITCH_ROLE: '/switch-role',
-  CONTACT_SEND: '/contact/send',
-  SELLER_LEADS_LIST: '/seller/leads',
-  BUYER_LEAD_CREATE: '/buyer/lead/create',
-  MODERATION_CHECK_IMAGE: '/moderation/check-image',
-  ADMIN_MODERATION_QUEUE: '/admin/moderation/queue',
-  ADMIN_MODERATION_APPROVE: '/admin/moderation/approve',
-  ADMIN_MODERATION_REJECT: '/admin/moderation/reject',
+  // Auth (AUTH_SCREENS_VERIFICATION_REPORT.md)
+  REGISTER: '/auth/register.php',
+  LOGIN: '/auth/login.php',
+  VERIFY_OTP: '/auth/verify-otp.php',
+  RESEND_OTP: '/auth/resend-otp.php',
+  FORGOT_PASSWORD: '/auth/forgot-password.php',
+  RESET_PASSWORD: '/auth/reset-password.php',
+  REFRESH_TOKEN: '/auth/refresh-token.php',
+  DELETE_ACCOUNT: '/auth/delete-account.php',
+  SWITCH_ROLE: '/auth/switch-role.php',
+
+  // Device token (push)
+  DEVICE_TOKEN_REGISTER: '/device-token/register.php',
+  DEVICE_TOKEN_UNREGISTER: '/device-token/unregister.php',
+
+  // Properties (propertyService / propertySearchService use these)
+  PROPERTY_SEARCH: '/buyer/properties/list.php',
+  PROPERTIES_LIST: '/buyer/properties/list.php',
+  PROPERTY_DETAILS: '/buyer/properties/details.php',
+
+  // Seller/agent property CRUD (AGENT_DASHBOARD_SYNC_REPORT.md)
+  PROPERTY_UPDATE: '/seller/properties/update.php',
+  PROPERTY_DELETE: '/seller/properties/delete.php',
+  MY_PROPERTIES: '/seller/properties/list.php',
+  UPLOAD_IMAGES: '/seller/properties/add.php',
+  SELLER_PROPERTIES_ADD: '/seller/properties/add.php',
+  SELLER_PROPERTIES_LIST: '/seller/properties/list.php',
+  SELLER_PROPERTIES_DELETE: '/seller/properties/delete.php',
+  SELLER_PROPERTIES_UPDATE: '/seller/properties/update.php',
+
+  // Buyer (BUYER_DASHBOARD_ENDPOINTS_REPORT.md)
+  FAVORITES_LIST: '/buyer/favorites/list.php',
+  FAVORITE_ADD: '/buyer/favorites/toggle.php',
+  FAVORITE_REMOVE: '/buyer/favorites/toggle.php',
+  FAVORITE_CHECK: '/buyer/favorites/list.php',
+  UPLOAD_PROFILE_IMAGE: '/upload/profile-image.php',
+  INQUIRY_SEND: '/buyer/inquiries/send.php',
+  SELLER_INQUIRIES_LIST: '/seller/inquiries/list.php',
+  INQUIRY_INBOX: '/inquiry/inbox.php',
+  INQUIRY_SENT: '/inquiry/sent.php',
+  INQUIRY_MARK_READ: '/inquiry/mark-read.php',
+  INQUIRY_REPLY: '/inquiry/reply.php',
+
+  // Moderation / images (PROPERTY_IMAGE_UPLOAD_WORKFLOW.md)
+  MODERATE_AND_UPLOAD: '/images/moderate-and-upload.php',
+  MODERATION_CHECK_IMAGE: '/moderation/check-image.php',
+  ADMIN_MODERATION_QUEUE: '/admin/moderation/queue.php',
+  ADMIN_MODERATION_APPROVE: '/admin/moderation/approve.php',
+  ADMIN_MODERATION_REJECT: '/admin/moderation/reject.php',
+
+  // Chat (CHAT_WORKFLOW_ROLE_SWITCHING_REPORT.md)
+  CHAT_CREATE_ROOM: '/chat/create-room.php',
+  CHAT_INIT_CONVERSATION: '/chat/init.php',
+  CHAT_MESSAGES: '/chat/messages.php',
+  CHAT_SEND_MESSAGE: '/chat/send-message.php',
+
+  // Buyer profile & actions
+  BUYER_PROFILE_GET: '/buyer/profile/get.php',
+  SELLER_PROFILE_GET: '/seller/profile/get.php',
+  UPDATE_PROFILE: '/profile/update.php',
+  UPLOAD_PICTURE: '/upload/picture.php',
+  CHANGE_PASSWORD: '/auth/change-password.php',
+  BUYER_PROPERTIES_LIST: '/buyer/properties/list.php',
+  BUYER_PROPERTY_DETAILS: '/buyer/properties/details.php',
+  BUYER_FAVORITES_LIST: '/buyer/favorites/list.php',
+  BUYER_FAVORITES_TOGGLE: '/buyer/favorites/toggle.php',
+  BUYER_INQUIRY_SEND: '/buyer/inquiries/send.php',
+  BUYER_PROFILE_UPDATE: '/buyer/profile/update.php',
+  BUYER_INTERACTION_RECORD: '/buyer/interactions/record.php',
+  BUYER_INTERACTION_CHECK: '/buyer/interactions/check.php',
+  BUYER_HISTORY_ADD: '/buyer/history/add.php',
+  BUYER_HISTORY_LIST: '/buyer/history/list.php',
+
+  // OTP (backend proxy)
+  OTP_SEND_SMS: '/otp/send_sms.php',
+  OTP_VERIFY_MSG91_TOKEN: '/otp/verify_msg91.php',
+  OTP_VERIFY_SMS: '/otp/verify_sms.php',
+  OTP_SEND_EMAIL: '/otp/send_email.php',
+  OTP_VERIFY_EMAIL: '/otp/verify_email.php',
+  MSG91_OTP_SEND: '/otp/msg91/send.php',
+  MSG91_OTP_VERIFY: '/otp/msg91/verify.php',
+
+  // Seller dashboard
+  SELLER_DASHBOARD_STATS: '/seller/dashboard/stats.php',
+  SELLER_BUYERS_GET: '/seller/buyers/get.php',
+  SELLER_PROFILE_UPDATE: '/seller/profile/update.php',
+  SELLER_INQUIRY_UPDATE_STATUS: '/seller/inquiries/updateStatus.php',
+
+  // Leads & contact
+  CONTACT_SEND: '/contact/send.php',
+  SELLER_LEADS_LIST: '/seller/leads/list.php',
+  BUYER_LEAD_CREATE: '/buyer/lead/create.php',
 };
