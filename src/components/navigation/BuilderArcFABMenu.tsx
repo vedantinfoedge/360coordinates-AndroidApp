@@ -11,7 +11,6 @@ import {
   BackHandler,
   Keyboard,
 } from 'react-native';
-import {BlurView} from '@react-native-community/blur';
 import {useNavigation} from '@react-navigation/native';
 import {useBuilderArcFAB} from '../../context/BuilderArcFABContext';
 import {scale, moderateScale} from '../../utils/responsive';
@@ -144,16 +143,7 @@ export default function BuilderArcFABMenu() {
     height: 2 * radius,
   };
 
-  const overlayBlur = Platform.OS === 'ios' ? (
-    <BlurView
-      style={StyleSheet.absoluteFill}
-      blurType="dark"
-      blurAmount={8}
-      reducedTransparencyFallbackColor={colors.overlay}
-    />
-  ) : (
-    <View style={[StyleSheet.absoluteFill, {backgroundColor: colors.overlay}]} />
-  );
+  const overlayBlur = <View style={[StyleSheet.absoluteFill, {backgroundColor: colors.overlay}]} />;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
