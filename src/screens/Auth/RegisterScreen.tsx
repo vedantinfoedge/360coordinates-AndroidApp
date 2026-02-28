@@ -211,71 +211,62 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     };
   }, []);
 
-  // Handle return from OTP verification screen
+  // Handle return from OTP verification screen (defer updates to avoid Android layout thrash/glitch)
   useFocusEffect(
     React.useCallback(() => {
       const params = route.params as any;
-      // #region agent log
-      console.log('[DEBUG][FOCUS] useFocusEffect triggered, paramsKeys=' + (params ? Object.keys(params).join(',') : 'none') + ', phoneVerified=' + params?.phoneVerified + ', alreadyProcessed=' + hasProcessedOtpParams.current);
-      // #endregion
-      
       // Skip if we've already processed OTP params to prevent re-render loops
       if (hasProcessedOtpParams.current && params?.phoneVerified === undefined) {
         return;
       }
-      
-      if (params?.name !== undefined) setName(String(params.name).toUpperCase());
-      if (params?.email !== undefined) setEmail(params.email);
-      if (params?.phone !== undefined) {
-        const rawPhone = String(params.phone ?? '');
-        const digitsOnly = rawPhone.replace(/\D/g, '');
-        let phoneToRestore = digitsOnly;
-        if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
-          phoneToRestore = digitsOnly.slice(2);
-        } else if (digitsOnly.length > 10) {
-          phoneToRestore = digitsOnly.slice(-10);
+      const {InteractionManager} = require('react-native');
+      const handle = InteractionManager.runAfterInteractions(() => {
+        if (params?.name !== undefined) setName(String(params.name).toUpperCase());
+        if (params?.email !== undefined) setEmail(params.email);
+        if (params?.phone !== undefined) {
+          const rawPhone = String(params.phone ?? '');
+          const digitsOnly = rawPhone.replace(/\D/g, '');
+          let phoneToRestore = digitsOnly;
+          if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+            phoneToRestore = digitsOnly.slice(2);
+          } else if (digitsOnly.length > 10) {
+            phoneToRestore = digitsOnly.slice(-10);
+          }
+          setPhone(phoneToRestore);
         }
-        setPhone(phoneToRestore);
-      }
-      if (params?.selectedRole !== undefined) setSelectedRole(params.selectedRole);
-      // Arc menu FAB passes role: 'agent' | 'builder' | 'seller' -> map to UserRole
-      if (params?.role !== undefined) {
-        const r = (params.role as string).toLowerCase();
-        setSelectedRole(r === 'seller' ? 'seller' : 'agent');
-      }
-      
-      if (params?.phoneVerified === true) {
-        // #region agent log
-        console.log('[DEBUG][FOCUS] phoneVerified=true detected, will update multiple states');
-        // #endregion
-        hasProcessedOtpParams.current = true;
-        setPhoneVerified(true);
-        if (params.phoneToken) setPhoneToken(params.phoneToken);
-        if (params.phoneMethod) setPhoneMethod(params.phoneMethod);
-        if (params.verifiedOtp) setVerifiedOtp(params.verifiedOtp);
-        // Also read phoneMsg91Token from params (passed from OTPVerificationScreen for SDK flow)
-        if (params.phoneMsg91Token) setPhoneMsg91Token(params.phoneMsg91Token);
-        // If phoneToken is provided but not phoneMsg91Token, use phoneToken as phoneMsg91Token for SDK methods
-        if (!params.phoneMsg91Token && params.phoneToken && (params.phoneMethod === 'msg91-sdk' || params.phoneMethod === 'msg91-widget')) {
-          setPhoneMsg91Token(params.phoneToken);
+        if (params?.selectedRole !== undefined) setSelectedRole(params.selectedRole);
+        if (params?.role !== undefined) {
+          const r = (params.role as string).toLowerCase();
+          setSelectedRole(r === 'seller' ? 'seller' : 'agent');
         }
-        // Use InteractionManager to defer params clearing to avoid blocking UI
-        const {InteractionManager} = require('react-native');
-        InteractionManager.runAfterInteractions(() => {
-          navigation.setParams({
-            phoneVerified: undefined,
-            phoneToken: undefined,
-            phoneMethod: undefined,
-            verifiedOtp: undefined,
-            phoneMsg91Token: undefined,
-            phone: undefined,
-            name: undefined,
-            email: undefined,
-            selectedRole: undefined,
-          } as any);
-        });
-      }
-    }, [navigation]) // Removed route.params from dependencies to prevent re-render loop
+        if (params?.phoneVerified === true) {
+          hasProcessedOtpParams.current = true;
+          setPhoneVerified(true);
+          if (params.phoneToken) setPhoneToken(params.phoneToken);
+          if (params.phoneMethod) setPhoneMethod(params.phoneMethod);
+          if (params.verifiedOtp) setVerifiedOtp(params.verifiedOtp);
+          if (params.phoneMsg91Token) setPhoneMsg91Token(params.phoneMsg91Token);
+          if (!params.phoneMsg91Token && params.phoneToken && (params.phoneMethod === 'msg91-sdk' || params.phoneMethod === 'msg91-widget')) {
+            setPhoneMsg91Token(params.phoneToken);
+          }
+          // Clear params after a frame so state updates can batch and avoid extra layout
+          requestAnimationFrame(() => {
+            navigation.setParams({
+              phoneVerified: undefined,
+              phoneToken: undefined,
+              phoneMethod: undefined,
+              verifiedOtp: undefined,
+              phoneMsg91Token: undefined,
+              phone: undefined,
+              name: undefined,
+              email: undefined,
+              selectedRole: undefined,
+            } as any);
+          });
+        }
+      });
+      return () => handle.cancel();
+    }, [navigation])
   );
 
   const extractWidgetToken = (payload: any): string | null => {
@@ -656,24 +647,25 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const completedFields = [selectedRole, name, email, phone, phoneVerified, password, confirmPassword, agreedToTerms].filter(Boolean).length;
 
   const trackWidth = SCREEN_WIDTH - 56;
-  const progressBarWidth = progressWidth.interpolate({
+  // Native-driver compatible progress: scaleX + translateX so bar fills left-to-right without layout thrash
+  const progressScaleX = progressWidth.interpolate({
     inputRange: [0, 100],
-    outputRange: [0, trackWidth],
+    outputRange: [0, 1],
+  });
+  const progressTranslateX = progressWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: [-trackWidth / 2, 0],
   });
 
-  // Animate progress bar when fields change
-  // Use InteractionManager to defer animation and prevent blocking input
+  // Animate progress bar when fields change (useNativeDriver: true to prevent Android glitch)
   useEffect(() => {
-    // #region agent log
-    console.log('[DEBUG][PROGRESS] Progress animation triggered, completedFields=' + completedFields + ', phoneVerified=' + phoneVerified);
-    // #endregion
     const {InteractionManager} = require('react-native');
     const handle = InteractionManager.runAfterInteractions(() => {
       Animated.timing(progressWidth, {
         toValue: (completedFields / 8) * 100,
         duration: 300,
         easing: Easing.out(Easing.ease),
-        useNativeDriver: false,
+        useNativeDriver: true,
       }).start();
     });
     return () => handle.cancel();
@@ -763,7 +755,18 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
 
         <Animated.View style={[styles.progWrap, {opacity: headerOpacity}]}>
           <View style={styles.progTrack}>
-            <Animated.View style={[styles.progFill, {width: progressBarWidth}]} />
+            <Animated.View
+              style={[
+                styles.progFill,
+                {
+                  width: trackWidth,
+                  transform: [
+                    {translateX: progressTranslateX},
+                    {scaleX: progressScaleX},
+                  ],
+                },
+              ]}
+            />
           </View>
           <Text style={styles.progLabel}>{completedFields}/8 fields completed</Text>
         </Animated.View>
