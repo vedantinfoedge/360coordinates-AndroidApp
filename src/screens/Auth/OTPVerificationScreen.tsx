@@ -17,6 +17,7 @@ import {authService} from '../../services/auth.service';
 import {otpService} from '../../services/otp.service';
 import {useAuth} from '../../context/AuthContext';
 import {switchToSMSWidget, switchToForgotPasswordWidget, initializeMSG91} from '../../config/msg91.config';
+import {otpReturnRef} from './otpReturnRef';
 
 type OTPVerificationScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -234,8 +235,8 @@ const OTPVerificationScreen: React.FC = () => {
             });
 
             if (restVerifyResponse?.success) {
-              // Treat phone as fully verified via MSG91; no local OTP/token needed
-              navigation.navigate('Register', {
+              // Use ref + goBack to avoid route param updates and Register screen blinking on Android
+              otpReturnRef.current = {
                 phoneVerified: true,
                 phoneToken: undefined,
                 phoneMethod: 'msg91',
@@ -244,19 +245,12 @@ const OTPVerificationScreen: React.FC = () => {
                 name: params.formData?.name,
                 email: params.formData?.email,
                 selectedRole: params.formData?.selectedRole,
-              } as any);
-
+              };
+              navigation.goBack();
               CustomAlert.alert(
                 'Success',
                 'Phone number verified successfully! You can now complete registration.',
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => {
-                      // Navigation already handled above
-                    },
-                  },
-                ],
+                [{ text: 'OK' }],
               );
               return;
             }
@@ -283,7 +277,7 @@ const OTPVerificationScreen: React.FC = () => {
           if (isRegistrationFlow && method === 'backend') {
             console.log('[OTP Verification] Registration + backend flow detected - skipping /otp/verify_sms and passing OTP directly to registration');
 
-            navigation.navigate('Register', {
+            otpReturnRef.current = {
               phoneVerified: true,
               phoneToken: undefined,
               phoneMethod: 'backend',
@@ -292,19 +286,12 @@ const OTPVerificationScreen: React.FC = () => {
               name: params.formData?.name,
               email: params.formData?.email,
               selectedRole: params.formData?.selectedRole,
-            } as any);
-
+            };
+            navigation.goBack();
             CustomAlert.alert(
               'Success',
               'Phone number verified successfully! You can now complete registration.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    // Navigation already handled above
-                  },
-                },
-              ],
+              [{ text: 'OK' }],
             );
             return;
           }
@@ -429,45 +416,30 @@ const OTPVerificationScreen: React.FC = () => {
                   tokenPreview: verificationToken ? `${verificationToken.substring(0, 20)}...` : 'missing',
                 });
                 
-                // For registration flow, navigate back with token
+                // For registration flow, return via ref + goBack to avoid Register blinking on Android
                 if (isRegistrationFlow) {
                   console.log('[OTP Verification] Registration flow - returning to RegisterScreen with SDK token');
-                  // #region agent log
-                  console.log('[DEBUG][NAV] Navigating back to Register with phoneVerified=true, method=msg91-sdk');
-                  // #endregion
-                  
-                  // Build JSON payload for backend as phoneVerificationToken (same format as widget)
                   const msg91PayloadForBackend = JSON.stringify({
                     ...verifyResponse,
                     extractedToken: verificationToken,
                     reqId: reqId,
                   });
-                  
-                  navigation.navigate('Register', {
+                  otpReturnRef.current = {
                     phoneVerified: true,
-                    phoneMsg91Token: msg91PayloadForBackend, // Full MSG91 payload for backend
-                    phoneToken: verificationToken, // Human-readable token preview
+                    phoneMsg91Token: msg91PayloadForBackend,
+                    phoneToken: verificationToken,
                     phoneMethod: 'msg91-sdk',
-                    phoneReqId: reqId,
-                    verifiedOtp: undefined, // No OTP needed, SDK already verified
-                    // Restore form data
+                    verifiedOtp: undefined,
                     phone: params.formData?.phone || phoneNumber,
                     name: params.formData?.name,
                     email: params.formData?.email,
                     selectedRole: params.formData?.selectedRole,
-                  } as any);
-                  
+                  };
+                  navigation.goBack();
                   CustomAlert.alert(
                     'Success',
                     'Phone number verified successfully! You can now complete registration.',
-                    [
-                      {
-                        text: 'OK',
-                        onPress: () => {
-                          // Navigation already handled above
-                        },
-                      },
-                    ],
+                    [{ text: 'OK' }],
                   );
                   return;
                 }
@@ -562,54 +534,24 @@ const OTPVerificationScreen: React.FC = () => {
               }
             }
             
-            // For registration flow, mark phone as verified and go back to registration
+            // For registration flow, return via ref + goBack to avoid Register blinking on Android
             if (isRegistrationFlow) {
               console.log('[OTP Verification] Registration flow - phone verified, returning to registration');
-              console.log('[OTP Verification] Verification details:', {
-                token: verificationToken ? `${verificationToken.substring(0, 20)}...` : 'not provided',
-                method: smsVerifyResponse.method || params.method,
-                phone: phoneNumber,
-              });
-              
-              // Pass verification result back via navigation params
-              // RegisterScreen will use useFocusEffect to detect this
-              // Also pass form data to restore form fields
-              const navigationParams = {
+              otpReturnRef.current = {
                 phoneVerified: true,
                 phoneToken: verificationToken || undefined,
-                phoneMethod: smsVerifyResponse.method || params.method || 'backend',
-                // For backend verification, pass the OTP that was verified (as fallback if no token)
+                phoneMethod: (smsVerifyResponse.method || params.method || 'backend') as any,
                 verifiedOtp: (smsVerifyResponse.method === 'backend' && !verificationToken) ? otp : undefined,
-                // Restore form data if available
                 phone: params.formData?.phone || phoneNumber,
                 name: params.formData?.name,
                 email: params.formData?.email,
                 selectedRole: params.formData?.selectedRole,
               };
-              
-              console.log('[OTP Verification] Navigating back to Register with params:', {
-                phoneVerified: navigationParams.phoneVerified,
-                phoneToken: navigationParams.phoneToken ? `${navigationParams.phoneToken.substring(0, 10)}...` : 'none',
-                phoneMethod: navigationParams.phoneMethod,
-                phone: navigationParams.phone,
-                hasName: !!navigationParams.name,
-                hasEmail: !!navigationParams.email,
-                selectedRole: navigationParams.selectedRole,
-              });
-              
-              navigation.navigate('Register', navigationParams as any);
-              
+              navigation.goBack();
               CustomAlert.alert(
                 'Success',
                 'Phone number verified successfully! You can now complete registration.',
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => {
-                      // Navigation already handled above
-                    },
-                  },
-                ],
+                [{ text: 'OK' }],
               );
               return;
             }
@@ -702,30 +644,21 @@ const OTPVerificationScreen: React.FC = () => {
         // Also pass form data to restore form fields
         // For backend verification, pass the OTP that was verified (since no token available)
         console.log('[OTP Verification] Backend fallback - passing verified OTP for registration');
-        
-        navigation.navigate('Register', {
+        otpReturnRef.current = {
           phoneVerified: true,
-          phoneToken: params.reqId || undefined, // Try reqId as token, but likely won't work
-          phoneMethod: 'backend', // Backend verification was used
-          verifiedOtp: otp, // Pass the OTP that was verified (backend will accept this)
-          // Restore form data if available
+          phoneToken: params.reqId || undefined,
+          phoneMethod: 'backend',
+          verifiedOtp: otp,
           phone: params.formData?.phone || phoneNumber,
           name: params.formData?.name,
           email: params.formData?.email,
           selectedRole: params.formData?.selectedRole,
-        } as any);
-        
+        };
+        navigation.goBack();
         CustomAlert.alert(
           'Success',
           'Phone number verified successfully! You can now complete registration.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigation already handled above
-              },
-            },
-          ],
+          [{ text: 'OK' }],
         );
       } else {
         throw new Error('User ID required for verification');

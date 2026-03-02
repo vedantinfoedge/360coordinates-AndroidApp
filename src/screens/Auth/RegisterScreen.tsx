@@ -28,6 +28,7 @@ import {colors, spacing} from '../../theme';
 import {useAuth, UserRole} from '../../context/AuthContext';
 import {authColors, authFonts} from './authDesignTheme';
 import {AuthFieldIcon} from './AuthFieldIcons';
+import {otpReturnRef} from './otpReturnRef';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 import MSG91WebWidget from '../../components/auth/MSG91WebWidget';
@@ -198,76 +199,86 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     return () => pulseAnimation.stop();
   }, []);
 
-  // Handle return from OTP verification screen (defer updates to avoid Android layout thrash/glitch)
+  // Handle return from OTP verification: prefer ref (no route params) to avoid Android blinking
   useFocusEffect(
     React.useCallback(() => {
-      const params = route.params as any;
-      // Skip if we've already processed OTP params to prevent re-render loops
-      if (hasProcessedOtpParams.current && params?.phoneVerified === undefined) {
-        return;
+      const fromRef = otpReturnRef.current;
+      if (fromRef) {
+        otpReturnRef.current = null;
+        hasProcessedOtpParams.current = true;
+        let refTimeoutId: ReturnType<typeof setTimeout> | null = null;
+        const apply = () => {
+          if (fromRef.name !== undefined) setName(String(fromRef.name).toUpperCase());
+          if (fromRef.email !== undefined) setEmail(fromRef.email);
+          if (fromRef.phone !== undefined) {
+            const rawPhone = String(fromRef.phone ?? '');
+            const digitsOnly = rawPhone.replace(/\D/g, '');
+            let phoneToRestore = digitsOnly;
+            if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+              phoneToRestore = digitsOnly.slice(2);
+            } else if (digitsOnly.length > 10) {
+              phoneToRestore = digitsOnly.slice(-10);
+            }
+            setPhone(phoneToRestore);
+          }
+          if (fromRef.selectedRole !== undefined) setSelectedRole(fromRef.selectedRole);
+          setPhoneVerified(true);
+          if (fromRef.phoneToken != null) setPhoneToken(fromRef.phoneToken);
+          if (fromRef.phoneMethod != null) setPhoneMethod(fromRef.phoneMethod);
+          if (fromRef.verifiedOtp != null) setVerifiedOtp(fromRef.verifiedOtp);
+          if (fromRef.phoneMsg91Token != null) setPhoneMsg91Token(fromRef.phoneMsg91Token);
+          else if (fromRef.phoneToken && (fromRef.phoneMethod === 'msg91-sdk' || fromRef.phoneMethod === 'msg91-widget')) {
+            setPhoneMsg91Token(fromRef.phoneToken);
+          }
+        };
+        const handle = InteractionManager.runAfterInteractions(() => {
+          const androidDelay = Platform.OS === 'android' ? 220 : 0;
+          if (androidDelay > 0) refTimeoutId = setTimeout(apply, androidDelay);
+          else apply();
+        });
+        return () => {
+          handle.cancel();
+          if (refTimeoutId != null) clearTimeout(refTimeoutId);
+        };
       }
+
+      // Fallback: route params (e.g. deep link or legacy)
+      const params = route.params as any;
+      if (hasProcessedOtpParams.current && params?.phoneVerified === undefined) return;
+
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
-      const applyOtpParams = () => {
+      const applyParams = () => {
         if (params?.name !== undefined) setName(String(params.name).toUpperCase());
         if (params?.email !== undefined) setEmail(params.email);
         if (params?.phone !== undefined) {
           const rawPhone = String(params.phone ?? '');
           const digitsOnly = rawPhone.replace(/\D/g, '');
-          let phoneToRestore = digitsOnly;
-          if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
-            phoneToRestore = digitsOnly.slice(2);
-          } else if (digitsOnly.length > 10) {
-            phoneToRestore = digitsOnly.slice(-10);
-          }
+          let phoneToRestore = digitsOnly.length === 12 && digitsOnly.startsWith('91') ? digitsOnly.slice(2) : digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
           setPhone(phoneToRestore);
         }
         if (params?.selectedRole !== undefined) setSelectedRole(params.selectedRole);
-        if (params?.role !== undefined) {
-          const r = (params.role as string).toLowerCase();
-          setSelectedRole(r === 'seller' ? 'seller' : 'agent');
-        }
+        if (params?.role !== undefined) setSelectedRole((params.role as string).toLowerCase() === 'seller' ? 'seller' : 'agent');
         if (params?.phoneVerified === true) {
           hasProcessedOtpParams.current = true;
-          // Batch all OTP-related state updates in one tick to reduce re-renders
           setPhoneVerified(true);
           if (params.phoneToken) setPhoneToken(params.phoneToken);
           if (params.phoneMethod) setPhoneMethod(params.phoneMethod);
           if (params.verifiedOtp) setVerifiedOtp(params.verifiedOtp);
           if (params.phoneMsg91Token) setPhoneMsg91Token(params.phoneMsg91Token);
-          if (!params.phoneMsg91Token && params.phoneToken && (params.phoneMethod === 'msg91-sdk' || params.phoneMethod === 'msg91-widget')) {
-            setPhoneMsg91Token(params.phoneToken);
-          }
-          // Clear params after transition settles - delayed on Android to prevent blinking
-          const clearDelay = Platform.OS === 'android' ? 500 : 100;
-          setTimeout(() => {
-            navigation.setParams({
-              phoneVerified: undefined,
-              phoneToken: undefined,
-              phoneMethod: undefined,
-              verifiedOtp: undefined,
-              phoneMsg91Token: undefined,
-              phone: undefined,
-              name: undefined,
-              email: undefined,
-              selectedRole: undefined,
-            } as any);
-          }, clearDelay);
+          else if (params.phoneToken && (params.phoneMethod === 'msg91-sdk' || params.phoneMethod === 'msg91-widget')) setPhoneMsg91Token(params.phoneToken);
+          // Do not call setParams - avoids extra render that can cause blinking
         }
       };
       const handle = InteractionManager.runAfterInteractions(() => {
-        // On Android, add extra delay so native transition fully completes before state updates
-        const androidDelay = Platform.OS === 'android' ? 180 : 0;
-        if (androidDelay > 0) {
-          timeoutId = setTimeout(applyOtpParams, androidDelay);
-        } else {
-          applyOtpParams();
-        }
+        const androidDelay = Platform.OS === 'android' ? 220 : 0;
+        if (androidDelay > 0) timeoutId = setTimeout(applyParams, androidDelay);
+        else applyParams();
       });
       return () => {
         handle.cancel();
         if (timeoutId != null) clearTimeout(timeoutId);
       };
-    }, [navigation, route.params])
+    }, [navigation])
   );
 
   const extractWidgetToken = (payload: any): string | null => {
