@@ -196,19 +196,19 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      // Normalize phone numbers: extract digits only, validate 10-15 digits
+      // Normalize phone numbers: extract digits only, validate exactly 10 digits
       const whatsappNumber = formData.whatsapp_number?.trim() || '';
       const normalizedWhatsApp = formatters.normalizePhoneNumber(whatsappNumber);
-      if (whatsappNumber && !formatters.validatePhoneNumber(whatsappNumber)) {
-        CustomAlert.alert('Validation Error', 'WhatsApp number must be 10-15 digits');
+      if (whatsappNumber && whatsappNumber.replace(/\D/g, '').length !== 10) {
+        CustomAlert.alert('Validation Error', 'WhatsApp number must be exactly 10 digits');
         setSaving(false);
         return;
       }
 
       const alternateMobile = formData.alternate_mobile?.trim() || '';
       const normalizedAlternate = formatters.normalizePhoneNumber(alternateMobile);
-      if (alternateMobile && !formatters.validatePhoneNumber(alternateMobile)) {
-        CustomAlert.alert('Validation Error', 'Alternate mobile number must be 10-15 digits');
+      if (alternateMobile && alternateMobile.replace(/\D/g, '').length !== 10) {
+        CustomAlert.alert('Validation Error', 'Alternate mobile number must be exactly 10 digits');
         setSaving(false);
         return;
       }
@@ -538,9 +538,13 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   value={formData.whatsapp_number}
-                  onChangeText={(text: string) => setFormData({ ...formData, whatsapp_number: text })}
-                  placeholder="Enter WhatsApp number"
-                  keyboardType="phone-pad"
+                  onChangeText={(text: string) => {
+                    const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                    setFormData({ ...formData, whatsapp_number: cleaned });
+                  }}
+                  placeholder="Enter 10-digit WhatsApp number"
+                  keyboardType="numeric"
+                  maxLength={10}
                 />
               ) : (
                 <Text style={styles.value}>{formData.whatsapp_number || 'Not set'}</Text>
@@ -556,9 +560,13 @@ const AgentProfileScreen: React.FC<Props> = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   value={formData.alternate_mobile}
-                  onChangeText={(text: string) => setFormData({ ...formData, alternate_mobile: text })}
-                  placeholder="Enter alternate mobile number"
-                  keyboardType="phone-pad"
+                  onChangeText={(text: string) => {
+                    const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                    setFormData({ ...formData, alternate_mobile: cleaned });
+                  }}
+                  placeholder="Enter 10-digit alternate number"
+                  keyboardType="numeric"
+                  maxLength={10}
                 />
               ) : (
                 <Text style={styles.value}>{formData.alternate_mobile || 'Not set'}</Text>

@@ -520,10 +520,13 @@ const BuyerProfileScreen: React.FC<Props> = ({navigation}) => {
               <TextInput
                 style={styles.input}
                 value={formData.alternateMobile}
-                onChangeText={text => setFormData({...formData, alternateMobile: text})}
-                placeholder="Enter alternate mobile number"
+                onChangeText={text => {
+                  const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                  setFormData({...formData, alternateMobile: cleaned});
+                }}
+                placeholder="Enter 10-digit alternate number"
                 placeholderTextColor={colors.textSecondary}
-                keyboardType="phone-pad"
+                keyboardType="numeric"
                 maxLength={10}
               />
             ) : (
