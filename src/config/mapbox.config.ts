@@ -1,21 +1,16 @@
 /**
  * Mapbox Configuration
  *
- * To get your Mapbox access token:
- * 1. Sign up at https://account.mapbox.com/
- * 2. Go to Account > Access tokens
- * 3. Copy your default public token or create a new one
- *
- * For production, store this token securely (e.g., environment variables)
- * For now, you can get it from backend API: GET /config/mapbox-token.php
+ * Token is loaded from .env (MAPBOX_ACCESS_TOKEN).
+ * Copy .env.example to .env and add your token.
+ * Get token at https://account.mapbox.com/ > Access tokens
  */
 
-import {API_CONFIG} from './api.config';
+import {MAPBOX_ACCESS_TOKEN as ENV_MAPBOX_TOKEN} from '@env';
 
-// Mapbox public access token (from API config as per guide)
+// Mapbox public access token (from .env - never commit .env)
 export const MAPBOX_ACCESS_TOKEN =
-  API_CONFIG.MAPBOX_TOKEN ||
-  'pk.eyJ1Ijoic3VkaGFrYXJwb3VsIiwiYSI6ImNtaXp0ZmFrNTAxaTQzZHNiODNrYndsdTAifQ.YTMezksySLU7ZpcYkvXyqg';
+  ENV_MAPBOX_TOKEN || 'YOUR_MAPBOX_ACCESS_TOKEN_HERE';
 
 // Default map settings
 export const MAP_CONFIG = {
@@ -44,7 +39,6 @@ export const initializeMapbox = async () => {
     //   return;
     // }
 
-    // Fallback to hardcoded token (for development)
     if (
       MAPBOX_ACCESS_TOKEN &&
       MAPBOX_ACCESS_TOKEN !== 'YOUR_MAPBOX_ACCESS_TOKEN_HERE'
@@ -53,7 +47,7 @@ export const initializeMapbox = async () => {
       Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
     } else {
       console.warn(
-        'Mapbox access token not configured. Please set MAPBOX_ACCESS_TOKEN in mapbox.config.ts'
+        'Mapbox access token not configured. Add MAPBOX_ACCESS_TOKEN to .env (see .env.example)'
       );
     }
   } catch (error) {

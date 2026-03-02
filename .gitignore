@@ -39,6 +39,11 @@ local.properties
 android/keystore.properties
 .kotlin/
 
+# Environment (secrets - never commit)
+.env
+.env.local
+.env.*.local
+
 # node.js
 #
 node_modules/
