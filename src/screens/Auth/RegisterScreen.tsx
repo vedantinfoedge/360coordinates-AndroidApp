@@ -13,6 +13,7 @@ import {
   Animated,
   Easing,
   Dimensions,
+  InteractionManager,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import LinearGradientLib from 'react-native-linear-gradient';
@@ -65,12 +66,6 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
   const [showMSG91Widget, setShowMSG91Widget] = useState(false);
   const [widgetPhoneIdentifier, setWidgetPhoneIdentifier] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-
-  // #region agent log
-  const renderCount = useRef(0);
-  renderCount.current++;
-  console.log('[DEBUG][RENDER] RegisterScreen render #' + renderCount.current + ', phoneVerified=' + phoneVerified);
-  // #endregion
 
   // Ref to track if we've already processed OTP verification params
   const hasProcessedOtpParams = useRef(false);
@@ -182,9 +177,6 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     }, 600);
 
     // Pulse animation for verify button
-    // #region agent log
-    console.log('[DEBUG][ANIM] Starting pulse animation loop');
-    // #endregion
     const pulseAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(verifyButtonPulse, {
@@ -203,12 +195,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
     );
     pulseAnimation.start();
 
-    return () => {
-      // #region agent log
-      console.log('[DEBUG][ANIM] Stopping pulse animation loop');
-      // #endregion
-      pulseAnimation.stop();
-    };
+    return () => pulseAnimation.stop();
   }, []);
 
   // Handle return from OTP verification screen (defer updates to avoid Android layout thrash/glitch)
@@ -219,8 +206,8 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
       if (hasProcessedOtpParams.current && params?.phoneVerified === undefined) {
         return;
       }
-      const {InteractionManager} = require('react-native');
-      const handle = InteractionManager.runAfterInteractions(() => {
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      const applyOtpParams = () => {
         if (params?.name !== undefined) setName(String(params.name).toUpperCase());
         if (params?.email !== undefined) setEmail(params.email);
         if (params?.phone !== undefined) {
@@ -241,6 +228,7 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
         }
         if (params?.phoneVerified === true) {
           hasProcessedOtpParams.current = true;
+          // Batch all OTP-related state updates in one tick to reduce re-renders
           setPhoneVerified(true);
           if (params.phoneToken) setPhoneToken(params.phoneToken);
           if (params.phoneMethod) setPhoneMethod(params.phoneMethod);
@@ -249,8 +237,9 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
           if (!params.phoneMsg91Token && params.phoneToken && (params.phoneMethod === 'msg91-sdk' || params.phoneMethod === 'msg91-widget')) {
             setPhoneMsg91Token(params.phoneToken);
           }
-          // Clear params after a frame so state updates can batch and avoid extra layout
-          requestAnimationFrame(() => {
+          // Clear params after transition settles - delayed on Android to prevent blinking
+          const clearDelay = Platform.OS === 'android' ? 500 : 100;
+          setTimeout(() => {
             navigation.setParams({
               phoneVerified: undefined,
               phoneToken: undefined,
@@ -262,11 +251,23 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
               email: undefined,
               selectedRole: undefined,
             } as any);
-          });
+          }, clearDelay);
+        }
+      };
+      const handle = InteractionManager.runAfterInteractions(() => {
+        // On Android, add extra delay so native transition fully completes before state updates
+        const androidDelay = Platform.OS === 'android' ? 180 : 0;
+        if (androidDelay > 0) {
+          timeoutId = setTimeout(applyOtpParams, androidDelay);
+        } else {
+          applyOtpParams();
         }
       });
-      return () => handle.cancel();
-    }, [navigation])
+      return () => {
+        handle.cancel();
+        if (timeoutId != null) clearTimeout(timeoutId);
+      };
+    }, [navigation, route.params])
   );
 
   const extractWidgetToken = (payload: any): string | null => {
@@ -659,16 +660,28 @@ const RegisterScreen: React.FC<Props> = ({navigation}) => {
 
   // Animate progress bar when fields change (useNativeDriver: true to prevent Android glitch)
   useEffect(() => {
-    const {InteractionManager} = require('react-native');
-    const handle = InteractionManager.runAfterInteractions(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    // On Android, defer progress bar update slightly to avoid overlapping with OTP-return re-renders
+    const androidDeferMs = Platform.OS === 'android' ? 120 : 0;
+    const runProgressAnimation = () => {
       Animated.timing(progressWidth, {
         toValue: (completedFields / 8) * 100,
         duration: 300,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }).start();
+    };
+    const handle = InteractionManager.runAfterInteractions(() => {
+      if (androidDeferMs > 0) {
+        timeoutId = setTimeout(runProgressAnimation, androidDeferMs);
+      } else {
+        runProgressAnimation();
+      }
     });
-    return () => handle.cancel();
+    return () => {
+      handle.cancel();
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
   }, [completedFields]);
 
   // Button press animation
