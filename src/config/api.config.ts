@@ -10,6 +10,8 @@ export const API_CONFIG = {
   BASE_URL: 'https://360coordinates.com',
   UPLOAD_BASE_URL: 'https://360coordinates.com',
   TIMEOUT: 30000,
+  /** Mapbox public token (optional - from backend config/mapbox-token.php) */
+  MAPBOX_TOKEN: undefined as string | undefined,
 };
 
 export const API_ENDPOINTS = {

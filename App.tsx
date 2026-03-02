@@ -32,11 +32,9 @@ const AppContent: React.FC = () => {
     notificationService.setShowNotificationCallback(showNotification);
 
     // Initialize Mapbox on app start (will fail gracefully if not linked)
-    try {
-      initializeMapbox();
-    } catch (error) {
+    initializeMapbox().catch((error) => {
       console.warn('Mapbox initialization failed (app will continue without maps):', error);
-    }
+    });
 
     // Initialize Firebase on app start (will fail gracefully if not configured)
     try {
