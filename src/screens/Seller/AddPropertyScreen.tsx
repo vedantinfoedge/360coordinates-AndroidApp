@@ -1283,6 +1283,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                     }
                   }}
                   visible={location.length >= 2 && !locationSelected}
+                  onRequestClose={() => setLocationSelected(true)}
                 />
               </View>
               {renderFieldError('location')}

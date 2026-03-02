@@ -1145,17 +1145,13 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                       setLocation('');
                     }
                   }}
-                  onFocus={() => {
-                    if (locationQuery.length >= 2) {
-                      setShowLocationSuggestions(true);
-                    }
-                  }}
                 />
                 {showLocationSuggestions && (
                   <LocationAutoSuggest
                     query={locationQuery}
                     onSelect={handleLocationSelect}
                     visible={showLocationSuggestions}
+                    onRequestClose={() => setShowLocationSuggestions(false)}
                   />
                 )}
               </View>
@@ -2412,7 +2408,6 @@ const styles = StyleSheet.create({
   locationInputContainer: {
     position: 'relative',
     zIndex: 1000,
-    overflow: 'visible',
   },
   mapButton: {
     flexDirection: 'row',

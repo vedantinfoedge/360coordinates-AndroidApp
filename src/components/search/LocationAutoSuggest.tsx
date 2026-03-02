@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Modal,
+  Pressable,
+  Platform,
 } from 'react-native';
 import {MAPBOX_ACCESS_TOKEN} from '../../config/mapbox.config';
 import {colors, spacing, typography} from '../../theme';
@@ -23,6 +26,8 @@ interface LocationAutoSuggestProps {
   onSelect: (location: LocationSuggestion) => void;
   visible?: boolean;
   debounceMs?: number;
+  /** Called when user taps outside dropdown (used with Modal on Android) */
+  onRequestClose?: () => void;
 }
 
 const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
@@ -30,6 +35,7 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
   onSelect,
   visible = true,
   debounceMs = 300,
+  onRequestClose,
 }) => {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,7 +140,7 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
     return null;
   }
 
-  return (
+  const dropdownContent = (
     <View style={styles.container}>
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -151,7 +157,8 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
             <TouchableOpacity
               key={item.id}
               style={styles.suggestion}
-              onPress={() => handleSelect(item)}>
+              onPress={() => handleSelect(item)}
+              activeOpacity={0.7}>
               <Text style={styles.suggestionText} numberOfLines={1}>
                 {item.name}
               </Text>
@@ -166,9 +173,39 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
       )}
     </View>
   );
+
+  // On Android, render in Modal to avoid dropdown being clipped by ScrollView
+  if (Platform.OS === 'android') {
+    return (
+      <Modal
+        visible={true}
+        transparent
+        animationType="fade"
+        onRequestClose={() => onRequestClose?.()}
+        statusBarTranslucent>
+        <Pressable style={styles.modalOverlay} onPress={() => onRequestClose?.()}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {dropdownContent}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    );
+  }
+
+  return dropdownContent;
 };
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-start',
+    paddingTop: 100,
+    paddingHorizontal: spacing.md,
+  },
+  modalContent: {
+    alignSelf: 'stretch',
+  },
   container: {
     backgroundColor: colors.surface,
     borderRadius: 8,
@@ -178,7 +215,7 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 5,
+    elevation: 15,
     zIndex: 1000,
   },
   list: {

@@ -64,12 +64,16 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Delay mounting map until modal is shown to avoid Android native crash during transition
-  const [isModalReady, setIsModalReady] = useState(false);
 
+  // Defer MapView mount until Modal is fully visible - prevents crash on Android
+  const [mapReady, setMapReady] = useState(false);
   useEffect(() => {
-    if (!visible) {
-      setIsModalReady(false);
+    if (visible) {
+      setMapReady(false);
+      const timer = setTimeout(() => setMapReady(true), 350);
+      return () => clearTimeout(timer);
+    } else {
+      setMapReady(false);
     }
   }, [visible]);
 
@@ -247,8 +251,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       visible={visible}
       animationType="slide"
       transparent={false}
-      onRequestClose={onClose}
-      onShow={() => setIsModalReady(true)}>
+      onRequestClose={onClose}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -273,97 +276,94 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Map - only mount after modal is shown to prevent Android crash */}
+        {/* Map - deferred mount to prevent Android crash when opening Modal */}
         <View style={styles.mapContainer}>
-          {!isModalReady && (
+          {mapReady ? (
+            <MapViewComponent
+              ref={mapViewRef}
+              initialCenter={selectedLocation || [73.8567, 18.5204]}
+              initialZoom={15}
+              onLocationSelect={handleMapPress}
+              interactive={true}
+              markers={
+                selectedLocation
+                  ? [
+                    {
+                      id: 'selected',
+                      coordinate: selectedLocation,
+                      color: colors.primary,
+                    },
+                  ]
+                  : []
+              }
+            />
+          ) : (
             <View style={styles.mapPlaceholder}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.mapPlaceholderText}>Loading map...</Text>
             </View>
           )}
-          {isModalReady && (
-            <>
-              <MapViewComponent
-                ref={mapViewRef}
-                initialCenter={selectedLocation || [73.8567, 18.5204]}
-                initialZoom={15}
-                onLocationSelect={handleMapPress}
-                interactive={true}
-                markers={
-                  selectedLocation
-                    ? [
-                        {
-                          id: 'selected',
-                          coordinate: selectedLocation,
-                          color: colors.primary,
-                        },
-                      ]
-                    : []
-                }
-              />
 
-              {/* Search Bar Overlay */}
-              <View style={styles.searchOverlay}>
-                <View style={styles.searchBarContainer}>
-                  <TabIcon name="search" color={colors.textSecondary} size={18} />
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search city, area, or landmark..."
-                    placeholderTextColor={colors.textTertiary}
-                    value={searchText}
-                    onChangeText={handleSearchChange}
-                    onFocus={() => {
-                      if (suggestions.length > 0) setShowSuggestions(true);
-                    }}
-                    returnKeyType="search"
-                    autoCorrect={false}
-                  />
-                  {searchLoading && (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  )}
-                  {searchText.length > 0 && !searchLoading && (
+          {/* Search Bar Overlay */}
+          <View style={styles.searchOverlay}>
+            <View style={styles.searchBarContainer}>
+              <TabIcon name="search" color={colors.textSecondary} size={18} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search city, area, or landmark..."
+                placeholderTextColor={colors.textTertiary}
+                value={searchText}
+                onChangeText={handleSearchChange}
+                onFocus={() => {
+                  if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                returnKeyType="search"
+                autoCorrect={false}
+              />
+              {searchLoading && (
+                <ActivityIndicator size="small" color={colors.primary} />
+              )}
+              {searchText.length > 0 && !searchLoading && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearchText('');
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <TabIcon name="close" color={colors.textSecondary} size={16} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {showSuggestions && suggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <FlatList
+                  data={suggestions}
+                  keyExtractor={item => item.id}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => (
                     <TouchableOpacity
-                      onPress={() => {
-                        setSearchText('');
-                        setSuggestions([]);
-                        setShowSuggestions(false);
-                      }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <TabIcon name="close" color={colors.textSecondary} size={16} />
+                      style={styles.suggestionItem}
+                      onPress={() => handleSuggestionSelect(item)}>
+                      <TabIcon name="location" color={colors.primary} size={16} />
+                      <Text style={styles.suggestionText} numberOfLines={2}>
+                        {item.place_name}
+                      </Text>
                     </TouchableOpacity>
                   )}
-                </View>
-
-                {showSuggestions && suggestions.length > 0 && (
-                  <View style={styles.suggestionsContainer}>
-                    <FlatList
-                      data={suggestions}
-                      keyExtractor={item => item.id}
-                      keyboardShouldPersistTaps="handled"
-                      renderItem={({ item }) => (
-                        <TouchableOpacity
-                          style={styles.suggestionItem}
-                          onPress={() => handleSuggestionSelect(item)}>
-                          <TabIcon name="location" color={colors.primary} size={16} />
-                          <Text style={styles.suggestionText} numberOfLines={2}>
-                            {item.place_name}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    />
-                  </View>
-                )}
+                />
               </View>
+            )}
+          </View>
 
-              {/* Compass Button */}
-              <TouchableOpacity
-                style={styles.compassButton}
-                onPress={handleResetBearing}
-                activeOpacity={0.8}>
-                <TabIcon name="navigation" color={colors.primary} size={20} />
-              </TouchableOpacity>
-            </>
-          )}
+          {/* Compass Button */}
+          <TouchableOpacity
+            style={styles.compassButton}
+            onPress={handleResetBearing}
+            activeOpacity={0.8}>
+            <TabIcon name="navigation" color={colors.primary} size={20} />
+          </TouchableOpacity>
         </View>
 
         {/* Location Info */}
@@ -444,14 +444,14 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   mapPlaceholder: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.surface,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
     gap: spacing.sm,
   },
   mapPlaceholderText: {
-    ...typography.body,
+    ...typography.caption,
     color: colors.textSecondary,
   },
   searchOverlay: {

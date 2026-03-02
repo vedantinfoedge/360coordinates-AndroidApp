@@ -1302,13 +1302,12 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     }
                   }}
                   onFocus={() => {
-                    if (location.length >= 2) {
+                    if (locationSelected && location.length >= 2) {
                       setLocationSelected(false);
                     }
                   }}
                   onBlur={() => {
-                    // Delay hiding dropdown so tap on suggestion registers first
-                    setTimeout(() => setLocationSelected(true), 400);
+                    setTimeout(() => setLocationSelected(true), 200);
                   }}
                 />
                 <LocationAutoSuggest
@@ -1324,6 +1323,7 @@ const AddPropertyScreen: React.FC<Props> = ({navigation}) => {
                     }
                   }}
                   visible={location.length >= 2 && !locationSelected}
+                  onRequestClose={() => setLocationSelected(true)}
                 />
               </View>
               {renderFieldError('location')}
@@ -2439,8 +2439,7 @@ const styles = StyleSheet.create({
   },
   locationInputContainer: {
     position: 'relative',
-    zIndex: 1000,
-    overflow: 'visible',
+    zIndex: 1,
   },
   stateInputContainer: {
     position: 'relative',
