@@ -104,6 +104,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerHeight = insets.top + verticalScale(70);
 
+  const searchInputContainerRef = useRef<View>(null);
   // Smooth marquee auto-scroll refs
   const carouselScrollRef = useRef<any>(null);
   const scrollPosition = useRef(0);
@@ -578,7 +579,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.searchSection}>
               <View style={styles.searchContainer}>
-                <View style={styles.searchInputContainerRef}>
+                <View ref={searchInputContainerRef} style={styles.searchInputContainerRef}>
                   <TabIcon name="search" color="rgba(199,238,255,0.6)" size={20} />
                   <View style={styles.searchInputWrapper}>
                     <TextInput
@@ -606,6 +607,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       query={searchLocation}
                       onSelect={handleLocationSelect}
                       visible={showLocationSuggestions}
+                      onRequestClose={() => setShowLocationSuggestions(false)}
+                      anchorRef={searchInputContainerRef}
                     />
                   </View>
                 )}

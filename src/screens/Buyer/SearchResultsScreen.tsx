@@ -117,6 +117,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [searchText, setSearchText] = useState(initialLocation);
   const [loading, setLoading] = useState(true);
+  const searchInputWrapperRef = useRef<View>(null);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<'listing' | 'property' | 'budget' | 'projectStatus' | 'possessionDate' | null>(null);
 
@@ -1077,7 +1078,7 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
       {/* Dark top bar - search + filter chips (reference) */}
       <View style={[styles.topBarDark, { paddingTop: insets.top }]}>
         <View style={styles.searchBarContainer}>
-          <View style={styles.searchInputWrapper}>
+          <View ref={searchInputWrapperRef} style={styles.searchInputWrapper}>
             <TabIcon name="location" color={colors.error} size={20} />
             <TextInput
               style={styles.searchInput}
@@ -1128,6 +1129,8 @@ const SearchResultsScreen: React.FC<Props> = ({ navigation, route }) => {
                   }, 150);
                 }}
                 visible={showLocationSuggestions}
+                onRequestClose={() => setShowLocationSuggestions(false)}
+                anchorRef={searchInputWrapperRef}
               />
             </View>
           )}

@@ -126,6 +126,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
   const [availableForBachelors, setAvailableForBachelors] = useState(false);
   const stepScrollViewRef = useRef<{ scrollTo: (opts: { y: number; animated?: boolean }) => void } | null>(null);
   const fieldLayouts = useRef<Record<string, number>>({});
+  const locationInputContainerRef = useRef<View>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Field order per step (visual order) - used to scroll to first error
@@ -1247,7 +1248,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.label}>
                 Location <Text style={styles.required}>*</Text>
               </Text>
-              <View style={styles.locationInputContainer}>
+              <View ref={locationInputContainerRef} style={styles.locationInputContainer}>
                 <TextInput
                   style={styles.input}
                   placeholder="Select location on map below"
@@ -1284,6 +1285,7 @@ const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
                   }}
                   visible={location.length >= 2 && !locationSelected}
                   onRequestClose={() => setLocationSelected(true)}
+                  anchorRef={locationInputContainerRef}
                 />
               </View>
               {renderFieldError('location')}

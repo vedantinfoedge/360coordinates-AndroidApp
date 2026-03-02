@@ -28,6 +28,8 @@ interface LocationAutoSuggestProps {
   debounceMs?: number;
   /** Called when user taps outside dropdown (used with Modal on Android) */
   onRequestClose?: () => void;
+  /** Ref to the input container View - used on Android to position dropdown below it */
+  anchorRef?: React.RefObject<View>;
 }
 
 const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
@@ -36,11 +38,28 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
   visible = true,
   debounceMs = 300,
   onRequestClose,
+  anchorRef,
 }) => {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dropdownTop, setDropdownTop] = useState<number>(120);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+
+  // Measure anchor position to show dropdown below input (Android Modal)
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible || !anchorRef?.current) return;
+    const measure = () => {
+      anchorRef.current?.measureInWindow((_x, y, _width, height) => {
+        if (isMountedRef.current) {
+          setDropdownTop(y + height + 4);
+        }
+      });
+    };
+    measure();
+    const t = setTimeout(measure, 50); // Re-measure after layout
+    return () => clearTimeout(t);
+  }, [visible, anchorRef]);
 
   const searchLocations = async (searchQuery: string) => {
     if (!isMountedRef.current) return;
@@ -176,6 +195,9 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
 
   // On Android, render in Modal to avoid dropdown being clipped by ScrollView
   if (Platform.OS === 'android') {
+    const overlayStyle = anchorRef
+      ? [styles.modalOverlay, {paddingTop: dropdownTop}]
+      : styles.modalOverlay;
     return (
       <Modal
         visible={true}
@@ -183,7 +205,7 @@ const LocationAutoSuggest: React.FC<LocationAutoSuggestProps> = ({
         animationType="fade"
         onRequestClose={() => onRequestClose?.()}
         statusBarTranslucent>
-        <Pressable style={styles.modalOverlay} onPress={() => onRequestClose?.()}>
+        <Pressable style={overlayStyle} onPress={() => onRequestClose?.()}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {dropdownContent}
           </Pressable>

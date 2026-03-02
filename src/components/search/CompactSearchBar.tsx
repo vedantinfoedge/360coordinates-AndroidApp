@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -103,6 +103,7 @@ const CompactSearchBar: React.FC<CompactSearchBarProps> = ({
   searchMode = 'properties',
 }) => {
   const isProjectMode = searchMode === 'projects';
+  const locationRowRef = useRef<View>(null);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<
     'listing' | 'property' | 'budget' | 'bedrooms' | 'area' | 'projectStatus' | 'possessionDate' | null
@@ -214,7 +215,7 @@ const CompactSearchBar: React.FC<CompactSearchBarProps> = ({
   return (
     <View style={[styles.container, compact && styles.containerCompact]}>
       {/* Location row */}
-      <View style={styles.locationRow}>
+      <View ref={locationRowRef} style={styles.locationRow}>
         <TabIcon name="location" color="#717171" size={20} />
         <TextInput
           style={styles.searchInput}
@@ -243,6 +244,8 @@ const CompactSearchBar: React.FC<CompactSearchBarProps> = ({
             query={searchText}
             onSelect={handleLocationSelect}
             visible={showLocationSuggestions}
+            onRequestClose={() => setShowLocationSuggestions(false)}
+            anchorRef={locationRowRef}
           />
         </View>
       )}

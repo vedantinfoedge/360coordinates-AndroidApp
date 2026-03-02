@@ -211,6 +211,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
   const scrollViewRef = useRef<ScrollView>(null);
   const fieldLayoutsRef = useRef<Record<string, number>>({});
+  const locationInputContainerRef = useRef<View>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -1130,7 +1131,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.label}>
                 Location / Area <Text style={styles.required}>*</Text>
               </Text>
-              <View style={styles.locationInputContainer}>
+              <View ref={locationInputContainerRef} style={styles.locationInputContainer}>
                 <TextInput
                   style={[styles.input, fieldErrors.location && styles.inputError]}
                   placeholder="Enter locality, area or landmark"
@@ -1152,6 +1153,7 @@ const AddProjectScreen: React.FC<Props> = ({ navigation }) => {
                     onSelect={handleLocationSelect}
                     visible={showLocationSuggestions}
                     onRequestClose={() => setShowLocationSuggestions(false)}
+                    anchorRef={locationInputContainerRef}
                   />
                 )}
               </View>
