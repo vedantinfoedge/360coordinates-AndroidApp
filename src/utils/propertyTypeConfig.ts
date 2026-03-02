@@ -226,85 +226,82 @@ export const getPropertyTypeConfig = (propertyType: GuidePropertyType): Property
  * Get available amenities based on property type (from guide)
  */
 export const getAvailableAmenitiesForPropertyType = (propertyType: GuidePropertyType): string[] => {
-  const allAmenities = [
-    'parking',
-    'lift',
-    'security',
-    'power_backup',
-    'gym',
-    'swimming_pool',
-    'garden',
-    'clubhouse',
-    'playground',
-    'cctv',
-    'intercom',
-    'fire_safety',
-    'water_supply',
-    'gas_pipeline',
-    'wifi',
-    'ac',
-    'electricity',
+  const residentialAmenities = [
+    'parking', 'lift', 'security', 'power_backup', 'gym', 'swimming_pool',
+    'garden', 'clubhouse', 'playground', 'cctv', 'intercom', 'fire_safety',
+    'water_supply', 'gas_pipeline', 'wifi',
   ];
 
-  // Residential (Apartment, Villa, Independent House, Row House, Penthouse, Studio Apartment)
+  // Residential: Apartment, Villa/Banglow, Independent House, Penthouse, Studio Apartment
   const isResidential = [
     'Apartment',
     'Villa / Banglow',
     'Independent House',
-    'Row House/ Farm House',
     'Penthouse',
     'Studio Apartment',
   ].includes(propertyType);
 
-  // Farm House (Row House/ Farm House)
+  // Row House / Farm House - same as residential but without lift
   const isFarmHouse = propertyType === 'Row House/ Farm House';
 
-  // Commercial Office
   const isCommercialOffice = propertyType === 'Commercial Office';
 
-  // Commercial Shop
-  const isCommercialShop = 
-    propertyType === 'Commercial Shop' || 
+  const isCommercialShop =
+    propertyType === 'Commercial Shop' ||
     propertyType === 'Warehouse / Godown';
 
-  // Plot/Land
   const isPlotLand = propertyType === 'Plot / Land / Industrial Property';
 
-  // PG/Hostel
   const isPGHostel = propertyType === 'PG / Hostel';
 
-  if (isPlotLand) {
-    // Plot/Land: security, water_supply, cctv, electricity
-    return ['security', 'water_supply', 'cctv', 'electricity'];
-  }
-
-  if (isPGHostel) {
-    // PG/Hostel: parking, security, power_backup, cctv, fire_safety, water_supply, wifi, ac, intercom
-    return ['parking', 'security', 'power_backup', 'cctv', 'fire_safety', 'water_supply', 'wifi', 'ac', 'intercom'];
-  }
-
-  if (isCommercialOffice) {
-    // Commercial Office: parking, lift, security, power_backup, cctv, fire_safety, water_supply, wifi, ac, intercom
-    return ['parking', 'lift', 'security', 'power_backup', 'cctv', 'fire_safety', 'water_supply', 'wifi', 'ac', 'intercom'];
-  }
-
-  if (isCommercialShop) {
-    // Commercial Shop: parking, security, power_backup, cctv, fire_safety, water_supply, wifi, ac
-    return ['parking', 'security', 'power_backup', 'cctv', 'fire_safety', 'water_supply', 'wifi', 'ac'];
+  if (isResidential) {
+    return residentialAmenities;
   }
 
   if (isFarmHouse) {
-    // Farm House: parking, security, power_backup, gym, swimming_pool, garden, clubhouse, playground, cctv, fire_safety, water_supply, gas_pipeline, wifi, ac
-    return ['parking', 'security', 'power_backup', 'gym', 'swimming_pool', 'garden', 'clubhouse', 'playground', 'cctv', 'fire_safety', 'water_supply', 'gas_pipeline', 'wifi', 'ac'];
+    return residentialAmenities.filter(a => a !== 'lift');
   }
 
-  if (isResidential) {
-    // Residential: All except electricity
-    return allAmenities.filter(amenity => amenity !== 'electricity');
+  if (isCommercialOffice) {
+    return [
+      'power_backup_ups', 'high_speed_internet', 'centralized_ac',
+      'lifts_high_speed', 'fire_safety', 'access_control', 'parking',
+      'visitor_parking', 'security_staff', 'reception_desk', 'lobby_area',
+      'conference_room', 'washrooms', 'pantry', 'cctv', 'security',
+      'lift', 'wifi',
+    ];
   }
 
-  // Default: return all amenities
-  return allAmenities;
+  if (isCommercialShop) {
+    return [
+      'power_supply_247', 'power_backup', 'customer_parking',
+      'two_wheeler_parking', 'wheelchair_accessible', 'escalator_access',
+      'display_window', 'shutter_door', 'washrooms', 'mezzanine_floor',
+      'high_speed_internet', 'parking', 'security', 'cctv', 'fire_safety',
+      'wifi',
+    ];
+  }
+
+  if (isPlotLand) {
+    return [
+      'internal_roads', 'led_lighting', 'rainwater_harvesting',
+      'underground_drainage', 'stormwater_drainage', 'water_line',
+      'electricity_provision', 'gated_entrance', 'compound_wall',
+      'security_cabin', 'landscaped_garden', 'playground', 'jogging_track',
+      'open_gym', 'visitor_parking', 'security', 'water_supply', 'cctv',
+      'electricity',
+    ];
+  }
+
+  if (isPGHostel) {
+    return [
+      'parking', 'security', 'power_backup', 'cctv', 'fire_safety',
+      'water_supply', 'wifi', 'intercom',
+    ];
+  }
+
+  // Default: return residential amenities
+  return residentialAmenities;
 };
 
 /**
@@ -329,6 +326,7 @@ export const PROPERTY_TYPES: Array<{value: GuidePropertyType; label: string; ico
  * Amenities list with labels and icons
  */
 export const AMENITIES_LIST = [
+  // Shared / Residential
   {id: 'parking', label: 'Parking', icon: '🚗'},
   {id: 'lift', label: 'Lift', icon: '🛗'},
   {id: 'security', label: '24x7 Security', icon: '👮'},
@@ -344,7 +342,42 @@ export const AMENITIES_LIST = [
   {id: 'water_supply', label: '24x7 Water', icon: '💧'},
   {id: 'gas_pipeline', label: 'Gas Pipeline', icon: '🔥'},
   {id: 'wifi', label: 'WiFi', icon: '📶'},
-  {id: 'ac', label: 'Air Conditioning', icon: '❄️'},
   {id: 'electricity', label: 'Electricity', icon: '⚡'},
+  // Commercial Office specific
+  {id: 'power_backup_ups', label: '24/7 Power Backup (UPS/DG)', icon: '🔋'},
+  {id: 'high_speed_internet', label: 'High-Speed Internet/Fiber Ready', icon: '🌐'},
+  {id: 'centralized_ac', label: 'Centralized AC (HVAC)', icon: '❄️'},
+  {id: 'lifts_high_speed', label: 'Elevators/High-Speed Lifts', icon: '🛗'},
+  {id: 'access_control', label: 'Access Control (RFID/Biometric)', icon: '🔒'},
+  {id: 'visitor_parking', label: 'Visitor Parking', icon: '🅿️'},
+  {id: 'security_staff', label: 'Security Staff (24x7)', icon: '🛡️'},
+  {id: 'reception_desk', label: 'Reception Desk', icon: '🛎️'},
+  {id: 'lobby_area', label: 'Lobby Area', icon: '🏢'},
+  {id: 'conference_room', label: 'Conference Room', icon: '📊'},
+  {id: 'washrooms', label: 'Washrooms (Private/Common)', icon: '🚻'},
+  {id: 'pantry', label: 'Pantry/Kitchenette', icon: '🍽️'},
+  // Commercial Shop specific
+  {id: 'power_supply_247', label: '24/7 Power Supply', icon: '⚡'},
+  {id: 'customer_parking', label: 'Customer Parking', icon: '🅿️'},
+  {id: 'two_wheeler_parking', label: 'Two-Wheeler Parking', icon: '🏍️'},
+  {id: 'wheelchair_accessible', label: 'Wheelchair Accessible/Ramp', icon: '♿'},
+  {id: 'escalator_access', label: 'Lift/Escalator Access', icon: '🛗'},
+  {id: 'display_window', label: 'Glass Front/Display Window', icon: '🪟'},
+  {id: 'shutter_door', label: 'Shutter Door', icon: '🚪'},
+  {id: 'mezzanine_floor', label: 'Mezzanine Floor/Storage Room', icon: '🏗️'},
+  // Plot / Land specific
+  {id: 'internal_roads', label: 'Internal Roads', icon: '🛤️'},
+  {id: 'led_lighting', label: 'LED Street Lighting', icon: '💡'},
+  {id: 'rainwater_harvesting', label: 'Rainwater Harvesting', icon: '🌧️'},
+  {id: 'underground_drainage', label: 'Underground Drainage', icon: '🔧'},
+  {id: 'stormwater_drainage', label: 'Stormwater Drainage', icon: '🌊'},
+  {id: 'water_line', label: 'Water Supply Line/Borewell', icon: '🚰'},
+  {id: 'electricity_provision', label: 'Electricity Provision', icon: '⚡'},
+  {id: 'gated_entrance', label: 'Gated Entrance', icon: '🚧'},
+  {id: 'compound_wall', label: 'Compound Wall', icon: '🧱'},
+  {id: 'security_cabin', label: 'Security Cabin', icon: '🛡️'},
+  {id: 'landscaped_garden', label: 'Landscaped Garden', icon: '🌳'},
+  {id: 'jogging_track', label: 'Jogging/Walking Track', icon: '🏃'},
+  {id: 'open_gym', label: 'Open Gym/Fitness Zone', icon: '🏋️'},
 ];
 

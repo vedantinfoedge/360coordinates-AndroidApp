@@ -78,6 +78,18 @@ const AMENITY_ICONS: Record<string, TabIconName> = {
   playground: 'sparkles', cctv: 'camera', intercom: 'phone', fire_safety: 'alert',
   water_supply: 'bath', gas_pipeline: 'sparkles', wifi: 'sparkles', ac: 'sparkles',
   electricity: 'sparkles',
+  power_backup_ups: 'sparkles', high_speed_internet: 'sparkles', centralized_ac: 'sparkles',
+  lifts_high_speed: 'layers', access_control: 'support', visitor_parking: 'square',
+  security_staff: 'support', reception_desk: 'building', lobby_area: 'building',
+  conference_room: 'building', washrooms: 'bath', pantry: 'sparkles',
+  power_supply_247: 'sparkles', customer_parking: 'square', two_wheeler_parking: 'square',
+  wheelchair_accessible: 'support', escalator_access: 'layers', display_window: 'sparkles',
+  shutter_door: 'sparkles', mezzanine_floor: 'layers',
+  internal_roads: 'sparkles', led_lighting: 'sparkles', rainwater_harvesting: 'bath',
+  underground_drainage: 'sparkles', stormwater_drainage: 'sparkles', water_line: 'bath',
+  electricity_provision: 'sparkles', gated_entrance: 'support', compound_wall: 'square',
+  security_cabin: 'support', landscaped_garden: 'sparkles', jogging_track: 'sparkles',
+  open_gym: 'square',
 };
 
 const AddPropertyScreen: React.FC<Props> = ({ navigation }) => {
