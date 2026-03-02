@@ -213,23 +213,19 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
       }
     }
 
-    // WhatsApp Number validation (optional, 10-15 digits as per backend spec)
+    // WhatsApp Number validation (optional, exactly 10 digits)
     if (formData.whatsapp_number && formData.whatsapp_number.trim()) {
       const digits = formData.whatsapp_number.replace(/\D/g, '');
-      if (digits.length < 10 || digits.length > 15) {
-        newErrors.whatsapp_number = 'WhatsApp number must be 10-15 digits';
-      } else if (!validation.indianPhone(formData.whatsapp_number)) {
-        newErrors.whatsapp_number = 'Please enter a valid Indian phone number';
+      if (digits.length !== 10) {
+        newErrors.whatsapp_number = 'WhatsApp number must be exactly 10 digits';
       }
     }
 
-    // Alternate Mobile validation (optional, 10-15 digits as per backend spec)
+    // Alternate Mobile validation (optional, exactly 10 digits)
     if (formData.alternate_mobile && formData.alternate_mobile.trim()) {
       const digits = formData.alternate_mobile.replace(/\D/g, '');
-      if (digits.length < 10 || digits.length > 15) {
-        newErrors.alternate_mobile = 'Alternate mobile must be 10-15 digits';
-      } else if (!validation.indianPhone(formData.alternate_mobile)) {
-        newErrors.alternate_mobile = 'Please enter a valid Indian phone number';
+      if (digits.length !== 10) {
+        newErrors.alternate_mobile = 'Alternate mobile must be exactly 10 digits';
       }
     }
 
@@ -631,17 +627,19 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
                 ]}
                 value={formData.whatsapp_number}
                 onChangeText={(text: string) => {
-                  setFormData({ ...formData, whatsapp_number: text });
+                  const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                  setFormData({ ...formData, whatsapp_number: cleaned });
                   if (errors.whatsapp_number) setErrors({ ...errors, whatsapp_number: '' });
                 }}
                 editable={isEditing}
-                keyboardType="phone-pad"
-                placeholder="+91 98765 43210"
+                keyboardType="numeric"
+                maxLength={10}
+                placeholder="Enter 10-digit WhatsApp number"
               />
               {errors.whatsapp_number && (
                 <Text style={styles.errorText}>{errors.whatsapp_number}</Text>
               )}
-              <Text style={styles.hintText}>Optional - Indian phone number</Text>
+              <Text style={styles.hintText}>Optional - 10-digit mobile number</Text>
             </View>
 
             <View style={styles.inputContainer}>
@@ -657,17 +655,19 @@ const SellerProfileScreen: React.FC<Props> = ({ navigation }) => {
                 ]}
                 value={formData.alternate_mobile}
                 onChangeText={(text: string) => {
-                  setFormData({ ...formData, alternate_mobile: text });
+                  const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                  setFormData({ ...formData, alternate_mobile: cleaned });
                   if (errors.alternate_mobile) setErrors({ ...errors, alternate_mobile: '' });
                 }}
                 editable={isEditing}
-                keyboardType="phone-pad"
-                placeholder="+91 98765 43210"
+                keyboardType="numeric"
+                maxLength={10}
+                placeholder="Enter 10-digit alternate number"
               />
               {errors.alternate_mobile && (
                 <Text style={styles.errorText}>{errors.alternate_mobile}</Text>
               )}
-              <Text style={styles.hintText}>Optional - Indian phone number</Text>
+              <Text style={styles.hintText}>Optional - 10-digit mobile number</Text>
             </View>
 
             <View style={styles.inputContainer}>
