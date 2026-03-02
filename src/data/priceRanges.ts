@@ -128,8 +128,8 @@ const COMMERCIAL_SALE_LABELS = [
   'Commercial Shop',
 ];
 
-/** Buy: commercial rent property types (Co-working, Warehouse). */
-const COMMERCIAL_RENT_LABELS = ['Co-working Space', 'Warehouse / Godown'];
+/** Buy: commercial rent property types (Warehouse). */
+const COMMERCIAL_RENT_LABELS = ['Warehouse / Godown'];
 
 /** Rent: all commercial/land use commercial_rent. */
 const COMMERCIAL_OR_LAND_LABELS = [
@@ -137,7 +137,6 @@ const COMMERCIAL_OR_LAND_LABELS = [
   'Industrial Property',
   'Commercial Office',
   'Commercial Shop',
-  'Co-working Space',
   'Warehouse / Godown',
 ];
 

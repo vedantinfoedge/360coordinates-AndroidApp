@@ -13,7 +13,6 @@ export type PropertyType =
   | 'commercial-office'
   | 'commercial-shop'
   | 'retail-space'
-  | 'coworking-space'
   | 'warehouse-godown'
   | 'industrial-property'
   | 'pg-hostel';
@@ -136,15 +135,6 @@ export const propertyTypes: PropertyTypeConfig[] = [
     category: 'commercial',
     buyBudgetRange: {min: 0, max: 1200}, // 0 to 12 Cr
     rentBudgetRange: {min: 0, max: 500}, // 0 to 5 Lakh/month
-    areaRange: {min: 500, max: 25000}, // 500 to 25000+ sq ft
-  },
-  {
-    id: 'coworking-space',
-    label: 'Co-working Space',
-    icon: '💼',
-    category: 'commercial',
-    buyBudgetRange: {min: 0, max: 800}, // 0 to 8 Cr
-    rentBudgetRange: {min: 0, max: 200}, // 0 to 2 Lakh/month
     areaRange: {min: 500, max: 25000}, // 500 to 25000+ sq ft
   },
   {

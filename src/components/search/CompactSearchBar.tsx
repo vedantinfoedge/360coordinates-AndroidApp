@@ -77,7 +77,6 @@ const areaBasedTypes = [
   'Plot / Land',
   'Commercial Office',
   'Commercial Shop',
-  'Co-working Space',
   'Warehouse / Godown',
   'Industrial Property',
 ];
