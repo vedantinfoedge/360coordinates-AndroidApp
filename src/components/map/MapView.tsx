@@ -28,7 +28,7 @@ try {
   isMapboxAvailable = true;
 
   // Set access token if available
-  if (MAPBOX_ACCESS_TOKEN && MAPBOX_ACCESS_TOKEN !== 'YOUR_MAPBOX_ACCESS_TOKEN_HERE') {
+  if (MAPBOX_ACCESS_TOKEN) {
     Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
   }
 } catch (error) {

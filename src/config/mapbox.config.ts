@@ -1,16 +1,15 @@
 /**
  * Mapbox Configuration
  *
- * Token is loaded from .env (MAPBOX_ACCESS_TOKEN).
- * Copy .env.example to .env and add your token.
+ * Token is loaded from API_CONFIG.MAPBOX_TOKEN with fallback.
  * Get token at https://account.mapbox.com/ > Access tokens
  */
 
-import {MAPBOX_ACCESS_TOKEN as ENV_MAPBOX_TOKEN} from '@env';
+import {API_CONFIG} from './api.config';
 
-// Mapbox public access token (from .env - never commit .env)
+// Mapbox public access token
 export const MAPBOX_ACCESS_TOKEN =
-  ENV_MAPBOX_TOKEN || 'YOUR_MAPBOX_ACCESS_TOKEN_HERE';
+  API_CONFIG.MAPBOX_TOKEN || 'pk.eyJ1Ijoic3VkaGFrYXJwb3VsIiwiYSI6ImNtaXp0ZmFrNTAxaTQzZHNiODNrYndsdTAifQ.YTMezksySLU7ZpcYkvXyqg';
 
 // Default map settings
 export const MAP_CONFIG = {
@@ -39,10 +38,7 @@ export const initializeMapbox = async () => {
     //   return;
     // }
 
-    if (
-      MAPBOX_ACCESS_TOKEN &&
-      MAPBOX_ACCESS_TOKEN !== 'YOUR_MAPBOX_ACCESS_TOKEN_HERE'
-    ) {
+    if (MAPBOX_ACCESS_TOKEN) {
       const Mapbox = require('@rnmapbox/maps').default;
       Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
     } else {
